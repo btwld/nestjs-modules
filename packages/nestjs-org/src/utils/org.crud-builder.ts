@@ -30,49 +30,7 @@ import { OrgDto } from '../dto/org.dto';
 import { ORG_MODULE_CONFIGURABLE_CRUD_SERVICE_TOKEN } from '../org.constants';
 import { OrgResource } from '../org.types';
 
-const orgCrudBuilderDefaultOptions: ConfigurableCrudOptions = {
-  service: {
-    entityKey: 'org',
-    injectionToken: ORG_MODULE_CONFIGURABLE_CRUD_SERVICE_TOKEN,
-  },
-  controller: {
-    path: 'org',
-    model: {
-      type: OrgDto,
-      paginatedType: OrgPaginatedDto,
-    },
-    extraDecorators: [ApiTags('org')],
-  },
-  getMany: {
-    extraDecorators: [AccessControlReadMany(OrgResource.Many)],
-  },
-  getOne: {
-    extraDecorators: [AccessControlReadOne(OrgResource.One)],
-  },
-  createMany: {
-    dto: OrgCreateManyDto,
-    extraDecorators: [AccessControlCreateMany(OrgResource.Many)],
-  },
-  createOne: {
-    dto: OrgCreateDto,
-    extraDecorators: [AccessControlCreateOne(OrgResource.One)],
-  },
-  updateOne: {
-    dto: OrgUpdateDto,
-    extraDecorators: [AccessControlUpdateOne(OrgResource.One)],
-  },
-  replaceOne: {
-    dto: OrgUpdateDto,
-    extraDecorators: [AccessControlReplaceOne(OrgResource.One)],
-  },
-  deleteOne: {
-    extraDecorators: [AccessControlDeleteOne(OrgResource.One)],
-  },
-  recoverOne: {
-    path: 'recover/:id',
-    extraDecorators: [AccessControlRecoverOne(OrgResource.One)],
-  },
-};
+import { OrgTypeOrmCrudAdapter } from '../__fixtures__/org-typeorm-crud.adapter';
 
 export class OrgCrudBuilder<
   Entity extends OrgEntityInterface = OrgEntityInterface,
@@ -89,7 +47,51 @@ export class OrgCrudBuilder<
   Replaceable,
   ExtraOptions
 > {
-  constructor(options?: ConfigurableCrudOptions) {
-    super(options ?? orgCrudBuilderDefaultOptions);
+  constructor(
+    options: ConfigurableCrudOptions<Entity> = {
+      service: {
+        adapter: OrgTypeOrmCrudAdapter<Entity>,
+        injectionToken: ORG_MODULE_CONFIGURABLE_CRUD_SERVICE_TOKEN,
+      },
+      controller: {
+        path: 'org',
+        model: {
+          type: OrgDto,
+          paginatedType: OrgPaginatedDto,
+        },
+        extraDecorators: [ApiTags('org')],
+      },
+      getMany: {
+        extraDecorators: [AccessControlReadMany(OrgResource.Many)],
+      },
+      getOne: {
+        extraDecorators: [AccessControlReadOne(OrgResource.One)],
+      },
+      createMany: {
+        dto: OrgCreateManyDto,
+        extraDecorators: [AccessControlCreateMany(OrgResource.Many)],
+      },
+      createOne: {
+        dto: OrgCreateDto,
+        extraDecorators: [AccessControlCreateOne(OrgResource.One)],
+      },
+      updateOne: {
+        dto: OrgUpdateDto,
+        extraDecorators: [AccessControlUpdateOne(OrgResource.One)],
+      },
+      replaceOne: {
+        dto: OrgUpdateDto,
+        extraDecorators: [AccessControlReplaceOne(OrgResource.One)],
+      },
+      deleteOne: {
+        extraDecorators: [AccessControlDeleteOne(OrgResource.One)],
+      },
+      recoverOne: {
+        path: 'recover/:id',
+        extraDecorators: [AccessControlRecoverOne(OrgResource.One)],
+      },
+    },
+  ) {
+    super(options);
   }
 }

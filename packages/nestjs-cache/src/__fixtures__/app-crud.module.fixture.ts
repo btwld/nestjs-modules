@@ -7,6 +7,7 @@ import { CrudModule } from '@concepta/nestjs-crud';
 
 import { CacheCrudControllerFixture } from './cache-crud.controller.fixture';
 import { CacheCrudServiceFixture } from './cache-crud.service.fixture';
+import { CacheTypeOrmCrudAdapterFixture } from './cache-typeorm-crud.adapter.fixture';
 import { UserCacheEntityFixture } from './entities/user-cache-entity.fixture';
 import { UserEntityFixture } from './entities/user-entity.fixture';
 
@@ -23,6 +24,7 @@ import { UserEntityFixture } from './entities/user-entity.fixture';
   ],
   controllers: [CacheCrudControllerFixture],
   providers: [
+    CacheTypeOrmCrudAdapterFixture,
     CacheCrudServiceFixture,
     {
       provide: APP_FILTER,

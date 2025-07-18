@@ -3,11 +3,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { CRUD_MODULE_SETTINGS_TOKEN } from './crud.constants';
 import { CrudModule } from './crud.module';
-import { CrudSettingsInterface } from './interfaces/crud-settings.interface';
+import { CrudModuleSettingsInterface } from './interfaces/crud-module-settings.interface';
 
 describe(CrudModule, () => {
   let crudModule: CrudModule;
-  let crudSettings: CrudSettingsInterface;
+  let crudSettings: CrudModuleSettingsInterface;
 
   describe(CrudModule.register, () => {
     beforeAll(async () => {
@@ -116,7 +116,7 @@ describe(CrudModule, () => {
 
   function setProviderVars(testModule: TestingModule) {
     crudModule = testModule.get<CrudModule>(CrudModule);
-    crudSettings = testModule.get<CrudSettingsInterface>(
+    crudSettings = testModule.get<CrudModuleSettingsInterface>(
       CRUD_MODULE_SETTINGS_TOKEN,
     );
   }

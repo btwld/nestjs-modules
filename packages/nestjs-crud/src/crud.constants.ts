@@ -1,7 +1,8 @@
-import { ParamsOptions } from '@nestjsx/crud-request';
 import { ClassTransformOptions } from 'class-transformer';
 
 import { ValidationPipeOptions } from '@nestjs/common';
+
+import { CrudParamsOptionsInterface } from './crud/interfaces/crud-params-options.interface';
 
 export const CRUD_MODULE_SETTINGS_TOKEN = 'CRUD_MODULE_SETTINGS_TOKEN';
 
@@ -36,9 +37,6 @@ export const CRUD_MODULE_ROUTE_QUERY_PERSIST_METADATA =
 
 export const CRUD_MODULE_ROUTE_QUERY_FILTER_METADATA =
   'CRUD_MODULE_ROUTE_QUERY_FILTER_METADATA';
-
-export const CRUD_MODULE_ROUTE_QUERY_JOIN_METADATA =
-  'CRUD_MODULE_ROUTE_QUERY_JOIN_METADATA';
 
 export const CRUD_MODULE_ROUTE_QUERY_SORT_METADATA =
   'CRUD_MODULE_ROUTE_QUERY_SORT_METADATA';
@@ -91,7 +89,7 @@ export const CRUD_MODULE_API_PARAMS_METADATA =
 export const CRUD_MODULE_API_RESPONSE_METADATA =
   'CRUD_MODULE_API_RESPONSE_METADATA';
 
-export const CRUD_MODULE_DEFAULT_PARAMS_OPTIONS: ParamsOptions = {
+export const CRUD_MODULE_DEFAULT_PARAMS_OPTIONS: CrudParamsOptionsInterface = {
   id: { field: 'id', type: 'string', primary: true },
 };
 

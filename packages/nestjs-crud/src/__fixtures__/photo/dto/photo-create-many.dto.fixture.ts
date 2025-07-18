@@ -2,7 +2,7 @@ import { Exclude, Expose, Type } from 'class-transformer';
 
 import { ApiProperty } from '@nestjs/swagger';
 
-import { CrudCreateManyDto } from '../../../dto/crud-create-many.dto';
+import { CrudCreateManyDto } from '../../../crud/dto/crud-create-many.dto';
 
 import { PhotoCreateDtoFixture } from './photo-create.dto.fixture';
 import { PhotoDtoFixture } from './photo.dto.fixture';

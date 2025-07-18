@@ -20,6 +20,7 @@ import { InvitationReattemptController } from './controllers/invitation-reattemp
 import { InvitationController } from './controllers/invitation.controller';
 import { InvitationEntityFixture } from './invitation/entities/invitation.entity.fixture';
 import { InvitationCrudService } from './invitation-crud.service';
+import { InvitationTypeOrmCrudAdapter } from './invitation-typeorm-crud.adapter';
 import { default as ormConfig } from './ormconfig.fixture';
 import { UserOtpEntityFixture } from './user/entities/user-otp.entity.fixture';
 import { UserEntityFixture } from './user/entities/user.entity.fixture';
@@ -92,6 +93,7 @@ import { UserEntityFixture } from './user/entities/user.entity.fixture';
   ],
   providers: [
     InvitationCrudService,
+    InvitationTypeOrmCrudAdapter,
     {
       provide: Logger,
       useValue: {

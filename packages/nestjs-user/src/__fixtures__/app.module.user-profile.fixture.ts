@@ -15,6 +15,7 @@ import { UserProfileUpdateDtoFixture } from './dto/user-profile-update.dto.fixtu
 import { UserProfileDtoFixture } from './dto/user-profile.dto.fixture';
 import { ormConfig } from './ormconfig.fixture';
 import { UserCrudModelServiceFixture } from './services/user-crud-model.service.fixture';
+import { UserProfileTypeOrmCrudAdapterFixture } from './services/user-profile-typeorm-crud.adapter.fixture';
 import { UserProfileEntityFixture } from './user-profile.entity.fixture';
 
 type UserProfileExtras = {
@@ -43,15 +44,17 @@ const extras: UserProfileExtras = {
 
 // update config to use new dto
 const myOptionsTransform: ConfigurableCrudOptionsTransformer<
+  UserProfileEntityFixture,
   UserProfileExtras
 > = (
-  options: ConfigurableCrudOptions,
+  options: ConfigurableCrudOptions<UserProfileEntityFixture>,
   extras?: UserProfileExtras,
-): ConfigurableCrudOptions => {
+): ConfigurableCrudOptions<UserProfileEntityFixture> => {
   if (!extras) return options;
 
   options.controller.model.type = extras.model.type;
-  options.service.entity = UserProfileEntityFixture;
+  options.service.adapter =
+    UserProfileTypeOrmCrudAdapterFixture<UserProfileEntityFixture>;
   if (options.createOne) options.createOne.dto = extras.createOne.dto;
   if (options.updateOne) options.updateOne.dto = extras.updateOne.dto;
   return options;
@@ -78,7 +81,11 @@ const { ConfigurableControllerClass, ConfigurableServiceProvider } =
     CrudModule.forRoot({}),
     EventModule.forRoot({}),
   ],
-  providers: [UserCrudModelServiceFixture, ConfigurableServiceProvider],
+  providers: [
+    UserProfileTypeOrmCrudAdapterFixture,
+    UserCrudModelServiceFixture,
+    ConfigurableServiceProvider,
+  ],
   exports: [UserCrudModelServiceFixture, ConfigurableServiceProvider],
   controllers: [ConfigurableControllerClass],
 })

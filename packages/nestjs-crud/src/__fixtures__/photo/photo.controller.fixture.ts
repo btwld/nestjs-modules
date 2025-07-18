@@ -1,19 +1,19 @@
 import { ApiTags } from '@nestjs/swagger';
 
-import { CrudCreateMany } from '../../decorators/actions/crud-create-many.decorator';
-import { CrudCreateOne } from '../../decorators/actions/crud-create-one.decorator';
-import { CrudDeleteOne } from '../../decorators/actions/crud-delete-one.decorator';
-import { CrudReadAll } from '../../decorators/actions/crud-read-all.decorator';
-import { CrudReadOne } from '../../decorators/actions/crud-read-one.decorator';
-import { CrudRecoverOne } from '../../decorators/actions/crud-recover-one.decorator';
-import { CrudReplaceOne } from '../../decorators/actions/crud-replace-one.decorator';
-import { CrudUpdateOne } from '../../decorators/actions/crud-update-one.decorator';
-import { CrudController } from '../../decorators/controller/crud-controller.decorator';
-import { CrudBody } from '../../decorators/params/crud-body.decorator';
-import { CrudRequest } from '../../decorators/params/crud-request.decorator';
-import { CrudSoftDelete } from '../../decorators/routes/crud-soft-delete.decorator';
-import { CrudControllerInterface } from '../../interfaces/crud-controller.interface';
-import { CrudRequestInterface } from '../../interfaces/crud-request.interface';
+import { CrudCreateMany } from '../../crud/decorators/actions/crud-create-many.decorator';
+import { CrudCreateOne } from '../../crud/decorators/actions/crud-create-one.decorator';
+import { CrudDeleteOne } from '../../crud/decorators/actions/crud-delete-one.decorator';
+import { CrudReadAll } from '../../crud/decorators/actions/crud-read-all.decorator';
+import { CrudReadOne } from '../../crud/decorators/actions/crud-read-one.decorator';
+import { CrudRecoverOne } from '../../crud/decorators/actions/crud-recover-one.decorator';
+import { CrudReplaceOne } from '../../crud/decorators/actions/crud-replace-one.decorator';
+import { CrudUpdateOne } from '../../crud/decorators/actions/crud-update-one.decorator';
+import { CrudController } from '../../crud/decorators/controller/crud-controller.decorator';
+import { CrudBody } from '../../crud/decorators/params/crud-body.decorator';
+import { CrudRequest } from '../../crud/decorators/params/crud-request.decorator';
+import { CrudSoftDelete } from '../../crud/decorators/routes/crud-soft-delete.decorator';
+import { CrudControllerInterface } from '../../crud/interfaces/crud-controller.interface';
+import { CrudRequestInterface } from '../../crud/interfaces/crud-request.interface';
 
 import { PhotoCreateManyDtoFixture } from './dto/photo-create-many.dto.fixture';
 import { PhotoCreateDtoFixture } from './dto/photo-create.dto.fixture';
