@@ -1,21 +1,20 @@
-import { Repository } from 'typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { CrudAdapter } from '../../crud/adapters/crud.adapter';
+import { CrudService } from '../../services/crud.service';
 
-import { TypeOrmCrudService } from '../../services/typeorm-crud.service';
-
+import { PhotoTypeOrmCrudAdapterFixture } from './photo-typeorm-crud.adapter.fixture';
 import { PhotoFixture } from './photo.entity.fixture';
 
 /**
  * Photo CRUD service
  */
 @Injectable()
-export class PhotoServiceFixture extends TypeOrmCrudService<PhotoFixture> {
+export class PhotoServiceFixture extends CrudService<PhotoFixture> {
   constructor(
-    @InjectRepository(PhotoFixture)
-    photoRepo: Repository<PhotoFixture>,
+    @Inject(PhotoTypeOrmCrudAdapterFixture)
+    crudAdapter: CrudAdapter<PhotoFixture>,
   ) {
-    super(photoRepo);
+    super(crudAdapter);
   }
 }

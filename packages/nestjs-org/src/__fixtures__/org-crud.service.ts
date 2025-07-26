@@ -1,27 +1,24 @@
-import { Repository } from 'typeorm';
-
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { OrgEntityInterface } from '@concepta/nestjs-common';
-import { TypeOrmCrudService } from '@concepta/nestjs-crud';
+import { CrudService, CrudAdapter } from '@concepta/nestjs-crud';
 
-import { OrgEntityFixture } from './org-entity.fixture';
+import { OrgTypeOrmCrudAdapter } from './org-typeorm-crud.adapter';
 
 /**
  * Org CRUD service
  */
 @Injectable()
-export class OrgCrudService extends TypeOrmCrudService<OrgEntityInterface> {
+export class OrgCrudService extends CrudService<OrgEntityInterface> {
   /**
    * Constructor
    *
-   * @param orgRepo - instance of the org repository.
+   * @param crudAdapter - instance of the org crud adapter.
    */
   constructor(
-    @InjectRepository(OrgEntityFixture)
-    orgRepo: Repository<OrgEntityInterface>,
+    @Inject(OrgTypeOrmCrudAdapter)
+    crudAdapter: CrudAdapter<OrgEntityInterface>,
   ) {
-    super(orgRepo);
+    super(crudAdapter);
   }
 }

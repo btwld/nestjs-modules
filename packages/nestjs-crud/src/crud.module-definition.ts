@@ -9,9 +9,9 @@ import { createSettingsProvider } from '@concepta/nestjs-common';
 
 import { crudDefaultConfig } from './config/crud-default.config';
 import { CRUD_MODULE_SETTINGS_TOKEN } from './crud.constants';
-import { CrudOptionsExtrasInterface } from './interfaces/crud-options-extras.interface';
-import { CrudOptionsInterface } from './interfaces/crud-options.interface';
-import { CrudSettingsInterface } from './interfaces/crud-settings.interface';
+import { CrudModuleOptionsExtrasInterface } from './interfaces/crud-module-options-extras.interface';
+import { CrudModuleOptionsInterface } from './interfaces/crud-module-options.interface';
+import { CrudModuleSettingsInterface } from './interfaces/crud-module-settings.interface';
 import { CrudReflectionService } from './services/crud-reflection.service';
 
 const RAW_OPTIONS_TOKEN = Symbol('__CRUD_MODULE_RAW_OPTIONS_TOKEN__');
@@ -20,11 +20,14 @@ export const {
   ConfigurableModuleClass: CrudModuleClass,
   OPTIONS_TYPE: CRUD_OPTIONS_TYPE,
   ASYNC_OPTIONS_TYPE: CRUD_ASYNC_OPTIONS_TYPE,
-} = new ConfigurableModuleBuilder<CrudOptionsInterface>({
+} = new ConfigurableModuleBuilder<CrudModuleOptionsInterface>({
   moduleName: 'Crud',
   optionsInjectionToken: RAW_OPTIONS_TOKEN,
 })
-  .setExtras<CrudOptionsExtrasInterface>({ global: false }, definitionTransform)
+  .setExtras<CrudModuleOptionsExtrasInterface>(
+    { global: false },
+    definitionTransform,
+  )
   .build();
 
 export type CrudOptions = Omit<typeof CRUD_OPTIONS_TYPE, 'global'>;
@@ -32,7 +35,7 @@ export type CrudAsyncOptions = Omit<typeof CRUD_ASYNC_OPTIONS_TYPE, 'global'>;
 
 function definitionTransform(
   definition: DynamicModule,
-  extras: CrudOptionsExtrasInterface,
+  extras: CrudModuleOptionsExtrasInterface,
 ): DynamicModule {
   const { providers = [] } = definition;
   const { global = false, imports } = extras;
@@ -76,7 +79,10 @@ export function createCrudProviders(options: {
 export function createCrudSettingsProvider(
   optionsOverrides?: CrudOptions,
 ): Provider {
-  return createSettingsProvider<CrudSettingsInterface, CrudOptionsInterface>({
+  return createSettingsProvider<
+    CrudModuleSettingsInterface,
+    CrudModuleOptionsInterface
+  >({
     settingsToken: CRUD_MODULE_SETTINGS_TOKEN,
     optionsToken: RAW_OPTIONS_TOKEN,
     settingsKey: crudDefaultConfig.KEY,

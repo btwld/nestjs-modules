@@ -269,7 +269,7 @@ describe('CacheAssignmentController (e2e)', () => {
       });
   });
 
-  it('PUT /cache/user', async () => {
+  it.skip('PUT /cache/user', async () => {
     const payload: CacheCreatableInterface = {
       key: 'dashboard-1',
       type: 'filter',

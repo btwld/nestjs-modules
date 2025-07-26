@@ -16,6 +16,7 @@ import { OrgCrudService } from '../__fixtures__/org-crud.service';
 import { OrgEntityFixture } from '../__fixtures__/org-entity.fixture';
 import { OrgMemberEntityFixture } from '../__fixtures__/org-member.entity.fixture';
 import { OrgProfileEntityFixture } from '../__fixtures__/org-profile.entity.fixture';
+import { OrgTypeOrmCrudAdapter } from '../__fixtures__/org-typeorm-crud.adapter';
 import { OwnerEntityFixture } from '../__fixtures__/owner-entity.fixture';
 import { OwnerFactoryFixture } from '../__fixtures__/owner-factory.fixture';
 import { OwnerModuleFixture } from '../__fixtures__/owner.module.fixture';
@@ -54,7 +55,7 @@ describe('OrgController (e2e)', () => {
           OwnerModuleFixture.register(),
         ],
         controllers: [OrgControllerFixture],
-        providers: [OrgCrudService],
+        providers: [OrgCrudService, OrgTypeOrmCrudAdapter],
       }).compile();
       app = moduleFixture.createNestApplication();
       await app.init();

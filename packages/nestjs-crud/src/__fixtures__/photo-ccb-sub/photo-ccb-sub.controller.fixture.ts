@@ -1,6 +1,6 @@
-import { CrudSoftDelete } from '../../decorators/routes/crud-soft-delete.decorator';
-import { CrudCreateManyInterface } from '../../interfaces/crud-create-many.interface';
-import { CrudRequestInterface } from '../../interfaces/crud-request.interface';
+import { CrudSoftDelete } from '../../crud/decorators/routes/crud-soft-delete.decorator';
+import { CrudCreateManyInterface } from '../../crud/interfaces/crud-create-many.interface';
+import { CrudRequestInterface } from '../../crud/interfaces/crud-request.interface';
 import { ConfigurableCrudBuilder } from '../../util/configurable-crud.builder';
 import { PhotoCreateManyDtoFixture } from '../photo/dto/photo-create-many.dto.fixture';
 import { PhotoCreateDtoFixture } from '../photo/dto/photo-create.dto.fixture';
@@ -10,7 +10,7 @@ import { PhotoDtoFixture } from '../photo/dto/photo.dto.fixture';
 import { PhotoCreatableInterfaceFixture } from '../photo/interfaces/photo-creatable.interface.fixture';
 import { PhotoEntityInterfaceFixture } from '../photo/interfaces/photo-entity.interface.fixture';
 import { PhotoUpdatableInterfaceFixture } from '../photo/interfaces/photo-updatable.interface.fixture';
-import { PhotoFixture } from '../photo/photo.entity.fixture';
+import { PhotoTypeOrmCrudAdapterFixture } from '../photo/photo-typeorm-crud.adapter.fixture';
 
 export const PHOTO_CRUD_SERVICE_TOKEN = Symbol('__PHOTO_CRUD_SERVICE_TOKEN__');
 
@@ -20,7 +20,7 @@ const crudBuilder = new ConfigurableCrudBuilder<
   PhotoUpdatableInterfaceFixture
 >({
   service: {
-    entity: PhotoFixture,
+    adapter: PhotoTypeOrmCrudAdapterFixture,
     injectionToken: PHOTO_CRUD_SERVICE_TOKEN,
   },
   controller: {
@@ -69,18 +69,20 @@ export class PhotoCcbSubCrudServiceFixture extends ConfigurableServiceClass {}
 @CrudController
 export class PhotoCcbSubControllerFixture extends ConfigurableControllerClass {
   @CrudGetMany
-  async getMany(crudRequest: CrudRequestInterface) {
+  async getMany(
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return super.getMany(crudRequest);
   }
 
   @CrudGetOne
-  async getOne(crudRequest: CrudRequestInterface) {
+  async getOne(crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>) {
     return super.getOne(crudRequest);
   }
 
   @CrudCreateMany
   async createMany(
-    crudRequest: CrudRequestInterface,
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     dto: CrudCreateManyInterface<PhotoCreatableInterfaceFixture>,
   ) {
     return super.createMany(crudRequest, dto);
@@ -88,7 +90,7 @@ export class PhotoCcbSubControllerFixture extends ConfigurableControllerClass {
 
   @CrudCreateOne
   async createOne(
-    crudRequest: CrudRequestInterface,
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     dto: PhotoCreatableInterfaceFixture,
   ) {
     return super.createOne(crudRequest, dto);
@@ -96,7 +98,7 @@ export class PhotoCcbSubControllerFixture extends ConfigurableControllerClass {
 
   @CrudUpdateOne
   async updateOne(
-    crudRequest: CrudRequestInterface,
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     dto: PhotoUpdatableInterfaceFixture,
   ) {
     return super.updateOne(crudRequest, dto);
@@ -104,19 +106,23 @@ export class PhotoCcbSubControllerFixture extends ConfigurableControllerClass {
 
   @CrudReplaceOne
   async replaceOne(
-    crudRequest: CrudRequestInterface,
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     dto: PhotoUpdatableInterfaceFixture,
   ) {
     return super.replaceOne(crudRequest, dto);
   }
 
   @CrudDeleteOne
-  async deleteOne(crudRequest: CrudRequestInterface) {
+  async deleteOne(
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return super.deleteOne(crudRequest);
   }
 
   @CrudRecoverOne
-  async recoverOne(crudRequest: CrudRequestInterface) {
+  async recoverOne(
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return super.recoverOne(crudRequest);
   }
 }

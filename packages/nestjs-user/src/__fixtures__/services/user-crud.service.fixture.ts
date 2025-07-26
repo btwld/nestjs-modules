@@ -1,27 +1,25 @@
-import { Repository } from 'typeorm';
-
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { UserEntityInterface } from '@concepta/nestjs-common';
-import { TypeOrmCrudService } from '@concepta/nestjs-crud';
+import { CrudService } from '@concepta/nestjs-crud';
+import { CrudAdapter } from '@concepta/nestjs-crud/src/crud/adapters/crud.adapter';
 
-import { UserEntityFixture } from '../user.entity.fixture';
+import { UserTypeOrmCrudAdapterFixture } from './user-typeorm-crud.adapter.fixture';
 
 /**
  * User CRUD service fixture
  */
 @Injectable()
-export class UserCrudServiceFixture extends TypeOrmCrudService<UserEntityInterface> {
+export class UserCrudServiceFixture extends CrudService<UserEntityInterface> {
   /**
    * Constructor
    *
-   * @param userRepo - instance of the user repository.
+   * @param crudAdapter - instance of the user crud adapter.
    */
   constructor(
-    @InjectRepository(UserEntityFixture)
-    protected readonly userRepo: Repository<UserEntityInterface>,
+    @Inject(UserTypeOrmCrudAdapterFixture)
+    protected readonly crudAdapter: CrudAdapter<UserEntityInterface>,
   ) {
-    super(userRepo);
+    super(crudAdapter);
   }
 }

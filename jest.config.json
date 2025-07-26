@@ -5,6 +5,7 @@
       "tsconfig": "tsconfig.jest.json"
     }
   },
+  "setupFilesAfterEnv": ["jest-extended/all"],
   "coverageThreshold": {
     "global": {
       "branches": 0,

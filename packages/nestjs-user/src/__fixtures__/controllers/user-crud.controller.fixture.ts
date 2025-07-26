@@ -78,7 +78,9 @@ export class UserCrudControllerFixture
    */
   @CrudReadMany()
   @AccessControlReadMany(UserResource.Many)
-  async getMany(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async getMany(
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
+  ) {
     return this.userCrudService.getMany(crudRequest);
   }
 
@@ -89,7 +91,9 @@ export class UserCrudControllerFixture
    */
   @CrudReadOne()
   @AccessControlReadOne(UserResource.One)
-  async getOne(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async getOne(
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
+  ) {
     return this.userCrudService.getOne(crudRequest);
   }
 
@@ -102,7 +106,7 @@ export class UserCrudControllerFixture
   @CrudCreateMany()
   @AccessControlCreateMany(UserResource.Many)
   async createMany(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
     @CrudBody() userCreateManyDto: UserCreateManyDto,
   ) {
     // call crud service to create
@@ -118,7 +122,7 @@ export class UserCrudControllerFixture
   @CrudCreateOne()
   @AccessControlCreateOne(UserResource.One)
   async createOne(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
     @CrudBody() userCreateDto: UserCreateDto,
   ) {
     return this.userCrudService.createOne(crudRequest, userCreateDto);
@@ -133,7 +137,7 @@ export class UserCrudControllerFixture
   @CrudUpdateOne()
   @AccessControlUpdateOne(UserResource.One)
   async updateOne(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
     @CrudBody() userUpdateDto: UserUpdateDto,
   ) {
     return this.userCrudService.updateOne(crudRequest, userUpdateDto);
@@ -146,7 +150,9 @@ export class UserCrudControllerFixture
    */
   @CrudDeleteOne()
   @AccessControlDeleteOne(UserResource.One)
-  async deleteOne(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async deleteOne(
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
+  ) {
     return this.userCrudService.deleteOne(crudRequest);
   }
 
@@ -157,7 +163,9 @@ export class UserCrudControllerFixture
    */
   @CrudRecoverOne()
   @AccessControlRecoverOne(UserResource.One)
-  async recoverOne(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async recoverOne(
+    @CrudRequest() crudRequest: CrudRequestInterface<UserEntityInterface>,
+  ) {
     return this.userCrudService.recoverOne(crudRequest);
   }
 }

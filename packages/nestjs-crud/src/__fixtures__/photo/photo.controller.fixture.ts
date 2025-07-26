@@ -1,19 +1,19 @@
 import { ApiTags } from '@nestjs/swagger';
 
-import { CrudCreateMany } from '../../decorators/actions/crud-create-many.decorator';
-import { CrudCreateOne } from '../../decorators/actions/crud-create-one.decorator';
-import { CrudDeleteOne } from '../../decorators/actions/crud-delete-one.decorator';
-import { CrudReadAll } from '../../decorators/actions/crud-read-all.decorator';
-import { CrudReadOne } from '../../decorators/actions/crud-read-one.decorator';
-import { CrudRecoverOne } from '../../decorators/actions/crud-recover-one.decorator';
-import { CrudReplaceOne } from '../../decorators/actions/crud-replace-one.decorator';
-import { CrudUpdateOne } from '../../decorators/actions/crud-update-one.decorator';
-import { CrudController } from '../../decorators/controller/crud-controller.decorator';
-import { CrudBody } from '../../decorators/params/crud-body.decorator';
-import { CrudRequest } from '../../decorators/params/crud-request.decorator';
-import { CrudSoftDelete } from '../../decorators/routes/crud-soft-delete.decorator';
-import { CrudControllerInterface } from '../../interfaces/crud-controller.interface';
-import { CrudRequestInterface } from '../../interfaces/crud-request.interface';
+import { CrudCreateMany } from '../../crud/decorators/actions/crud-create-many.decorator';
+import { CrudCreateOne } from '../../crud/decorators/actions/crud-create-one.decorator';
+import { CrudDeleteOne } from '../../crud/decorators/actions/crud-delete-one.decorator';
+import { CrudReadAll } from '../../crud/decorators/actions/crud-read-all.decorator';
+import { CrudReadOne } from '../../crud/decorators/actions/crud-read-one.decorator';
+import { CrudRecoverOne } from '../../crud/decorators/actions/crud-recover-one.decorator';
+import { CrudReplaceOne } from '../../crud/decorators/actions/crud-replace-one.decorator';
+import { CrudUpdateOne } from '../../crud/decorators/actions/crud-update-one.decorator';
+import { CrudController } from '../../crud/decorators/controller/crud-controller.decorator';
+import { CrudBody } from '../../crud/decorators/params/crud-body.decorator';
+import { CrudRequest } from '../../crud/decorators/params/crud-request.decorator';
+import { CrudSoftDelete } from '../../crud/decorators/routes/crud-soft-delete.decorator';
+import { CrudControllerInterface } from '../../crud/interfaces/crud-controller.interface';
+import { CrudRequestInterface } from '../../crud/interfaces/crud-request.interface';
 
 import { PhotoCreateManyDtoFixture } from './dto/photo-create-many.dto.fixture';
 import { PhotoCreateDtoFixture } from './dto/photo-create.dto.fixture';
@@ -53,7 +53,10 @@ export class PhotoControllerFixture
    * @param crudRequest the CRUD request object
    */
   @CrudReadAll()
-  async getMany(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async getMany(
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return this.photoService.getMany(crudRequest);
   }
 
@@ -62,7 +65,10 @@ export class PhotoControllerFixture
    * @param crudRequest the CRUD request object
    */
   @CrudReadOne()
-  async getOne(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async getOne(
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return this.photoService.getOne(crudRequest);
   }
 
@@ -73,7 +79,8 @@ export class PhotoControllerFixture
    */
   @CrudCreateMany()
   async createMany(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     @CrudBody() photoCreateManyDto: PhotoCreateManyDtoFixture,
   ) {
     return this.photoService.createMany(crudRequest, photoCreateManyDto);
@@ -86,7 +93,8 @@ export class PhotoControllerFixture
    */
   @CrudCreateOne()
   async createOne(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     @CrudBody() photoCreateDto: PhotoCreateDtoFixture,
   ) {
     return this.photoService.createOne(crudRequest, photoCreateDto);
@@ -99,7 +107,8 @@ export class PhotoControllerFixture
    */
   @CrudUpdateOne()
   async updateOne(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     @CrudBody() photoUpdateDto: PhotoUpdateDtoFixture,
   ) {
     return this.photoService.updateOne(crudRequest, photoUpdateDto);
@@ -111,7 +120,8 @@ export class PhotoControllerFixture
    */
   @CrudReplaceOne()
   async replaceOne(
-    @CrudRequest() crudRequest: CrudRequestInterface,
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
     @CrudBody() photoCreateDto: PhotoCreateDtoFixture,
   ) {
     return this.photoService.replaceOne(crudRequest, photoCreateDto);
@@ -122,7 +132,10 @@ export class PhotoControllerFixture
    * @param crudRequest the CRUD request object
    */
   @CrudDeleteOne()
-  async deleteOne(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async deleteOne(
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return this.photoService.deleteOne(crudRequest);
   }
 
@@ -132,7 +145,10 @@ export class PhotoControllerFixture
    */
   @CrudDeleteOne({ path: 'soft/:id' })
   @CrudSoftDelete(true)
-  async deleteOneSoft(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async deleteOneSoft(
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return this.photoService.deleteOne(crudRequest);
   }
 
@@ -141,7 +157,10 @@ export class PhotoControllerFixture
    * @param crudRequest the CRUD request object
    */
   @CrudRecoverOne()
-  async recoverOne(@CrudRequest() crudRequest: CrudRequestInterface) {
+  async recoverOne(
+    @CrudRequest()
+    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  ) {
     return this.photoService.recoverOne(crudRequest);
   }
 }

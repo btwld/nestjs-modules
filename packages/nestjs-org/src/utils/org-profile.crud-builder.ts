@@ -19,7 +19,6 @@ import {
   ConfigurableCrudBuilder,
   ConfigurableCrudOptions,
 } from '@concepta/nestjs-crud';
-import { OrgProfileSqliteEntity } from '@concepta/nestjs-typeorm-ext';
 
 import { OrgProfileCreateDto } from '../dto/profile/org-profile-create.dto';
 import { OrgProfilePaginatedDto } from '../dto/profile/org-profile-paginated.dto';
@@ -28,45 +27,7 @@ import { OrgProfileDto } from '../dto/profile/org-profile.dto';
 import { ORG_MODULE_CONFIGURABLE_CRUD_PROFILE_SERVICE_TOKEN } from '../org.constants';
 import { OrgProfileResource } from '../org.types';
 
-const orgProfileCrudBuilderDefaultOptions: ConfigurableCrudOptions = {
-  service: {
-    entity: OrgProfileSqliteEntity,
-    injectionToken: ORG_MODULE_CONFIGURABLE_CRUD_PROFILE_SERVICE_TOKEN,
-  },
-  controller: {
-    path: 'org-profile',
-    model: {
-      type: OrgProfileDto,
-      paginatedType: OrgProfilePaginatedDto,
-    },
-    extraDecorators: [ApiTags('org-profile')],
-  },
-  getMany: {
-    extraDecorators: [AccessControlReadMany(OrgProfileResource.Many)],
-  },
-  getOne: {
-    extraDecorators: [AccessControlReadOne(OrgProfileResource.One)],
-  },
-  createOne: {
-    dto: OrgProfileCreateDto,
-    extraDecorators: [AccessControlCreateOne(OrgProfileResource.One)],
-  },
-  updateOne: {
-    dto: OrgProfileUpdateDto,
-    extraDecorators: [AccessControlUpdateOne(OrgProfileResource.One)],
-  },
-  replaceOne: {
-    dto: OrgProfileUpdateDto,
-    extraDecorators: [AccessControlReplaceOne(OrgProfileResource.One)],
-  },
-  deleteOne: {
-    extraDecorators: [AccessControlDeleteOne(OrgProfileResource.One)],
-  },
-  recoverOne: {
-    path: 'recover/:id',
-    extraDecorators: [AccessControlRecoverOne(OrgProfileResource.One)],
-  },
-};
+import { OrgProfileTypeOrmCrudAdapter } from '../__fixtures__/org-profile-typeorm-crud.adapter';
 
 export class OrgProfileCrudBuilder<
   Entity extends OrgProfileEntityInterface = OrgProfileEntityInterface,
@@ -83,7 +44,47 @@ export class OrgProfileCrudBuilder<
   Replaceable,
   ExtraOptions
 > {
-  constructor(options?: ConfigurableCrudOptions) {
-    super(options ?? orgProfileCrudBuilderDefaultOptions);
+  constructor(
+    options: ConfigurableCrudOptions<Entity> = {
+      service: {
+        adapter: OrgProfileTypeOrmCrudAdapter<Entity>,
+        injectionToken: ORG_MODULE_CONFIGURABLE_CRUD_PROFILE_SERVICE_TOKEN,
+      },
+      controller: {
+        path: 'org-profile',
+        model: {
+          type: OrgProfileDto,
+          paginatedType: OrgProfilePaginatedDto,
+        },
+        extraDecorators: [ApiTags('org-profile')],
+      },
+      getMany: {
+        extraDecorators: [AccessControlReadMany(OrgProfileResource.Many)],
+      },
+      getOne: {
+        extraDecorators: [AccessControlReadOne(OrgProfileResource.One)],
+      },
+      createOne: {
+        dto: OrgProfileCreateDto,
+        extraDecorators: [AccessControlCreateOne(OrgProfileResource.One)],
+      },
+      updateOne: {
+        dto: OrgProfileUpdateDto,
+        extraDecorators: [AccessControlUpdateOne(OrgProfileResource.One)],
+      },
+      replaceOne: {
+        dto: OrgProfileUpdateDto,
+        extraDecorators: [AccessControlReplaceOne(OrgProfileResource.One)],
+      },
+      deleteOne: {
+        extraDecorators: [AccessControlDeleteOne(OrgProfileResource.One)],
+      },
+      recoverOne: {
+        path: 'recover/:id',
+        extraDecorators: [AccessControlRecoverOne(OrgProfileResource.One)],
+      },
+    },
+  ) {
+    super(options);
   }
 }

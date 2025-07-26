@@ -17,6 +17,7 @@ import { UserCrudControllerFixture } from './controllers/user-crud.controller.fi
 import { ormConfig } from './ormconfig.fixture';
 import { UserCrudModelServiceFixture } from './services/user-crud-model.service.fixture';
 import { UserCrudServiceFixture } from './services/user-crud.service.fixture';
+import { UserTypeOrmCrudAdapterFixture } from './services/user-typeorm-crud.adapter.fixture';
 import { UserEntityFixture } from './user.entity.fixture';
 
 const rules = new AccessControl();
@@ -48,7 +49,11 @@ rules
       queryServices: [UserAccessQueryService],
     }),
   ],
-  providers: [UserCrudModelServiceFixture, UserCrudServiceFixture],
+  providers: [
+    UserCrudModelServiceFixture,
+    UserTypeOrmCrudAdapterFixture,
+    UserCrudServiceFixture,
+  ],
   exports: [UserCrudModelServiceFixture, UserCrudServiceFixture],
   controllers: [UserCrudControllerFixture],
 })

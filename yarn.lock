@@ -1098,10 +1098,11 @@ __metadata:
     "@nestjs/swagger": "npm:^7.4.0"
     "@nestjs/testing": "npm:^10.4.1"
     "@nestjs/typeorm": "npm:^10.0.2"
-    "@nestjsx/crud": "npm:^5.0.0-alpha.3"
-    "@nestjsx/crud-request": "npm:^5.0.0-alpha.3"
-    "@nestjsx/crud-typeorm": "npm:^5.0.0-alpha.3"
+    "@zmotivat0r/o0": "npm:^1.0.2"
+    deepmerge: "npm:^3.2.0"
+    jest-extended: "npm:^2.0.0"
     jest-mock-extended: "npm:^2.0.9"
+    qs: "npm:^6.10.3"
     supertest: "npm:^6.3.4"
   peerDependencies:
     class-transformer: "*"
@@ -3280,47 +3281,6 @@ __metadata:
     rxjs: ^7.2.0
     typeorm: ^0.3.0
   checksum: 10c0/0c5a59273cab43c5b7e4da189e6b9792b64309b32a09c7dbd4bcd6bf2e6ac58faeb3ae40067d3fe987ca857841031bf91c90416ae6824e3525e3e990eb5cf852
-  languageName: node
-  linkType: hard
-
-"@nestjsx/crud-request@npm:^5.0.0-alpha.3":
-  version: 5.0.0-alpha.3
-  resolution: "@nestjsx/crud-request@npm:5.0.0-alpha.3"
-  dependencies:
-    "@nestjsx/util": "npm:^5.0.0-alpha.3"
-    qs: "npm:^6.8.0"
-  checksum: 10c0/e0ce56fe0fe319f365e4e2f9484087951f4d236197513188ead2a815f94f3918594404c716f9c5d0def538bd148ba3e620492f4a798ef78368a7607271dd2112
-  languageName: node
-  linkType: hard
-
-"@nestjsx/crud-typeorm@npm:^5.0.0-alpha.3":
-  version: 5.0.0-alpha.3
-  resolution: "@nestjsx/crud-typeorm@npm:5.0.0-alpha.3"
-  dependencies:
-    "@zmotivat0r/o0": "npm:^1.0.2"
-  checksum: 10c0/aa2039e7ffaf1fd9e3aa744b85546f70cc3dbef23b6e315c8cc7fdf090df811e2d804ecdf9497c560ddc6b39e96d91434f10e2601b8442902a9dd1264189728a
-  languageName: node
-  linkType: hard
-
-"@nestjsx/crud@npm:^5.0.0-alpha.3":
-  version: 5.0.0-alpha.3
-  resolution: "@nestjsx/crud@npm:5.0.0-alpha.3"
-  dependencies:
-    "@nestjsx/crud-request": "npm:^5.0.0-alpha.3"
-    "@nestjsx/util": "npm:^5.0.0-alpha.3"
-    deepmerge: "npm:^3.2.0"
-    pluralize: "npm:^8.0.0"
-  peerDependencies:
-    class-transformer: "*"
-    class-validator: "*"
-  checksum: 10c0/5e681b0af25c557e7fbf674aed2a14c87dd21e66d428d55c9977b141cdfa458aa864139e64f49a0c4528a71ca042e427765faa1f9a8a9165fc20caae9b98bdc7
-  languageName: node
-  linkType: hard
-
-"@nestjsx/util@npm:^5.0.0-alpha.3":
-  version: 5.0.0-alpha.3
-  resolution: "@nestjsx/util@npm:5.0.0-alpha.3"
-  checksum: 10c0/a795d07ec7b293ca30181de67060d3760fd40dfe1bff8437647450e9d405fd2b79b19cd066df28deba8e004093c92653281afc4b13a258c2039331686f6436f8
   languageName: node
   linkType: hard
 
@@ -12511,7 +12471,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jest-diff@npm:^27.5.1":
+"jest-diff@npm:^27.2.5, jest-diff@npm:^27.5.1":
   version: 27.5.1
   resolution: "jest-diff@npm:27.5.1"
   dependencies:
@@ -12574,7 +12534,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jest-get-type@npm:^27.5.1":
+"jest-extended@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "jest-extended@npm:2.0.0"
+  dependencies:
+    jest-diff: "npm:^27.2.5"
+    jest-get-type: "npm:^27.0.6"
+  peerDependencies:
+    jest: ">=27.2.5"
+  checksum: 10c0/bd344195b21f9775752b52e74c0296dedcef24ca864ebccd09da71f6d496ed7514ccbbf739d622e19bdd102dd02e5c9e97e5cabe50aa3afcfd12ad1996ac96b9
+  languageName: node
+  linkType: hard
+
+"jest-get-type@npm:^27.0.6, jest-get-type@npm:^27.5.1":
   version: 27.5.1
   resolution: "jest-get-type@npm:27.5.1"
   checksum: 10c0/42ee0101336bccfc3c1cff598b603c6006db7876b6117e5bd4a9fb7ffaadfb68febdb9ae68d1c47bc3a4174b070153fc6cfb59df995dcd054e81ace5028a7269
@@ -16636,7 +16608,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pluralize@npm:8.0.0, pluralize@npm:^8.0.0":
+"pluralize@npm:8.0.0":
   version: 8.0.0
   resolution: "pluralize@npm:8.0.0"
   checksum: 10c0/2044cfc34b2e8c88b73379ea4a36fc577db04f651c2909041b054c981cd863dd5373ebd030123ab058d194ae615d3a97cfdac653991e499d10caf592e8b3dc33
@@ -17119,7 +17091,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"qs@npm:^6.11.0, qs@npm:^6.8.0, qs@npm:^6.9.4":
+"qs@npm:^6.10.3":
+  version: 6.14.0
+  resolution: "qs@npm:6.14.0"
+  dependencies:
+    side-channel: "npm:^1.1.0"
+  checksum: 10c0/8ea5d91bf34f440598ee389d4a7d95820e3b837d3fd9f433871f7924801becaa0cd3b3b4628d49a7784d06a8aea9bc4554d2b6d8d584e2d221dc06238a42909c
+  languageName: node
+  linkType: hard
+
+"qs@npm:^6.11.0, qs@npm:^6.9.4":
   version: 6.13.0
   resolution: "qs@npm:6.13.0"
   dependencies:

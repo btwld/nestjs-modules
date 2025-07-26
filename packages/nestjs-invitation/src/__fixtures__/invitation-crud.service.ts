@@ -1,19 +1,17 @@
-import { Repository } from 'typeorm';
-
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { InvitationEntityInterface } from '@concepta/nestjs-common';
-import { TypeOrmCrudService } from '@concepta/nestjs-crud';
+import { CrudService } from '@concepta/nestjs-crud';
+import { CrudAdapter } from '@concepta/nestjs-crud/dist/crud/adapters/crud.adapter';
 
-import { InvitationEntityFixture } from './invitation/entities/invitation.entity.fixture';
+import { InvitationTypeOrmCrudAdapter } from './invitation-typeorm-crud.adapter';
 
 @Injectable()
-export class InvitationCrudService extends TypeOrmCrudService<InvitationEntityInterface> {
+export class InvitationCrudService extends CrudService<InvitationEntityInterface> {
   constructor(
-    @InjectRepository(InvitationEntityFixture)
-    invitationRepo: Repository<InvitationEntityInterface>,
+    @Inject(InvitationTypeOrmCrudAdapter)
+    crudAdapter: CrudAdapter<InvitationEntityInterface>,
   ) {
-    super(invitationRepo);
+    super(crudAdapter);
   }
 }

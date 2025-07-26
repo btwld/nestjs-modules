@@ -23,6 +23,7 @@ import { OrgProfileDtoFixture } from '../__fixtures__/dto/org-profile.dto.fixtur
 import { InvitationEntityFixture } from '../__fixtures__/invitation.entity.fixture';
 import { OrgEntityFixture } from '../__fixtures__/org-entity.fixture';
 import { OrgMemberEntityFixture } from '../__fixtures__/org-member.entity.fixture';
+import { OrgProfileTypeOrmCrudAdapter } from '../__fixtures__/org-profile-typeorm-crud.adapter';
 import { OrgProfileEntityFixture } from '../__fixtures__/org-profile.entity.fixture';
 import { OwnerEntityFixture } from '../__fixtures__/owner-entity.fixture';
 import { OwnerFactoryFixture } from '../__fixtures__/owner-factory.fixture';
@@ -68,14 +69,16 @@ describe('Org Profile Crud Builder (e2e)', () => {
 
   // update config to use new dto
   const myOptionsTransform: ConfigurableCrudOptionsTransformer<
+    OrgProfileEntityFixture,
     OrgProfileExtras
   > = (
-    options: ConfigurableCrudOptions,
+    options: ConfigurableCrudOptions<OrgProfileEntityFixture>,
     extras?: OrgProfileExtras,
-  ): ConfigurableCrudOptions => {
+  ): ConfigurableCrudOptions<OrgProfileEntityFixture> => {
     if (!extras) return options;
 
-    options.service.entity = OrgProfileEntityFixture;
+    options.service.adapter =
+      OrgProfileTypeOrmCrudAdapter<OrgProfileEntityFixture>;
     options.controller.model.type = extras.model.type;
     if (options.createOne) options.createOne.dto = extras.createOne.dto;
     if (options.updateOne) options.updateOne.dto = extras.updateOne.dto;
@@ -115,7 +118,7 @@ describe('Org Profile Crud Builder (e2e)', () => {
         CrudModule.forRoot({}),
       ],
       controllers: [ConfigurableControllerClass],
-      providers: [ConfigurableServiceProvider],
+      providers: [OrgProfileTypeOrmCrudAdapter, ConfigurableServiceProvider],
     }).compile();
     app = moduleFixture.createNestApplication();
     await app.init();

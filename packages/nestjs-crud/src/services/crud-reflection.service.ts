@@ -1,8 +1,23 @@
-import { CrudOptions, ParamsOptions } from '@nestjsx/crud';
-
-import { Injectable } from '@nestjs/common';
+import { Injectable, PlainLiteralObject } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import { CrudActions } from '../crud/enums/crud-actions.enum';
+import { CrudApiParamMetadataInterface } from '../crud/interfaces/crud-api-param-metadata.interface';
+import { CrudApiQueryMetadataInterface } from '../crud/interfaces/crud-api-query-metadata.interface';
+import { CrudApiResponseMetadataInterface } from '../crud/interfaces/crud-api-response-metadata.interface';
+import { CrudModelOptionsInterface } from '../crud/interfaces/crud-model-options.interface';
+import { CrudOptionsInterface } from '../crud/interfaces/crud-options.interface';
+import { CrudParamsOptionsInterface } from '../crud/interfaces/crud-params-options.interface';
+import {
+  CrudCreateOneOptionsInterface,
+  CrudDeleteOneOptionsInterface,
+  CrudRecoverOneOptionsInterface,
+  CrudReplaceOneOptionsInterface,
+  CrudUpdateOneOptionsInterface,
+} from '../crud/interfaces/crud-route-options.interface';
+import { CrudSerializationOptionsInterface } from '../crud/interfaces/crud-serialization-options.interface';
+import { CrudServiceQueryOptionsInterface } from '../crud/interfaces/crud-service-query-options.interface';
+import { CrudValidationMetadataInterface } from '../crud/interfaces/crud-validation-metadata.interface';
 import {
   CRUD_MODULE_ROUTE_ACTION_METADATA,
   CRUD_MODULE_ROUTE_CREATE_ONE_METADATA,
@@ -17,7 +32,6 @@ import {
   CRUD_MODULE_ROUTE_QUERY_EXCLUDE_METADATA,
   CRUD_MODULE_ROUTE_QUERY_PERSIST_METADATA,
   CRUD_MODULE_ROUTE_QUERY_FILTER_METADATA,
-  CRUD_MODULE_ROUTE_QUERY_JOIN_METADATA,
   CRUD_MODULE_ROUTE_QUERY_SORT_METADATA,
   CRUD_MODULE_ROUTE_QUERY_LIMIT_METADATA,
   CRUD_MODULE_ROUTE_QUERY_MAX_LIMIT_METADATA,
@@ -30,34 +44,21 @@ import {
   CRUD_MODULE_API_RESPONSE_METADATA,
   CRUD_MODULE_API_QUERY_METADATA,
 } from '../crud.constants';
-import { CrudActions } from '../crud.enums';
 import {
   CrudValidationOptions,
   ReflectionTargetOrHandler,
 } from '../crud.types';
-import { CrudApiParamMetadataInterface } from '../interfaces/crud-api-param-metadata.interface';
-import { CrudApiQueryMetadataInterface } from '../interfaces/crud-api-query-metadata.interface';
-import { CrudApiResponseMetadataInterface } from '../interfaces/crud-api-response-metadata.interface';
-import { CrudModelOptionsInterface } from '../interfaces/crud-model-options.interface';
-import { CrudQueryOptionsInterface } from '../interfaces/crud-query-options.interface';
-import {
-  CrudCreateOneOptionsInterface,
-  CrudDeleteOneOptionsInterface,
-  CrudRecoverOneOptionsInterface,
-  CrudReplaceOneOptionsInterface,
-  CrudUpdateOneOptionsInterface,
-} from '../interfaces/crud-route-options.interface';
-import { CrudSerializationOptionsInterface } from '../interfaces/crud-serialization-options.interface';
-import { CrudValidationMetadataInterface } from '../interfaces/crud-validation-metadata.interface';
 
 @Injectable()
-export class CrudReflectionService {
+export class CrudReflectionService<
+  Entity extends PlainLiteralObject = PlainLiteralObject,
+> {
   private reflector = new Reflector();
 
   public getRequestOptions(
     target: ReflectionTargetOrHandler,
     handler: ReflectionTargetOrHandler,
-  ): CrudOptions & { model: CrudModelOptionsInterface } {
+  ): CrudOptionsInterface<Entity> & { model: CrudModelOptionsInterface } {
     return {
       model: this.getAllModelOptions(target, handler),
 
@@ -70,37 +71,37 @@ export class CrudReflectionService {
       },
 
       routes: {
-        createOneBase: {
+        createOne: {
           returnShallow: false,
-          ...(this.reflector.get<CrudCreateOneOptionsInterface>(
+          ...(this.reflector.get<CrudCreateOneOptionsInterface<Entity>>(
             CRUD_MODULE_ROUTE_CREATE_ONE_METADATA,
             handler,
           ) ?? {}),
         },
-        replaceOneBase: {
+        replaceOne: {
           returnShallow: false,
-          ...(this.reflector.get<CrudReplaceOneOptionsInterface>(
+          ...(this.reflector.get<CrudReplaceOneOptionsInterface<Entity>>(
             CRUD_MODULE_ROUTE_REPLACE_ONE_METADATA,
             handler,
           ) ?? {}),
         },
-        updateOneBase: {
+        updateOne: {
           returnShallow: false,
-          ...(this.reflector.get<CrudUpdateOneOptionsInterface>(
+          ...(this.reflector.get<CrudUpdateOneOptionsInterface<Entity>>(
             CRUD_MODULE_ROUTE_UPDATE_ONE_METADATA,
             handler,
           ) ?? {}),
         },
-        deleteOneBase: {
+        deleteOne: {
           returnDeleted: false,
-          ...(this.reflector.get<CrudDeleteOneOptionsInterface>(
+          ...(this.reflector.get<CrudDeleteOneOptionsInterface<Entity>>(
             CRUD_MODULE_ROUTE_DELETE_ONE_METADATA,
             handler,
           ) ?? {}),
         },
-        recoverOneBase: {
+        recoverOne: {
           returnRecovered: false,
-          ...(this.reflector.get<CrudRecoverOneOptionsInterface>(
+          ...(this.reflector.get<CrudRecoverOneOptionsInterface<Entity>>(
             CRUD_MODULE_ROUTE_RECOVER_ONE_METADATA,
             handler,
           ) ?? {}),
@@ -109,49 +110,44 @@ export class CrudReflectionService {
 
       query: {
         allow: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['allow']
+          CrudServiceQueryOptionsInterface<Entity>['allow']
         >(CRUD_MODULE_ROUTE_QUERY_ALLOW_METADATA, [handler, target]),
 
         exclude: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['exclude']
+          CrudServiceQueryOptionsInterface<Entity>['exclude']
         >(CRUD_MODULE_ROUTE_QUERY_EXCLUDE_METADATA, [handler, target]),
 
         persist: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['persist']
+          CrudServiceQueryOptionsInterface<Entity>['persist']
         >(CRUD_MODULE_ROUTE_QUERY_PERSIST_METADATA, [handler, target]),
 
         filter:
-          this.reflector.getAllAndOverride<CrudQueryOptionsInterface['filter']>(
-            CRUD_MODULE_ROUTE_QUERY_FILTER_METADATA,
-            [handler, target],
-          ) ?? {},
-
-        join: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['join']
-        >(CRUD_MODULE_ROUTE_QUERY_JOIN_METADATA, [handler, target]),
+          this.reflector.getAllAndOverride<
+            CrudServiceQueryOptionsInterface<Entity>['filter']
+          >(CRUD_MODULE_ROUTE_QUERY_FILTER_METADATA, [handler, target]) ?? {},
 
         sort: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['sort']
+          CrudServiceQueryOptionsInterface<Entity>['sort']
         >(CRUD_MODULE_ROUTE_QUERY_SORT_METADATA, [handler, target]),
 
         limit: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['limit']
+          CrudServiceQueryOptionsInterface<Entity>['limit']
         >(CRUD_MODULE_ROUTE_QUERY_LIMIT_METADATA, [handler, target]),
 
         maxLimit: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['maxLimit']
+          CrudServiceQueryOptionsInterface<Entity>['maxLimit']
         >(CRUD_MODULE_ROUTE_QUERY_MAX_LIMIT_METADATA, [handler, target]),
 
         cache: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['cache']
+          CrudServiceQueryOptionsInterface<Entity>['cache']
         >(CRUD_MODULE_ROUTE_QUERY_CACHE_METADATA, [handler, target]),
 
         alwaysPaginate: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['alwaysPaginate']
+          CrudServiceQueryOptionsInterface<Entity>['alwaysPaginate']
         >(CRUD_MODULE_ROUTE_QUERY_ALWAYS_PAGINATE_METADATA, [handler, target]),
 
         softDelete: this.reflector.getAllAndOverride<
-          CrudQueryOptionsInterface['softDelete']
+          CrudServiceQueryOptionsInterface<Entity>['softDelete']
         >(CRUD_MODULE_ROUTE_QUERY_SOFT_DELETE_METADATA, [handler, target]),
       },
     };
@@ -177,8 +173,8 @@ export class CrudReflectionService {
   public getAllParamOptions(
     target: ReflectionTargetOrHandler,
     handler: ReflectionTargetOrHandler,
-  ) {
-    return this.reflector.getAllAndOverride<ParamsOptions>(
+  ): CrudParamsOptionsInterface<Entity> {
+    return this.reflector.getAllAndOverride<CrudParamsOptionsInterface<Entity>>(
       CRUD_MODULE_ROUTE_PARAMS_METADATA,
       [handler, target],
     );
@@ -186,12 +182,12 @@ export class CrudReflectionService {
 
   public getValidationOptions(
     target: ReflectionTargetOrHandler,
-  ): CrudValidationOptions {
+  ): CrudValidationOptions<Entity> {
     return this.reflector.get(CRUD_MODULE_ROUTE_VALIDATION_METADATA, target);
   }
 
   public getBodyParamOptions(target: ReflectionTargetOrHandler) {
-    return this.reflector.get<CrudValidationMetadataInterface[]>(
+    return this.reflector.get<CrudValidationMetadataInterface<Entity>[]>(
       CRUD_MODULE_PARAM_BODY_METADATA,
       target,
     );
