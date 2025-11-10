@@ -283,7 +283,11 @@ export class ConfigurableCrudBuilder<
         ),
       );
       CrudRequest()(InternalCrudClass.prototype, 'createOne', 0);
-      CrudBody()(InternalCrudClass.prototype, 'createOne', 1);
+      CrudBody({ validation: { expectedType: options.createOne?.dto } })(
+        InternalCrudClass.prototype,
+        'createOne',
+        1,
+      );
     }
 
     if (options?.updateOne) {
@@ -308,7 +312,11 @@ export class ConfigurableCrudBuilder<
         ),
       );
       CrudRequest()(InternalCrudClass.prototype, 'updateOne', 0);
-      CrudBody()(InternalCrudClass.prototype, 'updateOne', 1);
+      CrudBody({ validation: { expectedType: options.updateOne?.dto } })(
+        InternalCrudClass.prototype,
+        'updateOne',
+        1,
+      );
     }
 
     if (options?.replaceOne) {

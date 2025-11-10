@@ -78,7 +78,7 @@ describe('User Profile Crud Builder (e2e)', () => {
 
     await supertest(app.getHttpServer())
       .post('/user-profile')
-      .send({ userId: user.id })
+      .send({ userId: user.id, firstName: 'Foo' })
       .expect(201);
   });
 
@@ -89,7 +89,7 @@ describe('User Profile Crud Builder (e2e)', () => {
     // create user profile first
     const createResponse = await supertest(app.getHttpServer())
       .post('/user-profile')
-      .send({ userId: user.id })
+      .send({ userId: user.id, firstName: 'Bar' })
       .expect(201);
 
     const id = createResponse.body.id;

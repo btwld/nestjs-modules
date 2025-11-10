@@ -167,7 +167,7 @@ describe('Org Profile Crud Builder (e2e)', () => {
 
     await supertest(app.getHttpServer())
       .post('/org-profile')
-      .send({ orgId: org.id })
+      .send({ orgId: org.id, name: 'My Org' })
       .expect(201);
   });
 
@@ -178,7 +178,7 @@ describe('Org Profile Crud Builder (e2e)', () => {
     // create org profile first
     const createResponse = await supertest(app.getHttpServer())
       .post('/org-profile')
-      .send({ orgId: org.id })
+      .send({ orgId: org.id, name: 'My Org Updated' })
       .expect(201);
 
     const id = createResponse.body.id;
