@@ -80,13 +80,13 @@ describe('LoggerRequestInterceptor', () => {
 
   it('LoggerRequestInterceptor.intercept', async () => {
     const actualValue = await loggerRequestInterceptor.intercept(
-      executionContext as ExecutionContext,
+      executionContext,
       callHandler,
     );
 
     expect(actualValue).toBeTruthy();
-    expect(spyFormatRequestMessage).toBeCalledTimes(1);
-    expect(spyLog).toBeCalledTimes(1);
+    expect(spyFormatRequestMessage).toHaveBeenCalledTimes(1);
+    expect(spyLog).toHaveBeenCalledTimes(1);
   });
 
   it('LoggerRequestInterceptor.responseSuccess', async () => {
@@ -96,8 +96,8 @@ describe('LoggerRequestInterceptor', () => {
       new Date(),
     );
 
-    expect(spyFormatResponseMessage).toBeCalledTimes(1);
-    expect(spyLog).toBeCalledTimes(1);
+    expect(spyFormatResponseMessage).toHaveBeenCalledTimes(1);
+    expect(spyLog).toHaveBeenCalledTimes(1);
   });
 
   it('LoggerRequestInterceptor.responseError', async () => {
@@ -108,8 +108,8 @@ describe('LoggerRequestInterceptor', () => {
       new Error(),
     );
 
-    expect(spyFormatResponseMessage).toBeCalledTimes(1);
-    expect(spyException).toBeCalledTimes(1);
+    expect(spyFormatResponseMessage).toHaveBeenCalledTimes(1);
+    expect(spyException).toHaveBeenCalledTimes(1);
   });
 
   it('LoggerRequestInterceptor to throwError', async () => {
@@ -120,6 +120,6 @@ describe('LoggerRequestInterceptor', () => {
       new Error('TestError'),
     );
 
-    expect(observer.subscribe).toThrowError();
+    expect(observer.subscribe).toThrow();
   });
 });

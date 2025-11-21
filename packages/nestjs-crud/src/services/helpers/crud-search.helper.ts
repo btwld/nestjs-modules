@@ -26,8 +26,8 @@ export class CrudSearchHelper<Entity extends PlainLiteralObject> {
       searchConditions.length === 0
         ? undefined
         : searchConditions.length === 1
-        ? searchConditions[0]
-        : { $and: searchConditions };
+          ? searchConditions[0]
+          : { $and: searchConditions };
   }
 
   /**
@@ -49,8 +49,8 @@ export class CrudSearchHelper<Entity extends PlainLiteralObject> {
       options.query.filter.length
         ? options.query.filter.map(convertFilterToSearch)
         : options?.query?.filter
-        ? [options.query.filter as SCondition<Entity>]
-        : [];
+          ? [options.query.filter as SCondition<Entity>]
+          : [];
 
     let search: SCondition<Entity>[] = [];
 

@@ -13,6 +13,7 @@ export class SwaggerUiService {
    * Constructor.
    *
    * @param settings - swagger ui settings
+   * @param documentBuilder - dcument builder instance
    */
   constructor(
     @Inject(SWAGGER_UI_MODULE_SETTINGS_TOKEN)

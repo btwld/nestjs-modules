@@ -97,9 +97,8 @@ export class ReportService implements ReportServiceInterface {
   protected async checkExistingReport(
     report: ReportCreatableInterface,
   ): Promise<void> {
-    const existingReport = await this.reportModelService.getUniqueReport(
-      report,
-    );
+    const existingReport =
+      await this.reportModelService.getUniqueReport(report);
 
     if (existingReport) {
       throw new ReportDuplicateEntryException(report.serviceKey, report.name);
@@ -111,10 +110,9 @@ export class ReportService implements ReportServiceInterface {
   ): Promise<ReportEntityInterface> {
     if (report.fileId) {
       try {
-        report.downloadUrl = await this.reportStrategyService.getDownloadUrl(
-          report,
-        );
-      } catch (err) {
+        report.downloadUrl =
+          await this.reportStrategyService.getDownloadUrl(report);
+      } catch (_err) {
         report.downloadUrl = '';
       }
     }

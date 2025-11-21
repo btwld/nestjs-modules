@@ -33,8 +33,8 @@ describe(AuthJwtGuard, () => {
   describe(AuthJwtGuard.prototype.canActivate, () => {
     it('should be success', async () => {
       await authJwtGuard.canActivate(context);
-      expect(spyCanActivate).toBeCalled();
-      expect(spyCanActivate).toBeCalledWith(context);
+      expect(spyCanActivate).toHaveBeenCalled();
+      expect(spyCanActivate).toHaveBeenCalledWith(context);
     });
   });
 

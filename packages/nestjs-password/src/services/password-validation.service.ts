@@ -11,9 +11,6 @@ import { CryptUtil } from '../utils/crypt.util';
 export class PasswordValidationService
   implements PasswordValidationServiceInterface
 {
-  /**
-   * {@inheritDoc PasswordValidationServiceInterface.validate}
-   */
   async validate(options: PasswordValidateOptionsInterface): Promise<boolean> {
     return CryptUtil.validatePassword(
       options.password,

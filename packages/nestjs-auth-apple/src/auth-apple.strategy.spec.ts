@@ -37,15 +37,13 @@ jest.mock('@nestjs/passport', () => {
 
 // Mock passport-apple
 jest.mock('passport-apple', () => ({
-  Strategy: jest
-    .fn()
-    .mockImplementation(function MockStrategy(
-      this: unknown,
-      options: Record<string, unknown>,
-    ) {
-      (this as Record<string, unknown>).options = options;
-      return this;
-    }),
+  Strategy: jest.fn().mockImplementation(function MockStrategy(
+    this: unknown,
+    options: Record<string, unknown>,
+  ) {
+    (this as Record<string, unknown>).options = options;
+    return this;
+  }),
 }));
 
 // Mock the mapProfile util
@@ -132,9 +130,7 @@ describe('AuthAppleStrategy', () => {
     }).compile();
 
     strategy = module.get<AuthAppleStrategy>(AuthAppleStrategy);
-    federatedOAuthService = module.get(
-      FederatedOAuthService,
-    ) as jest.Mocked<FederatedOAuthService>;
+    federatedOAuthService = module.get(FederatedOAuthService);
     authAppleService = module.get(AUTH_APPLE_SERVICE_TOKEN);
 
     // Mock the mapProfile util implementation

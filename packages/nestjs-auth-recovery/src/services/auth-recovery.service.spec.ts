@@ -52,7 +52,7 @@ describe(AuthRecoveryService, () => {
 
     settings = moduleFixture.get<AuthRecoverySettingsInterface>(
       AUTH_RECOVERY_MODULE_SETTINGS_TOKEN,
-    ) as AuthRecoverySettingsInterface;
+    );
 
     notificationService =
       moduleFixture.get<AuthRecoveryNotificationServiceInterface>(

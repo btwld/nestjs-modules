@@ -14,7 +14,7 @@ describe('#crud', () => {
 
     describe('#throwBadRequestException', () => {
       it('should throw BadRequestException', () => {
-        expect(service.throwBadRequestException.bind(service, '')).toThrowError(
+        expect(service.throwBadRequestException.bind(service, '')).toThrow(
           BadRequestException,
         );
       });

@@ -80,7 +80,7 @@ describe('loggerSentryTransport', () => {
    * Test check if Sentry init was called
    */
   it('LoggerSentryTransport.init', async () => {
-    expect(spyInit).toBeCalledTimes(1);
+    expect(spyInit).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -91,8 +91,8 @@ describe('loggerSentryTransport', () => {
     const error = new Error();
     loggerSentryTransport.log(errorMessage, logLevel, error);
 
-    expect(spyLogLevelMap).toBeCalledTimes(1);
-    expect(spyCaptureException).toBeCalledTimes(1);
+    expect(spyLogLevelMap).toHaveBeenCalledTimes(1);
+    expect(spyCaptureException).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -103,9 +103,9 @@ describe('loggerSentryTransport', () => {
     const error = new Error();
     loggerSentryTransport.log(errorMessage, logLevel, error);
 
-    expect(spyLogLevelMap).toBeCalledTimes(1);
+    expect(spyLogLevelMap).toHaveBeenCalledTimes(1);
     expect(spyLogLevelMap).toHaveBeenCalledWith(logLevel);
-    expect(spyCaptureException).toBeCalledTimes(1);
+    expect(spyCaptureException).toHaveBeenCalledTimes(1);
     expect(spyCaptureException).toHaveBeenCalledWith(error, {
       level: 'error',
       extra: {
@@ -122,9 +122,9 @@ describe('loggerSentryTransport', () => {
     const error = 'Test error';
     loggerSentryTransport.log(errorMessage, logLevel, error);
 
-    expect(spyLogLevelMap).toBeCalledTimes(1);
+    expect(spyLogLevelMap).toHaveBeenCalledTimes(1);
     expect(spyLogLevelMap).toHaveBeenCalledWith(logLevel);
-    expect(spyCaptureException).toBeCalledTimes(1);
+    expect(spyCaptureException).toHaveBeenCalledTimes(1);
     expect(spyCaptureException).toHaveBeenCalledWith(error, {
       level: 'error',
       extra: {
@@ -142,16 +142,16 @@ describe('loggerSentryTransport', () => {
     const res = error.getResponse();
     loggerSentryTransport.log(errorMessage, logLevel, error);
 
-    expect(spyLogLevelMap).toBeCalledTimes(1);
+    expect(spyLogLevelMap).toHaveBeenCalledTimes(1);
     expect(spyLogLevelMap).toHaveBeenCalledWith(logLevel);
-    expect(spyCaptureException).toBeCalledTimes(1);
+    expect(spyCaptureException).toHaveBeenCalledTimes(1);
     const statusCode = error.getStatus();
     expect(spyCaptureException).toHaveBeenCalledWith(error, {
       level: 'error',
       extra: {
         developerMessage: errorMessage,
         statusCode,
-        errorCode: mapHttpStatus(statusCode as number),
+        errorCode: mapHttpStatus(statusCode),
         message: isObject(res) && 'message' in res ? res.message : res,
       },
     });
@@ -177,9 +177,9 @@ describe('loggerSentryTransport', () => {
 
     loggerSentryTransport.log(errorMessage, logLevel, exception);
 
-    expect(spyLogLevelMap).toBeCalledTimes(1);
+    expect(spyLogLevelMap).toHaveBeenCalledTimes(1);
     expect(spyLogLevelMap).toHaveBeenCalledWith(logLevel);
-    expect(spyCaptureException).toBeCalledTimes(1);
+    expect(spyCaptureException).toHaveBeenCalledTimes(1);
     expect(spyCaptureException).toHaveBeenCalledWith(exception, {
       level: 'error',
       extra: {
@@ -201,8 +201,8 @@ describe('loggerSentryTransport', () => {
 
     loggerSentryTransport.log(errorMessage, logLevel);
 
-    expect(spyLogLevelMap).toBeCalledTimes(1);
-    expect(spyCaptureException).toBeCalledTimes(0);
-    expect(spyCaptureMessage).toBeCalledTimes(1);
+    expect(spyLogLevelMap).toHaveBeenCalledTimes(1);
+    expect(spyCaptureException).toHaveBeenCalledTimes(0);
+    expect(spyCaptureMessage).toHaveBeenCalledTimes(1);
   });
 });

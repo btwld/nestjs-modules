@@ -92,7 +92,7 @@ describe(InvitationAcceptanceService, () => {
 
   afterEach(async () => {
     jest.clearAllMocks();
-    app && (await app.close());
+    if (app) await app.close();
   });
 
   it('Validate passcode', async () => {

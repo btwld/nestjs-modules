@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto';
 import { InternalServerErrorException, Logger } from '@nestjs/common';
 import { registerAs } from '@nestjs/config';
 
+import { toMilliseconds } from '@concepta/nestjs-common';
+
 import { JwtConfigUndefinedException } from '../exceptions/jwt-config-undefined.exception';
 import { JwtFallbackConfigUndefinedException } from '../exceptions/jwt-fallback-config-undefined.exception';
 import { JwtSettingsInterface } from '../interfaces/jwt-settings.interface';
@@ -20,20 +22,27 @@ export const jwtDefaultConfig = registerAs(
     const options: JwtSettingsInterface = {
       default: {
         signOptions: {
-          expiresIn: process.env?.JWT_MODULE_DEFAULT_EXPIRES_IN ?? '1h',
+          expiresIn: toMilliseconds(
+            process.env?.JWT_MODULE_DEFAULT_EXPIRES_IN,
+            '1h',
+          ),
         },
       },
       access: {
         signOptions: {
-          expiresIn:
+          expiresIn: toMilliseconds(
             process.env?.JWT_MODULE_ACCESS_EXPIRES_IN ??
-            process.env?.JWT_MODULE_DEFAULT_EXPIRES_IN ??
+              process.env?.JWT_MODULE_DEFAULT_EXPIRES_IN,
             '1h',
+          ),
         },
       },
       refresh: {
         signOptions: {
-          expiresIn: process.env?.JWT_MODULE_REFRESH_EXPIRES_IN ?? '99y',
+          expiresIn: toMilliseconds(
+            process.env?.JWT_MODULE_REFRESH_EXPIRES_IN,
+            '99y',
+          ),
         },
       },
     };

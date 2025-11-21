@@ -180,7 +180,7 @@ describe('#crud-typeorm', () => {
     beforeAll(async () => {
       const fixture = await Test.createTestingModule({
         imports: [
-          TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: 'all' }),
+          TypeOrmModule.forRoot({ ...ormSqliteConfig }),
           TypeOrmModule.forFeature([
             CompanyEntity,
             ProjectEntity,
@@ -231,176 +231,124 @@ describe('#crud-typeorm', () => {
     });
 
     describe('#select', () => {
-      it('should throw status 400', (done) => {
-        const query = qb
-          .setFilter({ field: 'invalid', operator: '$isnull' })
-          .query();
-        request(server)
+      it('should throw status 400', async () => {
+        qb.setFilter({ field: 'invalid', operator: '$isnull' });
+        const res = await request(server)
           .get('/companies')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(500);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(500);
       });
     });
 
     describe('#query filter', () => {
-      it('should return data with limit', (done) => {
-        const query = qb.setLimit(4).query();
-        request(server)
+      it('should return data with limit', async () => {
+        qb.setLimit(4);
+        const res = await request(server)
           .get('/companies')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(4);
-            res.body.data.forEach((e: CompanyEntity) => {
-              expect(e.id).not.toBe(1);
-            });
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(4);
+        res.body.data.forEach((e: CompanyEntity) => {
+          expect(e.id).not.toBe(1);
+        });
       });
-      it('should return with maxLimit', (done) => {
-        const query = qb.setLimit(7).query();
-        request(server)
+      it('should return with maxLimit', async () => {
+        qb.setLimit(7);
+        const res = await request(server)
           .get('/companies')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(5);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(5);
       });
-      it('should return with filter and or, 1', (done) => {
-        const query = qb
-          .setFilter({
-            field: 'name',
-            operator: '$notin',
-            value: ['Name2', 'Name3'],
-          })
-          .setOr({ field: 'domain', operator: '$cont', value: 5 })
-          .query();
-        request(server)
+      it('should return with filter and or, 1', async () => {
+        qb.setFilter({
+          field: 'name',
+          operator: '$notin',
+          value: ['Name2', 'Name3'],
+        }).setOr({ field: 'domain', operator: '$cont', value: 5 });
+        const res = await request(server)
           .get('/companies')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(5);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(5);
       });
-      it('should return with filter and or, 2', (done) => {
-        const query = qb
-          .setFilter({ field: 'name', operator: '$ends', value: 'foo' })
+      it('should return with filter and or, 2', async () => {
+        qb.setFilter({ field: 'name', operator: '$ends', value: 'foo' })
           .setOr({ field: 'name', operator: '$starts', value: 'P' })
-          .setOr({ field: 'isActive', operator: '$eq', value: true })
-          .query();
-        request(server)
+          .setOr({ field: 'isActive', operator: '$eq', value: true });
+        const res = await request(server)
           .get('/projects')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(10);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(10);
       });
-      it('should return with filter and or, 3', (done) => {
-        const query = qb
-          .setOr({ field: 'companyId', operator: '$gt', value: 22 })
+      it('should return with filter and or, 3', async () => {
+        qb.setOr({ field: 'companyId', operator: '$gt', value: 22 })
           .setFilter({ field: 'companyId', operator: '$gte', value: 6 })
-          .setFilter({ field: 'companyId', operator: '$lt', value: 10 })
-          .query();
-        request(server)
+          .setFilter({ field: 'companyId', operator: '$lt', value: 10 });
+        const res = await request(server)
           .get('/projects')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(8);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(8);
       });
-      it('should return with filter and or, 4', (done) => {
-        const query = qb
-          .setOr({ field: 'companyId', operator: '$in', value: [6, 10] })
+      it('should return with filter and or, 4', async () => {
+        qb.setOr({ field: 'companyId', operator: '$in', value: [6, 10] })
           .setOr({ field: 'companyId', operator: '$lte', value: 10 })
           .setFilter({ field: 'isActive', operator: '$eq', value: false })
-          .setFilter({ field: 'description', operator: '$notnull' })
-          .query();
-        request(server)
+          .setFilter({ field: 'description', operator: '$notnull' });
+        const res = await request(server)
           .get('/projects')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(10);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(10);
       });
-      it('should return with filter and or, 6', (done) => {
-        const query = qb
-          .setOr({ field: 'companyId', operator: '$isnull' })
-          .query();
-        request(server)
+      it('should return with filter and or, 6', async () => {
+        qb.setOr({ field: 'companyId', operator: '$isnull' });
+        const res = await request(server)
           .get('/projects')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(0);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(0);
       });
-      it('should return with filter and or, 6', (done) => {
-        const query = qb
-          .setOr({ field: 'companyId', operator: '$between', value: [1, 5] })
-          .query();
-        request(server)
+      it('should return with filter and or, 6', async () => {
+        qb.setOr({ field: 'companyId', operator: '$between', value: [1, 5] });
+        const res = await request(server)
           .get('/projects')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(10);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(10);
       });
-      it('should return with filter, 1', (done) => {
-        const query = qb
-          .setOr({ field: 'companyId', operator: '$eq', value: 1 })
-          .query();
-        request(server)
+      it('should return with filter, 1', async () => {
+        qb.setOr({ field: 'companyId', operator: '$eq', value: 1 });
+        const res = await request(server)
           .get('/projects')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBe(200);
-            expect(res.body.data.length).toBe(2);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBe(2);
       });
     });
 
     describe('#sort', () => {
       it('should sort by field', async () => {
-        const query = qb.sortBy({ field: 'id', order: 'DESC' }).query();
+        qb.sortBy({ field: 'id', order: 'DESC' });
         const res = await request(server)
           .get('/users')
-          .query(query)
+          .query(qb.queryObject)
           .expect(200);
         expect(res.body.data[1].id).toBeLessThan(res.body.data[0].id);
       });
 
-      it('should throw 400 if SQL injection has been detected', (done) => {
-        const query = qb
-          .sortBy({
-            field: ' ASC; SELECT CAST( version() AS INTEGER); --',
-            order: 'DESC',
-          })
-          .query();
+      it('should throw 400 if SQL injection has been detected', async () => {
+        qb.sortBy({
+          field: ' ASC; SELECT CAST( version() AS INTEGER); --',
+          order: 'DESC',
+        });
 
-        request(server)
+        const res = await request(server)
           .get('/companies')
-          .query(query)
-          .end((_, res) => {
-            expect(res.status).toBeGreaterThanOrEqual(400);
-            done();
-          });
+          .query(qb.queryObject);
+        expect(res.status).toBeGreaterThanOrEqual(400);
       });
     });
 

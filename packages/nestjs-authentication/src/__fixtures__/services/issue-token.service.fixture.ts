@@ -12,13 +12,13 @@ export class IssueTokenServiceFixture implements IssueTokenServiceInterface {
   }
   accessToken(
     _payload: string | object | Buffer,
-    _options?: JwtSignOptions | undefined,
+    _options?: JwtSignOptions,
   ): Promise<string> {
     throw new Error('Method not implemented.');
   }
   refreshToken(
     _payload: string | object | Buffer,
-    _options?: JwtSignOptions | undefined,
+    _options?: JwtSignOptions,
   ): Promise<string> {
     throw new Error('Method not implemented.');
   }

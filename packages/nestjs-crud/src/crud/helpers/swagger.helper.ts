@@ -7,12 +7,15 @@ import { CrudRouteName } from '../types/crud-route-name.type';
 import { safeRequire } from '../util';
 
 export const swagger = safeRequire('@nestjs/swagger', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@nestjs/swagger'),
 );
 export const swaggerConst = safeRequire('@nestjs/swagger/dist/constants', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@nestjs/swagger/dist/constants'),
 );
 export const swaggerPkgJson = safeRequire('@nestjs/swagger/package.json', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@nestjs/swagger/package.json'),
 );
 

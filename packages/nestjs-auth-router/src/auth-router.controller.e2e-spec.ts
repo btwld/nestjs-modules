@@ -1,10 +1,6 @@
 import supertest from 'supertest';
 
-import {
-  INestApplication,
-  ExecutionContext,
-  CanActivate,
-} from '@nestjs/common';
+import { INestApplication, CanActivate } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { AuthRouterModuleGuards } from './auth-router.constants';
@@ -57,7 +53,7 @@ describe('AuthRouterController (e2e)', () => {
       expect(guardSpy).toHaveBeenCalled();
 
       // Verify the guard received the correct execution context
-      const executionContext = guardSpy.mock.calls[0][0] as ExecutionContext;
+      const executionContext = guardSpy.mock.calls[0][0];
       const httpRequest = executionContext.switchToHttp().getRequest();
       expect(httpRequest.query.provider).toBe('google');
     });
@@ -91,7 +87,7 @@ describe('AuthRouterController (e2e)', () => {
       expect(response.body).toEqual({ ok: 'success' });
 
       // Verify the guard received the correct execution context
-      const executionContext = guardSpy.mock.calls[0][0] as ExecutionContext;
+      const executionContext = guardSpy.mock.calls[0][0];
       const httpRequest = executionContext.switchToHttp().getRequest();
       expect(httpRequest.query.provider).toBe('google');
 

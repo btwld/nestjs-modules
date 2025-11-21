@@ -64,7 +64,7 @@ describe('UserCrudController (e2e)', () => {
 
     afterEach(async () => {
       jest.clearAllMocks();
-      app && (await app.close());
+      if (app) await app.close();
     });
 
     it('GET /user', async () => {

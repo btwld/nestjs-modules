@@ -27,6 +27,7 @@ export { Type } from './utils/interfaces/type.interface';
 export { DeepPartial } from './utils/deep-partial';
 export { mapNonErrorToException } from './utils/map-non-error-to-exception.util';
 export { mapHttpStatus } from './utils/map-http-status.util';
+export { toMilliseconds } from './utils/to-milliseconds';
 
 // Reference types
 export {

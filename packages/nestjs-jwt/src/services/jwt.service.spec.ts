@@ -16,7 +16,7 @@ describe(JwtService, () => {
         .mockResolvedValue(token);
       const result = await jwtService.signAsync(token);
       expect(result).toBe(token);
-      expect(spySignAsync).toBeCalledWith(token);
+      expect(spySignAsync).toHaveBeenCalledWith(token);
     });
 
     it('should throw error', async () => {
@@ -24,7 +24,7 @@ describe(JwtService, () => {
         throw new Error();
       });
       const t = async () => await jwtService.signAsync(token);
-      await expect(t).rejects.toThrowError();
+      await expect(t).rejects.toThrow();
     });
   });
 
@@ -35,7 +35,7 @@ describe(JwtService, () => {
         .mockResolvedValue({ token });
       const result = await jwtService.verifyAsync(token);
       expect(result.token).toBe(token);
-      expect(spyVerifyAsync).toBeCalledWith(token);
+      expect(spyVerifyAsync).toHaveBeenCalledWith(token);
     });
 
     it('should throw error', async () => {
@@ -43,7 +43,7 @@ describe(JwtService, () => {
         throw new Error();
       });
       const t = async () => await jwtService.verifyAsync(token);
-      await expect(t).rejects.toThrowError();
+      await expect(t).rejects.toThrow();
     });
   });
 
@@ -51,7 +51,7 @@ describe(JwtService, () => {
     it('should success', async () => {
       const spyDecode = jest.spyOn(jwtService, 'decode');
       await jwtService.decode(token);
-      expect(spyDecode).toBeCalledWith(token);
+      expect(spyDecode).toHaveBeenCalledWith(token);
     });
 
     it('should throw error', async () => {
@@ -59,7 +59,7 @@ describe(JwtService, () => {
         throw new Error();
       });
       const t = async () => await jwtService.decode(token);
-      await expect(t).rejects.toThrowError();
+      await expect(t).rejects.toThrow();
     });
   });
 });

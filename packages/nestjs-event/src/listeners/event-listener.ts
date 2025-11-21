@@ -95,7 +95,7 @@ export abstract class EventListener<E> implements EventListenerInterface<E> {
     try {
       // remove the listener
       this.emitterListener.off();
-    } catch (e) {
+    } catch (_e) {
       throw new EventListenerException({
         message: 'Error occurred while trying to turn listener off()',
       });

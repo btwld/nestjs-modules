@@ -61,7 +61,7 @@ export class AuthAppleService implements AuthAppleServiceInterface {
       ) {
         kid = decodedHeader.header.kid;
       }
-    } catch (e) {
+    } catch (_e) {
       throw new AuthAppleDecodeException();
     }
 
@@ -77,7 +77,7 @@ export class AuthAppleService implements AuthAppleServiceInterface {
       const client = new JwksClient({ jwksUri: AUTH_APPLE_JWT_KEYS });
       const key = await client.getSigningKey(kid);
       return key.getPublicKey();
-    } catch (e) {
+    } catch (_e) {
       throw new AuthApplePublicKeyException();
     }
   }

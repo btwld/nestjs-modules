@@ -12,7 +12,7 @@ export class CrudMethodNotImplementedException<
 > extends CrudException {
   constructor(
     instance: InstanceType<T>,
-    method: Function,
+    method: CallableFunction,
     options?: RuntimeExceptionOptions,
   ) {
     super({

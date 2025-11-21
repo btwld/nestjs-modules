@@ -45,7 +45,7 @@ describe(AuthLocalValidateUserService.name, () => {
           username: USERNAME,
           password: PASSWORD,
         } as AuthLocalValidateUserInterface);
-      await expect(t).rejects.toThrowError(
+      await expect(t).rejects.toThrow(
         `No user found for username: ${USERNAME}`,
       );
     });
@@ -59,7 +59,7 @@ describe(AuthLocalValidateUserService.name, () => {
           username: USERNAME,
           password: PASSWORD,
         } as AuthLocalValidateUserInterface);
-      await expect(t).rejects.toThrowError(
+      await expect(t).rejects.toThrow(
         `User with username '${USERNAME}' is inactive`,
       );
     });
@@ -76,7 +76,7 @@ describe(AuthLocalValidateUserService.name, () => {
           username: USER.username,
           password: USER.password,
         } as AuthLocalValidateUserInterface);
-      await expect(t).rejects.toThrowError(
+      await expect(t).rejects.toThrow(
         `Invalid password for username: ${USER.username}`,
       );
     });

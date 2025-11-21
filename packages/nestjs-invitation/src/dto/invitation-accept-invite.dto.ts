@@ -17,7 +17,10 @@ export class InvitationAcceptInviteDto {
     title: 'Payload',
     type: 'object',
     description:
-      'payload content that will be passed through another module ir order to complete the activation. This payload will have necessary info to target module complete the activation e.g. new password or what ever required info. The object not have any strong type defined on purpose because the target moules will have object different signatures',
+      'Payload content that will be passed through another module ir order to complete the activation.' +
+      ' This payload will have necessary info to target module complete the activation e.g. new password or what ever required info.' +
+      ' The object not have any strong type defined on purpose because the target moules will have object different signatures',
+    additionalProperties: true,
   })
   @IsObject()
   @IsOptional()

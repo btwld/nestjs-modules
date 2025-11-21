@@ -54,10 +54,10 @@ export class TypeOrmCrudAdapter<
   protected entityColumnsHash: Record<string, unknown> = {};
 
   protected sqlInjectionRegEx: RegExp[] = [
-    /(%27)|(\')|(--)|(%23)|(#)/gi,
-    /((%3D)|(=))[^\n]*((%27)|(\')|(--)|(%3B)|(;))/gi,
-    /w*((%27)|(\'))((%6F)|o|(%4F))((%72)|r|(%52))/gi,
-    /((%27)|(\'))union/gi,
+    /(%27)|(')|(--)|(%23)|(#)/gi,
+    /((%3D)|(=))[^\n]*((%27)|(')|(--)|(%3B)|(;))/gi,
+    /w*((%27)|')((%6F)|o|(%4F))((%72)|r|(%52))/gi,
+    /((%27)|')union/gi,
   ];
 
   constructor(protected repo: Repository<Entity>) {
@@ -269,9 +269,11 @@ export class TypeOrmCrudAdapter<
         )
       : undefined;
 
-    req.options?.query?.softDelete === true
-      ? await this.repo.softRemove(found as unknown as DeepPartial<Entity>)
-      : await this.repo.remove(found);
+    if (req.options?.query?.softDelete === true) {
+      await this.repo.softRemove(found as unknown as DeepPartial<Entity>);
+    } else {
+      await this.repo.remove(found);
+    }
 
     return toReturn;
   }
@@ -688,8 +690,8 @@ export class TypeOrmCrudAdapter<
     return query.sort && query.sort.length
       ? this.mapSort(query.sort)
       : options.sort && options.sort.length
-      ? this.mapSort(options.sort)
-      : {};
+        ? this.mapSort(options.sort)
+        : {};
   }
 
   protected getFieldWithAlias(field: string, sort = false) {
@@ -698,7 +700,7 @@ export class TypeOrmCrudAdapter<
     const cols = field.split('.');
 
     switch (cols.length) {
-      case 1:
+      case 1: {
         if (sort) {
           return `${this.alias}.${field}`;
         }
@@ -709,6 +711,7 @@ export class TypeOrmCrudAdapter<
             : field;
 
         return `${i}${this.alias}${i}.${i}${dbColName}${i}`;
+      }
       case 2:
         return field;
       default:

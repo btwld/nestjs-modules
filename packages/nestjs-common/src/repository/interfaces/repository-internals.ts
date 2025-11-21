@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable tsdoc/syntax */
+/* eslint-disable @typescript-eslint/no-namespace */
 /**
  * !!! COPIED FROM TYPEORM !!!
  *
@@ -12,25 +13,24 @@ export namespace RepositoryInternals {
   /**
    * A single property handler for FindOptionsOrder.
    */
-  export type FindOptionsOrderProperty<Property> = Property extends Promise<
-    infer I
-  >
-    ? FindOptionsOrderProperty<NonNullable<I>>
-    : Property extends Array<infer I>
-    ? FindOptionsOrderProperty<NonNullable<I>>
-    : Property extends Function
-    ? never
-    : Property extends string
-    ? FindOptionsOrderValue
-    : Property extends number
-    ? FindOptionsOrderValue
-    : Property extends boolean
-    ? FindOptionsOrderValue
-    : Property extends Date
-    ? FindOptionsOrderValue
-    : Property extends object
-    ? FindOptionsOrder<Property> | FindOptionsOrderValue
-    : FindOptionsOrderValue;
+  export type FindOptionsOrderProperty<Property> =
+    Property extends Promise<infer I>
+      ? FindOptionsOrderProperty<NonNullable<I>>
+      : Property extends Array<infer I>
+        ? FindOptionsOrderProperty<NonNullable<I>>
+        : Property extends (...args: unknown[]) => unknown
+          ? never
+          : Property extends string
+            ? FindOptionsOrderValue
+            : Property extends number
+              ? FindOptionsOrderValue
+              : Property extends boolean
+                ? FindOptionsOrderValue
+                : Property extends Date
+                  ? FindOptionsOrderValue
+                  : Property extends object
+                    ? FindOptionsOrder<Property> | FindOptionsOrderValue
+                    : FindOptionsOrderValue;
   /**
    * Order by find options.
    */
@@ -78,13 +78,14 @@ export namespace RepositoryInternals {
   export type FindOptionsWhereProperty<
     PropertyToBeNarrowed,
     Property = PropertyToBeNarrowed,
-  > = PropertyToBeNarrowed extends Promise<infer I>
-    ? FindOptionsWhereProperty<NonNullable<I>>
-    : PropertyToBeNarrowed extends Array<infer I>
-    ? FindOptionsWhereProperty<NonNullable<I>>
-    : PropertyToBeNarrowed extends Function
-    ? never
-    : Property;
+  > =
+    PropertyToBeNarrowed extends Promise<infer I>
+      ? FindOptionsWhereProperty<NonNullable<I>>
+      : PropertyToBeNarrowed extends Array<infer I>
+        ? FindOptionsWhereProperty<NonNullable<I>>
+        : PropertyToBeNarrowed extends (...args: unknown[]) => unknown
+          ? never
+          : Property;
 
   /**
    * Used for find operations.

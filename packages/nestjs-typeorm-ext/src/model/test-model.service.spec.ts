@@ -246,7 +246,7 @@ describe(ModelService, () => {
 
       await testModelService.remove({ id: testObject.id });
 
-      expect(remove).toBeCalledTimes(1);
+      expect(remove).toHaveBeenCalledTimes(1);
 
       const foundObject = await testModelService.byId(testObject.id);
 

@@ -5,7 +5,7 @@ import { EmailSettingsInterface } from '../interfaces/email-settings.interface';
 
 import { emailSettingsConfig } from './email-settings.config';
 
-describe(emailSettingsConfig, () => {
+describe(emailSettingsConfig.name, () => {
   let testModule: TestingModule;
 
   afterEach(async () => {

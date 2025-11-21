@@ -80,9 +80,9 @@ describe(CrudService.name, () => {
 
         await ormService[crudMethod](mockRequest, mockOverrides);
 
-        expect(spy).toBeCalledTimes(1);
+        expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy).toBeCalledWith({
+        expect(spy).toHaveBeenCalledWith({
           options: { query: {} },
           parsed: {
             search: { $and: [{ name: 'apple' }, { name: 'pear' }] },
@@ -120,9 +120,9 @@ describe(CrudService.name, () => {
           await ormService[crudMethod](mockRequest, dto, mockOverrides);
         }
 
-        expect(spy).toBeCalledTimes(1);
+        expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy).toBeCalledWith(
+        expect(spy).toHaveBeenCalledWith(
           {
             options: { query: {} },
             parsed: {

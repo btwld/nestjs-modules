@@ -97,9 +97,7 @@ export class CrudRequestQueryBuilder<
     Object.keys(CrudRequestQueryBuilder._options.paramNamesMap).forEach(
       (key) => {
         const name = CrudRequestQueryBuilder._options.paramNamesMap[key];
-        this.paramNames[key] = isString(name)
-          ? (name as string)
-          : (name[0] as string);
+        this.paramNames[key] = isString(name) ? name : name[0];
       },
     );
   }
@@ -108,9 +106,7 @@ export class CrudRequestQueryBuilder<
     Object.keys(CrudRequestQueryBuilder._options.paramNamesMap).forEach(
       (key) => {
         const name = CrudRequestQueryBuilder._options.paramNamesMap[key];
-        this.paramNames[key] = isString(name)
-          ? (name as string)
-          : (name[0] as string);
+        this.paramNames[key] = isString(name) ? name : name[0];
       },
     );
   }

@@ -73,7 +73,7 @@ describe(InvitationSendService, () => {
 
   afterEach(async () => {
     jest.clearAllMocks();
-    app && (await app.close());
+    if (app) await app.close();
   });
 
   describe(InvitationSendService.prototype.send, () => {

@@ -70,11 +70,7 @@ export class LoggerService
    * @param message - Error Message
    * @param context - Context of current error
    */
-  exception(
-    error: Error,
-    message?: string,
-    context?: string | undefined,
-  ): void {
+  exception(error: Error, message?: string, context?: string): void {
     // message is missing?
     if (!message) {
       // yes, set it
@@ -106,11 +102,7 @@ export class LoggerService
    * @param trace - Stack trace error
    * @param context - Context of current Message
    */
-  error(
-    message: string,
-    trace?: string | undefined,
-    context?: string | undefined,
-  ): void {
+  error(message: string, trace?: string, context?: string): void {
     super.error(message, trace, this.getContext(context));
     // get a trace?
     if (trace) {
@@ -170,6 +162,6 @@ export class LoggerService
   }
 
   private getContext(context?: string) {
-    return context ? context : this.context ?? '';
+    return context ? context : (this.context ?? '');
   }
 }

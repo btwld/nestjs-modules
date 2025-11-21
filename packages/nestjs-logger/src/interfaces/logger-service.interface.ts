@@ -21,7 +21,7 @@ export interface LoggerServiceInterface {
    * @param message - The Error Message to be logged
    * @param context - The Context of the message
    */
-  exception(error: Error, message?: string, context?: string | undefined): void;
+  exception(error: Error, message?: string, context?: string): void;
 
   /**
    * Method to log message as a error log level.
@@ -30,11 +30,7 @@ export interface LoggerServiceInterface {
    * @param trace - Stack trace
    * @param context - The Context of the message
    */
-  error(
-    message: string,
-    trace?: string | undefined,
-    context?: string | undefined,
-  ): void;
+  error(message: string, trace?: string, context?: string): void;
 
   /**
    * Method to log message as a warn log level.

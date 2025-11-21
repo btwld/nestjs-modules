@@ -77,7 +77,7 @@ describe('LoggerService', () => {
   describe('Methods', () => {
     it('loggerService.addTransport', async () => {
       await loggerService.addTransport({} as LoggerTransportInterface);
-      expect(spyAddTransport).toBeCalledTimes(1);
+      expect(spyAddTransport).toHaveBeenCalledTimes(1);
     });
 
     /**
@@ -89,8 +89,8 @@ describe('LoggerService', () => {
       const error = new NotFoundException();
       await loggerService.exception(error);
 
-      expect(spyDebug).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyDebug).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.exception_debug_message', async () => {
@@ -98,97 +98,97 @@ describe('LoggerService', () => {
       const message = 'New message';
       await loggerService.exception(error, message);
 
-      expect(spyDebug).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledWith(message, 'debug', error);
+      expect(spyDebug).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledWith(message, 'debug', error);
     });
 
     it('loggerService.exception_error', async () => {
       await loggerService.exception(new Error());
 
-      expect(spyError).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyError).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.error_no_stack', async () => {
       await loggerService.error(errorMessage);
 
-      expect(spyError).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyError).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.error_with_stack', async () => {
       const err = new Error();
       await loggerService.error(errorMessage, err.stack);
 
-      expect(spyError).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyError).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.error_with_stack_context', async () => {
       const err = new Error();
       await loggerService.error(errorMessage, err.stack, context);
 
-      expect(spyError).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyError).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.warn', async () => {
       await loggerService.warn(errorMessage);
 
-      expect(spyWarn).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyWarn).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.warn_context', async () => {
       await loggerService.warn(errorMessage, context);
 
-      expect(spyWarn).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyWarn).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.debug', async () => {
       await loggerService.debug(errorMessage);
 
-      expect(spyDebug).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyDebug).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.debug_context', async () => {
       await loggerService.debug(errorMessage, context);
 
-      expect(spyDebug).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyDebug).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.verbose', async () => {
       await loggerService.verbose(errorMessage);
 
-      expect(spyVerbose).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyVerbose).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.verbose_context', async () => {
       await loggerService.verbose(errorMessage, context);
 
-      expect(spyVerbose).toBeCalledTimes(1);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyVerbose).toHaveBeenCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.log', async () => {
       await loggerService.log(errorMessage);
 
       expect(spyLog).toHaveBeenCalledWith(errorMessage, '');
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('loggerService.log_context', async () => {
       await loggerService.log(errorMessage, context);
 
       // This is being called twoices because of a log on module initialized
-      // expect(spyLog).toBeCalledTimes(2);
+      // expect(spyLog).toHaveBeenCalledTimes(2);
       expect(spyLog).toHaveBeenCalledWith(errorMessage, context);
-      expect(spyTransportLog).toBeCalledTimes(1);
+      expect(spyTransportLog).toHaveBeenCalledTimes(1);
     });
 
     it('LoggerService.log', () => {
@@ -199,7 +199,7 @@ describe('LoggerService', () => {
         .expect(500)
         .then(() => {
           expect(spyLoggerService).toHaveBeenCalledTimes(1);
-          expect(spyLoggerService).toThrowError();
+          expect(spyLoggerService).toThrow();
         });
     });
   });

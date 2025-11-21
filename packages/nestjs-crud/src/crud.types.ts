@@ -6,11 +6,11 @@ import { ConfigurableCrudOptions } from './util/interfaces/configurable-crud-opt
 export type CrudValidationOptions<Entity extends PlainLiteralObject> =
   CrudOptionsInterface<Entity>['validation'];
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/ban-types */
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export type DecoratorTargetObject<T = any> = Type<T> | T;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/ban-types */
-export type ReflectionTargetOrHandler = Function | Type<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ReflectionTargetOrHandler = CallableFunction | Type<any>;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export type AdditionalCrudMethodArgs = any[];

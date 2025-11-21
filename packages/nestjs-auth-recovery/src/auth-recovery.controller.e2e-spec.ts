@@ -50,7 +50,7 @@ describe(AuthRecoveryController, () => {
 
     settings = moduleFixture.get<AuthRecoverySettingsInterface>(
       AUTH_RECOVERY_MODULE_SETTINGS_TOKEN,
-    ) as AuthRecoverySettingsInterface;
+    );
 
     seedingSource = new SeedingSource({
       dataSource: moduleFixture.get(getDataSourceToken()),

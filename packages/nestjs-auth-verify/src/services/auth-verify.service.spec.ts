@@ -46,7 +46,7 @@ describe(AuthVerifyService, () => {
 
     settings = moduleFixture.get<AuthVerifySettingsInterface>(
       AUTH_VERIFY_MODULE_SETTINGS_TOKEN,
-    ) as AuthVerifySettingsInterface;
+    );
 
     notificationService =
       moduleFixture.get<AuthVerifyNotificationServiceInterface>(

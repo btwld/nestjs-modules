@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 
+import * as classValidator from 'class-validator';
 import { mock } from 'jest-mock-extended';
 
 import { BadRequestException, HttpStatus } from '@nestjs/common';
@@ -133,7 +134,6 @@ describe(AuthLocalStrategy.name, () => {
     });
 
     it('should throw BadRequest on validateOrReject', async () => {
-      const classValidator = require('class-validator');
       jest
         .spyOn(classValidator, 'validateOrReject')
         .mockRejectedValueOnce(BadRequestException);
@@ -175,7 +175,7 @@ describe(AuthLocalStrategy.name, () => {
       });
       authLocalStrategy = new AuthLocalStrategy(settings, validateUserService);
       const t = () => authLocalStrategy['assertSettings']();
-      expect(t).toThrowError();
+      expect(t).toThrow();
     });
 
     it('should throw error for no usernameField', async () => {
@@ -186,7 +186,7 @@ describe(AuthLocalStrategy.name, () => {
       });
       authLocalStrategy = new AuthLocalStrategy(settings, validateUserService);
       const t = () => authLocalStrategy['assertSettings']();
-      expect(t).toThrowError();
+      expect(t).toThrow();
     });
 
     it('should throw error for no passwordField', async () => {
@@ -197,7 +197,7 @@ describe(AuthLocalStrategy.name, () => {
       });
       authLocalStrategy = new AuthLocalStrategy(settings, validateUserService);
       const t = () => authLocalStrategy['assertSettings']();
-      expect(t).toThrowError();
+      expect(t).toThrow();
     });
   });
 });

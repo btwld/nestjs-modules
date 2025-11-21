@@ -1,3 +1,3 @@
-export interface Type<T = unknown> extends Function {
+export interface Type<T = unknown> {
   new (...args: unknown[]): T;
 }

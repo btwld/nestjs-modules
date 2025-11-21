@@ -52,7 +52,7 @@ describe(EventListenService, () => {
       class TestEvent extends Event<number> {}
       class TestListenOn extends EventListenerOn<TestEvent> {
         listen(e: TestEvent) {
-          e.payload; // no-op
+          void e.payload; // no-op
         }
       }
 

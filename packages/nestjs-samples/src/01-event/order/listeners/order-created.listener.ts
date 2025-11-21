@@ -11,7 +11,8 @@ export class OrderCreatedListener extends EventListenerOn<OrderCreatedEvent> {
   // custom handler
   listen(event: OrderCreatedEvent): void {
     const dto = event.payload;
-    dto.name; // no-op;
+    // no-op
+    void dto.name;
   }
 }
 

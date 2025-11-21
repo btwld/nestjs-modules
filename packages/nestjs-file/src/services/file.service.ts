@@ -55,12 +55,12 @@ export class FileService implements FileServiceInterface {
   private async addFileUrls(file: FileInterface): Promise<FileInterface> {
     try {
       file.uploadUri = await this.fileStrategyService.getUploadUrl(file);
-    } catch (err) {
+    } catch (_err) {
       file.uploadUri = '';
     }
     try {
       file.downloadUrl = await this.fileStrategyService.getDownloadUrl(file);
-    } catch (err) {
+    } catch (_err) {
       file.downloadUrl = '';
     }
     return file;

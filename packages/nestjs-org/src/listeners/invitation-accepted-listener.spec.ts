@@ -19,12 +19,14 @@ import { SeedingSource } from '@concepta/typeorm-seeding';
 
 import { OrgModule } from '../org.module';
 import { OrgFactory } from '../seeding/org.factory';
+import { OrgMemberModelService } from '../services/org-member-model.service';
 
 import { InvitationAcceptedListener } from './invitation-accepted-listener';
 
 import { InvitationAcceptedEventAsync } from '../__fixtures__/invitation-accepted.event';
 import { InvitationEntityFixture } from '../__fixtures__/invitation.entity.fixture';
 import { OrgEntityFixture } from '../__fixtures__/org-entity.fixture';
+import { OrgMemberModelServiceFixture } from '../__fixtures__/org-member-model.service.fixture';
 import { OrgMemberEntityFixture } from '../__fixtures__/org-member.entity.fixture';
 import { OrgProfileEntityFixture } from '../__fixtures__/org-profile.entity.fixture';
 import { OwnerEntityFixture } from '../__fixtures__/owner-entity.fixture';
@@ -85,7 +87,10 @@ describe(InvitationAcceptedListener, () => {
         CrudModule.forRoot({}),
         OwnerModuleFixture.register(),
       ],
-    }).compile();
+    })
+      .overrideProvider(OrgMemberModelService)
+      .useClass(OrgMemberModelServiceFixture)
+      .compile();
     app = testingModule.createNestApplication();
     await app.init();
 
@@ -140,6 +145,6 @@ describe(InvitationAcceptedListener, () => {
 
     const result = eventResult.every((it) => it === true);
 
-    expect(result);
+    expect(result).toBe(true);
   });
 });

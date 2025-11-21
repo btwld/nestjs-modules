@@ -67,13 +67,13 @@ describe('#request-query', () => {
         });
         it('should throw an error, 1', () => {
           const query = { filter: 'foo||$invalid||bar' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
         it('should throw an error, 2', () => {
           const query = { filter: 'foo||$eq' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -191,13 +191,13 @@ describe('#request-query', () => {
         });
         it('should throw an error, 1', () => {
           const query = { or: 'foo||$invalid||bar' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
         it('should throw an error, 2', () => {
           const query = { or: 'foo||$eq' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -252,13 +252,13 @@ describe('#request-query', () => {
         });
         it('should throw an error, 1', () => {
           const query = { sort: 'foo' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
         it('should throw an error, 2', () => {
           const query = { sort: 'foo,boo' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -287,7 +287,7 @@ describe('#request-query', () => {
         });
         it('should throw an error', () => {
           const query = { limit: 'a' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -312,7 +312,7 @@ describe('#request-query', () => {
         });
         it('should throw an error', () => {
           const query = { offset: 'a' };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -337,7 +337,7 @@ describe('#request-query', () => {
         });
         it('should throw an error', () => {
           const query = { page: ['a'] };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -362,7 +362,7 @@ describe('#request-query', () => {
         });
         it('should throw an error', () => {
           const query = { cache: ['a'] };
-          expect(qp.parseQuery.bind(qp, query)).toThrowError(
+          expect(qp.parseQuery.bind(qp, query)).toThrow(
             CrudRequestQueryException,
           );
         });
@@ -383,13 +383,13 @@ describe('#request-query', () => {
       });
       it('should throw an error, 1', () => {
         const query = { s: 'invalid' };
-        expect(qp.parseQuery.bind(qp, query)).toThrowError(
+        expect(qp.parseQuery.bind(qp, query)).toThrow(
           CrudRequestQueryException,
         );
       });
       it('should throw an error, 2', () => {
         const query = { s: 'true' };
-        expect(qp.parseQuery.bind(qp, query)).toThrowError(
+        expect(qp.parseQuery.bind(qp, query)).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -408,21 +408,21 @@ describe('#request-query', () => {
       it('should throw an error, 1', () => {
         const params = { foo: 'bar' };
         const options: CrudRequestParamsOptionsInterface<TestEntity> = {};
-        expect(qp.parseParams.bind(qp, params, options)).toThrowError(
+        expect(qp.parseParams.bind(qp, params, options)).toThrow(
           CrudRequestQueryException,
         );
       });
       it('should throw an error, 2', () => {
         const params = { foo: 'bar' };
         const options = {};
-        expect(qp.parseParams.bind(qp, params, options)).toThrowError(
+        expect(qp.parseParams.bind(qp, params, options)).toThrow(
           CrudRequestQueryException,
         );
       });
       it('should throw an error, 3', () => {
         const params = { foo: 'bar' };
         const options = { foo: {} };
-        expect(qp.parseParams.bind(qp, params, options)).toThrowError(
+        expect(qp.parseParams.bind(qp, params, options)).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -431,7 +431,7 @@ describe('#request-query', () => {
         const options = {
           foo: { field: 'number' },
         } as unknown as CrudRequestParamsOptionsInterface<TestEntity>;
-        expect(qp.parseParams.bind(qp, params, options)).toThrowError(
+        expect(qp.parseParams.bind(qp, params, options)).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -440,7 +440,7 @@ describe('#request-query', () => {
         const options: CrudRequestParamsOptionsInterface<TestEntity> = {
           foo: { field: 'foo', type: 'number' },
         };
-        expect(qp.parseParams.bind(qp, params, options)).toThrowError(
+        expect(qp.parseParams.bind(qp, params, options)).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -449,7 +449,7 @@ describe('#request-query', () => {
         const options: CrudRequestParamsOptionsInterface<TestEntity> = {
           foo: { field: 'foo', type: 'uuid' },
         };
-        expect(qp.parseParams.bind(qp, params, options)).toThrowError(
+        expect(qp.parseParams.bind(qp, params, options)).toThrow(
           CrudRequestQueryException,
         );
       });

@@ -8,6 +8,7 @@ export function safeRequire<T = unknown>(
 ): T | null {
   try {
     /* istanbul ignore next */
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pack = loader ? loader() : require(path);
     return pack;
   } catch (_) {

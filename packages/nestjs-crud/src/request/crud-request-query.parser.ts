@@ -177,9 +177,12 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
   ): string[] {
     return this._paramNames.filter((p) => {
       const name = this._options.paramNamesMap[type];
-      return isString(name)
-        ? name === p
-        : (name as string[]).some((m) => m === p);
+      const expectedNames = isString(name) ? [name] : (name as string[]);
+
+      // Check for exact match or array-style parameter names (e.g., 'filter[0]', 'filter[1]')
+      return expectedNames.some((expectedName) => {
+        return p === expectedName || p.startsWith(`${expectedName}[`);
+      });
     });
   }
 
@@ -198,7 +201,7 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
     }
 
     if (Array.isArray(value) && value.length) {
-      return (value as string[]).map((val) => parser(val));
+      return value.map((val) => parser(val));
     }
 
     return [];
@@ -216,7 +219,7 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
     }
 
     if (Array.isArray(value) && value.length) {
-      return (value as string[]).map((val) => parser(val));
+      return value.map((val) => parser(val));
     }
 
     return [];
@@ -234,7 +237,7 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
     }
 
     if (Array.isArray(value) && value.length) {
-      return (value as string[]).map((val) => parser(val));
+      return value.map((val) => parser(val));
     }
 
     return [];
@@ -252,7 +255,7 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
     }
 
     if (Array.isArray(value) && value.length) {
-      return (value as string[]).map((val) => parser(val));
+      return value.map((val) => parser(val));
     }
 
     return [];
@@ -347,7 +350,7 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
       }
 
       return parsed;
-    } catch (ignored) {
+    } catch (_ignored) {
       if (isDateString(val)) {
         return new Date(val);
       }
@@ -381,7 +384,7 @@ export class CrudRequestQueryParser<Entity extends PlainLiteralObject>
       }
 
       return data;
-    } catch (_) {
+    } catch (_e) {
       throw new CrudRequestQueryException({
         message: 'Invalid search param. JSON expected',
       });

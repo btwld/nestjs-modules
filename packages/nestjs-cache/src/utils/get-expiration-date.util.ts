@@ -1,4 +1,4 @@
-import ms from 'ms';
+import { toMilliseconds } from '@concepta/nestjs-common';
 
 import { CacheInvalidExpiredDateException } from '../exceptions/cache-invalid-expired-date.exception';
 
@@ -8,7 +8,7 @@ const getExpirationDate = (
   if (!expiresIn) return null;
 
   const now = new Date();
-  const expires = ms(expiresIn);
+  const expires = toMilliseconds(expiresIn);
 
   // TODO: should be a custom exception
   if (!expires) throw new CacheInvalidExpiredDateException();

@@ -45,7 +45,9 @@ export class AuthRouterGuard implements CanActivate {
           // The state parameter might be a JSON string containing provider info
           const stateData = JSON.parse(state);
           callbackProvider = stateData.provider;
-        } catch (error) {}
+        } catch (_error) {
+          // Ignore parse errors
+        }
       }
 
       if (!callbackProvider) {

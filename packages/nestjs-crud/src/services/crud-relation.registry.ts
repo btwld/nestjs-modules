@@ -26,7 +26,7 @@ export class CrudRelationRegistry<
    * @returns The matching service instance or undefined
    */
   private getService(
-    serviceType: Function,
+    serviceType: NewableFunction,
   ): CrudFetchServiceInterface<Relations[number]> | undefined {
     return this.services.find((svc) => svc.constructor === serviceType);
   }

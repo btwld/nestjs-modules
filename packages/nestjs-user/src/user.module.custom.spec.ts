@@ -33,7 +33,7 @@ describe('AppModule', () => {
 
   afterEach(async () => {
     jest.clearAllMocks();
-    testModule && (await testModule.close());
+    if (testModule) await testModule.close();
   });
 
   describe('module', () => {

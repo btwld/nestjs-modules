@@ -48,7 +48,7 @@ describe('#request-query', () => {
         expect(qb.queryObject.fields).toBeUndefined();
       });
       it('should throw an error', () => {
-        expect((qb.select as any).bind(qb, [false])).toThrowError(
+        expect((qb.select as any).bind(qb, [false])).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -65,17 +65,17 @@ describe('#request-query', () => {
         expect(qb.queryObject.filter).toBeUndefined();
       });
       it('should throw an error, 1', () => {
-        expect((qb.setFilter as any).bind(qb, { field: 1 })).toThrowError(
+        expect((qb.setFilter as any).bind(qb, { field: 1 })).toThrow(
           CrudRequestQueryException,
         );
       });
       it('should throw an error, 2', () => {
         expect(
           (qb.setFilter as any).bind(qb, { field: 'foo', operator: '$bar' }),
-        ).toThrowError(CrudRequestQueryException);
+        ).toThrow(CrudRequestQueryException);
       });
       it('should throw an error, 3', () => {
-        expect((qb.setFilter as any).bind(qb, [{}])).toThrowError(
+        expect((qb.setFilter as any).bind(qb, [{}])).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -121,17 +121,17 @@ describe('#request-query', () => {
         expect(qb.queryObject.or).toBeUndefined();
       });
       it('should throw an error, 1', () => {
-        expect((qb.setOr as any).bind(qb, { field: 1 })).toThrowError(
+        expect((qb.setOr as any).bind(qb, { field: 1 })).toThrow(
           CrudRequestQueryException,
         );
       });
       it('should throw an error, 2', () => {
         expect(
           (qb.setOr as any).bind(qb, { field: 'foo', operator: '$bar' }),
-        ).toThrowError(CrudRequestQueryException);
+        ).toThrow(CrudRequestQueryException);
       });
       it('should throw an error, 3', () => {
-        expect((qb.setOr as any).bind(qb, [{}])).toThrowError(
+        expect((qb.setOr as any).bind(qb, [{}])).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -156,17 +156,17 @@ describe('#request-query', () => {
         expect(qb.queryObject.sort).toBeUndefined();
       });
       it('should throw an error, 1', () => {
-        expect((qb.sortBy as any).bind(qb, { field: 1 })).toThrowError(
+        expect((qb.sortBy as any).bind(qb, { field: 1 })).toThrow(
           CrudRequestQueryException,
         );
       });
       it('should throw an error, 2', () => {
         expect(
           (qb.sortBy as any).bind(qb, { field: 'foo', order: 'bar' }),
-        ).toThrowError(CrudRequestQueryException);
+        ).toThrow(CrudRequestQueryException);
       });
       it('should throw an error, 3', () => {
-        expect((qb.sortBy as any).bind(qb, [{}])).toThrowError(
+        expect((qb.sortBy as any).bind(qb, [{}])).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -206,7 +206,7 @@ describe('#request-query', () => {
         expect(qb.queryObject.limit).toBeUndefined();
       });
       it('should throw an error', () => {
-        expect((qb.setLimit as any).bind(qb, {})).toThrowError(
+        expect((qb.setLimit as any).bind(qb, {})).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -223,7 +223,7 @@ describe('#request-query', () => {
         expect(qb.queryObject.offset).toBeUndefined();
       });
       it('should throw an error', () => {
-        expect((qb.setOffset as any).bind(qb, {})).toThrowError(
+        expect((qb.setOffset as any).bind(qb, {})).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -240,7 +240,7 @@ describe('#request-query', () => {
         expect(qb.queryObject.page).toBeUndefined();
       });
       it('should throw an error', () => {
-        expect((qb.setPage as any).bind(qb, {})).toThrowError(
+        expect((qb.setPage as any).bind(qb, {})).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -261,10 +261,10 @@ describe('#request-query', () => {
 
     describe('#cond', () => {
       it('should throw an error, 1', () => {
-        expect(qb.cond as any).toThrowError(CrudRequestQueryException);
+        expect(qb.cond as any).toThrow(CrudRequestQueryException);
       });
       it('should throw an error, 2', () => {
-        expect((qb.cond as any).bind(qb, {})).toThrowError(
+        expect((qb.cond as any).bind(qb, {})).toThrow(
           CrudRequestQueryException,
         );
       });
@@ -321,7 +321,7 @@ describe('#request-query', () => {
           .setIncludeDeleted(1)
           .query(false);
         const expected =
-          'fields=foo,bar&filter[0]=is||$notnull&or[0]=ok||$ne||false&limit=1&offset=2&page=3&sort[0]=foo,DESC&cache=0&include_deleted=1'; // eslint-disable-line
+          'fields=foo,bar&filter[0]=is||$notnull&or[0]=ok||$ne||false&limit=1&offset=2&page=3&sort[0]=foo,DESC&cache=0&include_deleted=1';
         expect(test).toBe(expected);
       });
     });

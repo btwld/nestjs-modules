@@ -44,12 +44,14 @@ export class PhotoControllerFixture
 {
   /**
    * Constructor.
+   *
    * @param photoService instance of the photo crud service
    */
   constructor(private photoService: PhotoServiceFixture) {}
 
   /**
    * Get many
+   *
    * @param crudRequest the CRUD request object
    */
   @CrudReadAll()
@@ -62,6 +64,7 @@ export class PhotoControllerFixture
 
   /**
    * Get one
+   *
    * @param crudRequest the CRUD request object
    */
   @CrudReadOne()
@@ -74,6 +77,7 @@ export class PhotoControllerFixture
 
   /**
    * Create many
+   *
    * @param crudRequest the CRUD request object
    * @param photoCreateManyDto photo create many dto
    */
@@ -88,6 +92,7 @@ export class PhotoControllerFixture
 
   /**
    * Create one
+   *
    * @param crudRequest the CRUD request object
    * @param photoCreateDto photo create dto
    */
@@ -102,6 +107,7 @@ export class PhotoControllerFixture
 
   /**
    * Update one
+   *
    * @param crudRequest the CRUD request object
    * @param photoUpdateDto photo update dto
    */
@@ -116,6 +122,7 @@ export class PhotoControllerFixture
 
   /**
    * Replace one
+   *
    * @param crudRequest the CRUD request object
    */
   @CrudReplaceOne()
@@ -129,6 +136,7 @@ export class PhotoControllerFixture
 
   /**
    * Delete one
+   *
    * @param crudRequest the CRUD request object
    */
   @CrudDeleteOne()
@@ -141,6 +149,7 @@ export class PhotoControllerFixture
 
   /**
    * Delete one (soft)
+   *
    * @param crudRequest the CRUD request object
    */
   @CrudDeleteOne({ path: 'soft/:id' })
@@ -154,6 +163,7 @@ export class PhotoControllerFixture
 
   /**
    * Recover one
+   *
    * @param crudRequest the CRUD request object
    */
   @CrudRecoverOne()

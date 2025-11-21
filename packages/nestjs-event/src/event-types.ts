@@ -4,25 +4,18 @@ import { EventExpectsReturnOfInterface } from './events/interfaces/event-expects
 
 export type EventPayload<V> = V;
 
-export type EventInstance<E> = E extends EventBaseInterface<infer V, infer R>
-  ? EventBaseInterface<V, R>
-  : never;
+export type EventInstance<E> =
+  E extends EventBaseInterface<infer V, infer R>
+    ? EventBaseInterface<V, R>
+    : never;
 
-export type EventAsyncInstance<E> = E extends EventAsyncInterface<
-  infer V,
-  infer R
->
-  ? EventAsyncInterface<V, R>
-  : never;
+export type EventAsyncInstance<E> =
+  E extends EventAsyncInterface<infer V, infer R>
+    ? EventAsyncInterface<V, R>
+    : never;
 
-export type EventReturnType<E> = E extends EventExpectsReturnOfInterface<
-  infer R
->
-  ? R
-  : never;
+export type EventReturnType<E> =
+  E extends EventExpectsReturnOfInterface<infer R> ? R : never;
 
-export type EventReturnPayload<E, R = EventReturnType<E>> = R extends Promise<
-  infer Z
->
-  ? Z
-  : R;
+export type EventReturnPayload<E, R = EventReturnType<E>> =
+  R extends Promise<infer Z> ? Z : R;

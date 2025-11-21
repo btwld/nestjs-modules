@@ -64,8 +64,14 @@ export const CrudInitApiQuery =
         // the merged options
         const appliedParamsMap = new Map<string, boolean>();
 
+        // filter options to only include those with a name property (NestJS 11 compatibility)
+        const queryOptionsWithName = [...options, ...queryParamsMeta].filter(
+          (option): option is typeof option & { name: string } =>
+            'name' in option && typeof option.name === 'string',
+        );
+
         // loop all of the options merged together, overrides first
-        for (const apiQueryOptions of [...options, ...queryParamsMeta]) {
+        for (const apiQueryOptions of queryOptionsWithName) {
           // applied yet?
           if (!appliedParamsMap.has(apiQueryOptions.name)) {
             // apply the decorator

@@ -46,7 +46,7 @@ describe(EmailService, () => {
 
         const result = await emailService.sendMail({});
         expect(result).toBeUndefined();
-        expect(mailerService.sendMail).toBeCalledTimes(1);
+        expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -67,8 +67,8 @@ describe(EmailService, () => {
         );
       }
 
-      expect(mailerService.sendMail).toBeCalledTimes(1);
-      expect(logger.error).toBeCalledTimes(1);
+      expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledTimes(1);
     });
   });
 });

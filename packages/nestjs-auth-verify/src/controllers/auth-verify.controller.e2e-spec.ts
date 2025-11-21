@@ -40,7 +40,7 @@ describe(AuthVerifyControllerFixture, () => {
 
     settings = moduleFixture.get<AuthVerifySettingsInterface>(
       AUTH_VERIFY_MODULE_SETTINGS_TOKEN,
-    ) as AuthVerifySettingsInterface;
+    );
 
     seedingSource = new SeedingSource({
       dataSource: moduleFixture.get(getDataSourceToken()),

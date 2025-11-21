@@ -26,7 +26,7 @@ describe('AppModule', () => {
   describe('Notification Controller', () => {
     it('Create notification', () => {
       notificationController.create({ emailAddress: 'email@email.com' });
-      expect(spyService).toBeCalledTimes(1);
+      expect(spyService).toHaveBeenCalledTimes(1);
     });
   });
 });

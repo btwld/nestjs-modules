@@ -13,7 +13,7 @@ interface UserInterface {
 describe(AuthUser.name, () => {
   interface ValueInterface {}
 
-  const getParamDecoratorFactory = (decorator: Function) => {
+  const getParamDecoratorFactory = (decorator: () => ParameterDecorator) => {
     class TestController {
       public test(@decorator() value: ValueInterface) {
         return value;

@@ -34,15 +34,13 @@ jest.mock('@nestjs/passport', () => {
 
 // Mock passport-github
 jest.mock('passport-github', () => ({
-  Strategy: jest
-    .fn()
-    .mockImplementation(function MockStrategy(
-      this: Record<string, unknown>,
-      options: Record<string, unknown>,
-    ) {
-      this.options = options;
-      return this;
-    }),
+  Strategy: jest.fn().mockImplementation(function MockStrategy(
+    this: Record<string, unknown>,
+    options: Record<string, unknown>,
+  ) {
+    this.options = options;
+    return this;
+  }),
 }));
 
 // Mock the mapProfile util

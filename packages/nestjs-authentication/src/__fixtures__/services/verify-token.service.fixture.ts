@@ -7,14 +7,14 @@ export class VerifyTokenServiceFixture implements VerifyTokenServiceInterface {
 
   async accessToken(
     _token: string,
-    _options?: JwtVerifyOptions | undefined,
+    _options?: JwtVerifyOptions,
   ): Promise<object> {
     throw new Error('Method not implemented.');
   }
 
   async refreshToken(
     _token: string,
-    _options?: JwtVerifyOptions | undefined,
+    _options?: JwtVerifyOptions,
   ): Promise<object> {
     throw new Error('Method not implemented.');
   }

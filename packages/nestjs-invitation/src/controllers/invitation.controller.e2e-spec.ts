@@ -90,7 +90,7 @@ describe('InvitationController (e2e)', () => {
 
   afterEach(async () => {
     jest.clearAllMocks();
-    app && (await app.close());
+    if (app) await app.close();
   });
 
   describe('Type: org', () => {

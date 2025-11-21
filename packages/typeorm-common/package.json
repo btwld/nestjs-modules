@@ -11,15 +11,15 @@
   ],
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
-    "@nestjs/common": "^10.4.1"
+    "@nestjs/common": "^11.1.9"
   },
   "devDependencies": {
     "@concepta/nestjs-common": "^7.0.0-alpha.9",
     "@concepta/nestjs-typeorm-ext": "^7.0.0-alpha.9",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
-    "@nestjs/typeorm": "^10.0.2",
-    "jest-mock-extended": "^2.0.9"
+    "@nestjs/typeorm": "^11.0.0",
+    "jest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
     "@nestjs/testing": "^10.4.1",

@@ -58,7 +58,7 @@ describe('LoggerExceptionFilter', () => {
     const spyLoggerServiceException = jest.spyOn(loggerService, 'exception');
     loggerExceptionFilter.catch(new Error(), mock<ArgumentsHost>());
 
-    expect(spyLoggerServiceException).toBeCalledTimes(1);
+    expect(spyLoggerServiceException).toHaveBeenCalledTimes(1);
   });
 
   afterEach(async () => {

@@ -17,7 +17,7 @@ describe('password configuration', () => {
     jest.clearAllMocks();
   });
 
-  describe(passwordDefaultConfig, () => {
+  describe(passwordDefaultConfig.name, () => {
     let moduleRef: TestingModule;
 
     it('should use fallbacks', async () => {

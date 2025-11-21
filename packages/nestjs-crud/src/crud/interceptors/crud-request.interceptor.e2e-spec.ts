@@ -100,7 +100,7 @@ describe('#crud', () => {
     }
   }
 
-  let $: supertest.SuperTest<supertest.Test>;
+  let $: ReturnType<typeof supertest>;
   let app: NestApplication;
 
   beforeAll(async () => {

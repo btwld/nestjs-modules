@@ -73,7 +73,7 @@ describe(InvitationRevocationService, () => {
 
   afterEach(async () => {
     jest.clearAllMocks();
-    app && (await app.close());
+    if (app) await app.close();
   });
 
   describe(InvitationRevocationService.prototype.revokeAll, () => {

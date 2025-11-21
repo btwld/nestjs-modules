@@ -20,7 +20,7 @@ describe(JwtVerifyTokenService, () => {
         .mockResolvedValue({ foo: 'bar' });
       const result = await jwtVerifyTokenService.accessToken('{"foo": "bar"}');
       expect(result).toEqual({ foo: 'bar' });
-      expect(spyAccessToken).toBeCalledWith('{"foo": "bar"}');
+      expect(spyAccessToken).toHaveBeenCalledWith('{"foo": "bar"}');
     });
 
     it('should throw error', async () => {
@@ -28,7 +28,7 @@ describe(JwtVerifyTokenService, () => {
         throw new Error();
       });
       const t = async () => await jwtVerifyTokenService.accessToken(token);
-      await expect(t).rejects.toThrowError();
+      await expect(t).rejects.toThrow();
     });
   });
 
@@ -39,7 +39,7 @@ describe(JwtVerifyTokenService, () => {
         .mockResolvedValue({ man: 'chu' });
       const result = await jwtVerifyTokenService.refreshToken('{"man": "chu"}');
       expect(result).toEqual({ man: 'chu' });
-      expect(spyRefreshToken).toBeCalledWith('{"man": "chu"}');
+      expect(spyRefreshToken).toHaveBeenCalledWith('{"man": "chu"}');
     });
 
     it('should throw error', async () => {
@@ -47,7 +47,7 @@ describe(JwtVerifyTokenService, () => {
         throw new Error();
       });
       const t = async () => await jwtVerifyTokenService.refreshToken(token);
-      await expect(t).rejects.toThrowError();
+      await expect(t).rejects.toThrow();
     });
   });
 });

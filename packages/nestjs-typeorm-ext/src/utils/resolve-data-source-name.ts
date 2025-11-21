@@ -6,5 +6,5 @@ export function resolveDataSourceName(
 ): string {
   return typeof dataSource === 'string'
     ? dataSource
-    : dataSource.name ?? TYPEORM_EXT_MODULE_DEFAULT_DATA_SOURCE_NAME;
+    : (dataSource.name ?? TYPEORM_EXT_MODULE_DEFAULT_DATA_SOURCE_NAME);
 }

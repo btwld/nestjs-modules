@@ -34,7 +34,7 @@ describe('AppModule', () => {
         description: 'Description to log',
         name: 'Order 1',
       });
-      expect(logService).toBeCalledTimes(1);
+      expect(logService).toHaveBeenCalledTimes(1);
     });
   });
 });

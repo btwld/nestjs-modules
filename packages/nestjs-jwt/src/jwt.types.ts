@@ -5,7 +5,7 @@ export {
 
 export type JwtVerifyTokenCallback<
   ErrorType extends Error = Error,
-  DecodedTokenType extends unknown = unknown,
+  DecodedTokenType = unknown,
 > = (
   token: string,
   done: (err?: ErrorType, decodedToken?: DecodedTokenType) => void,

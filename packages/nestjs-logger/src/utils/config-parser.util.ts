@@ -29,7 +29,7 @@ export function splitLogLevel(levels: string): LogLevel[] {
     // is the log level valid?
     if (LOGGER_VALID_LOG_LEVELS.includes(levelTrimmed)) {
       // yes
-      return levelTrimmed as LogLevel;
+      return levelTrimmed;
     } else {
       // no
       throw new LoggerInvalidLogLevelException(levelTrimmed);

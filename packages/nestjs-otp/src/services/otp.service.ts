@@ -1,6 +1,5 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import ms from 'ms';
 
 import { Inject, Injectable, Type } from '@nestjs/common';
 
@@ -16,6 +15,7 @@ import {
   ModelQueryException,
   ModelMutateException,
   ModelValidationException,
+  toMilliseconds,
 } from '@concepta/nestjs-common';
 
 import { OtpCreateDto } from '../dto/otp-create.dto';
@@ -250,6 +250,7 @@ export class OtpService implements OtpServiceInterface {
    *
    * @param assignment - The assignment of the check
    * @param otp - The otp to get assignments
+   * @param keepHistoryDays - Number of days to keep in history
    */
   // TODO: recieve query in parameters
   protected async getAssignedOtps(
@@ -451,6 +452,6 @@ export class OtpService implements OtpServiceInterface {
     const now = new Date();
 
     // add time in seconds to now as string format
-    return new Date(now.getTime() + ms(expiresIn));
+    return new Date(now.getTime() + toMilliseconds(expiresIn));
   }
 }

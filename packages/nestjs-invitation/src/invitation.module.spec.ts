@@ -99,7 +99,7 @@ describe(InvitationModule, () => {
   });
 
   afterEach(async () => {
-    testModule && (await testModule.close());
+    if (testModule) await testModule.close();
   });
 
   describe(InvitationModule.register, () => {
@@ -128,7 +128,7 @@ describe(InvitationModule, () => {
   });
 
   afterEach(async () => {
-    testModule && (await testModule.close());
+    if (testModule) await testModule.close();
   });
 
   describe(InvitationModule.forRootAsync, () => {
@@ -172,7 +172,7 @@ describe(InvitationModule, () => {
   });
 
   afterEach(async () => {
-    testModule && (await testModule.close());
+    if (testModule) await testModule.close();
   });
 
   describe(InvitationModule.registerAsync, () => {
@@ -216,7 +216,7 @@ describe(InvitationModule, () => {
   });
 
   afterEach(async () => {
-    testModule && (await testModule.close());
+    if (testModule) await testModule.close();
   });
 
   function commonVars() {

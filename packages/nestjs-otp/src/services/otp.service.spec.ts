@@ -1,9 +1,11 @@
-import ms from 'ms';
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
-import { OtpInterface, RepositoryInterface } from '@concepta/nestjs-common';
+import {
+  OtpInterface,
+  RepositoryInterface,
+  toMilliseconds,
+} from '@concepta/nestjs-common';
 import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 import { SeedingSource } from '@concepta/typeorm-seeding';
 
@@ -39,7 +41,7 @@ describe('OtpModule', () => {
     overrides: Partial<OtpInterface> & Pick<OtpInterface, 'assigneeId'>,
   ) => {
     const now = new Date();
-    const expirationDate = new Date(now.getTime() + ms('1d'));
+    const expirationDate = new Date(now.getTime() + toMilliseconds('1d'));
 
     return userOtpFactory.create({
       category: CATEGORY_DEFAULT,
@@ -165,7 +167,7 @@ describe('OtpModule', () => {
 
     it('check if is expired', async () => {
       const now = new Date();
-      const expirationDate = new Date(now.getTime() - ms('1d'));
+      const expirationDate = new Date(now.getTime() - toMilliseconds('1d'));
 
       const assignee = await factoryCreateUser();
 
@@ -405,7 +407,7 @@ describe('OtpModule', () => {
 
       // cleared passcodes should be invalid
       // TODO: check that they were actually removed from database
-      expect(await defaultIsValidOtp(otp)).toBeNull;
+      expect(await defaultIsValidOtp(otp)).toBeNull();
       expect(await defaultIsValidOtp(otp2)).toBeNull();
     });
   });

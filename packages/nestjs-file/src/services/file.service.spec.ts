@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import { mock } from 'jest-mock-extended';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 import {
   FileCreatableInterface,
@@ -15,12 +15,10 @@ import { FileModelService } from './file-model.service';
 import { FileStrategyService } from './file-strategy.service';
 import { FileService } from './file.service';
 
-import { FileEntityFixture } from '../__fixtures__/file/file-entity.fixture';
-
 describe(FileService.name, () => {
   let fileService: FileService;
-  let fileRepo: jest.Mocked<RepositoryInterface<FileEntityInterface>>;
-  let fileStrategyService: jest.Mocked<FileStrategyService>;
+  let fileRepo: MockProxy<RepositoryInterface<FileEntityInterface>>;
+  let fileStrategyService: MockProxy<FileStrategyService>;
   let fileModelService: FileModelService;
 
   const mockFile: FileEntityInterface = {
@@ -104,12 +102,12 @@ describe(FileService.name, () => {
   });
 });
 
-function createMockRepository(): jest.Mocked<
+function createMockRepository(): MockProxy<
   RepositoryInterface<FileEntityInterface>
 > {
-  return mock<RepositoryInterface<FileEntityFixture>>();
+  return mock<RepositoryInterface<FileEntityInterface>>();
 }
 
-function createMockFileStrategyService(): jest.Mocked<FileStrategyService> {
+function createMockFileStrategyService(): MockProxy<FileStrategyService> {
   return mock<FileStrategyService>();
 }

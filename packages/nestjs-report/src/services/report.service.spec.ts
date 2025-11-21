@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import { mock } from 'jest-mock-extended';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 import {
   ReportCreatableInterface,
@@ -40,8 +40,8 @@ const mockReportCreateDto: ReportCreateDto = {
 
 describe(ReportService.name, () => {
   let reportService: ReportService;
-  let reportRepo: jest.Mocked<RepositoryInterface<ReportEntityInterface>>;
-  let reportStrategyService: jest.Mocked<ReportStrategyService>;
+  let reportRepo: MockProxy<RepositoryInterface<ReportEntityInterface>>;
+  let reportStrategyService: MockProxy<ReportStrategyService>;
   let reportModelService: ReportModelServiceInterface;
 
   beforeEach(() => {
@@ -165,7 +165,7 @@ describe(ReportService.name, () => {
   });
 });
 
-function createMockRepository(): jest.Mocked<
+function createMockRepository(): MockProxy<
   RepositoryInterface<ReportEntityInterface>
 > {
   return mock<RepositoryInterface<ReportEntityInterface>>({
@@ -175,7 +175,7 @@ function createMockRepository(): jest.Mocked<
   });
 }
 
-function createMockReportStrategyService(): jest.Mocked<ReportStrategyService> {
+function createMockReportStrategyService(): MockProxy<ReportStrategyService> {
   return mock<ReportStrategyService>({
     generate: jest.fn().mockResolvedValue(mockReport),
   });

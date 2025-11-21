@@ -5,7 +5,7 @@ export function createSettingsProvider<
   ModuleSettingsType,
   ModuleOptionsType extends ModuleOptionsSettingsInterface<ModuleSettingsType>,
 >(options: {
-  settingsKey: string;
+  settingsKey: string | symbol;
   settingsToken: string;
   optionsToken: InjectionToken;
   optionsOverrides?: ModuleOptionsType;

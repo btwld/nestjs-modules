@@ -21,8 +21,8 @@ export class UserPasswordServiceFixture
   setPassword(
     _passwordDto: PasswordPlainInterface &
       Partial<PasswordPlainCurrentInterface>,
-    _userToUpdateId?: string | undefined,
-    _authorizedUser?: AuthenticatedUserInterface | undefined,
+    _userToUpdateId?: string,
+    _authorizedUser?: AuthenticatedUserInterface,
   ): Promise<void> {
     return Promise.resolve();
   }

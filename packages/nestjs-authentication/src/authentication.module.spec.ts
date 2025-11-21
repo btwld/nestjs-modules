@@ -217,9 +217,8 @@ describe(AuthenticationModule, () => {
 
       // Test 3: But tokens should be verifiable by their own services (sanity check)
       const tempVerified = await testService.verifyAccessToken(tempAccessToken);
-      const globalVerified = await globalVerifyService.accessToken(
-        globalAccessToken,
-      );
+      const globalVerified =
+        await globalVerifyService.accessToken(globalAccessToken);
 
       expect(tempVerified).toBeDefined();
       expect(globalVerified).toBeDefined();
@@ -271,6 +270,11 @@ describe(AuthenticationModule, () => {
   }
 });
 
+/**
+ * Factory function to create test module configuration
+ *
+ * @param extraImports - Additional imports to include in the test module
+ */
 function testModuleFactory(
   extraImports: DynamicModule['imports'] = [],
 ): ModuleMetadata {

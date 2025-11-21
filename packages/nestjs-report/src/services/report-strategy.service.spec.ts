@@ -82,7 +82,7 @@ describe(ReportStrategyService.name, () => {
 
       const result = await reportStrategyService.generate(mockReport);
 
-      expect(mockStorageService.generate).toBeCalledWith(mockReport);
+      expect(mockStorageService.generate).toHaveBeenCalledWith(mockReport);
       expect(result.status).toBe(ReportStatusEnum.Complete);
     });
   });
@@ -108,9 +108,8 @@ describe(ReportStrategyService.name, () => {
         mockReport.serviceKey = 'mock-service';
         reportStrategyService.addStorageService(mockStorageService);
 
-        const result = await reportStrategyService['resolveGeneratorService'](
-          mockReport,
-        );
+        const result =
+          await reportStrategyService['resolveGeneratorService'](mockReport);
 
         expect(result).toBe(mockStorageService);
       });
