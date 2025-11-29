@@ -1522,6 +1522,7 @@ __metadata:
     qs: "npm:^6.14.0"
     supertest: "npm:^6.3.4"
   peerDependencies:
+    "@concepta/nestjs-typeorm-ext": "*"
     class-transformer: "*"
     class-validator: "*"
     rxjs: ^7.1.0
