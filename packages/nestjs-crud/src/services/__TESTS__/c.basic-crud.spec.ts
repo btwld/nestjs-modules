@@ -326,10 +326,7 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
-          TypeOrmModule.forFeature([
-            ProjectEntity,
-            UserEntity,
-          ]),
+          TypeOrmModule.forFeature([ProjectEntity, UserEntity]),
           TypeOrmExtModule.forFeature({
             [CRUD_TEST_COMPANY_ENTITY_KEY]: {
               entity: CompanyEntity,
