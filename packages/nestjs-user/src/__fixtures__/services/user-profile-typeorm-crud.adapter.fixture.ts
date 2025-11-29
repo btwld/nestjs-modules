@@ -1,12 +1,13 @@
-import { Repository } from 'typeorm';
-
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 
-import { UserProfileEntityInterface } from '@concepta/nestjs-common';
+import {
+  InjectDynamicRepository,
+  UserProfileEntityInterface,
+} from '@concepta/nestjs-common';
 import { TypeOrmCrudAdapter } from '@concepta/nestjs-crud';
+import { TypeOrmRepositoryAdapter } from '@concepta/nestjs-typeorm-ext';
 
-import { UserProfileEntityFixture } from '../user-profile.entity.fixture';
+import { USER_MODULE_USER_PROFILE_ENTITY_KEY } from '../../user.constants';
 
 /**
  * User Profile TypeOrm CRUD adapter fixture
@@ -18,12 +19,12 @@ export class UserProfileTypeOrmCrudAdapterFixture<
   /**
    * Constructor
    *
-   * @param userRepo - instance of the user repository.
+   * @param repoAdapter - instance of the user profile repository adapter.
    */
   constructor(
-    @InjectRepository(UserProfileEntityFixture)
-    protected readonly userRepo: Repository<T>,
+    @InjectDynamicRepository(USER_MODULE_USER_PROFILE_ENTITY_KEY)
+    repoAdapter: TypeOrmRepositoryAdapter<T>,
   ) {
-    super(userRepo);
+    super(repoAdapter);
   }
 }

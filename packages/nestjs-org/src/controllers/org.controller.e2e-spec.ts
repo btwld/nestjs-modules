@@ -5,8 +5,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { CrudModule } from '@concepta/nestjs-crud';
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 import { SeedingSource } from '@concepta/typeorm-seeding';
 
+import { ORG_MODULE_ORG_ENTITY_KEY } from '../org.constants';
 import { OrgFactory } from '../seeding/org.factory';
 import { OrgSeeder } from '../seeding/org.seeder';
 
@@ -51,6 +53,11 @@ describe('OrgController (e2e)', () => {
             UserEntityFixture,
             InvitationEntityFixture,
           ]),
+          TypeOrmExtModule.forFeature({
+            [ORG_MODULE_ORG_ENTITY_KEY]: {
+              entity: OrgEntityFixture,
+            },
+          }),
           CrudModule.forRoot({}),
           OwnerModuleFixture.register(),
         ],

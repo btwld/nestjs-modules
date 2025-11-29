@@ -28,7 +28,7 @@ export class TypeOrmRepositoryAdapter<Entity extends PlainLiteralObject>
    *
    * @param repo - instance of the repo
    */
-  constructor(private repo: Repository<Entity>) {}
+  constructor(public readonly repo: Repository<Entity>) {}
 
   /**
    * Find wrapper.
@@ -89,6 +89,14 @@ export class TypeOrmRepositoryAdapter<Entity extends PlainLiteralObject>
   }
 
   async save<T extends DeepPartial<Entity>>(
+    entities: T[],
+    options?: RepositoryInternals.SaveOptions,
+  ): Promise<(T & Entity)[]>;
+  async save<T extends DeepPartial<Entity>>(
+    entity: T,
+    options?: RepositoryInternals.SaveOptions,
+  ): Promise<T & Entity>;
+  async save<T extends DeepPartial<Entity>>(
     entities: T | T[],
     options?: RepositoryInternals.SaveOptions,
   ): Promise<(T & Entity) | (T & Entity)[]> {
@@ -106,6 +114,32 @@ export class TypeOrmRepositoryAdapter<Entity extends PlainLiteralObject>
       return this.repo.remove(entity);
     } else {
       return this.repo.remove(entity);
+    }
+  }
+
+  /**
+   * Soft remove entities (sets delete date)
+   */
+  async softRemove(entities: Entity[]): Promise<Entity[]>;
+  async softRemove(entity: Entity): Promise<Entity>;
+  async softRemove(entity: Entity | Entity[]): Promise<Entity | Entity[]> {
+    if (Array.isArray(entity)) {
+      return this.repo.softRemove(entity as DeepPartial<Entity>[]);
+    } else {
+      return this.repo.softRemove(entity as DeepPartial<Entity>);
+    }
+  }
+
+  /**
+   * Recover soft-deleted entities
+   */
+  async recover(entities: Entity[]): Promise<Entity[]>;
+  async recover(entity: Entity): Promise<Entity>;
+  async recover(entity: Entity | Entity[]): Promise<Entity | Entity[]> {
+    if (Array.isArray(entity)) {
+      return this.repo.recover(entity as DeepPartial<Entity>[]);
+    } else {
+      return this.repo.recover(entity as DeepPartial<Entity>);
     }
   }
 

@@ -5,3 +5,5 @@ export const ROLE_MODULE_DEFAULT_SETTINGS_TOKEN =
   'ROLE_MODULE_DEFAULT_SETTINGS_TOKEN';
 export const ROLE_MODULE_ROLE_ENTITY_KEY = 'role';
 export const ROLE_MODULE_ROLE_ASSIGNMENT_KEY = 'roleAssignments';
+export const ROLE_MODULE_USER_ROLE_ENTITY_KEY = 'user-role';
+export const ROLE_MODULE_API_KEY_ROLE_ENTITY_KEY = 'api-key-role';

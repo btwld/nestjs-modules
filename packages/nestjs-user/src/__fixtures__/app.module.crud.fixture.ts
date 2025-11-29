@@ -9,8 +9,10 @@ import { AuthenticationModule } from '@concepta/nestjs-authentication';
 import { CrudModule } from '@concepta/nestjs-crud';
 import { EventModule } from '@concepta/nestjs-event';
 import { JwtModule } from '@concepta/nestjs-jwt';
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 
 import { UserAccessQueryService } from '../services/user-access-query.service';
+import { USER_MODULE_USER_ENTITY_KEY } from '../user.constants';
 import { UserResource } from '../user.types';
 
 import { UserCrudControllerFixture } from './controllers/user-crud.controller.fixture';
@@ -34,6 +36,11 @@ rules
   imports: [
     TypeOrmModule.forRoot(ormConfig),
     TypeOrmModule.forFeature([UserEntityFixture]),
+    TypeOrmExtModule.forFeature({
+      [USER_MODULE_USER_ENTITY_KEY]: {
+        entity: UserEntityFixture,
+      },
+    }),
     CrudModule.forRoot({}),
     EventModule.forRoot({}),
     JwtModule.forRoot({}),

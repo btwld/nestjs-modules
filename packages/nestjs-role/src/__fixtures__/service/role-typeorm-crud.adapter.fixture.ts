@@ -1,12 +1,13 @@
-import { Repository } from 'typeorm';
-
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 
-import { RoleEntityInterface } from '@concepta/nestjs-common';
+import {
+  InjectDynamicRepository,
+  RoleEntityInterface,
+} from '@concepta/nestjs-common';
 import { TypeOrmCrudAdapter } from '@concepta/nestjs-crud';
+import { TypeOrmRepositoryAdapter } from '@concepta/nestjs-typeorm-ext';
 
-import { RoleEntityFixture } from '../entities/role-entity.fixture';
+import { ROLE_MODULE_ROLE_ENTITY_KEY } from '../../role.constants';
 
 /**
  * Role TypeOrm CRUD adapter fixture
@@ -16,12 +17,12 @@ export class RoleTypeOrmCrudAdapterFixture extends TypeOrmCrudAdapter<RoleEntity
   /**
    * Constructor
    *
-   * @param roleRepo - instance of the role repository.
+   * @param roleRepoAdapter - instance of the role repository adapter.
    */
   constructor(
-    @InjectRepository(RoleEntityFixture)
-    roleRepo: Repository<RoleEntityInterface>,
+    @InjectDynamicRepository(ROLE_MODULE_ROLE_ENTITY_KEY)
+    roleRepoAdapter: TypeOrmRepositoryAdapter<RoleEntityInterface>,
   ) {
-    super(roleRepo);
+    super(roleRepoAdapter);
   }
 }

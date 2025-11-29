@@ -1,12 +1,13 @@
-import { Repository } from 'typeorm';
-
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 
-import { OrgEntityInterface } from '@concepta/nestjs-common';
+import {
+  InjectDynamicRepository,
+  OrgEntityInterface,
+} from '@concepta/nestjs-common';
 import { TypeOrmCrudAdapter } from '@concepta/nestjs-crud';
+import { TypeOrmRepositoryAdapter } from '@concepta/nestjs-typeorm-ext';
 
-import { OrgEntityFixture } from './org-entity.fixture';
+import { ORG_MODULE_ORG_ENTITY_KEY } from '../org.constants';
 
 /**
  * Org TypeORM CRUD adapter
@@ -18,12 +19,12 @@ export class OrgTypeOrmCrudAdapter<
   /**
    * Constructor
    *
-   * @param orgRepo - instance of the org repository.
+   * @param repoAdapter - instance of the org repository adapter.
    */
   constructor(
-    @InjectRepository(OrgEntityFixture)
-    orgRepo: Repository<T>,
+    @InjectDynamicRepository(ORG_MODULE_ORG_ENTITY_KEY)
+    repoAdapter: TypeOrmRepositoryAdapter<T>,
   ) {
-    super(orgRepo);
+    super(repoAdapter);
   }
 }

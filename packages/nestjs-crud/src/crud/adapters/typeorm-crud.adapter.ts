@@ -1,9 +1,7 @@
 import { oO } from '@zmotivat0r/o0';
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import {
   Brackets,
-  DeepPartial,
-  Repository,
   SelectQueryBuilder,
   DataSourceOptions,
   OrderByCondition,
@@ -21,6 +19,8 @@ import {
   isObject,
   isUndefined,
 } from '@nestjs/common/utils/shared.utils';
+
+import { TypeOrmRepositoryAdapter } from '@concepta/nestjs-typeorm-ext';
 
 import { CrudEntityColumn } from '../../crud.types';
 import { comparisonOperatorKeys } from '../../request/crud-request.utils';
@@ -60,23 +60,23 @@ export class TypeOrmCrudAdapter<
     /((%27)|')union/gi,
   ];
 
-  constructor(protected repo: Repository<Entity>) {
+  constructor(protected repoAdapter: TypeOrmRepositoryAdapter<Entity>) {
     super();
 
-    this.dbName = this.repo.metadata.connection.options.type;
+    this.dbName = this.repoAdapter.repo.metadata.connection.options.type;
     this.onInitMapEntityColumns();
   }
 
   public entityName(): string {
-    return this.repo.metadata.name;
+    return this.repoAdapter.repo.metadata.name;
   }
 
   public entityType(): Type<Entity> {
-    return this.repo.target as Type<Entity>;
+    return this.repoAdapter.repo.target as Type<Entity>;
   }
 
   protected get alias(): string {
-    return this.repo.metadata.targetName;
+    return this.repoAdapter.repo.metadata.targetName;
   }
 
   /**
@@ -113,13 +113,13 @@ export class TypeOrmCrudAdapter<
   ): Promise<Entity> {
     const { returnShallow } = req.options.routes?.createOne ?? {};
     const entity = this.prepareEntityBeforeSave(dto, req.parsed);
-    let saved: Entity;
 
-    if (entity) {
-      saved = await this.repo.save<Entity>(entity);
-    } else {
+    if (!entity) {
       throw new BadRequestException();
     }
+
+    // Use RepositoryInterface
+    const saved = await this.repoAdapter.save(entity);
 
     if (returnShallow) {
       return saved;
@@ -165,7 +165,7 @@ export class TypeOrmCrudAdapter<
       this.throwBadRequestException('Empty data. Nothing to save.');
     }
 
-    return this.repo.save<Entity>(bulk, { chunk: 50 });
+    return this.repoAdapter.save<Entity>(bulk, { chunk: 50 });
   }
 
   /**
@@ -183,8 +183,13 @@ export class TypeOrmCrudAdapter<
     const paramsFilters = this.getParamFilters(req.parsed);
     const found = await this.getOneOrFail(req, returnShallow);
     const toSave = { ...found, ...dto, ...paramsFilters };
-    const updated = await this.repo.save(
-      plainToClass(this.entityType(), toSave, req.parsed.classTransformOptions),
+
+    const updated = await this.repoAdapter.save(
+      plainToInstance(
+        this.entityType(),
+        toSave,
+        req.parsed.classTransformOptions,
+      ),
     );
 
     if (returnShallow) {
@@ -206,7 +211,7 @@ export class TypeOrmCrudAdapter<
    */
   public async recoverOne(req: CrudRequestInterface<Entity>): Promise<Entity> {
     const found = await this.getOneOrFail(req, false, true);
-    return this.repo.recover(found);
+    return this.repoAdapter.recover(found);
   }
 
   /**
@@ -228,8 +233,13 @@ export class TypeOrmCrudAdapter<
       ...dto,
       ...paramsFilters,
     };
-    const replaced = await this.repo.save(
-      plainToClass(this.entityType(), toSave, req.parsed.classTransformOptions),
+
+    const replaced = await this.repoAdapter.save(
+      plainToInstance(
+        this.entityType(),
+        toSave,
+        req.parsed.classTransformOptions,
+      ),
     );
 
     if (returnShallow) {
@@ -262,7 +272,7 @@ export class TypeOrmCrudAdapter<
     const { returnDeleted } = req.options?.routes?.deleteOne ?? {};
     const found = await this.getOneOrFail(req, returnDeleted);
     const toReturn = returnDeleted
-      ? plainToClass(
+      ? plainToInstance(
           this.entityType(),
           { ...found },
           req.parsed.classTransformOptions,
@@ -270,9 +280,9 @@ export class TypeOrmCrudAdapter<
       : undefined;
 
     if (req.options?.query?.softDelete === true) {
-      await this.repo.softRemove(found as unknown as DeepPartial<Entity>);
+      await this.repoAdapter.softRemove(found);
     } else {
-      await this.repo.remove(found);
+      await this.repoAdapter.remove(found);
     }
 
     return toReturn;
@@ -294,7 +304,7 @@ export class TypeOrmCrudAdapter<
     withDeleted = false,
   ): Promise<SelectQueryBuilder<Entity>> {
     // create query builder
-    const builder = this.repo.createQueryBuilder(this.alias);
+    const builder = this.repoAdapter.repo.createQueryBuilder(this.alias);
     // get select fields
     const select = this.getSelect(parsed, options.query ?? {});
     // select fields
@@ -360,7 +370,7 @@ export class TypeOrmCrudAdapter<
   }
 
   protected onInitMapEntityColumns() {
-    this.entityColumns = this.repo.metadata.columns.map((prop) => {
+    this.entityColumns = this.repoAdapter.repo.metadata.columns.map((prop) => {
       // In case column is an embedded, use the propertyPath to get complete path
       if (prop.embeddedMetadata) {
         this.entityColumnsHash[prop.propertyPath] = prop.databasePath;
@@ -369,11 +379,12 @@ export class TypeOrmCrudAdapter<
       this.entityColumnsHash[prop.propertyName] = prop.databasePath;
       return prop.propertyName;
     });
-    this.entityPrimaryColumns = this.repo.metadata.columns
+    this.entityPrimaryColumns = this.repoAdapter.repo.metadata.columns
       .filter((prop) => prop.isPrimary)
       .map((prop) => prop.propertyName);
     this.entityHasDeleteColumn =
-      this.repo.metadata.columns.filter((prop) => prop.isDeleteDate).length > 0;
+      this.repoAdapter.repo.metadata.columns.filter((prop) => prop.isDeleteDate)
+        .length > 0;
   }
 
   protected async getOneOrFail(
@@ -383,7 +394,7 @@ export class TypeOrmCrudAdapter<
   ): Promise<Entity> {
     const { parsed, options } = req;
     const builder = shallow
-      ? this.repo.createQueryBuilder(this.alias)
+      ? this.repoAdapter.repo.createQueryBuilder(this.alias)
       : await this.createBuilder(parsed, options, true, withDeleted);
 
     if (shallow) {

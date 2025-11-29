@@ -2,6 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CrudModule } from '@concepta/nestjs-crud';
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
+
+import {
+  ROLE_MODULE_API_KEY_ROLE_ENTITY_KEY,
+  ROLE_MODULE_ROLE_ENTITY_KEY,
+  ROLE_MODULE_USER_ROLE_ENTITY_KEY,
+} from '../role.constants';
 
 import { RoleControllerFixture } from './controller/role.controller.fixture';
 import { UserRoleAssignmentControllerFixture } from './controller/user-role-assignment.controller.fixture';
@@ -38,6 +45,17 @@ import { UserRoleAssignmentTypeOrmCrudAdapterFixture } from './service/user-role
       ApiKeyEntityFixture,
       ApiKeyRoleEntityFixture,
     ]),
+    TypeOrmExtModule.forFeature({
+      [ROLE_MODULE_ROLE_ENTITY_KEY]: {
+        entity: RoleEntityFixture,
+      },
+      [ROLE_MODULE_USER_ROLE_ENTITY_KEY]: {
+        entity: UserRoleEntityFixture,
+      },
+      [ROLE_MODULE_API_KEY_ROLE_ENTITY_KEY]: {
+        entity: ApiKeyRoleEntityFixture,
+      },
+    }),
     CrudModule.forRoot({}),
   ],
   controllers: [RoleControllerFixture, UserRoleAssignmentControllerFixture],

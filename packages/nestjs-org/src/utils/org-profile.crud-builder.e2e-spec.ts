@@ -9,8 +9,10 @@ import {
   ConfigurableCrudOptionsTransformer,
   CrudModule,
 } from '@concepta/nestjs-crud';
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 import { SeedingSource } from '@concepta/typeorm-seeding';
 
+import { ORG_MODULE_ORG_PROFILE_ENTITY_KEY } from '../org.constants';
 import { OrgProfileFactory } from '../seeding/org-profile.factory';
 import { OrgProfileSeeder } from '../seeding/org-profile.seeder';
 import { OrgFactory } from '../seeding/org.factory';
@@ -115,6 +117,11 @@ describe('Org Profile Crud Builder (e2e)', () => {
           ],
         }),
         TypeOrmModule.forFeature([OrgProfileEntityFixture]),
+        TypeOrmExtModule.forFeature({
+          [ORG_MODULE_ORG_PROFILE_ENTITY_KEY]: {
+            entity: OrgProfileEntityFixture,
+          },
+        }),
         CrudModule.forRoot({}),
       ],
       controllers: [ConfigurableControllerClass],

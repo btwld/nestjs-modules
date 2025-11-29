@@ -7,7 +7,9 @@ import {
   CrudModule,
 } from '@concepta/nestjs-crud';
 import { EventModule } from '@concepta/nestjs-event';
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 
+import { USER_MODULE_USER_PROFILE_ENTITY_KEY } from '../user.constants';
 import { UserProfileCrudBuilder } from '../utils/user-profile.crud-builder';
 
 import { UserProfileCreateDtoFixture } from './dto/user-profile-create.dto.fixture';
@@ -79,6 +81,11 @@ const { ConfigurableControllerClass, ConfigurableServiceProvider } =
   imports: [
     TypeOrmModule.forRoot(ormConfig),
     TypeOrmModule.forFeature([UserProfileEntityFixture]),
+    TypeOrmExtModule.forFeature({
+      [USER_MODULE_USER_PROFILE_ENTITY_KEY]: {
+        entity: UserProfileEntityFixture,
+      },
+    }),
     CrudModule.forRoot({}),
     EventModule.forRoot({}),
   ],

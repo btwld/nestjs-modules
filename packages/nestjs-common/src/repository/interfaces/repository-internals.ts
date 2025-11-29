@@ -116,6 +116,11 @@ export namespace RepositoryInternals {
      * This data can be used in subscribers then.
      */
     data?: any;
+    /**
+     * By default chunk is not applied. To enable chunking, specify chunk size.
+     * For example, specifying { chunk: 50 } will execute 50 inserts per chunk.
+     */
+    chunk?: number;
   }
 
   /**

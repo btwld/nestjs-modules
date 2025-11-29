@@ -1,7 +1,9 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 
 import { CrudModule } from '../../crud.module';
+import { CRUD_TEST_PHOTO_ENTITY_KEY } from '../crud-test.constants';
 
 import { PhotoTypeOrmCrudAdapterFixture } from './photo-typeorm-crud.adapter.fixture';
 import { PhotoControllerFixture } from './photo.controller.fixture';
@@ -18,7 +20,11 @@ export class PhotoModuleFixture {
       module: PhotoModuleFixture,
       imports: [
         CrudModule.forRoot({}),
-        TypeOrmModule.forFeature([PhotoFixture]),
+        TypeOrmExtModule.forFeature({
+          [CRUD_TEST_PHOTO_ENTITY_KEY]: {
+            entity: PhotoFixture,
+          },
+        }),
       ],
     };
   }

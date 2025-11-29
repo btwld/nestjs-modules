@@ -1,12 +1,13 @@
-import { Repository } from 'typeorm';
-
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 
-import { CacheInterface } from '@concepta/nestjs-common';
+import {
+  CacheInterface,
+  InjectDynamicRepository,
+} from '@concepta/nestjs-common';
 import { TypeOrmCrudAdapter } from '@concepta/nestjs-crud';
+import { TypeOrmRepositoryAdapter } from '@concepta/nestjs-typeorm-ext';
 
-import { UserCacheEntityFixture } from './entities/user-cache-entity.fixture';
+import { CACHE_MODULE_CACHE_ENTITY_KEY } from '../cache.constants';
 
 /**
  * Cache typeorm CRUD adapter
@@ -16,12 +17,12 @@ export class CacheTypeOrmCrudAdapterFixture extends TypeOrmCrudAdapter<CacheInte
   /**
    * Constructor
    *
-   * @param repo - instance of the cache repository.
+   * @param repoAdapter - instance of the cache repository adapter.
    */
   constructor(
-    @InjectRepository(UserCacheEntityFixture)
-    repo: Repository<CacheInterface>,
+    @InjectDynamicRepository(CACHE_MODULE_CACHE_ENTITY_KEY)
+    repoAdapter: TypeOrmRepositoryAdapter<CacheInterface>,
   ) {
-    super(repo);
+    super(repoAdapter);
   }
 }

@@ -8,7 +8,14 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { ExceptionsFilter } from '@concepta/nestjs-common';
+import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
 
+import {
+  CRUD_TEST_COMPANY_ENTITY_KEY,
+  CRUD_TEST_NOTE_ENTITY_KEY,
+  CRUD_TEST_PROJECT_ENTITY_KEY,
+  CRUD_TEST_USER_ENTITY_KEY,
+} from '../../__fixtures__/crud-test.constants';
 import { CompanyCrudService } from '../../__fixtures__/typeorm/company/company-crud.service';
 import { CompanyTypeOrmCrudAdapter } from '../../__fixtures__/typeorm/company/company-typeorm-crud.adapter';
 import { CompanyEntity } from '../../__fixtures__/typeorm/company/company.entity';
@@ -187,6 +194,20 @@ describe('#crud-typeorm', () => {
             UserEntity,
             NoteEntity,
           ]),
+          TypeOrmExtModule.forFeature({
+            [CRUD_TEST_COMPANY_ENTITY_KEY]: {
+              entity: CompanyEntity,
+            },
+            [CRUD_TEST_PROJECT_ENTITY_KEY]: {
+              entity: ProjectEntity,
+            },
+            [CRUD_TEST_USER_ENTITY_KEY]: {
+              entity: UserEntity,
+            },
+            [CRUD_TEST_NOTE_ENTITY_KEY]: {
+              entity: NoteEntity,
+            },
+          }),
           CrudModule.forRoot({}),
         ],
         controllers: [

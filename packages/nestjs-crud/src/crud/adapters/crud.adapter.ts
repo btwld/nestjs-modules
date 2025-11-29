@@ -1,4 +1,4 @@
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 
 import { BadRequestException, PlainLiteralObject, Type } from '@nestjs/common';
 import { isObject } from '@nestjs/common/utils/shared.utils';
@@ -177,7 +177,7 @@ export abstract class CrudAdapter<Entity extends PlainLiteralObject> {
 
     return dto instanceof this.entityType()
       ? Object.assign(dto)
-      : plainToClass(
+      : plainToInstance(
           this.entityType(),
           { ...dto },
           parsed.classTransformOptions,

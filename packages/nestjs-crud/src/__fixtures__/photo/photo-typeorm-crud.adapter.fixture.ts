@@ -1,12 +1,12 @@
-import { Repository } from 'typeorm';
-
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+
+import { InjectDynamicRepository } from '@concepta/nestjs-common';
+import { TypeOrmRepositoryAdapter } from '@concepta/nestjs-typeorm-ext';
 
 import { TypeOrmCrudAdapter } from '../../crud/adapters/typeorm-crud.adapter';
+import { CRUD_TEST_PHOTO_ENTITY_KEY } from '../crud-test.constants';
 
 import { PhotoEntityInterfaceFixture } from './interfaces/photo-entity.interface.fixture';
-import { PhotoFixture } from './photo.entity.fixture';
 
 /**
  * Photo CRUD Adapter Fixture
@@ -14,9 +14,9 @@ import { PhotoFixture } from './photo.entity.fixture';
 @Injectable()
 export class PhotoTypeOrmCrudAdapterFixture extends TypeOrmCrudAdapter<PhotoEntityInterfaceFixture> {
   constructor(
-    @InjectRepository(PhotoFixture)
-    repo: Repository<PhotoEntityInterfaceFixture>,
+    @InjectDynamicRepository(CRUD_TEST_PHOTO_ENTITY_KEY)
+    repoAdapter: TypeOrmRepositoryAdapter<PhotoEntityInterfaceFixture>,
   ) {
-    super(repo);
+    super(repoAdapter);
   }
 }
