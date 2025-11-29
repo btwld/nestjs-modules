@@ -76,7 +76,6 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          TypeOrmModule.forFeature([CompanyEntity]),
           TypeOrmExtModule.forFeature({
             [CRUD_TEST_COMPANY_ENTITY_KEY]: {
               entity: CompanyEntity,
@@ -145,7 +144,6 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          TypeOrmModule.forFeature([CompanyEntity]),
           TypeOrmExtModule.forFeature({
             [CRUD_TEST_COMPANY_ENTITY_KEY]: {
               entity: CompanyEntity,
@@ -329,10 +327,8 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
           TypeOrmModule.forFeature([
-            CompanyEntity,
             ProjectEntity,
             UserEntity,
-            DeviceEntity,
           ]),
           TypeOrmExtModule.forFeature({
             [CRUD_TEST_COMPANY_ENTITY_KEY]: {

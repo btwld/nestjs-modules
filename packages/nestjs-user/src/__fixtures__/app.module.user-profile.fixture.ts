@@ -80,7 +80,6 @@ const { ConfigurableControllerClass, ConfigurableServiceProvider } =
 @Module({
   imports: [
     TypeOrmModule.forRoot(ormConfig),
-    TypeOrmModule.forFeature([UserProfileEntityFixture]),
     TypeOrmExtModule.forFeature({
       [USER_MODULE_USER_PROFILE_ENTITY_KEY]: {
         entity: UserProfileEntityFixture,

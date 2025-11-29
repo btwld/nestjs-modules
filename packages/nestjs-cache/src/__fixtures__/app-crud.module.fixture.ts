@@ -22,7 +22,6 @@ import { UserEntityFixture } from './entities/user-entity.fixture';
       synchronize: true,
       entities: [UserEntityFixture, UserCacheEntityFixture],
     }),
-    TypeOrmModule.forFeature([UserEntityFixture]),
     TypeOrmExtModule.forFeature({
       [CACHE_MODULE_CACHE_ENTITY_KEY]: {
         entity: UserCacheEntityFixture,

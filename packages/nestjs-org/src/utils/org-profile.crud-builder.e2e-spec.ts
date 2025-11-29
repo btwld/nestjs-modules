@@ -116,7 +116,6 @@ describe('Org Profile Crud Builder (e2e)', () => {
             InvitationEntityFixture,
           ],
         }),
-        TypeOrmModule.forFeature([OrgProfileEntityFixture]),
         TypeOrmExtModule.forFeature({
           [ORG_MODULE_ORG_PROFILE_ENTITY_KEY]: {
             entity: OrgProfileEntityFixture,
