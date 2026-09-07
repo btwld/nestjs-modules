@@ -13,11 +13,9 @@ export { RoleAssignmentRepositoryResolver } from './infrastructure/persistence/r
 
 // schemas (Zod / Standard Schema)
 export { roleSchema } from './infrastructure/schemas/role.schema.js';
-export { rolePaginatedSchema } from './infrastructure/schemas/role-paginated.schema.js';
 export { roleCreateSchema } from './infrastructure/schemas/role-create.schema.js';
 export { roleUpdateSchema } from './infrastructure/schemas/role-update.schema.js';
 export { roleAssignmentSchema } from './infrastructure/schemas/role-assignment.schema.js';
-export { roleAssignmentPaginatedSchema } from './infrastructure/schemas/role-assignment-paginated.schema.js';
 export { roleAssignmentCreateSchema } from './infrastructure/schemas/role-assignment-create.schema.js';
 
 // commands

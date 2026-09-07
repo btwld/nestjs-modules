@@ -57,6 +57,8 @@
   },
   "peerDependencies": {
     "@concepta/nestjs-crud": "8.0.0-alpha.10",
+    "@concepta/typeorm-seeding": "^4.0.0",
+    "@faker-js/faker": "^8.4.1",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1",
@@ -64,7 +66,19 @@
     "typeorm": "^0.3.0"
   },
   "peerDependenciesMeta": {
+    "@concepta/nestjs-crud": {
+      "optional": true
+    },
+    "@concepta/typeorm-seeding": {
+      "optional": true
+    },
+    "@faker-js/faker": {
+      "optional": true
+    },
     "@nestjs/cqrs": {
+      "optional": true
+    },
+    "typeorm": {
       "optional": true
     }
   }

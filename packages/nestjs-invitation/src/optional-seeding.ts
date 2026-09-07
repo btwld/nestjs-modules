@@ -3,4 +3,4 @@
  * and tools without loading the entire module which
  * runs all of its decorators and meta data.
  */
-export { InvitationFactory } from './seeding/invitation.factory.js';
+export { InvitationFactory } from './infrastructure/seeding/invitation.factory.js';

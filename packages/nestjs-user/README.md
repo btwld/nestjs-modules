@@ -390,9 +390,9 @@ import {
   userUpdateSchema,
   userPasswordUpdateSchema,
   userSchema,
-  userPaginatedSchema,
 } from '@concepta/nestjs-user';
 import {
+  userPaginatedSchema,
   CreateUserRequest,
   CreateUserRequestHandler,
   UpdateUserRequest,
@@ -505,7 +505,7 @@ legacy class-validator DTO classes.
 | `userPasswordSchema` | main | `password` (min 8 chars) |
 | `userPasswordUpdateSchema` | main | `password` (min 8 chars), optional `passwordCurrent` |
 | `userPasswordHashSchema` | main | `passwordHash` (kept for API parity; not wired to any CRUD operation) |
-| `userPaginatedSchema` | main (also re-exported from `optional/crud`) | Paginated user list response (named OpenAPI component `UserPaginated`) |
+| `userPaginatedSchema` | `optional/crud` | Paginated user list response (named OpenAPI component `UserPaginated`) |
 | `userCreateBatchSchema` | `optional/crud` | Batch create request (`bulk` array of `userCreateSchema`) |
 
 Notes:

@@ -4,7 +4,7 @@ import { faker } from '@faker-js/faker';
 
 import { Factory } from '@concepta/typeorm-seeding';
 
-import { type InvitationEntityInterface } from '../infrastructure/persistence/interfaces/invitation-entity.interface.js';
+import { type InvitationEntityInterface } from '../persistence/interfaces/invitation-entity.interface.js';
 
 export class InvitationFactory extends Factory<InvitationEntityInterface> {
   protected async entity(

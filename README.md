@@ -51,3 +51,38 @@ once we have finalized our Contributor License Agreement.
 | [nestjs-federated](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-federated 'nestjs-federated')                                 | Federated (OAuth) identity linking module that maps external provider identities to local user accounts.             |
 | [nestjs-authentication](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-authentication 'nestjs-authentication')                 | Full-featured authentication module (JWT, local, refresh, recovery, verify, OAuth router) using DDD and CQRS.       |
 | [nestjs-access-control](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-access-control 'nestjs-access-control')                 | Advanced access control guard with role-based grants and optional per-request response attribute filtering.          |
+
+## Entry Points
+
+A module's main entry point (`@concepta/nestjs-x`) never requires an
+optional peer dependency to load. Anything that does needs its own subpath
+entry point instead, so a consumer who never imports that subpath never has
+to install the dependency.
+
+| subpath | gated on |
+| --- | --- |
+| `optional/typeorm` | `typeorm` |
+| `optional/seeding` | `@concepta/typeorm-seeding` + `@faker-js/faker` |
+| `optional/crud` | `@concepta/nestjs-crud` |
+
+Rules for maintaining this boundary:
+
+1. **The main entry is dependency-free.** Nothing reachable from
+   `src/index.ts` may import an optional peer dependency.
+2. **One `optional/*` subpath per optional peer**, named after the dep it
+   gates. Source file is `src/optional-<name>.ts`, built to
+   `dist/optional-<name>.js`.
+3. **Every `optional/*` entry has a matching optional peer declaration** —
+   the dep appears in `peerDependencies` *and* in `peerDependenciesMeta`
+   with `"optional": true`.
+4. **A symbol is exported from exactly one entry point.** No re-exporting
+   an `optional/*` symbol from `index.ts`.
+5. **Canonical source locations:** typeorm entities in
+   `src/infrastructure/persistence/typeorm/`, seed factories and seeders in
+   `src/infrastructure/seeding/`, CRUD request/handler classes in
+   `src/gateways/http/{commands,queries}/{impl,handlers}/`.
+
+`@concepta/nestjs-core/aggregate`, `@concepta/nestjs-core/testing` and
+`@concepta/nestjs-repository/testing` are deliberate exceptions — they gate
+nothing, they're just alternate entry points into always-available code, so
+they don't live under `optional/`.

@@ -481,15 +481,15 @@ Register the listener as a provider in your module to start receiving events.
 ## Schemas
 
 All schemas are Zod v4 objects (Standard Schema compatible), replacing the
-legacy class-validator DTO classes. All are exported from the main entry.
+legacy class-validator DTO classes.
 
-| Schema | Fields | Purpose |
-| --- | --- | --- |
-| `invitationSchema` | id, code, category, userId, active, constraints, timestamps | Full invitation representation (response resource) |
-| `invitationCreateSchema` | category, userId, code, constraints? | Create by user ID |
-| `invitationCreateByEmailSchema` | email (validated email), category, constraints? | Create by email |
-| `invitationAcceptSchema` | passcode, payload? | Accept invitation |
-| `invitationPaginatedSchema` | data: invitationSchema[] + pagination meta | Paginated response wrapper |
+| Schema | Entry | Fields | Purpose |
+| --- | --- | --- | --- |
+| `invitationSchema` | main | id, code, category, userId, active, constraints, timestamps | Full invitation representation (response resource) |
+| `invitationCreateSchema` | main | category, userId, code, constraints? | Create by user ID |
+| `invitationCreateByEmailSchema` | main | email (validated email), category, constraints? | Create by email |
+| `invitationAcceptSchema` | main | passcode, payload? | Accept invitation |
+| `invitationPaginatedSchema` | `optional/crud` | data: invitationSchema[] + pagination meta | Paginated response wrapper |
 
 ## Exceptions
 
@@ -536,6 +536,8 @@ import {
   InvitationModule,
   invitationSchema,
   invitationCreateSchema,
+} from '@concepta/nestjs-invitation';
+import {
   invitationPaginatedSchema,
   CreateInvitationRequest,
   CreateInvitationRequestHandler,
@@ -545,7 +547,7 @@ import {
   ListInvitationsRequestHandler,
   ReadInvitationRequest,
   ReadInvitationRequestHandler,
-} from '@concepta/nestjs-invitation';
+} from '@concepta/nestjs-invitation/optional/crud';
 
 @Module({
   imports: [
@@ -614,11 +616,13 @@ import {
   CrudUpdate,
 } from '@concepta/nestjs-crud';
 import {
-  AcceptInvitationRequest,
-  AcceptInvitationRequestHandler,
   InvitationAcceptableInterface,
   invitationAcceptSchema,
 } from '@concepta/nestjs-invitation';
+import {
+  AcceptInvitationRequest,
+  AcceptInvitationRequestHandler,
+} from '@concepta/nestjs-invitation/optional/crud';
 
 @CrudController({
   path: 'invitation-acceptance',
@@ -654,7 +658,8 @@ Register `AcceptInvitationRequestHandler` as a provider and the controller in
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-invitation` | Module, aggregate, commands, queries, events, handlers, ports, policies, schemas, repository, mapper, exceptions, gateway request/handler classes |
+| `@concepta/nestjs-invitation` | Module, aggregate, commands, queries, events, handlers, ports, policies, schemas, repository, mapper, exceptions |
+| `@concepta/nestjs-invitation/optional/crud` | Gateway request/handler classes, `invitationPaginatedSchema` |
 | `@concepta/nestjs-invitation/optional/typeorm` | `InvitationSqliteEntity`, `InvitationPostgresEntity` |
 | `@concepta/nestjs-invitation/optional/seeding` | `InvitationFactory` |
 

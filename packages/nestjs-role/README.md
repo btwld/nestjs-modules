@@ -484,10 +484,10 @@ import {
   roleCreateSchema,
   roleUpdateSchema,
   roleSchema,
-  rolePaginatedSchema,
   RoleNamespace,
 } from '@concepta/nestjs-role';
 import {
+  rolePaginatedSchema,
   ListRolesRequest,
   ListRolesRequestHandler,
   ReadRoleRequest,
@@ -562,13 +562,13 @@ const ROLE_ENTITY_KEY = 'role';
 export class RoleHttpModule {}
 ```
 
-Note that all role schemas — including `rolePaginatedSchema` and
-`roleAssignmentPaginatedSchema` — live in the MAIN entry
-(`@concepta/nestjs-role`); only the request/handler classes and batch
-schemas come from `optional/crud`. Builder-generated controllers derive
-request body validation from `operations[].request.body` automatically; a
-handwritten `@CrudController` class would need an explicit
-`@CrudBody({ schema })` for runtime validation.
+Note that `rolePaginatedSchema` and `roleAssignmentPaginatedSchema`, like the
+request/handler classes and batch schemas, come from `optional/crud` — only
+the non-paginated core schemas live in the MAIN entry
+(`@concepta/nestjs-role`). Builder-generated controllers derive request body
+validation from `operations[].request.body` automatically; a handwritten
+`@CrudController` class would need an explicit `@CrudBody({ schema })` for
+runtime validation.
 
 This generates the following endpoints:
 
@@ -612,10 +612,8 @@ Exported from `@concepta/nestjs-role`:
 | `roleSchema` | `RoleInterface` | `id`, `name`, `description`, audit fields (named OpenAPI component `Role`) |
 | `roleCreateSchema` | `RoleCreatableInterface` | `name` (required, non-blank), `description` (defaults to `''`) |
 | `roleUpdateSchema` | `RoleUpdatableInterface` | `name`, `description` (both optional — a partial update) |
-| `rolePaginatedSchema` | — | Paginated role list response |
 | `roleAssignmentSchema` | `RoleAssignmentInterface` | `id`, `roleId`, `assigneeId`, audit fields |
 | `roleAssignmentCreateSchema` | `RoleAssignmentCreatableInterface` | `roleId`, `assigneeId` |
-| `roleAssignmentPaginatedSchema` | — | Paginated assignment list response |
 
 `roleCreateSchema` requires a non-blank `name` (`.trim().min(1)`) and
 defaults an omitted `description` to `''`. `roleUpdateSchema` is a true
@@ -629,6 +627,8 @@ Exported from `@concepta/nestjs-role/optional/crud`:
 
 | Schema | Purpose |
 | --- | --- |
+| `rolePaginatedSchema` | Paginated role list response |
+| `roleAssignmentPaginatedSchema` | Paginated assignment list response |
 | `roleCreateBatchSchema` | Bulk role creation request |
 | `roleAssignmentCreateBatchSchema` | Bulk assignment creation request |
 
@@ -662,7 +662,7 @@ import { RoleFactory } from '@concepta/nestjs-role/optional/seeding';
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-role` | Module, aggregates, commands, queries, events, handlers, schemas (including paginated), repositories, context overlay, exceptions, domain interfaces |
-| `@concepta/nestjs-role/optional/crud` | CRUD request/handler classes, batch schemas |
+| `@concepta/nestjs-role` | Module, aggregates, commands, queries, events, handlers, schemas, repositories, context overlay, exceptions, domain interfaces |
+| `@concepta/nestjs-role/optional/crud` | CRUD request/handler classes, paginated schemas, batch schemas |
 | `@concepta/nestjs-role/optional/typeorm` | `RoleSqliteEntity`, `RolePostgresEntity`, `RoleAssignmentSqliteEntity`, `RoleAssignmentPostgresEntity` |
 | `@concepta/nestjs-role/optional/seeding` | `RoleFactory` |

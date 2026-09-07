@@ -75,6 +75,9 @@
     },
     "@nestjs/cqrs": {
       "optional": true
+    },
+    "typeorm": {
+      "optional": true
     }
   }
 }

@@ -68,7 +68,6 @@ export { InvitationOptionsInterface } from './interfaces/options/invitation-opti
 
 // schemas (Zod / Standard Schema)
 export { invitationSchema } from './infrastructure/schemas/invitation.schema.js';
-export { invitationPaginatedSchema } from './infrastructure/schemas/invitation-paginated.schema.js';
 export { invitationCreateSchema } from './infrastructure/schemas/invitation-create.schema.js';
 export { invitationCreateByEmailSchema } from './infrastructure/schemas/invitation-create-by-email.schema.js';
 export { invitationAcceptSchema } from './infrastructure/schemas/invitation-accept.schema.js';
@@ -80,21 +79,3 @@ export { InvitationRevokedException } from './domain/exceptions/invitation-revok
 export { InvitationUserUndefinedException } from './application/exceptions/invitation-user-undefined.exception.js';
 export { InvitationNotAcceptedException } from './gateways/exceptions/invitation-not-accepted.exception.js';
 export { InvitationNotFoundException } from './application/exceptions/invitation-not-found.exception.js';
-
-// gateway commands
-export { CreateInvitationRequest } from './gateways/http/commands/impl/create-invitation.request.js';
-export { CreateInvitationRequestHandler } from './gateways/http/commands/handlers/create-invitation-request.handler.js';
-export { DeleteInvitationRequest } from './gateways/http/commands/impl/delete-invitation.request.js';
-export { DeleteInvitationRequestHandler } from './gateways/http/commands/handlers/delete-invitation-request.handler.js';
-export { AcceptInvitationRequest } from './gateways/http/commands/impl/accept-invitation.request.js';
-export { AcceptInvitationRequestHandler } from './gateways/http/commands/handlers/accept-invitation-request.handler.js';
-export { SendInvitationRequest } from './gateways/http/commands/impl/send-invitation.request.js';
-export { SendInvitationRequestHandler } from './gateways/http/commands/handlers/send-invitation-request.handler.js';
-export { CreateInvitationByEmailRequest } from './gateways/http/commands/impl/create-invitation-by-email.request.js';
-export { CreateInvitationByEmailRequestHandler } from './gateways/http/commands/handlers/create-invitation-by-email-request.handler.js';
-
-// gateway queries
-export { ListInvitationsRequest } from './gateways/http/queries/impl/list-invitations.request.js';
-export { ListInvitationsRequestHandler } from './gateways/http/queries/handlers/list-invitations-request.handler.js';
-export { ReadInvitationRequest } from './gateways/http/queries/impl/read-invitation.request.js';
-export { ReadInvitationRequestHandler } from './gateways/http/queries/handlers/read-invitation-request.handler.js';

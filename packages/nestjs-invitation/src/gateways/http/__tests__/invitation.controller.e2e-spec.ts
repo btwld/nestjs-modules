@@ -12,7 +12,7 @@ import { type InvitationAcceptableInterface } from '../../../domain/interfaces/i
 import { type InvitationCreatableInterface } from '../../../domain/interfaces/invitation-creatable.interface.js';
 import { InvitationOtpPort } from '../../../domain/ports/invitation-otp.port.js';
 import { type InvitationEntityInterface } from '../../../infrastructure/persistence/interfaces/invitation-entity.interface.js';
-import { InvitationFactory } from '../../../seeding/invitation.factory.js';
+import { InvitationFactory } from '../../../infrastructure/seeding/invitation.factory.js';
 
 import { AppCrudModuleFixture } from './fixtures/app-crud.module.fixture.js';
 import { InvitationEntityFixture } from './fixtures/entities/invitation.entity.fixture.js';

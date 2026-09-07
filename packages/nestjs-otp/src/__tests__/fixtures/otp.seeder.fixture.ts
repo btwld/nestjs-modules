@@ -1,6 +1,6 @@
 import { Seeder } from '@concepta/typeorm-seeding';
 
-import { OtpFactory } from '../../infrastructure/persistence/otp.factory.js';
+import { OtpFactory } from '../../infrastructure/seeding/otp.factory.js';
 
 /**
  * Otp seeder fixture

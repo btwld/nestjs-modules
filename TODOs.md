@@ -10,15 +10,10 @@ Critical/High/Nice-To-Have labels, which were rough guesses and sometimes wrong.
 tags: S/M/L. Completed items are removed from this list rather than marked done — see
 git history for what shipped.
 
-  1. **[needs research first] Optional exports patterns are different across the
-      modules** — user confirmed no canonical pattern has been chosen yet; needs research
-      into the existing per-module variations before a target shape can even be proposed.
-      Not a quick win.
-
-  2. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
+  1. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
 
-  3. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  2. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. Root `package.json` `workspaces` array — add dir (or revert to glob `packages/*`
          when all are migrated)

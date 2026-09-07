@@ -1,4 +1,6 @@
 // schemas (Zod / Standard Schema)
+export { rolePaginatedSchema } from './infrastructure/schemas/role-paginated.schema.js';
+export { roleAssignmentPaginatedSchema } from './infrastructure/schemas/role-assignment-paginated.schema.js';
 export { roleCreateBatchSchema } from './infrastructure/schemas/role-create-batch.schema.js';
 export { roleAssignmentCreateBatchSchema } from './infrastructure/schemas/role-assignment-create-batch.schema.js';
 

@@ -17,7 +17,7 @@ import { type UserEntityFixture } from '../../../__tests__/fixtures/entities/use
 import { UserCacheFactoryFixture } from '../../../__tests__/fixtures/factories/user-cache.factory.fixture.js';
 import { UserFactoryFixture } from '../../../__tests__/fixtures/factories/user.factory.fixture.js';
 import { type CacheCreatableInterface } from '../../../domain/interfaces/cache-creatable.interface.js';
-import { CacheFactory } from '../../../infrastructure/persistence/cache.factory.js';
+import { CacheFactory } from '../../../infrastructure/seeding/cache.factory.js';
 
 import { AppCrudModuleFixture } from './fixtures/app-crud.module.fixture.js';
 

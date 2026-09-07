@@ -28,6 +28,57 @@ const v8Packages = [
 ];
 const v8Files = v8Packages.map((name) => `packages/${name}/src/**/*.ts`);
 
+// Guard the optional/* entry-point boundary (see the root README's Entry
+// Points section): an optional peer dependency may only be imported from the
+// source backing that dependency's optional/* entry point, or from tests and
+// fixtures. `nestjs-repository-typeorm` and `nestjs-crud` are exempt — they
+// are the TypeORM driver and the CRUD framework these entry points build on,
+// so restricting them from importing their own reason for existing is
+// pointless.
+const optionalDepFreePackages = ['nestjs-repository-typeorm', 'nestjs-crud'];
+const optionalDepRestrictedPackages = v8Packages.filter(
+  (name) => !optionalDepFreePackages.includes(name),
+);
+const optionalDepRestrictedFiles = optionalDepRestrictedPackages.map(
+  (name) => `packages/${name}/src/**/*.ts`,
+);
+const optionalDepAllowedFiles = optionalDepRestrictedPackages.flatMap(
+  (name) => [
+    `packages/${name}/src/gateways/http/**/*.ts`,
+    `packages/${name}/src/infrastructure/persistence/typeorm/**/*.ts`,
+    `packages/${name}/src/infrastructure/seeding/**/*.ts`,
+    `packages/${name}/src/infrastructure/schemas/*-paginated.schema.ts`,
+    `packages/${name}/src/infrastructure/schemas/*-create-batch.schema.ts`,
+    `packages/${name}/src/**/__tests__/**/*.ts`,
+    `packages/${name}/src/**/__fixtures__/**/*.ts`,
+    `packages/${name}/src/**/*.spec.ts`,
+    `packages/${name}/src/**/*.fixture.ts`,
+  ],
+);
+
+const OPTIONAL_DEP_RESTRICTED_PATHS = [
+  {
+    name: '@concepta/nestjs-crud',
+    message:
+      "Only the optional/crud entry point may import this (src/gateways/http/**, *-paginated.schema.ts, *-create-batch.schema.ts) — see the root README's Entry Points section.",
+  },
+  {
+    name: 'typeorm',
+    message:
+      "Only the optional/typeorm entry point may import this (src/infrastructure/persistence/typeorm/**) — see the root README's Entry Points section.",
+  },
+  {
+    name: '@concepta/typeorm-seeding',
+    message:
+      "Only the optional/seeding entry point may import this (src/infrastructure/seeding/**) — see the root README's Entry Points section.",
+  },
+  {
+    name: '@faker-js/faker',
+    message:
+      "Only the optional/seeding entry point may import this (src/infrastructure/seeding/**) — see the root README's Entry Points section.",
+  },
+];
+
 export default tseslint.config(
   // Ignore patterns
   {
@@ -125,6 +176,20 @@ export default tseslint.config(
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-param': 'off',
       'jsdoc/require-returns': 'off',
+    },
+  },
+
+  // optional/* entry-point boundary — restrict, then re-allow where expected
+  {
+    files: optionalDepRestrictedFiles,
+    rules: {
+      'no-restricted-imports': ['error', { paths: OPTIONAL_DEP_RESTRICTED_PATHS }],
+    },
+  },
+  {
+    files: optionalDepAllowedFiles,
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 

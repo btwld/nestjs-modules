@@ -3,4 +3,4 @@
  * and tools without loading the entire module which
  * runs all of its decorators and meta data.
  */
-export { CacheFactory } from './infrastructure/persistence/cache.factory.js';
+export { CacheFactory } from './infrastructure/seeding/cache.factory.js';

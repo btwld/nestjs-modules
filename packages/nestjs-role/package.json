@@ -61,6 +61,9 @@
     "typeorm": "^0.3.0"
   },
   "peerDependenciesMeta": {
+    "@concepta/nestjs-crud": {
+      "optional": true
+    },
     "@concepta/typeorm-seeding": {
       "optional": true
     },

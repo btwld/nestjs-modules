@@ -1,6 +1,6 @@
 import { Seeder } from '@concepta/typeorm-seeding';
 
-import { RoleFactory } from '../../infrastructure/persistence/role.factory.js';
+import { RoleFactory } from '../../infrastructure/seeding/role.factory.js';
 
 /**
  * Role seeder

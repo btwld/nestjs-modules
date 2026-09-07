@@ -13,7 +13,6 @@ export { UserCredentialsRepositoryInterface } from './domain/repositories/user-c
 
 // schemas (Zod / Standard Schema)
 export { userSchema } from './infrastructure/schemas/user.schema.js';
-export { userPaginatedSchema } from './infrastructure/schemas/user-paginated.schema.js';
 export { userCreateSchema } from './infrastructure/schemas/user-create.schema.js';
 export { userUpdateSchema } from './infrastructure/schemas/user-update.schema.js';
 export { userPasswordSchema } from './infrastructure/schemas/password/user-password.schema.js';
