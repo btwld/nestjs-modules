@@ -4,6 +4,7 @@ import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
 import tsdocPlugin from 'eslint-plugin-tsdoc';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
+import nPlugin from 'eslint-plugin-n';
 
 // The 13 packages migrated to v8 (nodenext, DDD) — same set as root
 // tsconfig.json's `references` and tsconfig.eslint.json's `include`. Only
@@ -57,6 +58,7 @@ export default tseslint.config(
     plugins: {
       import: importPlugin,
       tsdoc: tsdocPlugin,
+      n: nPlugin,
     },
     settings: {
       jsdoc: {
@@ -67,6 +69,13 @@ export default tseslint.config(
       // Import rules
       'import/no-duplicates': 'error',
       'import/no-extraneous-dependencies': 'error',
+      // nodenext requires explicit `.js` on relative imports — `tsc` enforces
+      // this as TS2835; this keeps it enforced at lint time too, and keeps it
+      // enforced if `moduleResolution` is ever relaxed. Unlike
+      // eslint-plugin-import's `import/extensions`, this rule correctly
+      // handles dotted-suffix filenames (`*.exception.ts`, `*.interface.ts`,
+      // etc. — most of this repo) without needing a TS-aware resolver.
+      'n/file-extension-in-import': ['error', 'always'],
       // Project-specific import order with @nestjs and @concepta path groups
       'import/order': [
         'error',
