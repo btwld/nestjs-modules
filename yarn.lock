@@ -707,7 +707,7 @@ __metadata:
     "@nestjs/common": "npm:^12.0.1"
     "@nestjs/testing": "npm:^12.0.1"
     "@nestjs/typeorm": "npm:^12.0.1"
-    "@tsyche/membrane": "npm:^0.7.0"
+    "@tsyche/membrane": "npm:^0.8.1"
     sqlite3: "npm:^5.1.4"
     vitest-mock-extended: "npm:^4.0.0"
   peerDependencies:
@@ -724,7 +724,7 @@ __metadata:
     "@nestjs/common": "npm:^12.0.1"
     "@nestjs/core": "npm:^12.0.1"
     "@nestjs/testing": "npm:^12.0.1"
-    "@tsyche/membrane": "npm:^0.7.0"
+    "@tsyche/membrane": "npm:^0.8.1"
     vitest: "npm:^4.1.9"
     vitest-mock-extended: "npm:^4.0.0"
   peerDependencies:
@@ -3305,10 +3305,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tsyche/membrane@npm:^0.7.0":
-  version: 0.7.0
-  resolution: "@tsyche/membrane@npm:0.7.0"
-  checksum: 10c0/671128088ad473793106bf77be34810e9d0ff30482482fac2262c2a86a362eefda07886658a7ada416195c062099bf2ee98562ec8b1429d6f66731b20107ab42
+"@tsyche/membrane@npm:^0.8.1":
+  version: 0.8.1
+  resolution: "@tsyche/membrane@npm:0.8.1"
+  checksum: 10c0/9c4422b20e96992632bd71a9b6bd935c7b8c9b0b439439d25f9647e65b3ad22ab670925a7b49b270304c693202bd38ae35a55df005074cb758cd6108109926f1
   languageName: node
   linkType: hard
 

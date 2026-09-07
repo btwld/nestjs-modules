@@ -46,7 +46,7 @@ NestJS 12.
 | Package | Notes |
 | --- | --- |
 | `@concepta/nestjs-core` | Core interfaces, hook system, and utilities |
-| `@tsyche/membrane` | Hook pipeline (`Permeator`/`Membrane`) — ^0.7.0 |
+| `@tsyche/membrane` | Hook pipeline (`Permeator`/`Membrane`) — ^0.8.1 |
 
 ### Peer Dependencies
 
@@ -1023,15 +1023,24 @@ return the (possibly modified) payload.
 Hook execution is orchestrated by `RepoPermeatorFactory`, built on
 `@tsyche/membrane` (`Permeator`/`Membrane`). Each public repository
 operation runs before-hooks on its input, calls the driver's `do*` method,
-then runs after-hooks on the result, with one of two merge semantics:
+then runs after-hooks on the result, with one of two merge semantics for
+single-entity payloads and options objects (`Membrane.object` /
+`Membrane.objectReplace`), and a separate strategy for array payloads
+(`Membrane.collection`):
 
-- **`overwrite`** -- read operations (`find`, `findOne`, `count`,
-  `findAndCount`) and `createMany`: hooks may freely transform options and
+- **`Membrane.objectReplace`** -- read operations (`find`, `findOne`,
+  `count`, `findAndCount`): the last hook's return value replaces the
+  payload/result wholesale, so hooks may freely transform options and
   results.
-- **`preserve`** -- single-entity write operations (`create`, `update`,
-  `upsert`, `replace`) and delete/lifecycle operations (`delete`,
-  `deleteMany`, `softDelete`, `restore`): the original/DB result wins over
-  hook mutations.
+- **`Membrane.object`** -- single-entity write operations (`create`,
+  `update`, `upsert`, `replace`) and delete/lifecycle operations (`delete`,
+  `deleteMany`, `softDelete`, `restore`): hook output is merged onto the
+  original, which wins on conflict — the original/DB result survives hook
+  mutations.
+- **`Membrane.collection`** -- `createMany` (`overwrite`: hooks may freely
+  transform the array) and `deleteMany` (`preserve`: the original array
+  wins on conflict) keep the strategy argument, since it governs array
+  merging rather than object replacement.
 
 Any error thrown inside the pipeline (a hook or the driver call) is wrapped
 in `RepositoryQueryException`. `RuntimeException` subclasses — `OptimisticLockException`,

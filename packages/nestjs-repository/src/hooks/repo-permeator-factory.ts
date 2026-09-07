@@ -2,7 +2,7 @@ import {
   Membrane,
   Permeator,
   type IPermeator,
-  type PermeateCallback,
+  type PassthroughPermeateCallback,
   type PermeatorOptions,
 } from '@tsyche/membrane';
 
@@ -29,12 +29,12 @@ type RunHooksFn = <T>(
 ) => Promise<T>;
 
 type Ctx = PlainLiteralObject;
-type HookCb = PermeateCallback<unknown, Ctx>;
+type HookCb = PassthroughPermeateCallback<Ctx>;
 
 type RepoPermeator<TIn, TOut, TResult = TOut> = IPermeator<
   TIn,
   TOut,
-  unknown,
+  TIn,
   unknown,
   Ctx,
   TResult
@@ -75,7 +75,7 @@ export class RepoPermeatorFactory<
       <T>(payload: T, ambient?: Ctx) =>
         runHooks(key, payload, ambient);
 
-    const options: PermeatorOptions = {
+    const options: PermeatorOptions<Ctx> = {
       onError: (error: unknown): never => {
         if (error instanceof RuntimeException) throw error;
         throw new RepositoryQueryException(entityName, {
@@ -87,14 +87,16 @@ export class RepoPermeatorFactory<
     // Read
     this.find = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<RepositoryFindOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_READ),
-          'overwrite',
-        ),
-        Membrane.object<RepositoryFindOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_FIND),
-          'overwrite',
-        ),
+        Membrane.objectReplace<
+          RepositoryFindOptions<Entity>,
+          RepositoryFindOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_READ)),
+        Membrane.objectReplace<
+          RepositoryFindOptions<Entity>,
+          RepositoryFindOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_FIND)),
       ),
       Membrane.sequence(
         Membrane.collection<Entity, Ctx>(cb(K.AFTER_FIND), 'overwrite'),
@@ -105,22 +107,21 @@ export class RepoPermeatorFactory<
 
     this.findOne = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<RepositoryFindOneOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_READ),
-          'overwrite',
-        ),
-        Membrane.object<RepositoryFindOneOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_FIND_ONE),
-          'overwrite',
-        ),
+        Membrane.objectReplace<
+          RepositoryFindOneOptions<Entity>,
+          RepositoryFindOneOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_READ)),
+        Membrane.objectReplace<
+          RepositoryFindOneOptions<Entity>,
+          RepositoryFindOneOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_FIND_ONE)),
       ),
       Membrane.nullable(
         Membrane.sequence(
-          Membrane.object<Entity, unknown, Ctx>(
-            cb(K.AFTER_FIND_ONE),
-            'overwrite',
-          ),
-          Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_READ), 'overwrite'),
+          Membrane.objectReplace<Entity, Entity, Ctx>(cb(K.AFTER_FIND_ONE)),
+          Membrane.objectReplace<Entity, Entity, Ctx>(cb(K.AFTER_READ)),
         ),
       ),
       options,
@@ -128,14 +129,16 @@ export class RepoPermeatorFactory<
 
     this.count = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<RepositoryFindOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_READ),
-          'overwrite',
-        ),
-        Membrane.object<RepositoryFindOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_COUNT),
-          'overwrite',
-        ),
+        Membrane.objectReplace<
+          RepositoryFindOptions<Entity>,
+          RepositoryFindOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_READ)),
+        Membrane.objectReplace<
+          RepositoryFindOptions<Entity>,
+          RepositoryFindOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_COUNT)),
       ),
       Membrane.scalar<number, number, Ctx>(cb(K.AFTER_COUNT)),
       options,
@@ -143,37 +146,36 @@ export class RepoPermeatorFactory<
 
     this.findAndCount = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<RepositoryFindOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_READ),
-          'overwrite',
-        ),
-        Membrane.object<RepositoryFindOptions<Entity>, unknown, Ctx>(
-          cb(K.BEFORE_FIND_AND_COUNT),
-          'overwrite',
-        ),
+        Membrane.objectReplace<
+          RepositoryFindOptions<Entity>,
+          RepositoryFindOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_READ)),
+        Membrane.objectReplace<
+          RepositoryFindOptions<Entity>,
+          RepositoryFindOptions<Entity>,
+          Ctx
+        >(cb(K.BEFORE_FIND_AND_COUNT)),
       ),
-      Membrane.object<[Entity[], number], unknown, Ctx>(
+      Membrane.objectReplace<[Entity[], number], [Entity[], number], Ctx>(
         cb(K.AFTER_FIND_AND_COUNT),
-        'overwrite',
       ),
       options,
     );
 
-    // Write (preserve: original data wins)
+    // Write (merge, base wins)
     this.create = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_WRITE),
-          'preserve',
         ),
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_CREATE),
-          'preserve',
         ),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_CREATE), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_WRITE), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_CREATE)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_WRITE)),
       ),
       options,
     );
@@ -198,54 +200,48 @@ export class RepoPermeatorFactory<
 
     this.update = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_WRITE),
-          'preserve',
         ),
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_UPDATE),
-          'preserve',
         ),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_UPDATE), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_WRITE), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_UPDATE)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_WRITE)),
       ),
       options,
     );
 
     this.upsert = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_WRITE),
-          'preserve',
         ),
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_UPSERT),
-          'preserve',
         ),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_UPSERT), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_WRITE), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_UPSERT)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_WRITE)),
       ),
       options,
     );
 
     this.replace = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_WRITE),
-          'preserve',
         ),
-        Membrane.object<DeepPartial<Entity>, unknown, Ctx>(
+        Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
           cb(K.BEFORE_REPLACE),
-          'preserve',
         ),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_REPLACE), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_WRITE), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_REPLACE)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_WRITE)),
       ),
       options,
     );
@@ -253,12 +249,12 @@ export class RepoPermeatorFactory<
     // Delete/lifecycle
     this.delete = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.BEFORE_DESTROY), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.BEFORE_DELETE), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.BEFORE_DESTROY)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.BEFORE_DELETE)),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_DELETE), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_DESTROY), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_DELETE)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_DESTROY)),
       ),
       options,
     );
@@ -277,42 +273,24 @@ export class RepoPermeatorFactory<
 
     this.softDelete = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(
-          cb(K.BEFORE_TRANSITION),
-          'preserve',
-        ),
-        Membrane.object<Entity, unknown, Ctx>(
-          cb(K.BEFORE_SOFT_DELETE),
-          'preserve',
-        ),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.BEFORE_TRANSITION)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.BEFORE_SOFT_DELETE)),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(
-          cb(K.AFTER_SOFT_DELETE),
-          'preserve',
-        ),
-        Membrane.object<Entity, unknown, Ctx>(
-          cb(K.AFTER_TRANSITION),
-          'preserve',
-        ),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_SOFT_DELETE)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_TRANSITION)),
       ),
       options,
     );
 
     this.restore = Permeator.mutable(
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(
-          cb(K.BEFORE_TRANSITION),
-          'preserve',
-        ),
-        Membrane.object<Entity, unknown, Ctx>(cb(K.BEFORE_RESTORE), 'preserve'),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.BEFORE_TRANSITION)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.BEFORE_RESTORE)),
       ),
       Membrane.sequence(
-        Membrane.object<Entity, unknown, Ctx>(cb(K.AFTER_RESTORE), 'preserve'),
-        Membrane.object<Entity, unknown, Ctx>(
-          cb(K.AFTER_TRANSITION),
-          'preserve',
-        ),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_RESTORE)),
+        Membrane.object<Entity, Entity, Ctx>(cb(K.AFTER_TRANSITION)),
       ),
       options,
     );
