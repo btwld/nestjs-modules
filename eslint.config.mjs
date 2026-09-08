@@ -56,27 +56,38 @@ const optionalDepAllowedFiles = optionalDepRestrictedPackages.flatMap(
   ],
 );
 
-const OPTIONAL_DEP_RESTRICTED_PATHS = [
-  {
-    name: '@concepta/nestjs-crud',
-    message:
-      "Only the optional/crud entry point may import this (src/gateways/http/**, *-paginated.schema.ts, *-create-batch.schema.ts) — see the root README's Entry Points section.",
-  },
-  {
-    name: 'typeorm',
-    message:
-      "Only the optional/typeorm entry point may import this (src/infrastructure/persistence/typeorm/**) — see the root README's Entry Points section.",
-  },
-  {
-    name: '@concepta/typeorm-seeding',
-    message:
-      "Only the optional/seeding entry point may import this (src/infrastructure/seeding/**) — see the root README's Entry Points section.",
-  },
-  {
-    name: '@faker-js/faker',
-    message:
-      "Only the optional/seeding entry point may import this (src/infrastructure/seeding/**) — see the root README's Entry Points section.",
-  },
+// `regex` (not `group`) — `group` uses gitignore-style matching via the
+// `ignore` package, which is unanchored: a pattern like `typeorm/**` matches
+// ANY path with a `typeorm` path segment, including our own relative import
+// `./infrastructure/persistence/typeorm/cache-sqlite.entity.js` from inside
+// optional-typeorm.ts. `regex` is tested with `RegExp#test` against the raw
+// import source, so anchoring with `^...$` matches only the bare specifier
+// or a subpath of it (`typeorm`, `typeorm/browser`), never a relative path.
+const optionalDepPattern = (name, message) => ({
+  regex: `^${name}(/.*)?$`,
+  message,
+});
+const OPTIONAL_DEP_RESTRICTED_PATTERNS = [
+  optionalDepPattern(
+    '@concepta/nestjs-crud',
+    "Only the optional/crud entry point may import this (src/gateways/http/**, *-paginated.schema.ts, *-create-batch.schema.ts) — see the root README's Entry Points section.",
+  ),
+  optionalDepPattern(
+    '@concepta/nestjs-repository-typeorm',
+    "Only the optional/typeorm entry point may import this (src/infrastructure/persistence/typeorm/**) — see the root README's Entry Points section.",
+  ),
+  optionalDepPattern(
+    'typeorm',
+    "Only the optional/typeorm entry point may import this (src/infrastructure/persistence/typeorm/**) — see the root README's Entry Points section.",
+  ),
+  optionalDepPattern(
+    '@concepta/typeorm-seeding',
+    "Only the optional/seeding entry point may import this (src/infrastructure/seeding/**) — see the root README's Entry Points section.",
+  ),
+  optionalDepPattern(
+    '@faker-js/faker',
+    "Only the optional/seeding entry point may import this (src/infrastructure/seeding/**) — see the root README's Entry Points section.",
+  ),
 ];
 
 export default tseslint.config(
@@ -183,7 +194,7 @@ export default tseslint.config(
   {
     files: optionalDepRestrictedFiles,
     rules: {
-      'no-restricted-imports': ['error', { paths: OPTIONAL_DEP_RESTRICTED_PATHS }],
+      'no-restricted-imports': ['error', { patterns: OPTIONAL_DEP_RESTRICTED_PATTERNS }],
     },
   },
   {
