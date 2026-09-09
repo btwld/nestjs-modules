@@ -1,16 +1,16 @@
-import { type DataSource, type Repository } from 'typeorm';
+import { type DataSource, type EntitySchema, type Repository } from 'typeorm';
 
 import {
   type DynamicModule,
   type PlainLiteralObject,
   type Provider,
+  type Type,
 } from '@nestjs/common';
 import {
   getDataSourceToken,
   getRepositoryToken,
   TypeOrmModule,
 } from '@nestjs/typeorm';
-import { type EntityClassOrSchema } from '@nestjs/typeorm/dist/interfaces/entity-class-or-schema.type.js';
 
 import { HookResolverService } from '@concepta/nestjs-core';
 import {
@@ -24,6 +24,16 @@ import { TypeOrmRepository } from './repository/typeorm-repository.js';
 import { TypeOrmTransactionFactory } from './transaction/typeorm-transaction.factory.js';
 import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from './typeorm-repository.constants.js';
 import { type TypeOrmDataSourceToken } from './typeorm-repository.types.js';
+
+// `@nestjs/typeorm` uses this type internally (e.g. `getRepositoryToken`'s
+// parameter) but does not export it from its public entry point, and its
+// `exports` map forbids reaching into `dist/interfaces/` directly — that
+// deep import only worked here because of a stale incremental tsc cache, not
+// because it's a supported path. Redefined locally, matching the upstream
+// `Function | EntitySchema` shape but with the constructor half narrowed to
+// `Type<unknown>` (Nest's own class-constructor type) instead of the bare
+// `Function` upstream uses.
+type EntityClassOrSchema = Type<unknown> | EntitySchema;
 
 /**
  * Resolve data source name from token.
