@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-auth-apple",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "description": "Rockets NestJS Apple Authentication",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

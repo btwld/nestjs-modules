@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-auth-github",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "description": "Rockets NestJS GitHub Authentication",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
