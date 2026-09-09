@@ -113,6 +113,4 @@ dist
 # generated docs
 /docs
 
-# .yarn meta
-.yarn
 .claude/settings.local.json

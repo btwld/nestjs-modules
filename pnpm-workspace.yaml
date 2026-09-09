@@ -1,0 +1,57 @@
+# The 13 v8 packages. The 14 legacy v7 dirs under packages/ are added below in a
+# separate block — they are install-only members and are never built, tested,
+# linted, or published. See TODOs.md for the port checklist.
+packages:
+  - 'packages/nestjs-core'
+  - 'packages/nestjs-repository'
+  - 'packages/nestjs-repository-typeorm'
+  - 'packages/nestjs-crud'
+  - 'packages/nestjs-cache'
+  - 'packages/nestjs-otp'
+  - 'packages/nestjs-role'
+  - 'packages/nestjs-password'
+  - 'packages/nestjs-user'
+  - 'packages/nestjs-invitation'
+  - 'packages/nestjs-federated'
+  - 'packages/nestjs-authentication'
+  - 'packages/nestjs-access-control'
+
+# Load-bearing for the v7 packages added in Phase 6: their plain
+# `@concepta/*@^7.0.0-alpha.10` ranges link to a local package only when the local
+# version satisfies the range, which is exactly the partition we want.
+linkWorkspacePackages: true
+
+# Installs missing *required* peers (rxjs, repository-typeorm's typeorm) and
+# deliberately does NOT install optional ones — which is what keeps the
+# optional/* entry-point design intact (see README "Entry Points").
+autoInstallPeers: true
+
+# The optional/* design leaves ~6 optional `typeorm` peers unmet on purpose.
+# Turning this on would make that a hard install failure.
+strictPeerDependencies: false
+
+# pnpm does not run dependency lifecycle scripts unless allowlisted, and
+# strictDepBuilds defaults to true, so an unlisted one fails the install.
+#   bcrypt  - runtime dependency of @concepta/nestjs-password
+#   sqlite3 - loaded dynamically by TypeORM for every `type: 'sqlite'` DataSource
+#             across the crud/cache/user/role/otp test fixtures
+# @scarf/scarf is telemetry and is explicitly denied.
+allowBuilds:
+  bcrypt: true
+  sqlite3: true
+  '@scarf/scarf': false
+
+# TypeORM and reflect-metadata must be single instances or decorator metadata
+# splits across copies and you get "No metadata for X was found" at runtime.
+# Yarn's flat hoist guaranteed this structurally; pnpm does not.
+# ^0.3.28 also satisfies the legacy packages' ^0.3.0 peer range.
+overrides:
+  typeorm: ^0.3.28
+  reflect-metadata: ^0.2.2
+  # Pinned to the exact version yarn.lock had resolved. zod 4.5.4 (the latest
+  # version satisfying every package's `^4.4.3` range) changes $ref hoisting in
+  # z.toJSONSchema() output and breaks nestjs-crud's OpenAPI tests
+  # (swagger-request-body.spec.ts, petstore.spec.ts) — a real behavior
+  # regression to investigate separately, not something this migration should
+  # paper over by loosening test expectations. Revisit once that's triaged.
+  zod: 4.4.3

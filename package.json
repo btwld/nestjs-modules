@@ -5,23 +5,8 @@
   "private": true,
   "engines": {
     "node": ">=22.12.0",
-    "yarn": ">=4.0.0"
+    "pnpm": ">=12.0.0"
   },
-  "workspaces": [
-    "packages/nestjs-core",
-    "packages/nestjs-repository",
-    "packages/nestjs-repository-typeorm",
-    "packages/nestjs-crud",
-    "packages/nestjs-cache",
-    "packages/nestjs-otp",
-    "packages/nestjs-role",
-    "packages/nestjs-password",
-    "packages/nestjs-user",
-    "packages/nestjs-invitation",
-    "packages/nestjs-federated",
-    "packages/nestjs-authentication",
-    "packages/nestjs-access-control"
-  ],
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
@@ -68,27 +53,28 @@
     "postinstall": "husky install",
     "clean": "rimraf packages/*/dist docs",
     "build": "tsc -b",
-    "prepublish": "yarn clean && yarn build",
-    "watch": "yarn build && tsc --build --watch",
+    "prepublish": "pnpm clean && pnpm build",
+    "release": "pnpm clean && pnpm build && pnpm -r publish",
+    "watch": "pnpm build && tsc --build --watch",
     "lint": "eslint \"packages/*/src/**/*.{ts,js,json}\"",
-    "lint:fix": "yarn lint --fix",
+    "lint:fix": "pnpm lint --fix",
     "lint:md": "markdownlint README.md packages/**/*.md",
-    "lint:md:fix": "yarn lint:md --fix",
-    "lint:all": "yarn lint && yarn lint:md",
+    "lint:md:fix": "pnpm lint:md --fix",
+    "lint:all": "pnpm lint && pnpm lint:md",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=./junit.xml",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config-e2e.ts",
-    "test:all": "yarn test && yarn test:e2e",
+    "test:all": "pnpm test && pnpm test:e2e",
     "smoke": "node ./scripts/smoke-test.mjs",
     "doc": "rimraf ./docs && typedoc",
-    "doc:cov": "yarn doc --coverageOutputType all",
+    "doc:cov": "pnpm doc --coverageOutputType all",
     "changelog": "standard-version",
     "changelog:minor": "standard-version --release-as minor",
     "changelog:patch": "standard-version --release-as patch",
     "changelog:major": "standard-version --release-as major"
   },
-  "packageManager": "yarn@4.11.0"
+  "packageManager": "pnpm@12.3.4"
 }

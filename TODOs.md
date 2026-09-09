@@ -1,6 +1,6 @@
 # Current scope
   * `@concepta/nestjs-common` is deprecated — reverted to v7 line (`7.0.0-alpha.10`) and excluded from the v8 workspace. Its remaining v8-only symbols were merged into nestjs-core. Run `npm deprecate @concepta/nestjs-common@8.0.0-alpha.6` at publish time.
-  * Non-v8 packages (everything under `packages/` not listed in root `package.json`'s `workspaces`) are excluded from the Yarn workspace until migrated to the DDD pattern and NestJS 12. Also removed `@concepta/nestjs-email` from devDependencies in nestjs-invitation and nestjs-authentication (only used in e2e tests — restore when nestjs-email is migrated).
+  * Non-v8 packages (everything under `packages/` not listed under the v8 block in `pnpm-workspace.yaml`) are install-only workspace members until migrated to the DDD pattern and NestJS 12 — see the install-only block in `pnpm-workspace.yaml` for the full list. Also removed `@concepta/nestjs-email` from devDependencies in nestjs-invitation and nestjs-authentication (only used in e2e tests — restore when nestjs-email is migrated).
 
 # Ranked backlog
 
@@ -15,8 +15,9 @@ git history for what shipped.
 
   2. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
-      1. Root `package.json` `workspaces` array — add dir (or revert to glob `packages/*`
-         when all are migrated)
+      1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
+         `packages` list (or collapse both blocks to a single `packages/*` glob when all
+         are migrated), and remove `"private": true` from the package manifest
       2. Root `tsconfig.json` `references` — add `{ "path": "packages/<pkg>" }` (this
          alone drives both the `tsc -b` ESM build and the type-check gate — the build is
          solution-file-driven)

@@ -34,6 +34,7 @@
     "@nestjs/swagger": "^12.0.1",
     "@nestjs/testing": "^12.0.1",
     "@nestjs/typeorm": "^12.0.1",
+    "@types/qs": "^6.15.1",
     "supertest": "^6.3.4",
     "typeorm": "^0.3.28",
     "vitest-mock-extended": "^4.0.0"
