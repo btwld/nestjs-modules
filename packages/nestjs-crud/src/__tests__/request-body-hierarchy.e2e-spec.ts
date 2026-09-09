@@ -53,12 +53,10 @@ describe('CRUD request body — controller-level-only schema (#467)', () => {
     );
 
     const op = doc.paths['/photo-body-fallback']?.post as
-      | OperationObject
-      | undefined;
+      OperationObject | undefined;
     const schema = (
       op?.requestBody as
-        | { content?: { 'application/json'?: { schema?: unknown } } }
-        | undefined
+        { content?: { 'application/json'?: { schema?: unknown } } } | undefined
     )?.content?.['application/json']?.schema;
 
     expect(schema).toEqual({ $ref: '#/components/schemas/Photo' });

@@ -10,8 +10,7 @@ import {
 import { InvitationUserInterface } from '../interfaces/invitation-user.interface.js';
 
 export type InvitationUserResult =
-  | (ReferenceIdInterface & InvitationUserInterface)
-  | null;
+  (ReferenceIdInterface & InvitationUserInterface) | null;
 
 export interface GetUserByIdQueryInterface {
   ctx: PlainLiteralObject;

@@ -45,8 +45,7 @@ export type WhereOperator = (typeof WhereOperator)[keyof typeof WhereOperator];
  * Operator group types — partition WhereOperator by value shape.
  */
 export type WhereNullaryOperator =
-  | typeof WhereOperator.IS_NULL
-  | typeof WhereOperator.NOT_NULL;
+  typeof WhereOperator.IS_NULL | typeof WhereOperator.NOT_NULL;
 
 export type WhereScalarOperator =
   | typeof WhereOperator.EQ
@@ -63,8 +62,7 @@ export type WhereScalarOperator =
   | typeof WhereOperator.NENDS;
 
 export type WhereArrayOperator =
-  | typeof WhereOperator.IN
-  | typeof WhereOperator.NIN;
+  typeof WhereOperator.IN | typeof WhereOperator.NIN;
 
 export type WherePairOperator = typeof WhereOperator.BETWEEN;
 
@@ -110,8 +108,7 @@ export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];
  * A sort key on a single entity field — discriminated union on `order`.
  */
 export type OrderSortKey<T extends PlainLiteralObject = PlainLiteralObject> =
-  | OrderSortKeyAsc<T>
-  | OrderSortKeyDesc<T>;
+  OrderSortKeyAsc<T> | OrderSortKeyDesc<T>;
 
 /**
  * Tuple shorthand for an order sort key: `[field, order]`.

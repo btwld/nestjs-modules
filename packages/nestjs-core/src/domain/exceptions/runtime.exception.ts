@@ -93,8 +93,7 @@ export class RuntimeException
     let message: string | undefined;
 
     let finalOptions:
-      | RuntimeExceptionOptions
-      | Omit<RuntimeExceptionOptions, 'message'> = {};
+      RuntimeExceptionOptions | Omit<RuntimeExceptionOptions, 'message'> = {};
 
     if (typeof messageOrOptions === 'object') {
       message = messageOrOptions?.message;

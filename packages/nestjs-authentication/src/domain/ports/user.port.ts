@@ -15,8 +15,7 @@ export interface AuthenticationUserInterface {
 }
 
 export type AuthenticationUserResult =
-  | (ReferenceIdInterface & AuthenticationUserInterface)
-  | null;
+  (ReferenceIdInterface & AuthenticationUserInterface) | null;
 
 export interface GetUserByIdQueryInterface extends Query<AuthenticationUserResult> {
   ctx: PlainLiteralObject;

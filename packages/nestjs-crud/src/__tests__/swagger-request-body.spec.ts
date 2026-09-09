@@ -35,8 +35,7 @@ function requestBodySchema(doc: OpenAPIObject, path: string): unknown {
   const op = doc.paths[path]?.post as OperationObject | undefined;
   return (
     op?.requestBody as
-      | { content?: { 'application/json'?: { schema?: unknown } } }
-      | undefined
+      { content?: { 'application/json'?: { schema?: unknown } } } | undefined
   )?.content?.['application/json']?.schema;
 }
 

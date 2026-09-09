@@ -19,5 +19,4 @@ export interface HookWithSpec<
  * Can be a hook class directly or a HookWithSpec object with spec override.
  */
 export type HookOption<Ctx extends PlainLiteralObject = PlainLiteralObject> =
-  | Type
-  | HookWithSpec<Ctx>;
+  Type | HookWithSpec<Ctx>;

@@ -99,5 +99,4 @@ export type SConditionAND<T extends PlainLiteralObject> = {
 export type SConditionKey = '$and' | '$or';
 
 export type SCondition<T extends PlainLiteralObject> =
-  | SFields<T>
-  | SConditionAND<T>;
+  SFields<T> | SConditionAND<T>;

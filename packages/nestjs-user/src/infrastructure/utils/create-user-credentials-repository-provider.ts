@@ -40,8 +40,7 @@ export function createUserCredentialsRepositoryProvider(
       ],
       useFactory: (
         repository:
-          | RepositoryInterface<UserCredentialEntityInterface>
-          | undefined,
+          RepositoryInterface<UserCredentialEntityInterface> | undefined,
         mapper: UserCredentialsMapper,
       ) => {
         if (repository) {
