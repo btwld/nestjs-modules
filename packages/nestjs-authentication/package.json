@@ -15,9 +15,9 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "^8.0.0-alpha.10",
-    "@concepta/nestjs-password": "8.0.0-alpha.10",
-    "@concepta/nestjs-user": "8.0.0-alpha.10",
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-password": "workspace:*",
+    "@concepta/nestjs-user": "workspace:*",
     "@nestjs/jwt": "^12.0.1",
     "@nestjs/passport": "^12.0.0",
     "@standard-schema/spec": "^1.0.0",
@@ -30,8 +30,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@concepta/nestjs-crud": "8.0.0-alpha.10",
-    "@concepta/nestjs-otp": "8.0.0-alpha.10",
+    "@concepta/nestjs-crud": "workspace:*",
+    "@concepta/nestjs-otp": "workspace:*",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1",

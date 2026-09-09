@@ -15,7 +15,7 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "^8.0.0-alpha.10",
+    "@concepta/nestjs-core": "workspace:^",
     "@types/zxcvbn": "^4.4.4",
     "bcrypt": "^5.1.1",
     "zxcvbn": "^4.4.2"

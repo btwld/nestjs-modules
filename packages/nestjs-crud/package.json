@@ -15,8 +15,8 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "^8.0.0-alpha.10",
-    "@concepta/nestjs-repository": "8.0.0-alpha.10",
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-repository": "workspace:*",
     "@standard-schema/spec": "^1.0.0",
     "deepmerge": "^3.2.0",
     "qs": "^6.14.0",
@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
-    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.10",
+    "@concepta/nestjs-repository-typeorm": "workspace:*",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
     "@nestjs/common": "^12.0.1",

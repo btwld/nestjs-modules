@@ -15,7 +15,7 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "^8.0.0-alpha.10",
+    "@concepta/nestjs-core": "workspace:^",
     "accesscontrol": "^2.2.1",
     "rxjs": "^7.8.1"
   },

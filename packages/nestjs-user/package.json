@@ -33,14 +33,14 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "^8.0.0-alpha.10",
-    "@concepta/nestjs-password": "8.0.0-alpha.10",
-    "@concepta/nestjs-repository": "8.0.0-alpha.10",
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-password": "workspace:*",
+    "@concepta/nestjs-repository": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@concepta/nestjs-crud": "8.0.0-alpha.10",
-    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.10",
+    "@concepta/nestjs-crud": "workspace:*",
+    "@concepta/nestjs-repository-typeorm": "workspace:*",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
     "@nestjs/common": "^12.0.1",
