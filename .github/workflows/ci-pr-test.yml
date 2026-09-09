@@ -13,27 +13,23 @@ jobs:
         node-version: [22.x]
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Enable Corepack
-        run: corepack enable
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-
-      - uses: actions/cache@v3
-        with:
-          path: '**/node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          cache: 'pnpm'
 
       - name: Install
-        run: yarn --immutable
+        run: pnpm install --frozen-lockfile
       - name: Build
-        run: yarn build
+        run: pnpm build
       - name: Linting
-        run: yarn lint:all
+        run: pnpm lint:all
       - name: Unit tests
-        run: yarn test:ci
+        run: pnpm test:ci
       - name: Save the PR number in an artifact
         shell: bash
         env:
