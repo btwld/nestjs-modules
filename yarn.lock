@@ -473,6 +473,7 @@ __metadata:
     zod: "npm:^4.4.3"
   peerDependencies:
     "@concepta/nestjs-crud": 8.0.0-alpha.10
+    "@concepta/nestjs-repository-typeorm": 8.0.0-alpha.10
     "@concepta/typeorm-seeding": ^4.0.0
     "@faker-js/faker": ^8.4.1
     "@nestjs/common": ^12.0.1
@@ -483,11 +484,15 @@ __metadata:
   peerDependenciesMeta:
     "@concepta/nestjs-crud":
       optional: true
+    "@concepta/nestjs-repository-typeorm":
+      optional: true
     "@concepta/typeorm-seeding":
       optional: true
     "@faker-js/faker":
       optional: true
     "@nestjs/cqrs":
+      optional: true
+    typeorm:
       optional: true
   languageName: unknown
   linkType: soft
@@ -617,6 +622,8 @@ __metadata:
   peerDependencies:
     "@concepta/nestjs-crud": 8.0.0-alpha.10
     "@concepta/nestjs-repository-typeorm": 8.0.0-alpha.10
+    "@concepta/typeorm-seeding": ^4.0.0
+    "@faker-js/faker": ^8.4.1
     "@nestjs/common": ^12.0.1
     "@nestjs/config": ^12.0.0
     "@nestjs/core": ^12.0.1
@@ -624,9 +631,17 @@ __metadata:
     rxjs: ^7.1.0
     typeorm: ^0.3.0
   peerDependenciesMeta:
+    "@concepta/nestjs-crud":
+      optional: true
     "@concepta/nestjs-repository-typeorm":
       optional: true
+    "@concepta/typeorm-seeding":
+      optional: true
+    "@faker-js/faker":
+      optional: true
     "@nestjs/cqrs":
+      optional: true
+    typeorm:
       optional: true
   languageName: unknown
   linkType: soft
@@ -650,6 +665,7 @@ __metadata:
     vitest-mock-extended: "npm:^4.0.0"
     zod: "npm:^4.4.3"
   peerDependencies:
+    "@concepta/nestjs-repository-typeorm": 8.0.0-alpha.10
     "@concepta/typeorm-seeding": ^4.0.0
     "@faker-js/faker": ^8.4.1
     "@nestjs/common": ^12.0.1
@@ -659,6 +675,8 @@ __metadata:
     rxjs: ^7.1.0
     typeorm: ^0.3.0
   peerDependenciesMeta:
+    "@concepta/nestjs-repository-typeorm":
+      optional: true
     "@concepta/typeorm-seeding":
       optional: true
     "@faker-js/faker":
@@ -755,6 +773,7 @@ __metadata:
     zod: "npm:^4.4.3"
   peerDependencies:
     "@concepta/nestjs-crud": 8.0.0-alpha.10
+    "@concepta/nestjs-repository-typeorm": 8.0.0-alpha.10
     "@concepta/typeorm-seeding": ^4.0.0
     "@faker-js/faker": ^8.4.1
     "@nestjs/common": ^12.0.1
@@ -762,6 +781,10 @@ __metadata:
     "@nestjs/cqrs": ^12.0.0
     typeorm: ^0.3.0
   peerDependenciesMeta:
+    "@concepta/nestjs-crud":
+      optional: true
+    "@concepta/nestjs-repository-typeorm":
+      optional: true
     "@concepta/typeorm-seeding":
       optional: true
     "@faker-js/faker":
@@ -798,13 +821,26 @@ __metadata:
     zod: "npm:^4.4.3"
   peerDependencies:
     "@concepta/nestjs-crud": 8.0.0-alpha.10
+    "@concepta/nestjs-repository-typeorm": 8.0.0-alpha.10
+    "@concepta/typeorm-seeding": ^4.0.0
+    "@faker-js/faker": ^8.4.1
     "@nestjs/common": ^12.0.1
     "@nestjs/config": ^12.0.0
     "@nestjs/core": ^12.0.1
     "@nestjs/cqrs": ^12.0.0
     typeorm: ^0.3.0
   peerDependenciesMeta:
+    "@concepta/nestjs-crud":
+      optional: true
+    "@concepta/nestjs-repository-typeorm":
+      optional: true
+    "@concepta/typeorm-seeding":
+      optional: true
+    "@faker-js/faker":
+      optional: true
     "@nestjs/cqrs":
+      optional: true
+    typeorm:
       optional: true
   languageName: unknown
   linkType: soft
