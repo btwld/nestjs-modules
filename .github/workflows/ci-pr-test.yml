@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: ['main']
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,19 +36,33 @@ jobs:
         run: pnpm test:ci
       - name: Smoke test
         run: pnpm smoke
-      - name: Save the PR number in an artifact
-        shell: bash
-        env:
-          PR_NUM: ${{ github.event.number }}
-        run: |
-          echo $PR_NUM > ./pr_num.txt
       - name: Upload test-results artifact
         uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
           name: test-results
           path: |
-            pr_num.txt
             junit.xml
             coverage/lcov.info
             coverage/coverage-final.json
+      - name: Process Test Results
+        uses: dorny/test-reporter@v3
+        if: success() || failure()
+        with:
+          name: Unit Tests
+          path: 'junit.xml'
+          reporter: java-junit
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          files: ./coverage/coverage-final.json
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Upload coverage to Codacy
+        uses: codacy/codacy-coverage-reporter-action@v1.3.0
+        if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: ./coverage/lcov.info
