@@ -34,6 +34,8 @@ jobs:
         run: pnpm lint:all
       - name: Unit tests
         run: pnpm test:ci
+      - name: E2E tests
+        run: pnpm test:e2e
       - name: Smoke test
         run: pnpm smoke
       - name: Upload test-results artifact
