@@ -10,10 +10,19 @@ Critical/High/Nice-To-Have labels, which were rough guesses and sometimes wrong.
 tags: S/M/L. Completed items are removed from this list rather than marked done — see
 git history for what shipped.
 
-  1. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
+  1. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+      that depend on zod are pinned to `~4.4.3` (both the published range and a
+      `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
+      hoisting in a way that breaks nestjs-crud's OpenAPI tests
+      (`swagger-request-body.spec.ts`, `petstore.spec.ts`). A live correctness gap, not
+      just cleanup — either fix nestjs-crud's hoisting logic to handle the new output
+      correctly, or confirm 4.5.x's behavior is actually fine and the tests need
+      updating, then widen the range back.
+
+  2. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
 
-  2. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  3. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
          `packages` list (or collapse both blocks to a single `packages/*` glob when all
