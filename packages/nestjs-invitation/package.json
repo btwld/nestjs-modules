@@ -28,7 +28,8 @@
     "access": "public"
   },
   "files": [
-    "dist/**/!(*.spec|*.e2e-spec|*.fixture|*.mock).{js,d.ts}",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "!dist/**/__tests__/**",
     "!dist/**/__fixtures__/**"
   ],
