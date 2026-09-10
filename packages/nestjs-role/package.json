@@ -36,7 +36,7 @@
   "dependencies": {
     "@concepta/nestjs-core": "workspace:^",
     "@concepta/nestjs-repository": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "~4.4.3"
   },
   "devDependencies": {
     "@concepta/nestjs-crud": "workspace:*",

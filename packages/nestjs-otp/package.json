@@ -33,7 +33,7 @@
     "@concepta/nestjs-core": "workspace:^",
     "@concepta/nestjs-repository": "workspace:*",
     "@standard-schema/spec": "^1.0.0",
-    "zod": "^4.4.3"
+    "zod": "~4.4.3"
   },
   "devDependencies": {
     "@concepta/nestjs-repository-typeorm": "workspace:*",

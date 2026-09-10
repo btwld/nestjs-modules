@@ -21,7 +21,7 @@
     "@standard-schema/spec": "^1.0.0",
     "deepmerge": "^3.2.0",
     "qs": "^6.14.0",
-    "zod": "^4.4.3"
+    "zod": "~4.4.3"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
