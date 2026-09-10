@@ -1,6 +1,6 @@
 {
   "name": "@concepta/nestjs-core",
-  "version": "8.0.0-alpha.10",
+  "version": "8.0.0-alpha.11",
   "description": "Rockets App - Core framework module for Rockets applications",
   "type": "module",
   "main": "./dist/index.js",

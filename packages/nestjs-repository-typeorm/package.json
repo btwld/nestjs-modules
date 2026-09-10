@@ -1,6 +1,6 @@
 {
   "name": "@concepta/nestjs-repository-typeorm",
-  "version": "8.0.0-alpha.10",
+  "version": "8.0.0-alpha.11",
   "description": "Rockets NestJS TypeORM Repository Module",
   "type": "module",
   "main": "./dist/index.js",

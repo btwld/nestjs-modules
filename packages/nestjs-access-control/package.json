@@ -1,6 +1,6 @@
 {
   "name": "@concepta/nestjs-access-control",
-  "version": "8.0.0-alpha.10",
+  "version": "8.0.0-alpha.11",
   "description": "Rockets NestJS Access Control",
   "type": "module",
   "main": "./dist/index.js",
