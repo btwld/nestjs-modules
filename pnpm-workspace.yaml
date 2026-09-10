@@ -75,10 +75,11 @@ allowBuilds:
 overrides:
   typeorm: ^0.3.28
   reflect-metadata: ^0.2.2
-  # Pinned to the exact version yarn.lock had resolved. zod 4.5.4 (the latest
-  # version satisfying every package's `^4.4.3` range) changes $ref hoisting in
-  # z.toJSONSchema() output and breaks nestjs-crud's OpenAPI tests
-  # (swagger-request-body.spec.ts, petstore.spec.ts) — a real behavior
-  # regression to investigate separately, not something this migration should
-  # paper over by loosening test expectations. Revisit once that's triaged.
+  # Pinned to the exact version yarn.lock had resolved. zod 4.5.0 changes $ref
+  # hoisting in z.toJSONSchema() output and breaks nestjs-crud's OpenAPI tests
+  # (swagger-request-body.spec.ts, petstore.spec.ts). Every dependent package's
+  # published range is narrowed to match (`~4.4.3`, see their package.json) so
+  # this override isn't hiding the same problem from real consumers — see
+  # TODOs.md for the investigation to fix the hoisting logic (or confirm 4.5.x
+  # is correct) and widen the range back.
   zod: 4.4.3

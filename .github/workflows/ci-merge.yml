@@ -26,6 +26,8 @@ jobs:
         run: pnpm build
       - name: Unit tests
         run: pnpm test:ci
+      - name: Smoke test
+        run: pnpm smoke
       - name: Process Test Results
         uses: dorny/test-reporter@v1
         with:

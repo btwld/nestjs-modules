@@ -30,6 +30,8 @@ jobs:
         run: pnpm lint:all
       - name: Unit tests
         run: pnpm test:ci
+      - name: Smoke test
+        run: pnpm smoke
       - name: Save the PR number in an artifact
         shell: bash
         env:
