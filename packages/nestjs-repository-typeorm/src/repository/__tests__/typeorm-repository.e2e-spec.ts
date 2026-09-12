@@ -707,6 +707,21 @@ describe(TypeOrmRepository, () => {
       expect(withDeleted).not.toBeNull();
       expect(withDeleted?.dateDeleted).not.toBeNull();
     });
+
+    it('should no-op, preserving the original delete date, when soft-deleting an already-soft-deleted entity', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+      const firstDeleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!firstDeleted) throw new Error('fixture precondition failed');
+
+      const secondDeleted = await testRepository.softDelete(firstDeleted);
+
+      expect(secondDeleted.dateDeleted).toEqual(firstDeleted.dateDeleted);
+      expect(secondDeleted.version).toBe(firstDeleted.version);
+    });
   });
 
   describe('restore', () => {

@@ -329,6 +329,12 @@ export abstract class RepositoryAdapter<
     entity: Entity,
     options?: RepositoryDeleteOptions,
   ): Promise<Entity> {
+    const deleteDateColumn = this.getDeleteDateColumn();
+    if (deleteDateColumn && this.isSoftDeleted(entity, deleteDateColumn)) {
+      // Idempotent rather than rejected: a retried delete must not fail.
+      return entity;
+    }
+
     return this.permeator.softDelete.permeate(
       entity,
       (scoped) => this.doSoftDelete(scoped, options),

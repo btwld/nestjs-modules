@@ -20,6 +20,7 @@ class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
   doUpdateCalls = 0;
   doReplaceCalls = 0;
   doUpsertCalls = 0;
+  doSoftDeleteCalls = 0;
   doFindOneCalls: RepositoryFindOneOptions<TestEntity>[] = [];
   findOneResult: TestEntity | null = null;
 
@@ -44,6 +45,11 @@ class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
   ): Promise<TestEntity> {
     this.doUpsertCalls++;
     return Promise.resolve(this.prepare(entity) ?? new TestEntityClass());
+  }
+
+  protected override doSoftDelete(entity: TestEntity): Promise<TestEntity> {
+    this.doSoftDeleteCalls++;
+    return Promise.resolve({ ...entity, dateDeleted: new Date() });
   }
 
   protected override doFindOne(
@@ -191,6 +197,24 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
 
       expect(adapter.doUpsertCalls).toEqual(1);
       expect(result.name).toEqual('x');
+    });
+  });
+
+  describe('softDelete', () => {
+    it('should no-op on an already-soft-deleted entity', async () => {
+      const entity = softDeletedEntity();
+
+      const result = await adapter.softDelete(entity);
+
+      expect(result).toBe(entity);
+      expect(adapter.doSoftDeleteCalls).toEqual(0);
+    });
+
+    it('should delegate to doSoftDelete for a live entity', async () => {
+      const result = await adapter.softDelete(liveEntity());
+
+      expect(adapter.doSoftDeleteCalls).toEqual(1);
+      expect(result.dateDeleted).not.toBeNull();
     });
   });
 });
