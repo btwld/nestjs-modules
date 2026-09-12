@@ -389,7 +389,13 @@ export class TypeOrmRepository<
       primaryKeys[col] = value;
     }
 
-    const result = await repo.findOne({ where: primaryKeys });
+    // `withDeleted: true` — identity re-read of the row `repo.upsert()` just
+    // wrote; it may legitimately be soft-deleted (e.g. via `{ force: true }`
+    // at the abstraction level). See `saveWithVersionCheck` below.
+    const result = await repo.findOne({
+      where: primaryKeys,
+      withDeleted: true,
+    });
 
     if (!result) {
       throw new Error('Upsert failed: entity not found after upsert');
@@ -478,7 +484,15 @@ export class TypeOrmRepository<
         throw new OptimisticLockException(this.metadata.name);
       }
 
-      const fresh = await repo.findOne({ where: primaryWhere });
+      // `withDeleted: true` — identity re-read of the row the `increment`
+      // guard above just matched (full primary key + version); it may
+      // legitimately be soft-deleted (e.g. via `{ force: true }` at the
+      // abstraction level), and without this it would wrongly come back
+      // null and throw below for a row that demonstrably exists (#471).
+      const fresh = await repo.findOne({
+        where: primaryWhere,
+        withDeleted: true,
+      });
 
       if (!fresh) {
         throw new RuntimeException({
