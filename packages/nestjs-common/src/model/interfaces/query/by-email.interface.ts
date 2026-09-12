@@ -1,5 +1,5 @@
-import { ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
-import { ReferenceEmail } from '../../../reference/interfaces/reference.types';
+import { type ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
+import { type ReferenceEmail } from '../../../reference/interfaces/reference.types';
 
 export interface ByEmailInterface<
   T = ReferenceEmail,

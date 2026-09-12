@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 import { AUTH_GOOGLE_MODULE_DEFAULT_SETTINGS_TOKEN } from '../auth-google.constants';
 import { AuthGoogleLoginDto } from '../dto/auth-google-login.dto';
-import { AuthGoogleSettingsInterface } from '../interfaces/auth-google-settings.interface';
+import { type AuthGoogleSettingsInterface } from '../interfaces/auth-google-settings.interface';
 import { mapProfile } from '../utils/auth-google-map-profile';
 import { authGoogleParseScope } from '../utils/auth-google-scope-parser.util';
 

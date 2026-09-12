@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { CrudModule } from '../crud.module';
+import { RepositoryModule } from '@concepta/nestjs-repository';
 
-import { default as ormConfig } from './ormconfig.fixture';
-import { PhotoCcbModuleFixture } from './photo-ccb/photo-ccb.module.fixture';
+import { CrudModule } from '../crud.module.js';
+
+import { PhotoCcbModuleFixture } from './photo-ccb/photo-ccb.module.fixture.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(ormConfig),
+    RepositoryModule.forRoot({}),
     CrudModule.forRoot({}),
     PhotoCcbModuleFixture,
   ],

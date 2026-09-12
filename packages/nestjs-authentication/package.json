@@ -1,35 +1,70 @@
 {
   "name": "@concepta/nestjs-authentication",
-  "version": "7.0.0-alpha.10",
+  "version": "8.0.0-alpha.11",
   "description": "Rockets NestJS Authentication",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "license": "BSD-3-Clause",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "dist/**/!(*.spec|*.e2e-spec|*.fixture).{js,d.ts}"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-common": "^7.0.0-alpha.10",
-    "@concepta/nestjs-jwt": "^7.0.0-alpha.10",
-    "@nestjs/common": "^11.1.9",
-    "@nestjs/config": "^4.0.2",
-    "@nestjs/core": "^11.1.9",
-    "@nestjs/passport": "^11.0.5",
-    "@nestjs/swagger": "^11.2.2",
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-password": "workspace:*",
+    "@concepta/nestjs-user": "workspace:*",
+    "@nestjs/jwt": "^12.0.1",
+    "@nestjs/passport": "^12.0.0",
+    "@standard-schema/spec": "^1.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "ms": "^2.1.3",
     "passport": "^0.7.0",
-    "passport-strategy": "^1.0.0"
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "passport-strategy": "^1.0.0",
+    "zod": "~4.4.3"
   },
   "devDependencies": {
-    "@nestjs/jwt": "^11.0.1",
-    "@nestjs/testing": "^11.1.9",
-    "jest-mock-extended": "^4.0.0"
+    "@concepta/nestjs-crud": "workspace:*",
+    "@concepta/nestjs-otp": "workspace:*",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/testing": "^12.0.1",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/ms": "^2.1.0",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-local": "^1.0.38",
+    "@types/passport-strategy": "^0.2.38",
+    "express": "^4.21.0",
+    "supertest": "^6.3.4",
+    "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "class-transformer": "*",
-    "class-validator": "*",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
+    "@nestjs/swagger": "^12.0.1",
     "rxjs": "^7.1.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/cqrs": {
+      "optional": true
+    }
   }
 }

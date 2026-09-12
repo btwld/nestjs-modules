@@ -1,4 +1,12 @@
 export { OrgModule } from './org.module';
+
+// entities
+export { OrgSqliteEntity } from './entities/org-sqlite.entity';
+export { OrgPostgresEntity } from './entities/org-postgres.entity';
+export { OrgMemberSqliteEntity } from './entities/org-member-sqlite.entity';
+export { OrgMemberPostgresEntity } from './entities/org-member-postgres.entity';
+export { OrgProfileSqliteEntity } from './entities/org-profile-sqlite.entity';
+export { OrgProfilePostgresEntity } from './entities/org-profile-postgres.entity';
 export { OrgCrudBuilder } from './utils/org.crud-builder';
 export { OrgProfileCrudBuilder } from './utils/org-profile.crud-builder';
 

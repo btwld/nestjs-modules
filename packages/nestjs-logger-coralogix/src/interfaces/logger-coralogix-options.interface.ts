@@ -1,4 +1,4 @@
-import { LoggerCoralogixSettingsInterface } from './logger-coralogix-settings.interface';
+import { type LoggerCoralogixSettingsInterface } from './logger-coralogix-settings.interface';
 
 /**
  * Coralogix options interface.

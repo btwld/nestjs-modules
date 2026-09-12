@@ -1,12 +1,13 @@
-import { FactoryProvider, ModuleMetadata } from '@nestjs/common';
+import { type FactoryProvider, type ModuleMetadata } from '@nestjs/common';
 
-import { CoralogixOptionsInterface } from './logger-coralogix-options.interface';
+import { type CoralogixOptionsInterface } from './logger-coralogix-options.interface';
 
 /**
  * Coralogix async options.
  */
 export interface CoralogixAsyncOptionsInterface
-  extends Pick<ModuleMetadata, 'imports'>,
+  extends
+    Pick<ModuleMetadata, 'imports'>,
     Pick<
       FactoryProvider<
         CoralogixOptionsInterface | Promise<CoralogixOptionsInterface>

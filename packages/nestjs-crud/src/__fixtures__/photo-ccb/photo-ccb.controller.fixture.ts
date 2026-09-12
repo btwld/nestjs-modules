@@ -1,55 +1,58 @@
-import { CrudSoftDelete } from '../../crud/decorators/routes/crud-soft-delete.decorator';
-import { ConfigurableCrudBuilder } from '../../util/configurable-crud.builder';
-import { PhotoCreateManyDtoFixture } from '../photo/dto/photo-create-many.dto.fixture';
-import { PhotoCreateDtoFixture } from '../photo/dto/photo-create.dto.fixture';
-import { PhotoPaginatedDtoFixture } from '../photo/dto/photo-paginated.dto.fixture';
-import { PhotoUpdateDtoFixture } from '../photo/dto/photo-update.dto.fixture';
-import { PhotoDtoFixture } from '../photo/dto/photo.dto.fixture';
-import { PhotoCreatableInterfaceFixture } from '../photo/interfaces/photo-creatable.interface.fixture';
-import { PhotoEntityInterfaceFixture } from '../photo/interfaces/photo-entity.interface.fixture';
-import { PhotoUpdatableInterfaceFixture } from '../photo/interfaces/photo-updatable.interface.fixture';
-import { PhotoTypeOrmCrudAdapterFixture } from '../photo/photo-typeorm-crud.adapter.fixture';
+import { Operation } from '@concepta/nestjs-core';
 
-export const PHOTO_CRUD_ADAPTER_TOKEN = Symbol('__PHOTO_CRUD_ADAPTER_TOKEN__');
+import { ConfigurableCrudBuilder } from '../../infrastructure/utils/configurable-crud.builder.js';
+import { CRUD_TEST_PHOTO_CCB_ENTITY_NAME } from '../crud-test.constants.js';
+import { type PhotoEntityInterfaceFixture } from '../photo/interfaces/photo-entity.interface.fixture.js';
+import {
+  photoCreateBatchResponseSchema,
+  photoCreateBatchSchema,
+} from '../photo/schemas/photo-create-batch.schema.fixture.js';
+import { photoCreateSchema } from '../photo/schemas/photo-create.schema.fixture.js';
+import { photoPaginatedSchema } from '../photo/schemas/photo-paginated.schema.fixture.js';
+import { photoUpdateSchema } from '../photo/schemas/photo-update.schema.fixture.js';
+import { photoSchema } from '../photo/schemas/photo.schema.fixture.js';
 
-const crudBuilder = new ConfigurableCrudBuilder<
-  PhotoEntityInterfaceFixture,
-  PhotoCreatableInterfaceFixture,
-  PhotoUpdatableInterfaceFixture
->({
-  service: {
-    adapterToken: PhotoTypeOrmCrudAdapterFixture,
-    serviceToken: PHOTO_CRUD_ADAPTER_TOKEN,
-  },
+const crudBuilder = new ConfigurableCrudBuilder<PhotoEntityInterfaceFixture>({
   controller: {
     path: 'photo',
-    model: {
-      type: PhotoDtoFixture,
-      paginatedType: PhotoPaginatedDtoFixture,
+    entity: CRUD_TEST_PHOTO_CCB_ENTITY_NAME,
+    request: { body: photoSchema },
+    response: {
+      resource: photoSchema,
+      paginated: photoPaginatedSchema,
     },
   },
-  getMany: {},
-  getOne: {},
-  createMany: {
-    dto: PhotoCreateManyDtoFixture,
-  },
-  createOne: {
-    dto: PhotoCreateDtoFixture,
-  },
-  updateOne: {
-    dto: PhotoUpdateDtoFixture,
-  },
-  replaceOne: {
-    dto: PhotoUpdateDtoFixture,
-  },
-  deleteOne: {
-    extraDecorators: [CrudSoftDelete(true)],
-  },
-  recoverOne: { path: 'recover/:id' },
+  operations: [
+    { operation: Operation.List },
+    { operation: Operation.Read },
+    {
+      operation: Operation.CreateBatch,
+      request: { bodyBatch: photoCreateBatchSchema },
+      response: {
+        serialization: { resource: photoCreateBatchResponseSchema },
+      },
+    },
+    {
+      operation: Operation.Create,
+      request: { body: photoCreateSchema },
+    },
+    {
+      operation: Operation.Update,
+      request: { body: photoUpdateSchema },
+    },
+    {
+      operation: Operation.Replace,
+      request: { body: photoUpdateSchema },
+    },
+    { operation: Operation.Delete },
+    { operation: Operation.SoftDelete, path: 'soft/:id' },
+    { operation: Operation.Restore, path: 'restore/:id' },
+  ],
 });
 
-const { ConfigurableControllerClass, ConfigurableServiceClass } =
-  crudBuilder.build();
+const { controllers, providers } = crudBuilder.build();
+const { PhotoCcbController } = controllers;
 
-export class PhotoCcbCrudServiceFixture extends ConfigurableServiceClass {}
-export class PhotoCcbControllerFixture extends ConfigurableControllerClass {}
+export class PhotoCcbControllerFixture extends PhotoCcbController {}
+
+export { providers as PhotoCcbProviders };

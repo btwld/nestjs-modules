@@ -5,8 +5,6 @@
 ## Project
 
 [![Codacy](https://app.codacy.com/project/badge/Grade/6b92bb0756ee4664a1403c4688a0d172)](https://www.codacy.com/gh/conceptadev/rockets/dashboard?utm_source=github.com&utm_medium=referral&utm_content=conceptadev/rockets&utm_campaign=Badge_Grade)
-[![Code Climate Maint](https://img.shields.io/codeclimate/maintainability/conceptadev/rockets?logo=codeclimate)](https://codeclimate.com/github/conceptadev/rockets)
-[![Code Climate Debt](https://img.shields.io/codeclimate/tech-debt/conceptadev/rockets?logo=codeclimate)](https://codeclimate.com/github/conceptadev/rockets)
 [![Codecov](https://codecov.io/gh/conceptadev/rockets/branch/main/graph/badge.svg?token=QXUHV1RP5N)](https://codecov.io/gh/conceptadev/rockets)
 [![GitHub Build](https://img.shields.io/github/actions/workflow/status/conceptadev/rockets/ci-pr-test.yml?logo=github)](https://github.com/conceptadev/rockets/actions/workflows/ci-pr-test.yml)
 [![GH Commits](https://img.shields.io/github/commit-activity/m/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
@@ -19,6 +17,9 @@ Rapid Enterprise Development Toolkit
 
 A collection of NestJS modules
 that were created for the rapid development of enterpise level APIs.
+
+The v8 line is schema-first — native Zod v4 / Standard Schema validation,
+serialization, and OpenAPI — on NestJS 12, ESM-only, Node >= 22.
 
 All reasonable efforts have been made to provide loosely coupled interfaces,
 overridable services, and sane default implementations.
@@ -33,21 +34,53 @@ once we have finalized our Contributor License Agreement.
 
 ## Modules
 
-| Module                                                                                                                           | Summary                                                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| [nestjs-access-control](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-access-control 'nestjs-access-control') | Advanced access control guard for NestJS with optional per-request filtering.                                                               |
-| [nestjs-auth-github](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-auth-github 'nestjs-auth-github')          | Authenticate requests using GitHub oAuth2 sign-on.                                                                                          |
-| [nestjs-auth-jwt](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-auth-jwt 'nestjs-auth-jwt')                   | Authenticate requests using JWT tokens passed via the request (headers, cookies, body, query, etc).                                         |
-| [nestjs-auth-local](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-auth-local 'nestjs-auth-local')             | Authenticate requests using username/email and password against a local or remote data source.                                              |
-| [nestjs-auth-refresh](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-auth-refresh 'nestjs-auth-refresh')       | Authenticate requests using JWT refresh tokens passed via the request (headers, cookies, body, query, etc).                                 |
-| [nestjs-authentication](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-authentication 'nestjs-authentication') | Authenticate requests using one or more strategies (local, jwt, etc).                                                                       |
-| [nestjs-common](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-common 'nestjs-common')                         | The common module is a dependency of all Rockets modules.                                                                                   |
-| [nestjs-crud](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-crud 'nestjs-crud')                               | Extremely powerful CRUD module that is an extension/wrapper of the popular @nestjsx/crud module.                                            |
-| [nestjs-email](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-email 'nestjs-email')                            | Email deliver module that supports most popular transports, as well as template based email bodies using handlebars syntax.                 |
-| [nestjs-event](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-event 'nestjs-event')                            | Advanced class based event dispatch/listener module.                                                                                        |
-| [nestjs-jwt](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-jwt 'nestjs-jwt')                                  | A flexible JWT utilities module for signing and validating tokens.                                                                          |
-| [nestjs-logger](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-logger 'nestjs-logger')                         | Drop-in replacement for the core NestJS logger that provides additonal support for pushing log data to external log providers.              |
-| [nestjs-password](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-password 'nestjs-password')                   | A flexible Password utilities module that provides services for password strength, creation and storage.                                    |
-| [nestjs-swagger-ui](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-swagger-ui 'nestjs-swagger-ui')             | Expose your OpenApi spec on your API using the powerful Swagger UI interface.                                                               |
-| [nestjs-typeorm-ext](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-typeorm-ext 'nestjs-typeorm-ext')          | Extension of the NestJS TypeOrm module that allows your dynamic modules to accept drop-in replacements of custom entities and repositories. |
-| [nestjs-user](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-user 'nestjs-user')                               | A module for managing a basic User entity, including controller with full CRUD, DTOs, sample data factory and seeder.                       |
+| Module                                                                                                                                           | Summary                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [nestjs-core](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-core 'nestjs-core')                                               | Core framework module providing the app context system, DDD base classes, and shared utilities for Rockets modules.  |
+| [nestjs-repository](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-repository 'nestjs-repository')                             | Abstract repository adapter layer with transaction management, federation, and repository hook support.              |
+| [nestjs-repository-typeorm](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-repository-typeorm 'nestjs-repository-typeorm')     | TypeORM driver for nestjs-repository with entity base classes and where-clause translation.                          |
+| [nestjs-crud](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-crud 'nestjs-crud')                                               | Powerful CRUD module with full DDD/CQRS integration, configurable operations, and optional OpenAPI documentation.    |
+| [nestjs-cache](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-cache 'nestjs-cache')                                             | Cache management module using DDD/CQRS patterns with pluggable storage and HTTP CRUD gateway.                        |
+| [nestjs-otp](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-otp 'nestjs-otp')                                                   | One-time password module supporting multiple OTP categories with rate limiting and expiry management.                |
+| [nestjs-role](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-role 'nestjs-role')                                               | Role and role-assignment management module with DDD/CQRS and HTTP CRUD gateway.                                      |
+| [nestjs-password](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-password 'nestjs-password')                                   | Password utilities module providing strength validation, hashing, and storage via configurable policy services.      |
+| [nestjs-user](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-user 'nestjs-user')                                               | User entity management module with DDD/CQRS, password integration, and optional HTTP CRUD gateway.                   |
+| [nestjs-invitation](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-invitation 'nestjs-invitation')                             | Invitation workflow module handling token generation, delivery, acceptance, and revocation via DDD/CQRS.             |
+| [nestjs-federated](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-federated 'nestjs-federated')                                 | Federated (OAuth) identity linking module that maps external provider identities to local user accounts.             |
+| [nestjs-authentication](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-authentication 'nestjs-authentication')                 | Full-featured authentication module (JWT, local, refresh, recovery, verify, OAuth router) using DDD and CQRS.       |
+| [nestjs-access-control](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-access-control 'nestjs-access-control')                 | Advanced access control guard with role-based grants and optional per-request response attribute filtering.          |
+
+## Entry Points
+
+A module's main entry point (`@concepta/nestjs-x`) never requires an
+optional peer dependency to load. Anything that does needs its own subpath
+entry point instead, so a consumer who never imports that subpath never has
+to install the dependency.
+
+| subpath | gated on |
+| --- | --- |
+| `optional/typeorm` | `typeorm` |
+| `optional/seeding` | `@concepta/typeorm-seeding` + `@faker-js/faker` |
+| `optional/crud` | `@concepta/nestjs-crud` |
+
+Rules for maintaining this boundary:
+
+1. **The main entry is dependency-free.** Nothing reachable from
+   `src/index.ts` may import an optional peer dependency.
+2. **One `optional/*` subpath per optional peer**, named after the dep it
+   gates. Source file is `src/optional-<name>.ts`, built to
+   `dist/optional-<name>.js`.
+3. **Every `optional/*` entry has a matching optional peer declaration** —
+   the dep appears in `peerDependencies` *and* in `peerDependenciesMeta`
+   with `"optional": true`.
+4. **A symbol is exported from exactly one entry point.** No re-exporting
+   an `optional/*` symbol from `index.ts`.
+5. **Canonical source locations:** typeorm entities in
+   `src/infrastructure/persistence/typeorm/`, seed factories and seeders in
+   `src/infrastructure/seeding/`, CRUD request/handler classes in
+   `src/gateways/http/{commands,queries}/{impl,handlers}/`.
+
+`@concepta/nestjs-core/aggregate`, `@concepta/nestjs-core/testing` and
+`@concepta/nestjs-repository/testing` are deliberate exceptions — they gate
+nothing, they're just alternate entry points into always-available code, so
+they don't live under `optional/`.

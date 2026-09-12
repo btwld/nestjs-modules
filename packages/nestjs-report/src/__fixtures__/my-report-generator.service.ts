@@ -8,9 +8,7 @@ import { ReportGeneratorServiceInterface } from '../interfaces/report-generator-
 
 import { AWS_KEY_FIXTURE, REPORT_KEY_FIXTURE } from './constants.fixture';
 
-export class MyReportGeneratorService
-  implements ReportGeneratorServiceInterface
-{
+export class MyReportGeneratorService implements ReportGeneratorServiceInterface {
   constructor(
     @Inject(FileService)
     private readonly fileService: FileService,

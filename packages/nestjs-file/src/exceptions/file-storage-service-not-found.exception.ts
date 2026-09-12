@@ -1,6 +1,6 @@
 import {
-  RuntimeException,
-  RuntimeExceptionOptions,
+  type RuntimeException,
+  type RuntimeExceptionOptions,
 } from '@concepta/nestjs-common';
 
 import { FileException } from './file.exception';
@@ -20,7 +20,7 @@ export class FileStorageServiceNotFoundException extends FileException {
     this.errorCode = 'FILE_STORAGE_SERVICE_NOT_FOUND_ERROR';
 
     this.context = {
-      ...super.context,
+      ...this.context,
       storageServiceName: assignmentName,
     };
   }

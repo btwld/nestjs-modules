@@ -1,4 +1,4 @@
-import { ReferenceIdInterface } from '@concepta/nestjs-common';
+import { type ReferenceIdInterface } from '@concepta/nestjs-core';
 
 export interface PhotoEntityInterfaceFixture extends ReferenceIdInterface {
   name: string;

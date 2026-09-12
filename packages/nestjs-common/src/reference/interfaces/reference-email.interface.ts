@@ -1,4 +1,4 @@
-import { ReferenceEmail } from './reference.types';
+import { type ReferenceEmail } from './reference.types';
 
 /**
  * Identifiable by email.

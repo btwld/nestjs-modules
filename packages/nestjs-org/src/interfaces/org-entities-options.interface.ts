@@ -1,14 +1,14 @@
 import {
-  OrgEntityInterface,
-  RepositoryEntityOptionInterface,
-  OrgMemberEntityInterface,
-  OrgProfileEntityInterface,
+  type OrgEntityInterface,
+  type RepositoryEntityOptionInterface,
+  type OrgMemberEntityInterface,
+  type OrgProfileEntityInterface,
 } from '@concepta/nestjs-common';
 
 import {
-  ORG_MODULE_ORG_MEMBER_ENTITY_KEY,
-  ORG_MODULE_ORG_ENTITY_KEY,
-  ORG_MODULE_ORG_PROFILE_ENTITY_KEY,
+  type ORG_MODULE_ORG_MEMBER_ENTITY_KEY,
+  type ORG_MODULE_ORG_ENTITY_KEY,
+  type ORG_MODULE_ORG_PROFILE_ENTITY_KEY,
 } from '../org.constants';
 
 export interface OrgEntitiesOptionsInterface {

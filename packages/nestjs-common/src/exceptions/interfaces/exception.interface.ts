@@ -1,4 +1,4 @@
-import { ExceptionContext } from '../../core.types';
+import { type ExceptionContext } from '../../core.types';
 
 export interface ExceptionInterface extends Error {
   /**

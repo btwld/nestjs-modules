@@ -1,5 +1,5 @@
-import { ReferenceIdInterface } from './reference-id.interface';
-import { ReferenceId } from './reference.types';
+import { type ReferenceIdInterface } from './reference-id.interface';
+import { type ReferenceId } from './reference.types';
 
 /**
  * References a role.

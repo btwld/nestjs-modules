@@ -1,35 +1,85 @@
 {
   "name": "@concepta/nestjs-role",
-  "version": "7.0.0-alpha.10",
-  "description": "Rockets NestJS User",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "version": "8.0.0-alpha.11",
+  "description": "Rockets NestJS Role",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./optional/crud": {
+      "types": "./dist/optional-crud.d.ts",
+      "default": "./dist/optional-crud.js"
+    },
+    "./optional/seeding": {
+      "types": "./dist/optional-seeding.d.ts",
+      "default": "./dist/optional-seeding.js"
+    },
+    "./optional/typeorm": {
+      "types": "./dist/optional-typeorm.d.ts",
+      "default": "./dist/optional-typeorm.js"
+    }
+  },
   "license": "BSD-3-Clause",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "dist/**/!(*.spec|*.e2e-spec|*.fixture).{js,d.ts}"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-access-control": "^7.0.0-alpha.10",
-    "@concepta/nestjs-common": "^7.0.0-alpha.10",
-    "@nestjs/common": "^11.1.9",
-    "@nestjs/config": "^4.0.2",
-    "@nestjs/swagger": "^11.2.2"
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-repository": "workspace:*",
+    "zod": "~4.4.3"
   },
   "devDependencies": {
-    "@concepta/nestjs-crud": "^7.0.0-alpha.10",
-    "@concepta/nestjs-typeorm-ext": "^7.0.0-alpha.10",
+    "@concepta/nestjs-crud": "workspace:*",
+    "@concepta/nestjs-repository-typeorm": "workspace:*",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
-    "@nestjs/testing": "^11.1.9",
-    "@nestjs/typeorm": "^11.0.0",
-    "supertest": "^6.3.4"
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/testing": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.1",
+    "supertest": "^6.3.4",
+    "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "class-transformer": "*",
-    "class-validator": "*",
+    "@concepta/nestjs-crud": "8.0.0-alpha.10",
+    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.10",
+    "@concepta/typeorm-seeding": "^4.0.0",
+    "@faker-js/faker": "^8.4.1",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
     "typeorm": "^0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@concepta/nestjs-crud": {
+      "optional": true
+    },
+    "@concepta/nestjs-repository-typeorm": {
+      "optional": true
+    },
+    "@concepta/typeorm-seeding": {
+      "optional": true
+    },
+    "@faker-js/faker": {
+      "optional": true
+    },
+    "@nestjs/cqrs": {
+      "optional": true
+    },
+    "typeorm": {
+      "optional": true
+    }
   }
 }

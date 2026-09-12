@@ -1,0 +1,54 @@
+{
+  "name": "@concepta/nestjs-repository",
+  "version": "8.0.0-alpha.11",
+  "description": "Rockets NestJS Repository",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "license": "BSD-3-Clause",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
+  ],
+  "dependencies": {
+    "@concepta/nestjs-core": "workspace:^",
+    "@tsyche/membrane": "^0.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/testing": "^12.0.1",
+    "vitest": "^4.1.9",
+    "vitest-mock-extended": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "rxjs": "^7.8.1",
+    "vitest": ">=4.0.0",
+    "vitest-mock-extended": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    },
+    "vitest-mock-extended": {
+      "optional": true
+    }
+  }
+}

@@ -1,23 +1,44 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { CqrsModule, QueryBus } from '@nestjs/cqrs';
 
-import { createSettingsProvider } from '@concepta/nestjs-common';
+import { createSettingsProvider } from '@concepta/nestjs-core';
 
-import { AccessControlGuard } from './access-control.guard';
-import { accessControlDefaultConfig } from './config/acess-control-default.config';
-import { ACCESS_CONTROL_MODULE_SETTINGS_TOKEN } from './constants';
-import { AccessControlFilter } from './filter/access-control.filter';
-import { AccessControlOptionsExtrasInterface } from './interfaces/access-control-options-extras.interface';
-import { AccessControlOptionsInterface } from './interfaces/access-control-options.interface';
-import { AccessControlSettingsInterface } from './interfaces/access-control-settings.interface';
-import { AccessControlService } from './services/access-control.service';
+import {
+  ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
+  ACCESS_CONTROL_PORT_TOKEN,
+} from './access-control.constants.js';
+import {
+  AccessControlPort,
+  type AccessControlPortSettings,
+} from './application/ports/access-control.port.js';
+import { CheckAccessHandler } from './application/queries/handlers/check-access.handler.js';
+import { FilterResponseAttributesHandler } from './application/queries/handlers/filter-response-attributes.handler.js';
+import { ResolveUserRolesHandler } from './application/queries/handlers/resolve-user-roles.handler.js';
+import { CheckAccessQuery } from './application/queries/impl/check-access.query.js';
+import { FilterResponseAttributesQuery } from './application/queries/impl/filter-response-attributes.query.js';
+import { ResolveUserRolesQuery } from './application/queries/impl/resolve-user-roles.query.js';
+import { AccessControlFilter } from './gateways/http/access-control.filter.js';
+import { AccessControlGuard } from './gateways/http/access-control.guard.js';
+import { accessControlDefaultConfig } from './infrastructure/config/access-control-default.config.js';
+import { type AccessControlOptionsExtrasInterface } from './infrastructure/config/interfaces/access-control-options-extras.interface.js';
+import { type AccessControlOptionsInterface } from './infrastructure/config/interfaces/access-control-options.interface.js';
+import { type AccessControlSettingsInterface } from './infrastructure/config/interfaces/access-control-settings.interface.js';
+import { AccessControlService } from './infrastructure/services/access-control.service.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__ACCESS_CONTROL_MODULE_RAW_OPTIONS_TOKEN__');
+
+export const DEFAULT_ACCESS_CONTROL_PORT_SETTINGS: Required<AccessControlPortSettings> =
+  {
+    checkAccessQuery: CheckAccessQuery,
+    filterResponseAttributesQuery: FilterResponseAttributesQuery,
+    resolveUserRolesQuery: ResolveUserRolesQuery,
+  };
 
 export const {
   ConfigurableModuleClass: AccessControlModuleClass,
@@ -43,6 +64,12 @@ export type AccessControlAsyncOptions = Omit<
   'global'
 >;
 
+const ACCESS_CONTROL_QUERY_HANDLERS = [
+  CheckAccessHandler,
+  FilterResponseAttributesHandler,
+  ResolveUserRolesHandler,
+];
+
 function definitionTransform(
   definition: DynamicModule,
   extras: AccessControlOptionsExtrasInterface,
@@ -64,7 +91,10 @@ function definitionTransform(
 export function createAccessControlImports(
   overrides?: Pick<AccessControlOptions, 'imports'>,
 ): DynamicModule['imports'] {
-  const imports = [ConfigModule.forFeature(accessControlDefaultConfig)];
+  const imports = [
+    CqrsModule,
+    ConfigModule.forFeature(accessControlDefaultConfig),
+  ];
 
   if (overrides?.imports?.length) {
     return [...imports, ...overrides.imports];
@@ -76,6 +106,7 @@ export function createAccessControlImports(
 export function createAccessControlExports() {
   return [
     ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
+    ACCESS_CONTROL_PORT_TOKEN,
     AccessControlService,
     AccessControlFilter,
     AccessControlGuard,
@@ -90,10 +121,12 @@ export function createAccessControlProviders(options: {
     ...(options.providers ?? []),
     createAccessControlSettingsProvider(options.overrides),
     createAccessControlServiceProvider(options.overrides),
+    createAccessControlPortProvider(options.overrides),
     createAccessControlAppGuardProvider(options.overrides),
     createAccessControlAppFilterProvider(options.overrides),
     AccessControlFilter,
     AccessControlGuard,
+    ...ACCESS_CONTROL_QUERY_HANDLERS,
   ];
 }
 
@@ -117,10 +150,30 @@ export function createAccessControlServiceProvider(
   return {
     provide: AccessControlService,
     inject: [RAW_OPTIONS_TOKEN],
-    useFactory: async (options: AccessControlOptionsInterface) =>
+    useFactory: (options: AccessControlOptionsInterface) =>
       optionsOverrides?.service ??
       options.service ??
       new AccessControlService(),
+  };
+}
+
+export function createAccessControlPortProvider(
+  optionsOverrides?: AccessControlOptions,
+): Provider {
+  return {
+    provide: ACCESS_CONTROL_PORT_TOKEN,
+    inject: [RAW_OPTIONS_TOKEN, QueryBus],
+    useFactory: (
+      options: AccessControlOptionsInterface,
+      queryBus: QueryBus,
+    ) => {
+      const portSettings: Required<AccessControlPortSettings> = {
+        ...DEFAULT_ACCESS_CONTROL_PORT_SETTINGS,
+        ...options?.ports?.accessControl,
+        ...optionsOverrides?.ports?.accessControl,
+      };
+      return new AccessControlPort(portSettings, queryBus);
+    },
   };
 }
 
@@ -130,19 +183,15 @@ export function createAccessControlAppGuardProvider(
   return {
     provide: APP_GUARD,
     inject: [RAW_OPTIONS_TOKEN, AccessControlGuard],
-    useFactory: async (
+    useFactory: (
       options: AccessControlOptionsInterface,
       defaultGuard: AccessControlGuard,
     ) => {
-      // get app guard from the options
       const appGuard = optionsOverrides?.appGuard ?? options?.appGuard;
 
-      // is app guard explicitly false?
       if (appGuard === false) {
-        // yes, don't set a guard
         return null;
       } else {
-        // return app guard if set, or fall back to default
         return appGuard ?? defaultGuard;
       }
     },
@@ -155,19 +204,15 @@ export function createAccessControlAppFilterProvider(
   return {
     provide: APP_INTERCEPTOR,
     inject: [RAW_OPTIONS_TOKEN, AccessControlFilter],
-    useFactory: async (
+    useFactory: (
       options: AccessControlOptionsInterface,
       defaultFilter: AccessControlFilter,
     ) => {
-      // get app filter from the options
       const appFilter = optionsOverrides?.appFilter ?? options?.appFilter;
 
-      // is app filter explicitly false?
       if (appFilter === false) {
-        // yes, don't set a filter
         return null;
       } else {
-        // return app filter if set, or fall back to default
         return appFilter ?? defaultFilter;
       }
     },

@@ -1,4 +1,4 @@
-import { LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
 
 import { LOGGER_VALID_LOG_LEVELS } from '../config/logger.config';
 import { LoggerInvalidLogLevelException } from '../exceptions/logger-invalid-log-level.exception';

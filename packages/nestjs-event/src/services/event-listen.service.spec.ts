@@ -9,7 +9,7 @@ import {
 import { Event } from '../events/event';
 import { EventAsync } from '../events/event-async';
 import { EventListenException } from '../exceptions/event-listen.exception';
-import { EventSettingsInterface } from '../interfaces/event-settings.interface';
+import { type EventSettingsInterface } from '../interfaces/event-settings.interface';
 import { EventListenerOn } from '../listeners/event-listener-on';
 
 import { EventListenService } from './event-listen.service';

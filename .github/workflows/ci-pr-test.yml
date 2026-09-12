@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: ['main']
 
+permissions:
+  contents: read
+  checks: write
+
 concurrency:
   group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -14,43 +18,57 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Enable Corepack
-        run: corepack enable
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-
-      - uses: actions/cache@v3
-        with:
-          path: '**/node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          cache: 'pnpm'
 
       - name: Install
-        run: yarn --immutable
+        run: pnpm install --frozen-lockfile
       - name: Build
-        run: yarn build
+        run: pnpm build
       - name: Linting
-        run: yarn lint:all
+        run: pnpm lint:all
       - name: Unit tests
-        run: yarn test:ci
-      - name: Save the PR number in an artifact
-        shell: bash
-        env:
-          PR_NUM: ${{ github.event.number }}
-        run: |
-          echo $PR_NUM > ./pr_num.txt
+        run: pnpm test:ci
+      - name: E2E tests
+        run: pnpm test:e2e
+      - name: Smoke test
+        run: pnpm smoke
       - name: Upload test-results artifact
         uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
           name: test-results
           path: |
-            pr_num.txt
             junit.xml
             coverage/lcov.info
             coverage/coverage-final.json
+      - name: Process Test Results
+        uses: dorny/test-reporter@v3
+        if: success() || failure()
+        with:
+          name: Unit Tests
+          path: 'junit.xml'
+          reporter: java-junit
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          files: ./coverage/coverage-final.json
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Upload coverage to Codacy
+        uses: codacy/codacy-coverage-reporter-action@v1.3.0
+        if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: ./coverage/lcov.info

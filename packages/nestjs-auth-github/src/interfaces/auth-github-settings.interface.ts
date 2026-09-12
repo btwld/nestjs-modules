@@ -1,8 +1,8 @@
-import { Type } from '@nestjs/common';
+import { type Type } from '@nestjs/common';
 
-import { AuthenticationCodeInterface } from '@concepta/nestjs-common';
+import { type AuthenticationCodeInterface } from '@concepta/nestjs-common';
 
-import { MapProfile } from '../auth-github.types';
+import { type MapProfile } from '../auth-github.types';
 
 export interface AuthGithubSettingsInterface {
   clientId: string;

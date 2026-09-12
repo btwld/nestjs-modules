@@ -1,9 +1,9 @@
 import {
-  RuntimeException,
-  RuntimeExceptionOptions,
+  type RuntimeException,
+  type RuntimeExceptionOptions,
 } from '@concepta/nestjs-common';
 
-import { EventListenOnInterface } from '../services/interfaces/event-listen-on.interface';
+import { type EventListenOnInterface } from '../services/interfaces/event-listen-on.interface';
 
 import { EventException } from './event.exception';
 

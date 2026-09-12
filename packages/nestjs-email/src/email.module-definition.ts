@@ -1,8 +1,8 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
+  type DynamicModule,
   Logger,
-  Provider,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -14,9 +14,9 @@ import {
   EMAIL_MODULE_MAILER_SERVICE_TOKEN,
 } from './email.constants';
 import { EmailService } from './email.service';
-import { EmailOptionsExtrasInterface } from './interfaces/email-options-extras.interface';
-import { EmailOptionsInterface } from './interfaces/email-options.interface';
-import { EmailSettingsInterface } from './interfaces/email-settings.interface';
+import { type EmailOptionsExtrasInterface } from './interfaces/email-options-extras.interface';
+import { type EmailOptionsInterface } from './interfaces/email-options.interface';
+import { type EmailSettingsInterface } from './interfaces/email-settings.interface';
 
 const RAW_OPTIONS_TOKEN = Symbol('__EMAIL_MODULE_RAW_OPTIONS_TOKEN__');
 

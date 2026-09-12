@@ -1,9 +1,9 @@
-import { DynamicModule, ModuleMetadata } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type DynamicModule, type ModuleMetadata } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { LoggerModule } from '@concepta/nestjs-logger';
 
-import { LoggerSentrySettingsInterface } from './interfaces/logger-sentry-settings.interface';
+import { type LoggerSentrySettingsInterface } from './interfaces/logger-sentry-settings.interface';
 import { LoggerSentryModule } from './logger-sentry.module';
 import { LoggerSentryTransport } from './transports/logger-sentry.transport';
 import { formatMessage, logLevelMap } from './utils';

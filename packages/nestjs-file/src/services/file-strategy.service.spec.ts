@@ -1,6 +1,6 @@
 import { FileCreateDto } from '../dto/file-create.dto';
 import { FileStorageServiceNotFoundException } from '../exceptions/file-storage-service-not-found.exception';
-import { FileStorageServiceInterface } from '../interfaces/file-storage-service.interface';
+import { type FileStorageServiceInterface } from '../interfaces/file-storage-service.interface';
 
 import { FileStrategyService } from './file-strategy.service';
 

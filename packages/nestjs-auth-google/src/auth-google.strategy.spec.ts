@@ -1,9 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
   FederatedOAuthService,
-  FederatedCredentialsInterface,
+  type FederatedCredentialsInterface,
 } from '@concepta/nestjs-federated';
 
 import {
@@ -13,8 +13,8 @@ import {
 import { AuthGoogleStrategy } from './auth-google.strategy';
 import { AuthGoogleMissingEmailException } from './exceptions/auth-google-missing-email.exception';
 import { AuthGoogleMissingIdException } from './exceptions/auth-google-missing-id.exception';
-import { AuthGoogleProfileInterface } from './interfaces/auth-google-profile.interface';
-import { AuthGoogleSettingsInterface } from './interfaces/auth-google-settings.interface';
+import { type AuthGoogleProfileInterface } from './interfaces/auth-google-profile.interface';
+import { type AuthGoogleSettingsInterface } from './interfaces/auth-google-settings.interface';
 import { mapProfile } from './utils/auth-google-map-profile';
 
 // Mock the PassportStrategy class

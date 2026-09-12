@@ -1,262 +1,247 @@
 # Rockets NestJS Federated Authentication
 
-Authenticate via federated login
+Authenticate via federated login (OAuth providers like GitHub, Google, Apple).
 
 ## Project
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-federated)](https://www.npmjs.com/package/@concepta/nestjs-federated)
-[![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-federated)](https://www.npmjs.com/package/@concepta/nestjs-federated)
+[![NPM Downloads](https://img.shields.io/npm/dw/@concepta/nestjs-federated)](https://www.npmjs.com/package/@concepta/nestjs-federated)
 [![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
 [![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/rockets/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-federated%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
 
 1. [Tutorials](#tutorials)
    - [Introduction](#introduction)
-   - [Getting Started with Federated Authentication](#getting-started-with-federated-authentication)
-     - [Step 1: Create User Entity](#step-1-create-user-entity)
-     - [Step 2: Create Federated Entity](#step-2-create-federated-entity)
-     - [Step 3: Implement FederatedUserModelServiceInterface](#step-3-implement-federatedusermodelserviceinterface)
-     - [Step 4: Configure the Module](#step-4-configure-the-module)
-     - [Step 5: Integrate with other Oauth Module](#step-5-integrate-with-other-oauth-module)
+   - [Getting Started](#getting-started)
+     - [Step 1: Create the Identity Entity](#step-1-create-the-identity-entity)
+     - [Step 2: Configure the User Port](#step-2-configure-the-user-port)
+     - [Step 3: Configure the Module](#step-3-configure-the-module)
+     - [Step 4: Integrate with an OAuth Module](#step-4-integrate-with-an-oauth-module)
 2. [How-To Guides](#how-to-guides)
-   - [Implement FederatedUserModelServiceInterface](#implement-federatedusermodelserviceinterface)
-   - [Using federated with Rockets Github Module](#using-federated-with-rockets-github-module)
+   - [Override the Identity Repository](#override-the-identity-repository)
 3. [Reference](#reference)
+   - [Module Options](#module-options)
+   - [Key Exports](#key-exports)
 4. [Explanation](#explanation)
-   - [Federated Services](#federated-services)
-   - [Module Options Responsibilities](#module-options-responsibilities)
+   - [Architecture](#architecture)
+   - [The Sign Flow](#the-sign-flow)
 
 ## Tutorials
 
 ### Introduction
 
-Before we begin, you'll need to set up OAuth Apps for the social providers you
-wish to use (e.g., GitHub, Google, Facebook) to obtain the necessary credentials.
-For detailed guides on creating OAuth Apps and obtaining your Client IDs and
-Client Secrets, please refer to the official documentation of each provider and
-refer to the [`@concepta/nestjs-auth-github`](https://www.rockets.tools/reference/rockets/nestjs-auth-github/README),
-[`nestjs-auth-apple`](https://www.rockets.tools/reference/rockets/nestjs-auth-apple/README),
-and [`@concepta/nestjs-auth-google`](https://www.rockets.tools/reference/rockets/nestjs-auth-google/README)
-documentation to use our modules.
+The `@concepta/nestjs-federated` module manages the link between OAuth provider
+identities and your application's users. When a user authenticates via an
+external provider (GitHub, Google, Apple), this module:
 
-### Getting Started with Federated Authentication
+1. Looks up an existing identity record by provider + subject
+2. If found, returns the associated user
+3. If not found, creates the user and identity record in a single transaction
+
+Before you begin, set up OAuth Apps for your social providers to obtain Client
+IDs and Client Secrets. Refer to the provider-specific auth modules:
+
+- [`@concepta/nestjs-auth-github`](https://www.rockets.tools/reference/rockets/nestjs-auth-github/README)
+- [`@concepta/nestjs-auth-apple`](https://www.rockets.tools/reference/rockets/nestjs-auth-apple/README)
+- [`@concepta/nestjs-auth-google`](https://www.rockets.tools/reference/rockets/nestjs-auth-google/README)
+
+### Getting Started
 
 #### Installation
 
-To get started, install the `FederatedModule` package:
-
-`yarn add @concepta/nestjs-federated`
-
-### Step 1: Create User Entity
-
-First, let's create the `UserEntity`:
-
-```ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { FederatedEntity } from '../federated/federated.entity';
-
-@Entity()
-export class UserEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column()
-  name: string;
-
-  @OneToMany(() => FederatedEntity, (federated) => federated.user)
-  federated!: FederatedEntity;
-}
+```sh
+yarn add @concepta/nestjs-federated @nestjs/common @nestjs/config @nestjs/core
 ```
 
-### Step 2: Create Federated Entity
+This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 
-Next, create the `FederatedEntity`:
+### Peer Dependencies
+
+| Package | Required | Notes |
+| --- | --- | --- |
+| `@nestjs/common` | Yes | NestJS framework peer |
+| `@nestjs/config` | Yes | Used by the module's config factory |
+| `@nestjs/core` | Yes | Required transitively by `@nestjs/cqrs` |
+| `@nestjs/cqrs` | No | Optional peer — required in practice, `FederatedUserPort` dispatches through the `QueryBus`/`CommandBus` |
+| `rxjs` | Yes | NestJS requirement |
+| `typeorm` | No | Only if using the TypeORM repository adapter |
+| `@concepta/nestjs-repository-typeorm` | No | Only if using the TypeORM repository adapter |
+
+For TypeORM entity base classes (optional):
+
+```sh
+yarn add @concepta/nestjs-repository-typeorm
+```
+
+### Step 1: Create the Identity Entity
+
+Create a concrete entity that extends one of the abstract base classes from the
+optional TypeORM subpath:
 
 ```ts
-import { Entity, ManyToOne } from 'typeorm';
-import { FederatedSqliteEntity } from '@concepta/nestjs-typeorm-ext';
+import { Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { IdentitySqliteEntity } from '@concepta/nestjs-federated/optional/typeorm';
 import { UserEntity } from '../user/user.entity';
 
 @Entity()
-export class FederatedEntity extends FederatedSqliteEntity {
-  @ManyToOne(() => UserEntity, (user) => user.federated)
-  user!: UserEntity;
+export class IdentityEntity extends IdentitySqliteEntity {
+  @ManyToOne(() => UserEntity, { eager: true })
+  @JoinColumn()
+  user: UserEntity;
 }
 ```
 
-### Step 3: Implement FederatedUserModelServiceInterface
+The `user` property is declared `abstract` on the base class, so you must
+provide it with the appropriate TypeORM relationship decorator.
 
-Refer to [Implement FederatedUserModelServiceInterface](#implement-federatedusermodelserviceinterface)
-section
+For PostgreSQL, extend `IdentityPostgresEntity` instead.
 
-### Step 4: Configure the Module
+### Step 2: Configure the User Port
 
-Finally, set up the module configuration:
+The module communicates with your user system through a `userPort` — a set of
+query/command class references that the module dispatches via the NestJS CQRS
+`QueryBus` and `CommandBus`.
+
+You need to provide three class references:
+
+- `getByIdQuery` — a query class with `(ctx, id)` constructor
+- `getByEmailQuery` — a query class with `(ctx, email)` constructor
+- `createCommand` — a command class with `(ctx, dto)` constructor
+
+Each must have a registered handler in your application. For example, if you use
+`@concepta/nestjs-user`, its `GetUserQuery`, `GetUserByEmailQuery`, and
+`CreateUserCommand` satisfy these contracts.
+
+### Step 3: Configure the Module
 
 ```ts
-import { AuthenticationModule } from '@concepta/nestjs-authentication';
-import { FederatedModule } from '@concepta/nestjs-federated';
-import { JwtModule } from '@concepta/nestjs-jwt';
 import { Module } from '@nestjs/common';
-import { FederatedUserModelService } from './federated/federated-model.service';
-import { FederatedEntity } from './federated/federated.entity';
-import { AuthGithubModule } from '@concepta/nestjs-auth-github';
-import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
-import { UserEntity } from './user/user.entity';
+import { FederatedModule } from '@concepta/nestjs-federated';
+import { GetUserQuery } from './user/queries/get-user.query';
+import { GetUserByEmailQuery } from './user/queries/get-user-by-email.query';
+import { CreateUserCommand } from './user/commands/create-user.command';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    TypeOrmExtModule.forRoot({
-      type: 'sqlite',
-      database: ':memory:',
-      entities: [UserEntity, FederatedEntity],
-    }),
-    JwtModule.forRoot({}),
-    AuthenticationModule.forRoot({}),
-    TypeOrmExtModule.forFeature({
-      federated: {
-        entity: FederatedEntity,
+    FederatedModule.forRoot({
+      entities: { identity: 'identity' },
+      userPort: {
+        getByIdQuery: GetUserQuery,
+        getByEmailQuery: GetUserByEmailQuery,
+        createCommand: CreateUserCommand,
       },
     }),
-    FederatedModule.forRoot({
-      userModelService: new FederatedUserModelService(),
-    }),
   ],
-  controllers: [],
-  providers: [],
 })
 export class AppModule {}
 ```
 
-This configuration uses SQLite for testing, but you can use any database
-supported by TypeORM.
+### Step 4: Integrate with an OAuth Module
 
-### Step 5: Integrate with other Oauth Module
+To complete the authentication flow, use one of the Rockets auth modules:
 
-To complete the integration with OAuth providers and set up the whole
-authentication flow, you'll need to implement one of the @concepta social
-authentication modules. Follow the documentation for the specific module you
-want to use:
+- [GitHub Authentication](https://www.rockets.tools/reference/rockets/nestjs-auth-github/README)
+- [Apple Authentication](https://www.rockets.tools/reference/rockets/nestjs-auth-apple/README)
+- [Google Authentication](https://www.rockets.tools/reference/rockets/nestjs-auth-google/README)
 
-1. GitHub Authentication:
-   Refer to the [@concepta/nestjs-auth-github documentation](https://www.rockets.tools/reference/rockets/nestjs-auth-github/README)
-   for detailed instructions on setting up GitHub OAuth authentication.
-
-2. Apple Authentication:
-   For Apple Sign-In, follow the [nestjs-auth-apple documentation](https://www.rockets.tools/reference/rockets/nestjs-auth-apple/README)
-   to implement Apple's OAuth flow.
-
-3. Google Authentication:
-   To set up Google OAuth, consult the [@concepta/nestjs-auth-google documentation](https://www.rockets.tools/reference/rockets/nestjs-auth-google/README)
-   for step-by-step guidance.
-
-These documentation resources will guide you through:
-
-- Obtaining the necessary OAuth credentials from the respective providers
-- Configuring the OAuth module in your NestJS application
-- Setting up the required controllers and routes
-- Implementing the authentication flow
-
-By following these provider-specific guides, you'll be able to complete the
-federated authentication setup and enable users to log in using their preferred
-social accounts.
+These modules call `FederatedOAuthService.sign()` internally to handle the
+identity lookup and user creation.
 
 ## How-To Guides
 
-### Implement FederatedUserModelServiceInterface
+### Override the Identity Repository
 
-Create a service that implements `FederatedUserModelServiceInterface`:
-
-```ts
-// user.mock.ts
-export const mockUser = {
-  id: 'abc',
-  email: 'me@dispostable.com',
-  username: 'me@dispostable.com',
-}
-```
+To provide a custom repository implementation, pass it via the `repositories`
+option:
 
 ```ts
-// user-model.service.ts
-import { Injectable } from '@nestjs/common';
-import { ReferenceEmail } from '@concepta/nestjs-common';
-import {
-  FederatedUserModelServiceInterface 
-  FederatedCredentialsInterface,
-} from '@concepta/nestjs-federated';
-import { mockUser } from './user.mock';
-
-
-@Injectable()
-export class UserModelServiceFixture
-  implements FederatedUserModelServiceInterface
-{
-  async byId(
-    id: string
-  ): ReturnType<FederatedUserModelServiceInterface['byId']> {
-    if (id === mockUser.id) {
-      return mockUser;
-    } else {
-      throw new Error();
-    }
-  }
-
-  async byEmail(
-    email: ReferenceEmail
-  ): Promise<UserInterface | null> {
-    return email === mockUser.email ? mockUser : null;
-  }
-
-  async create(
-    _object: ReferenceEmailInterface & ReferenceUsernameInterface
-  ): Promise<FederatedCredentialsInterface> {
-    return mockUser;
-  }
-}
+FederatedModule.forRoot({
+  entities: { identity: 'identity' },
+  repositories: {
+    identity: CustomIdentityRepository,
+  },
+  userPort: { ... },
+})
 ```
 
-### Using federated with Rockets Github Module
-
-For detailed instructions on using the federated module with the Rockets GitHub
-module, please refer to the [@concepta/nestjs-auth-github documentation](https://www.rockets.tools/reference/rockets/nestjs-auth-github/README).
+Your custom repository must implement `IdentityRepositoryInterface`.
 
 ## Reference
 
-For detailed information on the properties, methods, and classes used in
-the `@concepta/nestjs-federated`, please refer to the API documentation
-available at
-[FederatedModule API Documentation](https://www.rockets.tools/reference/rockets/nestjs-federated/README).
-This documentation provides comprehensive details on the interfaces and
-services that you can utilize to customize and extend the authentication
-functionality within your NestJS application.
+### Module Options
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `userPort` | `FederatedUserPortSettings` | Yes | Query/command class references for user lookup and creation |
+| `settings` | `FederatedSettingsInterface` | No | Reserved for future settings |
+
+#### Extras (passed alongside options)
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `global` | `boolean` | No | Register as a global module (default: `false`) |
+| `entities.identity` | `string` | No | Entity key for identity (default: `'identity'`) |
+| `repositories.identity` | `Type<IdentityRepositoryInterface>` | No | Custom repository class |
+
+### Key Exports
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `FederatedModule` | Module | The NestJS dynamic module |
+| `FederatedOAuthService` | Service | Core orchestration service with `sign()` method |
+| `Identity` | Aggregate | Domain aggregate for identity records |
+| `IdentityCreatedEvent` | Event | Emitted when a new identity is created |
+| `FederatedUserPort` | Port | QueryBus/CommandBus-based port for user operations |
+| `CreateIdentityCommand` | Command | CQRS command for direct identity creation |
+| `FindIdentityByProviderQuery` | Query | CQRS query to find identity by provider + subject |
+| `IdentityRepositoryInterface` | Interface | Contract for custom repository implementations |
+| `FederatedCredentialsInterface` | Interface | User credentials shape (`id`, `email`, `username`) |
+| `identitySchema` | Schema | Zod schema for identity records (serialization) |
+| `identityCreateSchema` | Schema | Zod schema for identity creation (validation) |
+| `FederatedException` | Exception | Base exception (extends `RuntimeException`, which extends NestJS's `HttpException` — no filter needed; wire body `{ statusCode, message, errorCode, error? }`) |
+| `IdentityCreateUserException` | Exception | User creation via the user port failed |
+| `IdentityFindUserException` | Exception | User lookup via the user port failed |
+| `IdentityUserRelationshipException` | Exception | Identity record has no valid user relationship |
+
+#### Optional TypeORM Exports
+
+Available via `@concepta/nestjs-federated/optional/typeorm`:
+
+| Export | Description |
+|--------|-------------|
+| `IdentitySqliteEntity` | Abstract base entity for SQLite |
+| `IdentityPostgresEntity` | Abstract base entity for PostgreSQL |
 
 ## Explanation
 
-### Federated Services
+### Architecture
 
-1. **User Creation and Association**: The federated service then takes over:
-   - It checks if a user associated with the provider (e.g., GitHub, Google,
-    Facebook) account already exists.
-   - If the user doesn't exist, it creates a new user account.
-   - It associates the provider with the user account, creating a
-   link between the user's application account and their provider identity.
+The module follows DDD/Clean Architecture:
 
-### Module Options Responsibilities
+- **Domain layer**: `Identity` aggregate (write-once), `FederatedOAuthService`
+  (orchestration), `FederatedUserPort` (external user system integration),
+  repository interface
+- **Application layer**: `CreateIdentityCommand` and
+  `FindIdentityByProviderQuery` with their handlers
+- **Infrastructure layer**: TypeORM entity base classes, repository
+  implementation, mapper, Zod schemas, provider factories
 
-The `FederatedOptionsInterface` defines the configuration options for the
-federated module. Here are the responsibilities of each option:
+### The Sign Flow
 
-- **userModelService**: This is an implementation of the
-  `FederatedUserModelServiceInterface`. It is responsible for looking up users
-  based on various criteria such as user ID or email. This service ensures that
-  the application can retrieve user information from the database or any other
-  storage mechanism.
+`FederatedOAuthService.sign(ctx, provider, email, subject)` orchestrates the
+full federated login:
 
-By configuring these options, you can customize the behavior of the federated
-module to suit your application's requirements, ensuring seamless integration
-with multiple social authentication providers.
+1. **Lookup**: Find an existing identity by `provider` + `subject`
+2. **Existing identity found**:
+   - Verify the identity has a valid user relationship
+   - Look up the user via `FederatedUserPort.getById()`
+   - Return the user credentials
+3. **No identity found** (wrapped in a transaction):
+   - Check if a user with the given email already exists via
+     `FederatedUserPort.getByEmail()`
+   - If no user exists, create one via `FederatedUserPort.create()`
+   - Create an `Identity` aggregate and persist it
+   - Emit `IdentityCreatedEvent` on transaction commit
+   - Return the user credentials

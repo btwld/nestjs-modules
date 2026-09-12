@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { default as ormConfig } from './ormconfig.fixture';
-import { PhotoModuleFixture } from './photo/photo.module.fixture';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+
+import { PhotoModuleFixture } from './photo/photo.module.fixture.js';
 
 @Module({
-  imports: [TypeOrmModule.forRoot(ormConfig), PhotoModuleFixture.register()],
+  imports: [RepositoryModule.forRoot({}), PhotoModuleFixture.register()],
 })
 export class AppModuleFixture {}

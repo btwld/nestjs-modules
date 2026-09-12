@@ -4,50 +4,52 @@ on:
     branches: ["main"]
   workflow_dispatch:
     branches: ["main"]
+
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   ci:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
     steps:
-      - uses: actions/checkout@v2
-      - name: Enable Corepack
-        run: corepack enable
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-
-      - uses: actions/cache@v3
-        with:
-          path: "**/node_modules"
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          cache: 'pnpm'
 
       - name: Install
-        run: yarn --immutable
+        run: pnpm install --frozen-lockfile
       - name: Build
-        run: yarn build
+        run: pnpm build
+      - name: Linting
+        run: pnpm lint:all
       - name: Unit tests
-        run: yarn test:ci
+        run: pnpm test:ci
+      - name: E2E tests
+        run: pnpm test:e2e
+      - name: Smoke test
+        run: pnpm smoke
       - name: Process Test Results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         with:
-          name: Jest Tests
+          name: Unit Tests
           path: "junit.xml"
-          reporter: jest-junit
+          reporter: java-junit
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage/coverage-final.json
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
           verbose: true
-      - name: Upload coverage to Code Climate
-        uses: paambaati/codeclimate-action@v3.0.0
-        env:
-          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
-        with:
-          coverageLocations: |
-            ${{ github.workspace }}/coverage/lcov.info:lcov
       - name: Upload coverage to Codacy
         uses: codacy/codacy-coverage-reporter-action@v1.3.0
         with:

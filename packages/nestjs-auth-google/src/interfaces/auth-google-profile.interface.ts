@@ -1,13 +1,12 @@
 import {
-  ReferenceEmailInterface,
-  ReferenceIdInterface,
+  type ReferenceEmailInterface,
+  type ReferenceIdInterface,
 } from '@concepta/nestjs-common';
 
-import { AuthGoogleEmailsInterface } from './auth-google-emails.interface';
+import { type AuthGoogleEmailsInterface } from './auth-google-emails.interface';
 
 export interface AuthGoogleProfileInterface
-  extends ReferenceIdInterface,
-    Partial<ReferenceEmailInterface> {
+  extends ReferenceIdInterface, Partial<ReferenceEmailInterface> {
   displayName: string;
   name: {
     familyName: string;

@@ -1,7 +1,7 @@
 import {
-  FileCreatableInterface,
-  FileInterface,
-  ReferenceIdInterface,
+  type FileCreatableInterface,
+  type FileInterface,
+  type ReferenceIdInterface,
 } from '@concepta/nestjs-common';
 
 export interface FileServiceInterface {

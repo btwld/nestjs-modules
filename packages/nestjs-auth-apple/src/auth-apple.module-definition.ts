@@ -1,13 +1,13 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import {
   IssueTokenService,
-  IssueTokenServiceInterface,
+  type IssueTokenServiceInterface,
 } from '@concepta/nestjs-authentication';
 import { createSettingsProvider } from '@concepta/nestjs-common';
 import { FederatedOAuthService } from '@concepta/nestjs-federated';
@@ -22,10 +22,10 @@ import {
 import { AuthAppleService } from './auth-apple.service';
 import { AuthAppleStrategy } from './auth-apple.strategy';
 import { authAppleDefaultConfig } from './config/auth-apple-default.config';
-import { AuthAppleOptionsExtrasInterface } from './interfaces/auth-apple-options-extras.interface';
-import { AuthAppleOptionsInterface } from './interfaces/auth-apple-options.interface';
-import { AuthAppleServiceInterface } from './interfaces/auth-apple-service.interface';
-import { AuthAppleSettingsInterface } from './interfaces/auth-apple-settings.interface';
+import { type AuthAppleOptionsExtrasInterface } from './interfaces/auth-apple-options-extras.interface';
+import { type AuthAppleOptionsInterface } from './interfaces/auth-apple-options.interface';
+import { type AuthAppleServiceInterface } from './interfaces/auth-apple-service.interface';
+import { type AuthAppleSettingsInterface } from './interfaces/auth-apple-settings.interface';
 
 const RAW_OPTIONS_TOKEN = Symbol('__AUTH_APPLE_MODULE_RAW_OPTIONS_TOKEN__');
 

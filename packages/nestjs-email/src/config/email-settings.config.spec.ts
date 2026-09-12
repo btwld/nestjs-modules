@@ -1,7 +1,7 @@
 import { ConfigModule } from '@nestjs/config';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
-import { EmailSettingsInterface } from '../interfaces/email-settings.interface';
+import { type EmailSettingsInterface } from '../interfaces/email-settings.interface';
 
 import { emailSettingsConfig } from './email-settings.config';
 

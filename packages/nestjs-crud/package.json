@@ -1,40 +1,66 @@
 {
   "name": "@concepta/nestjs-crud",
-  "version": "7.0.0-alpha.10",
+  "version": "8.0.0-alpha.11",
   "description": "Rockets NestJS CRUD",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "license": "BSD-3-Clause",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "dist/**/!(*.spec|*.e2e-spec|*.fixture).{js,d.ts}"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-common": "^7.0.0-alpha.10",
-    "@nestjs/common": "^11.1.9",
-    "@nestjs/config": "^4.0.2",
-    "@nestjs/core": "^11.1.9",
-    "@nestjs/swagger": "^11.2.2",
-    "@zmotivat0r/o0": "^1.0.2",
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-repository": "workspace:*",
+    "@standard-schema/spec": "^1.0.0",
     "deepmerge": "^3.2.0",
-    "qs": "^6.14.0"
+    "qs": "^6.14.0",
+    "zod": "~4.4.3"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "@concepta/nestjs-repository-typeorm": "workspace:*",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
-    "@nestjs/testing": "^11.1.9",
-    "@nestjs/typeorm": "^11.0.0",
-    "jest-extended": "^7.0.0",
-    "jest-mock-extended": "^4.0.0",
-    "supertest": "^6.3.4"
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/testing": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.1",
+    "@types/qs": "^6.15.1",
+    "supertest": "^6.3.4",
+    "typeorm": "^0.3.28",
+    "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "@concepta/nestjs-typeorm-ext": "*",
-    "class-transformer": "*",
-    "class-validator": "*",
-    "rxjs": "^7.1.0",
-    "typeorm": "^0.3.0"
+    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.10",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
+    "@nestjs/swagger": "^12.0.1",
+    "rxjs": "^7.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@concepta/nestjs-repository-typeorm": {
+      "optional": true
+    },
+    "@nestjs/cqrs": {
+      "optional": true
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   }
 }

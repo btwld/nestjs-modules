@@ -1,6 +1,6 @@
-import { FileCreatableInterface } from '@concepta/nestjs-common';
+import { type FileCreatableInterface } from '@concepta/nestjs-common';
 
-import { FileStorageServiceInterface } from '../interfaces/file-storage-service.interface';
+import { type FileStorageServiceInterface } from '../interfaces/file-storage-service.interface';
 
 import {
   AWS_KEY_FIXTURE,

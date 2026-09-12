@@ -1,6 +1,6 @@
-import { LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
 
-import { LoggerMessageInterface } from './logger-message.interface';
+import { type LoggerMessageInterface } from './logger-message.interface';
 
 /**
  * Logger options interface.

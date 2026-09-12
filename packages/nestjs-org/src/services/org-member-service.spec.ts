@@ -1,13 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
   getDynamicRepositoryToken,
-  RepositoryInterface,
-  OrgMemberEntityInterface,
+  type RepositoryInterface,
+  type OrgMemberEntityInterface,
 } from '@concepta/nestjs-common';
 
 import { OrgMemberException } from '../exceptions/org-member.exception';
-import { OrgMemberCreatableInterface } from '../interfaces/org-member-creatable.interface';
+import { type OrgMemberCreatableInterface } from '../interfaces/org-member-creatable.interface';
 import { ORG_MODULE_ORG_MEMBER_ENTITY_KEY } from '../org.constants';
 
 import { OrgMemberModelService } from './org-member-model.service';

@@ -1,0 +1,85 @@
+# The 13 v8 packages. The 14 legacy v7 dirs under packages/ are added below in a
+# separate block — they are install-only members and are never built, tested,
+# linted, or published. See TODOs.md for the port checklist.
+packages:
+  - 'packages/nestjs-core'
+  - 'packages/nestjs-repository'
+  - 'packages/nestjs-repository-typeorm'
+  - 'packages/nestjs-crud'
+  - 'packages/nestjs-cache'
+  - 'packages/nestjs-otp'
+  - 'packages/nestjs-role'
+  - 'packages/nestjs-password'
+  - 'packages/nestjs-user'
+  - 'packages/nestjs-invitation'
+  - 'packages/nestjs-federated'
+  - 'packages/nestjs-authentication'
+  - 'packages/nestjs-access-control'
+
+  # Legacy v7 packages, install-only. Not built, tested, linted, or published
+  # from this repo — each is marked "private": true for exactly that reason.
+  # They pull a NestJS 11 tree that cannot coexist with the v8 packages' NestJS
+  # 12 tree in a single hoisted node_modules, which is why they were excluded
+  # under yarn; pnpm's isolated per-package node_modules removes that
+  # constraint. See TODOs.md for the full port-to-v8 checklist.
+  - 'packages/nestjs-auth-apple'
+  - 'packages/nestjs-auth-github'
+  - 'packages/nestjs-auth-google'
+  - 'packages/nestjs-common'
+  - 'packages/nestjs-email'
+  - 'packages/nestjs-event'
+  - 'packages/nestjs-file'
+  - 'packages/nestjs-logger'
+  - 'packages/nestjs-logger-coralogix'
+  - 'packages/nestjs-logger-sentry'
+  - 'packages/nestjs-org'
+  - 'packages/nestjs-report'
+  - 'packages/nestjs-samples'
+  - 'packages/nestjs-swagger-ui'
+
+# Load-bearing for the v7 packages above: their plain
+# `@concepta/*@^7.0.0-alpha.10` ranges link to a local package only when the local
+# version satisfies the range, which is exactly the partition we want.
+linkWorkspacePackages: true
+
+# Installs missing *required* peers (rxjs, repository-typeorm's typeorm) and
+# deliberately does NOT install optional ones — which is what keeps the
+# optional/* entry-point design intact (see README "Entry Points").
+autoInstallPeers: true
+
+# The optional/* design leaves ~6 optional `typeorm` peers unmet on purpose.
+# Turning this on would make that a hard install failure.
+strictPeerDependencies: false
+
+# pnpm does not run dependency lifecycle scripts unless allowlisted, and
+# strictDepBuilds defaults to true, so an unlisted one fails the install.
+#   bcrypt  - runtime dependency of @concepta/nestjs-password
+#   sqlite3 - loaded dynamically by TypeORM for every `type: 'sqlite'` DataSource
+#             across the crud/cache/user/role/otp test fixtures
+# @scarf/scarf is telemetry and is explicitly denied. @parcel/watcher and
+# unrs-resolver are jest's optional native file-watch/resolve accelerators,
+# pulled in transitively via jest-mock-extended (a devDependency of several
+# install-only legacy v7 packages) — jest itself is never invoked from this
+# repo (vitest is the test runner), so both are denied.
+allowBuilds:
+  bcrypt: true
+  sqlite3: true
+  '@scarf/scarf': false
+  '@parcel/watcher': false
+  unrs-resolver: false
+
+# TypeORM and reflect-metadata must be single instances or decorator metadata
+# splits across copies and you get "No metadata for X was found" at runtime.
+# Yarn's flat hoist guaranteed this structurally; pnpm does not.
+# ^0.3.28 also satisfies the legacy packages' ^0.3.0 peer range.
+overrides:
+  typeorm: ^0.3.28
+  reflect-metadata: ^0.2.2
+  # Pinned to the exact version yarn.lock had resolved. zod 4.5.0 changes $ref
+  # hoisting in z.toJSONSchema() output and breaks nestjs-crud's OpenAPI tests
+  # (swagger-request-body.spec.ts, petstore.spec.ts). Every dependent package's
+  # published range is narrowed to match (`~4.4.3`, see their package.json) so
+  # this override isn't hiding the same problem from real consumers — see
+  # TODOs.md for the investigation to fix the hoisting logic (or confirm 4.5.x
+  # is correct) and widen the range back.
+  zod: 4.4.3

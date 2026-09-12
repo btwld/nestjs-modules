@@ -1,10 +1,10 @@
-import { AuthenticateOptions } from 'passport-apple';
+import { type AuthenticateOptions } from 'passport-apple';
 
-import { Type } from '@nestjs/common';
+import { type Type } from '@nestjs/common';
 
-import { AuthenticationCodeInterface } from '@concepta/nestjs-common';
+import { type AuthenticationCodeInterface } from '@concepta/nestjs-common';
 
-import { MapProfile } from '../auth-apple.types';
+import { type MapProfile } from '../auth-apple.types';
 
 export interface AuthAppleSettingsInterface extends AuthenticateOptions {
   loginDto?: Type<AuthenticationCodeInterface>;

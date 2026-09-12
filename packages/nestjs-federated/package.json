@@ -1,30 +1,61 @@
 {
   "name": "@concepta/nestjs-federated",
-  "version": "7.0.0-alpha.10",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "version": "8.0.0-alpha.11",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./optional/typeorm": {
+      "types": "./dist/optional-typeorm.d.ts",
+      "default": "./dist/optional-typeorm.js"
+    }
+  },
   "license": "BSD-3-Clause",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "dist/**/!(*.spec|*.e2e-spec|*.fixture).{js,d.ts}"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-common": "^7.0.0-alpha.10",
-    "@nestjs/common": "^11.1.9",
-    "@nestjs/config": "^4.0.2",
-    "@nestjs/swagger": "^11.2.2"
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-repository": "workspace:*",
+    "zod": "~4.4.3"
   },
   "devDependencies": {
-    "@concepta/nestjs-typeorm-ext": "^7.0.0-alpha.10",
-    "@concepta/nestjs-user": "^7.0.0-alpha.10",
-    "@nestjs/testing": "^11.1.9"
+    "@concepta/nestjs-repository-typeorm": "workspace:*",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "class-transformer": "*",
-    "class-validator": "*",
+    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.10",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/cqrs": "^12.0.0",
     "rxjs": "^7.1.0",
     "typeorm": "^0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@concepta/nestjs-repository-typeorm": {
+      "optional": true
+    },
+    "@nestjs/cqrs": {
+      "optional": true
+    },
+    "typeorm": {
+      "optional": true
+    }
   }
 }

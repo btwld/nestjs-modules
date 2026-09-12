@@ -1,95 +1,158 @@
 // the module
-export { CrudModule } from './crud.module';
+export { CrudModule } from './crud.module.js';
 
 // interfaces
-export { CrudControllerInterface } from './crud/interfaces/crud-controller.interface';
-export { CrudRequestInterface } from './crud/interfaces/crud-request.interface';
-export { CrudFederationFetchOptionsInterface } from './services/interfaces/crud-federation-fetch-options.interface';
-export { CrudFetchServiceInterface } from './services/interfaces/crud-fetch-service.interface';
-export { CrudRelationBindingInterface } from './services/interfaces/crud-relation-binding.interface';
-export { CrudResponsePaginatedInterface } from './crud/interfaces/crud-response-paginated.interface';
-export { CrudResponseMetrics } from './crud/interfaces/crud-response-metrics.interface';
-export { CrudCreateManyInterface } from './crud/interfaces/crud-create-many.interface';
-export { CrudModuleForFeatureOptionsInterface } from './interfaces/crud-module-for-feature-options.interface';
-
-export { CrudAdapter } from './crud/adapters/crud.adapter';
-export { TypeOrmCrudAdapter } from './crud/adapters/typeorm-crud.adapter';
-
-// utilities
-export { createCrudAdapterProvider } from './util/create-crud-adapter-provider';
-export { createCrudServiceProvider } from './util/create-crud-service-provider';
+export { CrudContextInterface } from './infrastructure/interceptors/interfaces/crud-context.interface.js';
+export { CrudParsedQueryInterface } from './infrastructure/request/interfaces/crud-parsed-query.interface.js';
+export { CrudResponsePaginatedInterface } from './infrastructure/interfaces/crud-response-paginated.interface.js';
+export { CrudResponseMetrics } from './infrastructure/interfaces/crud-response-metrics.interface.js';
+export { CrudCreateBatchInterface } from './infrastructure/interfaces/crud-create-batch.interface.js';
+export { CrudModuleForFeatureOptionsInterface } from './infrastructure/config/interfaces/crud-module-for-feature-options.interface.js';
 export {
-  InjectDynamicCrudAdapter,
-  getDynamicCrudAdapterToken,
-} from './util/inject-dynamic-crud-adapter.decorator';
-export {
-  InjectDynamicCrudService,
-  getDynamicCrudServiceToken,
-} from './util/inject-dynamic-crud-service.decorator';
+  CrudControllerClassOptionsInterface,
+  CrudControllerOptionsInterface,
+} from './infrastructure/interfaces/crud-controller-options.interface.js';
+export { CrudRequestConfig } from './infrastructure/request/interfaces/crud-request-config.interface.js';
+export { CrudResponseConfig } from './infrastructure/request/interfaces/crud-response-config.interface.js';
+export { CrudParamOptionInterface } from './infrastructure/interfaces/crud-param-option.interface.js';
+export { CrudParamsOptionsInterface } from './infrastructure/interfaces/crud-params-options.interface.js';
+export { CrudSerializationOptionsInterface } from './infrastructure/interfaces/crud-serialization-options.interface.js';
+
+export { CrudAdapter } from './infrastructure/adapters/crud.adapter.js';
+
+// types
+export { CrudAdapterProvider } from './infrastructure/adapters/interfaces/crud-adapter.types.js';
+
+// utility decorators
+export { InjectCrudAdapter } from './infrastructure/decorators/util/inject-crud-adapter.decorator.js';
 
 // controller decorators
-export { CrudController } from './crud/decorators/controller/crud-controller.decorator';
+export { CrudController } from './infrastructure/decorators/controller/crud-controller.decorator.js';
 
 // route decorators
-export { CrudReadAll } from './crud/decorators/actions/crud-read-all.decorator';
-export { CrudReadMany } from './crud/decorators/actions/crud-read-many.decorator';
-export { CrudGetMany } from './crud/decorators/actions/crud-get-many.decorator';
-export { CrudReadOne } from './crud/decorators/actions/crud-read-one.decorator';
-export { CrudGetOne } from './crud/decorators/actions/crud-get-one.decorator';
-export { CrudCreateOne } from './crud/decorators/actions/crud-create-one.decorator';
-export { CrudCreateMany } from './crud/decorators/actions/crud-create-many.decorator';
-export { CrudUpdateOne } from './crud/decorators/actions/crud-update-one.decorator';
-export { CrudReplaceOne } from './crud/decorators/actions/crud-replace-one.decorator';
-export { CrudDeleteOne } from './crud/decorators/actions/crud-delete-one.decorator';
-export { CrudRecoverOne } from './crud/decorators/actions/crud-recover-one.decorator';
+export { CrudList } from './infrastructure/decorators/operations/crud-list.decorator.js';
+export { CrudRead } from './infrastructure/decorators/operations/crud-read.decorator.js';
+export { CrudCreate } from './infrastructure/decorators/operations/crud-create.decorator.js';
+export { CrudCreateBatch } from './infrastructure/decorators/operations/crud-create-batch.decorator.js';
+export { CrudUpdate } from './infrastructure/decorators/operations/crud-update.decorator.js';
+export { CrudReplace } from './infrastructure/decorators/operations/crud-replace.decorator.js';
+export { CrudDelete } from './infrastructure/decorators/operations/crud-delete.decorator.js';
+export { CrudSoftDelete } from './infrastructure/decorators/operations/crud-soft-delete.decorator.js';
+export { CrudRestore } from './infrastructure/decorators/operations/crud-restore.decorator.js';
 
 // route option decorators
-export { CrudAction } from './crud/decorators/routes/crud-action.decorator';
-export { CrudAllow } from './crud/decorators/routes/crud-allow.decorator';
-export { CrudCache } from './crud/decorators/routes/crud-cache.decorator';
-export { CrudExclude } from './crud/decorators/routes/crud-exclude.decorator';
-export { CrudFilter } from './crud/decorators/routes/crud-filter.decorator';
-export { CrudLimit } from './crud/decorators/routes/crud-limit.decorator';
-export { CrudMaxLimit } from './crud/decorators/routes/crud-max-limit.decorator';
-export { CrudModel } from './crud/decorators/routes/crud-model.decorator';
-export { CrudParams } from './crud/decorators/routes/crud-params.decorator';
-export { CrudPersist } from './crud/decorators/routes/crud-persist.decorator';
-export { CrudSerialize } from './crud/decorators/routes/crud-serialize.decorator';
-export { CrudSoftDelete } from './crud/decorators/routes/crud-soft-delete.decorator';
-export { CrudSort } from './crud/decorators/routes/crud-sort.decorator';
-export { CrudValidate } from './crud/decorators/routes/crud-validate.decorator';
+export { CrudAllow } from './infrastructure/decorators/routes/crud-allow.decorator.js';
+export { CrudCache } from './infrastructure/decorators/routes/crud-cache.decorator.js';
+export { CrudCommand } from './infrastructure/decorators/routes/crud-command.decorator.js';
+export { CrudCommandHandler } from './infrastructure/decorators/routes/crud-command-handler.decorator.js';
+export { CrudExclude } from './infrastructure/decorators/routes/crud-exclude.decorator.js';
+export { CrudFilter } from './infrastructure/decorators/routes/crud-filter.decorator.js';
+export { CrudJoin } from './infrastructure/decorators/routes/crud-join.decorator.js';
+export { CrudLimit } from './infrastructure/decorators/routes/crud-limit.decorator.js';
+export { CrudMaxLimit } from './infrastructure/decorators/routes/crud-max-limit.decorator.js';
+export { CrudEntity } from './infrastructure/decorators/routes/crud-entity.decorator.js';
+export { CrudName } from './infrastructure/decorators/routes/crud-name.decorator.js';
+export { CrudParams } from './infrastructure/decorators/routes/crud-params.decorator.js';
+export { CrudPersist } from './infrastructure/decorators/routes/crud-persist.decorator.js';
+export { CrudQuery } from './infrastructure/decorators/routes/crud-query.decorator.js';
+export { CrudQueryHandler } from './infrastructure/decorators/routes/crud-query-handler.decorator.js';
+export { CrudRequestBody } from './infrastructure/decorators/routes/crud-request-body.decorator.js';
+export { CrudRequestBodyBatch } from './infrastructure/decorators/routes/crud-request-body-batch.decorator.js';
+export { CrudResponseResource } from './infrastructure/decorators/routes/crud-response-resource.decorator.js';
+export { CrudResponsePaginated } from './infrastructure/decorators/routes/crud-response-paginated.decorator.js';
+export { CrudReturnDeleted } from './infrastructure/decorators/routes/crud-return-deleted.decorator.js';
+export { CrudReturnRestored } from './infrastructure/decorators/routes/crud-return-restored.decorator.js';
+export { CrudSerialize } from './infrastructure/decorators/routes/crud-serialize.decorator.js';
+export { CrudSort } from './infrastructure/decorators/routes/crud-sort.decorator.js';
+export { CrudValidate } from './infrastructure/decorators/routes/crud-validate.decorator.js';
+export { CrudQueryParamsApi } from './infrastructure/decorators/routes/crud-query-params-api.decorator.js';
+// interceptors
+export {
+  CrudContextOverlay,
+  CrudCtx,
+} from './infrastructure/interceptors/crud-context.overlay.js';
 
 // param decorators
-export { CrudRequest } from './crud/decorators/params/crud-request.decorator';
-export { CrudBody } from './crud/decorators/params/crud-body.decorator';
+export { CrudBody } from './infrastructure/decorators/params/crud-body.decorator.js';
+export { CrudQueryParams } from './infrastructure/decorators/params/crud-query-params.decorator.js';
 
 // api decorators
-export { CrudApiBody } from './crud/decorators/openapi/crud-api-body.decorator';
-export { CrudApiOperation } from './crud/decorators/openapi/crud-api-operation.decorator';
-export { CrudApiParam } from './crud/decorators/openapi/crud-api-param.decorator';
-export { CrudApiQuery } from './crud/decorators/openapi/crud-api-query.decorator';
-export { CrudApiResponse } from './crud/decorators/openapi/crud-api-response.decorator';
+export { CrudApiBody } from './infrastructure/decorators/openapi/crud-api-body.decorator.js';
+export { CrudApiOperation } from './infrastructure/decorators/openapi/crud-api-operation.decorator.js';
+export { CrudApiParam } from './infrastructure/decorators/openapi/crud-api-param.decorator.js';
+export { CrudApiQuery } from './infrastructure/decorators/openapi/crud-api-query.decorator.js';
+export { CrudApiResponse } from './infrastructure/decorators/openapi/crud-api-response.decorator.js';
 
-// classes
-export { CrudQueryHelper } from './services/helpers/crud-query.helper';
-export { CrudService } from './services/crud.service';
-export { CrudFederationService } from './services/crud-federation.service';
-export { CrudRelationRegistry } from './services/crud-relation.registry';
-export { CrudBaseController } from './crud/controllers/crud-base.controller';
-
-// dto
-export { CrudResponsePaginatedDto } from './crud/dto/crud-response-paginated.dto';
-export { CrudCreateManyDto } from './crud/dto/crud-create-many.dto';
+// schemas (Zod / Standard Schema)
+export { paginatedSchema } from './infrastructure/schemas/crud-response-paginated.schema.js';
+export { createBatchSchema } from './infrastructure/schemas/crud-create-batch.schema.js';
 
 // exceptions
-export { CrudException } from './exceptions/crud.exception';
-export { CrudFederationException } from './exceptions/crud-federation.exception';
-export { CrudMethodNotImplementedException } from './exceptions/crud-method-not-implemented.exception';
-export { CrudRequestException } from './exceptions/crud-request.exception';
-export { CrudQueryException } from './exceptions/crud-query.exception';
+export { CrudException } from './infrastructure/exceptions/crud.exception.js';
+export { CrudContextException } from './infrastructure/exceptions/crud-context.exception.js';
+export { CrudDecoratorException } from './infrastructure/exceptions/crud-decorator.exception.js';
+export { CrudQueryException } from './infrastructure/exceptions/crud-query.exception.js';
 
 // configurable crud builder
-export { ConfigurableCrudHost } from './util/interfaces/configurable-crud-host.interface';
-export { ConfigurableCrudOptions } from './util/interfaces/configurable-crud-options.interface';
-export { ConfigurableCrudBuilder } from './util/configurable-crud.builder';
-export { ConfigurableCrudOptionsTransformer } from './crud.types';
+export {
+  ConfigurableCrudClassesMap,
+  ConfigurableCrudHost,
+} from './infrastructure/utils/interfaces/configurable-crud-host.interface.js';
+export {
+  ConfigurableCrudClassOptions,
+  ConfigurableCrudHybridOptions,
+  ConfigurableCrudGeneratedOptions,
+  ConfigurableCrudOptions,
+} from './infrastructure/utils/interfaces/configurable-crud-options.interface.js';
+export { ConfigurableCrudBuilder } from './infrastructure/utils/configurable-crud.builder.js';
+export {
+  ConfigurableCrudOptionsTransformer,
+  CrudSchema,
+  CrudValidationOptions,
+} from './crud.types.js';
+
+// operation types
+export { CrudOperationOptions } from './infrastructure/utils/crud-operation-options.type.js';
+export { Operation } from '@concepta/nestjs-core';
+
+// specifications
+export { CrudSpecContextInterface } from './infrastructure/specifications/interfaces/crud-spec-context.interface.js';
+export { CrudSpec } from './infrastructure/specifications/crud-spec.factory.js';
+export { OperationSpecification } from './infrastructure/specifications/operation.specification.js';
+export { ActionSpecification } from './infrastructure/specifications/action.specification.js';
+
+// resolvers
+export { CrudResolverInterface } from './infrastructure/resolvers/interfaces/crud-resolver.interface.js';
+export { CrudAdapterResolver } from './infrastructure/resolvers/crud-adapter.resolver.js';
+export { CrudOperationResolver } from './infrastructure/resolvers/crud-operation.resolver.js';
+export { CrudCqrsResolver } from './infrastructure/resolvers/crud-cqrs.resolver.js';
+export { CrudResolver } from './infrastructure/decorators/routes/crud-resolver.decorator.js';
+
+// operations (queries/commands)
+export { CrudListQuery } from './application/queries/impl/crud-list.query.js';
+export { CrudReadQuery } from './application/queries/impl/crud-read.query.js';
+export { CrudCreateCommand } from './application/commands/impl/crud-create.command.js';
+export { CrudCreateBatchCommand } from './application/commands/impl/crud-create-batch.command.js';
+export { CrudUpdateCommand } from './application/commands/impl/crud-update.command.js';
+export { CrudReplaceCommand } from './application/commands/impl/crud-replace.command.js';
+export { CrudDeleteCommand } from './application/commands/impl/crud-delete.command.js';
+export { CrudSoftDeleteCommand } from './application/commands/impl/crud-soft-delete.command.js';
+export { CrudRestoreCommand } from './application/commands/impl/crud-restore.command.js';
+export { CrudWithBodyCommand } from './application/commands/impl/crud-with-body.command.js';
+
+// operations (handlers)
+export { CrudListHandler } from './application/queries/handlers/crud-list.handler.js';
+export { CrudReadHandler } from './application/queries/handlers/crud-read.handler.js';
+export { CrudCreateHandler } from './application/commands/handlers/crud-create.handler.js';
+export { CrudCreateBatchHandler } from './application/commands/handlers/crud-create-batch.handler.js';
+export { CrudUpdateHandler } from './application/commands/handlers/crud-update.handler.js';
+export { CrudReplaceHandler } from './application/commands/handlers/crud-replace.handler.js';
+export { CrudDeleteHandler } from './application/commands/handlers/crud-delete.handler.js';
+export { CrudSoftDeleteHandler } from './application/commands/handlers/crud-soft-delete.handler.js';
+export { CrudRestoreHandler } from './application/commands/handlers/crud-restore.handler.js';
+
+// Base handler classes for consumers to extend when writing custom handlers.
+export { CrudCommandBaseHandler } from './application/commands/handlers/crud-command-base.handler.js';
+export { CrudQueryBaseHandler } from './application/queries/handlers/crud-query-base.handler.js';
+export { CrudCommandInterface } from './application/commands/interfaces/crud-command.interface.js';
+export { CrudQueryInterface } from './application/queries/interfaces/crud-query.interface.js';

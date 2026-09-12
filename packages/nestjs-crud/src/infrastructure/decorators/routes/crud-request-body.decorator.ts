@@ -1,0 +1,17 @@
+import { CRUD_MODULE_REQUEST_BODY_METADATA } from '../../../crud.constants.js';
+import { type CrudSchema } from '../../../crud.types.js';
+import {
+  CrudMetadataLookupTarget,
+  CrudMetadata,
+} from '../../services/crud-metadata.service.js';
+
+/**
+ * Set the expected body schema for single-item mutations
+ * (create, update, replace).
+ *
+ * Can be applied at controller level (default) or method level (override).
+ */
+export const CrudRequestBody = CrudMetadata.createDecorator<CrudSchema>({
+  key: CRUD_MODULE_REQUEST_BODY_METADATA,
+  lookupTarget: CrudMetadataLookupTarget.MethodAndClass,
+});
