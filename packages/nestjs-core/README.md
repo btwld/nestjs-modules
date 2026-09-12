@@ -117,17 +117,38 @@ current handler and attaches the resolved hook list to the request context via
 
 Use `@Hook({ type })` to mark an injectable class as a hook. Methods are
 decorated with subsystem-specific decorators (e.g. `@BeforeFind()`,
-`@AfterCreate()` from `@concepta/nestjs-repository`).
+`@AfterCreate()` from `@concepta/nestjs-repository`) — `@RepoHook()` used
+below is sugar for `@Hook({ type: RepoHook })`, see that package's README
+for the full decorator set and its write-hook merge semantics.
+
+Every hook method **must return** the (possibly modified) payload — mutating
+the argument in place and returning nothing is silently discarded by the
+pipeline that calls it (`@concepta/nestjs-repository`'s hook execution
+merges/replaces based on the *return value*, never the input reference).
 
 ```ts
-import { Hook } from '@concepta/nestjs-core';
-import { RepoHook, BeforeFind } from '@concepta/nestjs-repository';
+import { Hook, type AppContextInterface, OverlayRef } from '@concepta/nestjs-core';
+import { RepoHook, BeforeFind, type RepositoryFindOptions, Where } from '@concepta/nestjs-repository';
+
+export const TenantCtx = new OverlayRef<'withTenant', { tenantId: string }>(
+  'withTenant',
+);
 
 @Hook({ type: RepoHook })
 export class TenantScopeHook {
   @BeforeFind()
-  addTenantFilter(options: FindOptions, ctx: PlainLiteralObject): void {
-    options.where = { ...options.where, tenantId: ctx.tenantId };
+  async addTenantFilter(
+    options: RepositoryFindOptions<OrderEntity>,
+    ctx?: AppContextInterface,
+  ): Promise<RepositoryFindOptions<OrderEntity>> {
+    const tenant = ctx?.supports(TenantCtx) ? ctx.with(TenantCtx) : undefined;
+    if (!tenant) return options;
+
+    const condition = Where.eq('tenantId', tenant.tenantId);
+    return {
+      ...options,
+      where: options.where ? Where.and(options.where, condition) : condition,
+    };
   }
 }
 ```
@@ -136,11 +157,20 @@ Forgetting `@Hook()` is a hard failure, not a silent no-op: a class registered
 via `@UseHooks()` without the class-level `@Hook()` decorator throws
 `HookNotDecoratedException` at resolution time, and a hook that can't be
 resolved from the module's providers throws `HookProviderNotFoundException`.
+There is no equivalent hard failure for the two steps below — omitting
+either one leaves the hook silently inert, no error, no warning:
+
+1. **`CoreModule.forRoot()`** must be imported — it provides
+   `HookResolverService` and the interceptor that populates hook state on
+   the request context.
+2. **The hook class must be listed in `providers`** for DI to resolve it.
 
 ### Attaching Hooks to Controllers
 
 `@UseHooks(...hooks)` is applied to a controller class or a specific method.
-Method-level decorators are merged with class-level decorators.
+Method-level decorators are merged with class-level decorators. This is the
+third required step — see `@concepta/nestjs-repository`'s README, "Wiring
+Hooks", for the full three-step checklist with a non-HTTP alternative.
 
 ```ts
 import { UseHooks } from '@concepta/nestjs-core';

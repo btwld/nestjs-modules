@@ -1034,15 +1034,19 @@ AuthenticationModule.forRoot({
 
 Configured under `settings.jwt` (see `JwtPolicySettingsInterface`). Both
 `access` and `refresh` accept `TokenOptionsInterface`, which extends
-`JwtModuleOptions` from `@nestjs/jwt` minus `secretOrPrivateKey` (and narrows
-`secret` to `string | Buffer`).
+`JwtModuleOptions` from `@nestjs/jwt` minus `secretOrPrivateKey` and
+`secretOrKeyProvider` (and narrows `secret`/`publicKey` to `string | Buffer`).
+`issuer`, `audience`, `algorithms` and `clockTolerance` (under
+`signOptions`/`verifyOptions`) all pass straight through to the underlying
+`@nestjs/jwt` calls, same as `expiresIn`.
 
 ```typescript
 settings: {
   jwt: {
     access: {
       secret: process.env.JWT_ACCESS_SECRET,   // min 32 chars recommended
-      signOptions: { expiresIn: '15m' },
+      signOptions: { expiresIn: '15m', issuer: 'my-app', audience: 'my-api' },
+      verifyOptions: { issuer: 'my-app', audience: 'my-api' },
     },
     refresh: {
       secret: process.env.JWT_REFRESH_SECRET,  // must differ from access secret
@@ -1051,6 +1055,31 @@ settings: {
   },
 }
 ```
+
+Asymmetric keys (RS256/ES256) work the same way, via `privateKey`/`publicKey`
+instead of a shared `secret` — set `signOptions.algorithm`/`verifyOptions.algorithms`
+to match:
+
+```typescript
+settings: {
+  jwt: {
+    access: {
+      privateKey: process.env.JWT_ACCESS_PRIVATE_KEY, // sign
+      publicKey: process.env.JWT_ACCESS_PUBLIC_KEY,   // verify
+      signOptions: { algorithm: 'RS256', expiresIn: '15m' },
+      verifyOptions: { algorithms: ['RS256'] },
+    },
+  },
+}
+```
+
+`secretOrKeyProvider` — `@nestjs/jwt`'s hook for dynamic/JWKS key resolution
+— is deliberately **not** part of `TokenOptionsInterface`: it's a
+module-level construct, and this package always registers the underlying
+`NestJwtModule` with empty options, resolving keys per call instead. Setting
+it here would type-check and then silently never run. For JWKS or other
+external token verification, override at the `JwtPort` tier instead — see
+[Two-Tier CQRS Architecture](#two-tier-cqrs-architecture) below.
 
 Defaults when `signOptions.expiresIn` is omitted: access = **1h**, refresh =
 **24h** — and the module emits a `process.emitWarning`
@@ -1077,6 +1106,10 @@ Omitting a strategy key entirely disables that strategy.
 `loginSchema` is any `StandardSchemaV1` (default: `localLoginSchema`).
 
 ### MFA Settings
+
+> **Naming note:** despite the name, this is OTP-based password recovery and
+> email/account verification (see the [Features](#features) table above) —
+> not a second factor at login. There is no login-time MFA step today.
 
 Presence of an MFA key activates that feature:
 
@@ -1213,6 +1246,27 @@ This means you can override at either tier:
 Default `JwtPort` settings use the built-in `SignAccessTokenCommand`,
 `SignRefreshTokenCommand`, `JwtVerifyAccessTokenQuery`, and
 `JwtVerifyRefreshTokenQuery`.
+
+#### Verifying externally-issued tokens (JWKS / OIDC)
+
+By default, `JwtVerifyAccessTokenQuery` verifies tokens this module itself
+issued, against `settings.jwt`. To accept tokens from an external identity
+provider (Azure AD/Entra, Auth0, etc.) instead, provide a
+`ports.jwt.verifyAccessTokenQuery` implementing `JwtVerifyTokenQueryInterface`
+that verifies against the provider's JWKS endpoint (e.g. via `jwks-rsa`) and
+checks `iss`/`aud` — this is the tier `create-verify-token-callback.util.ts`
+wires into the JWT Passport strategy for you, so no other module code needs
+to change.
+
+This alone does not "log in" a caller: `JwtStrategy.validate` still calls
+`UserPort.getBySubject` with the verified token's subject and throws
+`JwtUnauthorizedException` if no matching local user exists (see
+`infrastructure/strategies/jwt/jwt.strategy.ts`). Verifying an external
+token and auto-provisioning a local user on first sight are two different
+concerns — the latter needs either a pre-provisioning step or a custom
+`UserPort`/strategy, not just a `ports.jwt` override. `nestjs-federated`
+handles the adjacent "link this external identity to a local user" problem,
+but performs no token verification itself.
 
 ### Custom Notification Commands
 

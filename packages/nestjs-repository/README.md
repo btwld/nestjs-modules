@@ -944,32 +944,132 @@ getTransactionalOptions(context.getHandler(), context.getClass());
 
 The hook system provides cross-cutting concerns for repository operations.
 Hooks are resolved at runtime via `@concepta/nestjs-core` and can be scoped
-to specific entities using specifications.
+to specific entities using specifications. This section covers the
+repository-specific decorators and merge semantics; for the underlying
+mechanism (how a class becomes a hook, how it's attached to a controller,
+and how values get into `ctx`) see `@concepta/nestjs-core`'s
+[Hook Feature](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-core#hook-feature)
+and [Context System](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-core#context-system)
+sections.
 
 ### Defining a Hook
 
 ```ts
+import { Injectable } from '@nestjs/common';
+import {
+  type AppContextInterface,
+  type DeepPartial,
+  OverlayRef,
+} from '@concepta/nestjs-core';
 import {
   RepoHook,
   BeforeFind,
-  AfterCreate,
+  BeforeCreate,
+  type RepositoryFindOptions,
+  Where,
 } from '@concepta/nestjs-repository';
 
+// Typed token for the tenant id — attached to the request context by a
+// ContextOverlayInterceptor registered as an APP_INTERCEPTOR (see nestjs-core's
+// Context System docs for the interceptor that populates this).
+export const TenantCtx = new OverlayRef<'withTenant', { tenantId: string }>(
+  'withTenant',
+);
+
 @RepoHook()
-export class AuditHook {
+@Injectable()
+export class TenantScopeHook {
+  // Scoped reads: hook output replaces the query options wholesale, so a
+  // caller's own `where` clause is ANDed with the tenant filter, never
+  // dropped — the two combine rather than one overriding the other.
   @BeforeFind()
-  addTenantFilter(options, ctx) {
-    // Modify query options before find
-    return { ...options, where: { ...options.where, tenantId: ctx.tenantId } };
+  async addTenantFilter(
+    options: RepositoryFindOptions<OrderEntity>,
+    ctx?: AppContextInterface,
+  ): Promise<RepositoryFindOptions<OrderEntity>> {
+    const tenant = ctx?.supports(TenantCtx) ? ctx.with(TenantCtx) : undefined;
+    if (!tenant) return options;
+
+    const condition = Where.eq('tenantId', tenant.tenantId);
+    return {
+      ...options,
+      where: options.where ? Where.and(options.where, condition) : condition,
+    };
   }
 
-  @AfterCreate()
-  logCreation(entity, ctx) {
-    // React to entity creation
-    return entity;
+  // Authoritative write: { replace: true } makes this hook's output win over
+  // whatever the caller supplied — a caller-provided `tenantId` in the
+  // request body cannot override the stamp. Without { replace: true }, the
+  // default merge semantics would let a caller's own tenantId win instead —
+  // see "Hook Pipeline" below. This is the isolation-relevant half; the
+  // read-side filter alone is not enough to keep tenants apart.
+  @BeforeCreate({ replace: true })
+  async stampTenant(
+    data: DeepPartial<OrderEntity>,
+    ctx?: AppContextInterface,
+  ): Promise<DeepPartial<OrderEntity>> {
+    const tenant = ctx?.supports(TenantCtx) ? ctx.with(TenantCtx) : undefined;
+    if (!tenant) return data;
+
+    return { ...data, tenantId: tenant.tenantId };
   }
 }
 ```
+
+### Wiring Hooks
+
+Defining a hook class is not enough on its own — three things all have to be
+true for it to run, and skipping any one of them means the hook silently
+never fires (no error, no warning beyond `ROCKETS_HOOKS_NOT_WIRED` — see
+below — if *no* repository anywhere has hooks wired):
+
+1. **`CoreModule.forRoot()`** (or `.register()`) is imported. It provides
+   `HookResolverService` and the interceptor that reads `@UseHooks()`
+   metadata into the request context.
+2. **`@UseHooks(TheHook)`** is applied to the controller or method — for a
+   plain controller, directly; for a CRUD-generated one, via
+   `extraDecorators: [UseHooks(TheHook)]` on the `crud.controller` options.
+3. **The hook class is listed in `providers`** so Nest's DI can resolve it.
+
+```ts
+import { Module } from '@nestjs/common';
+import { CoreModule, UseHooks } from '@concepta/nestjs-core';
+
+@Module({
+  imports: [
+    CoreModule.forRoot(), // 1. required for any hook to run
+    // ...RepositoryModule, TypeOrmModule, etc.
+  ],
+  controllers: [], // if wiring @UseHooks directly on a controller (2)
+  providers: [TenantScopeHook], // 3. required so DI can resolve it
+})
+export class OrderModule {}
+
+@UseHooks(TenantScopeHook) // 2. required — the actual attachment point
+@Controller('orders')
+export class OrderController {}
+```
+
+Outside HTTP (a queue worker, a CLI script, a test), there's no controller
+for `@UseHooks()` to attach to, so build the hook list directly and set it
+on the ambient `ctx` yourself:
+
+```ts
+import { AppContextHost, HooksCtx } from '@concepta/nestjs-core';
+import { RepoHook } from '@concepta/nestjs-repository';
+
+const ctx = new AppContextHost();
+ctx.defineOverlay(HooksCtx, {
+  hooks: [{ hook: TenantScopeHook, type: RepoHook.KEY }],
+});
+
+await orderRepo.create(dto, { ctx });
+```
+
+`TenantScopeHook` still needs to be resolvable from the module container
+(`HookResolverService` resolves it via `moduleRef.get(hook, { strict: false
+})`, so any module works, not specifically `CoreModule`'s own) — this only
+replaces the `@UseHooks()`/controller attachment step, not step 1 above.
 
 ### Scoped Hooks
 
@@ -1018,6 +1118,12 @@ match broad categories, and fine-grained decorators for specific operations.
 Hook methods receive the operation payload and an optional context, and must
 return the (possibly modified) payload.
 
+The five write decorators — `@BeforeWrite`, `@BeforeCreate`, `@BeforeUpdate`,
+`@BeforeUpsert`, `@BeforeReplace` — additionally accept
+`{ replace: true }` in place of (or alongside) a specification, e.g.
+`@BeforeCreate({ replace: true })`. See "Hook Pipeline" below for what it
+changes and when to use it; every other decorator's signature is unaffected.
+
 ### Hook Pipeline
 
 Hook execution is orchestrated by `RepoPermeatorFactory`, built on
@@ -1035,12 +1141,26 @@ single-entity payloads and options objects (`Membrane.object` /
 - **`Membrane.object`** -- single-entity write operations (`create`,
   `update`, `upsert`, `replace`) and delete/lifecycle operations (`delete`,
   `deleteMany`, `softDelete`, `restore`): hook output is merged onto the
-  original, which wins on conflict — the original/DB result survives hook
-  mutations.
+  original, which wins on conflict — **the caller's own payload survives
+  hook mutations by default.** This is right for enrichment (a hook filling
+  in a default the caller is free to override) but wrong for authorization
+  (a hook enforcing a value the caller must not be able to override, e.g. a
+  tenant id) — a caller who explicitly supplies that same field defeats the
+  hook silently, no error either way.
+- **`{ replace: true }`** on any of the five write decorators inverts this
+  for that hook only: it runs through `Membrane.objectReplace` instead, in a
+  second pass after every plain (merge) hook for the same key, so its output
+  wins regardless of what the caller supplied. Use this whenever a hook is
+  enforcing something, not suggesting it — see the `@BeforeCreate({ replace:
+  true })` example above. `RepoHookStrategy` (exported alongside the
+  decorators) is the pair of predicates this routing is built on, in case
+  you need to reason about it directly.
 - **`Membrane.collection`** -- `createMany` (`overwrite`: hooks may freely
   transform the array) and `deleteMany` (`preserve`: the original array
   wins on conflict) keep the strategy argument, since it governs array
-  merging rather than object replacement.
+  merging rather than object replacement. `createMany` hooks already behave
+  like `{ replace: true }` unconditionally — there's no merge-vs-replace
+  choice to make for it.
 
 Any error thrown inside the pipeline (a hook or the driver call) is wrapped
 in `RepositoryQueryException`. `RuntimeException` subclasses — `OptimisticLockException`,
