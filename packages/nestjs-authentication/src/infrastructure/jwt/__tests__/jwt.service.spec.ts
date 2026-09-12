@@ -124,6 +124,98 @@ describe(JwtService, () => {
     });
   });
 
+  describe('asymmetric key support (RS256)', () => {
+    const privateKey = 'test-private-key';
+    const publicKey = 'test-public-key';
+
+    let asymmetricJwtService: JwtService;
+    let asymmetricNestJwtService: NestJwtService;
+
+    beforeEach(() => {
+      asymmetricNestJwtService = mock<NestJwtService>();
+      const asymmetricPolicy = new JwtPolicy({
+        access: {
+          privateKey,
+          publicKey,
+          signOptions: { algorithm: 'RS256', expiresIn: '1h' },
+        },
+        refresh: {
+          privateKey,
+          publicKey,
+          signOptions: { algorithm: 'RS256', expiresIn: '7d' },
+        },
+      });
+      asymmetricJwtService = new JwtService(
+        asymmetricPolicy,
+        asymmetricNestJwtService,
+      );
+    });
+
+    it('should pass privateKey through on signAccessToken', async () => {
+      void asymmetricNestJwtService.signAsync;
+      vi.spyOn(asymmetricNestJwtService, 'signAsync').mockResolvedValue(
+        signedToken,
+      );
+
+      await asymmetricJwtService.signAccessToken(accessToken);
+
+      expect(asymmetricNestJwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ sub: 'user-1' }),
+        expect.objectContaining({
+          algorithm: 'RS256',
+          privateKey,
+          secret: undefined,
+        }),
+      );
+    });
+
+    it('should pass privateKey through on signRefreshToken', async () => {
+      void asymmetricNestJwtService.signAsync;
+      vi.spyOn(asymmetricNestJwtService, 'signAsync').mockResolvedValue(
+        signedToken,
+      );
+
+      await asymmetricJwtService.signRefreshToken(refreshToken);
+
+      expect(asymmetricNestJwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ sub: 'user-1' }),
+        expect.objectContaining({
+          algorithm: 'RS256',
+          privateKey,
+          secret: undefined,
+        }),
+      );
+    });
+
+    it('should pass publicKey through on verifyAccessToken', async () => {
+      void asymmetricNestJwtService.verifyAsync;
+      vi.spyOn(asymmetricNestJwtService, 'verifyAsync').mockResolvedValue(
+        decoded,
+      );
+
+      await asymmetricJwtService.verifyAccessToken(signedToken);
+
+      expect(asymmetricNestJwtService.verifyAsync).toHaveBeenCalledWith(
+        signedToken,
+        expect.objectContaining({ publicKey, secret: undefined }),
+      );
+    });
+
+    it('should pass publicKey through on verifyRefreshToken', async () => {
+      void asymmetricNestJwtService.verifyAsync;
+      vi.spyOn(asymmetricNestJwtService, 'verifyAsync').mockResolvedValue(
+        decoded,
+      );
+
+      await asymmetricJwtService.verifyRefreshToken(signedToken);
+
+      expect(asymmetricNestJwtService.verifyAsync).toHaveBeenCalledWith(
+        signedToken,
+        expect.objectContaining({ publicKey, secret: undefined }),
+      );
+    });
+  });
+
   describe('JwtPolicy#getAccessExpiry / getRefreshExpiry', () => {
     it('should compute access expiry from policy expiresIn', () => {
       const from = new Date('2025-06-01T00:00:00.000Z');

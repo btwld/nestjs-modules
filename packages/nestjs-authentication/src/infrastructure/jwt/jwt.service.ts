@@ -14,38 +14,42 @@ export class JwtService {
   ) {}
 
   async signAccessToken(token: Token): Promise<string> {
-    const { signOptions, secret } = this.tokenPolicy.access;
+    const { signOptions, secret, privateKey } = this.tokenPolicy.access;
     // strip expiresIn — exp is set explicitly in claims; both together is a
     // runtime error in jsonwebtoken ("expiresIn and exp are mutually exclusive")
     const { expiresIn: _expiresIn, ...opts } = signOptions ?? {};
     return this.nestJwtService.signAsync(this.toClaims(token), {
       ...opts,
       secret,
+      privateKey,
     });
   }
 
   async signRefreshToken(token: Token): Promise<string> {
-    const { signOptions, secret } = this.tokenPolicy.refresh;
+    const { signOptions, secret, privateKey } = this.tokenPolicy.refresh;
     const { expiresIn: _expiresIn, ...opts } = signOptions ?? {};
     return this.nestJwtService.signAsync(this.toClaims(token), {
       ...opts,
       secret,
+      privateKey,
     });
   }
 
   async verifyAccessToken(token: string): Promise<PlainLiteralObject> {
-    const { verifyOptions, secret } = this.tokenPolicy.access;
+    const { verifyOptions, secret, publicKey } = this.tokenPolicy.access;
     return this.nestJwtService.verifyAsync<PlainLiteralObject>(token, {
       ...verifyOptions,
       secret,
+      publicKey,
     });
   }
 
   async verifyRefreshToken(token: string): Promise<PlainLiteralObject> {
-    const { verifyOptions, secret } = this.tokenPolicy.refresh;
+    const { verifyOptions, secret, publicKey } = this.tokenPolicy.refresh;
     return this.nestJwtService.verifyAsync<PlainLiteralObject>(token, {
       ...verifyOptions,
       secret,
+      publicKey,
     });
   }
 
