@@ -5,7 +5,11 @@ import { HookMethodKeyType } from './decorators/hook-method.decorator.js';
 import { HookNotDecoratedException } from './exceptions/hook-not-decorated.exception.js';
 import { HookProviderNotFoundException } from './exceptions/hook-provider-not-found.exception.js';
 import { HOOK_METHODS_CACHE_KEY } from './hook.constants.js';
-import { HookMethodMapInterface, ResolvedHook } from './hook.interfaces.js';
+import {
+  HookMethodFilter,
+  HookMethodMapInterface,
+  ResolvedHook,
+} from './hook.interfaces.js';
 import { HookWithSpec } from './hook.types.js';
 import { SpecificationInterface } from './interfaces/specification.interface.js';
 
@@ -39,6 +43,10 @@ export class HookResolverService {
    * @param methodKey - The method key (e.g., 'beforeFind')
    * @param payload - The payload to pass through hooks
    * @param ctx - The hook context
+   * @param filter - Optional predicate over each method's metadata, letting a
+   *   subsystem split a single method key into disjoint execution groups (e.g.
+   *   by subsystem-defined `options`). Omitted = every registered method runs,
+   *   which is the existing behavior.
    * @returns The payload after processing by applicable hooks
    */
   async execute<T>(
@@ -46,6 +54,7 @@ export class HookResolverService {
     methodKey: HookMethodKeyType,
     payload: T,
     ctx: PlainLiteralObject | undefined,
+    filter?: HookMethodFilter,
   ): Promise<T> {
     if (!ctx?.hooks?.length) {
       return payload;
@@ -65,7 +74,7 @@ export class HookResolverService {
     let result = payload;
 
     for (const resolvedHook of resolved) {
-      const methods = this.getMethods<T>(resolvedHook, methodKey);
+      const methods = this.getMethods<T>(resolvedHook, methodKey, filter);
 
       for (const { method, spec } of methods) {
         if (!spec.isSatisfiedBy(ctx)) {
@@ -92,11 +101,13 @@ export class HookResolverService {
    *
    * @param resolved - The resolved hook
    * @param methodKey - The hook method key (e.g., 'beforeFind')
+   * @param filter - Optional predicate over each method's metadata
    * @returns Array of objects containing bound method and pre-computed spec
    */
   getMethods<T>(
     resolved: ResolvedHook,
     methodKey: HookMethodKeyType,
+    filter?: HookMethodFilter,
   ): Array<{
     method: (payload: T, ctx?: unknown) => Promise<T>;
     spec: SpecificationInterface;
@@ -112,6 +123,10 @@ export class HookResolverService {
     }> = [];
 
     for (const methodInfo of methodInfos) {
+      if (filter && !filter(methodInfo.metadata)) {
+        continue;
+      }
+
       result.push({
         method: methodInfo.method.bind(resolved.hook),
         spec: methodInfo.resolvedSpec,

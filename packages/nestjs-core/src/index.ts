@@ -143,7 +143,11 @@ export { createEventContext } from './domain/events/create-event-context.js';
 export { CoreModule } from './core.module.js';
 
 // Hook feature
-export { HookTypeInterface } from './infrastructure/hook/hook.interfaces.js';
+export {
+  HookTypeInterface,
+  HookMethodMetadataInterface,
+  HookMethodFilter,
+} from './infrastructure/hook/hook.interfaces.js';
 export type { HookMethodKeyType } from './infrastructure/hook/decorators/hook-method.decorator.js';
 export { Spec } from './infrastructure/hook/specification/spec.factory.js';
 export { CompositeSpecification } from './infrastructure/hook/specification/composite-specification.js';

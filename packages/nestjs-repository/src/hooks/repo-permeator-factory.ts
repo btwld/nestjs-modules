@@ -10,6 +10,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 
 import {
   type DeepPartial,
+  type HookMethodFilter,
   type HookMethodKeyType,
   RuntimeException,
 } from '@concepta/nestjs-core';
@@ -20,12 +21,16 @@ import {
   type RepositoryFindOneOptions,
 } from '../repository/interfaces/repository-options.interface.js';
 
-import { RepoHookMethodKey as K } from './repository-hook.decorators.js';
+import {
+  RepoHookMethodKey as K,
+  RepoHookStrategy,
+} from './repository-hook.decorators.js';
 
 type RunHooksFn = <T>(
   methodKey: HookMethodKeyType,
   payload: T,
   ctx: PlainLiteralObject | undefined,
+  filter?: HookMethodFilter,
 ) => Promise<T>;
 
 type Ctx = PlainLiteralObject;
@@ -71,9 +76,9 @@ export class RepoPermeatorFactory<
 
   constructor(runHooks: RunHooksFn, entityName: string) {
     const cb =
-      (key: HookMethodKeyType): HookCb =>
+      (key: HookMethodKeyType, filter?: HookMethodFilter): HookCb =>
       <T>(payload: T, ambient?: Ctx) =>
-        runHooks(key, payload, ambient);
+        runHooks(key, payload, ambient, filter);
 
     const options: PermeatorOptions<Ctx> = {
       onError: (error: unknown): never => {
@@ -163,14 +168,24 @@ export class RepoPermeatorFactory<
       options,
     );
 
-    // Write (merge, base wins)
+    // Write: two passes per key. Default (no options, or { replace: false })
+    // hooks run through Membrane.object — merge, caller wins on conflict.
+    // Hooks declared { replace: true } run through Membrane.objectReplace
+    // afterward — hook wins wholesale, so a caller cannot override a field
+    // an authoritative hook set.
     this.create = Permeator.mutable(
       Membrane.sequence(
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_WRITE),
+          cb(K.BEFORE_WRITE, RepoHookStrategy.merge),
         ),
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_CREATE),
+          cb(K.BEFORE_CREATE, RepoHookStrategy.merge),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_WRITE, RepoHookStrategy.replace),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_CREATE, RepoHookStrategy.replace),
         ),
       ),
       Membrane.sequence(
@@ -201,10 +216,16 @@ export class RepoPermeatorFactory<
     this.update = Permeator.mutable(
       Membrane.sequence(
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_WRITE),
+          cb(K.BEFORE_WRITE, RepoHookStrategy.merge),
         ),
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_UPDATE),
+          cb(K.BEFORE_UPDATE, RepoHookStrategy.merge),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_WRITE, RepoHookStrategy.replace),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_UPDATE, RepoHookStrategy.replace),
         ),
       ),
       Membrane.sequence(
@@ -217,10 +238,16 @@ export class RepoPermeatorFactory<
     this.upsert = Permeator.mutable(
       Membrane.sequence(
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_WRITE),
+          cb(K.BEFORE_WRITE, RepoHookStrategy.merge),
         ),
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_UPSERT),
+          cb(K.BEFORE_UPSERT, RepoHookStrategy.merge),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_WRITE, RepoHookStrategy.replace),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_UPSERT, RepoHookStrategy.replace),
         ),
       ),
       Membrane.sequence(
@@ -233,10 +260,16 @@ export class RepoPermeatorFactory<
     this.replace = Permeator.mutable(
       Membrane.sequence(
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_WRITE),
+          cb(K.BEFORE_WRITE, RepoHookStrategy.merge),
         ),
         Membrane.object<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
-          cb(K.BEFORE_REPLACE),
+          cb(K.BEFORE_REPLACE, RepoHookStrategy.merge),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_WRITE, RepoHookStrategy.replace),
+        ),
+        Membrane.objectReplace<DeepPartial<Entity>, DeepPartial<Entity>, Ctx>(
+          cb(K.BEFORE_REPLACE, RepoHookStrategy.replace),
         ),
       ),
       Membrane.sequence(

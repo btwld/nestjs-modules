@@ -1,4 +1,6 @@
 import {
+  type HookMethodKeyType,
+  type HookMethodMetadataInterface,
   type SpecificationInterface,
   createHookMethodDecorator,
   Hook,
@@ -84,6 +86,77 @@ Object.freeze(RepoHook);
 export const RepoHookType: HookTypeInterface = RepoHook;
 
 // =============================================================================
+// Write Hook Options
+// =============================================================================
+
+/**
+ * Options accepted by the five single-entity write decorators
+ * (`@BeforeWrite`, `@BeforeCreate`, `@BeforeUpdate`, `@BeforeUpsert`,
+ * `@BeforeReplace`).
+ */
+export interface RepoWriteHookOptions {
+  /**
+   * By default, a write hook's output is merged onto the caller's payload
+   * and the caller wins on conflict — the hook can only fill in fields the
+   * caller omitted. Set `replace: true` to invert that: the hook's output
+   * replaces the caller's payload wholesale, regardless of what the caller
+   * supplied. Use this for authorization decisions (e.g. stamping a
+   * tenant/territory id) — never for enrichment, where the default (caller
+   * wins) is almost always what you want.
+   *
+   * "Wholesale" is not per-field: unlike the default (merge) behavior, a
+   * `replace: true` hook that returns a partial object without spreading
+   * `...data` first will silently drop every other field from the payload.
+   * Always spread the incoming data unless you specifically mean to discard
+   * the rest of it.
+   */
+  replace?: boolean;
+}
+
+/**
+ * Predicates over a write hook method's metadata, matching
+ * `RepoWriteHookOptions.replace`. Used internally to split each write
+ * decorator's method key into two disjoint execution passes — see
+ * `RepoPermeatorFactory`.
+ */
+export const RepoHookStrategy = {
+  merge: (metadata: HookMethodMetadataInterface): boolean =>
+    metadata.options?.replace !== true,
+  replace: (metadata: HookMethodMetadataInterface): boolean =>
+    metadata.options?.replace === true,
+} as const;
+
+function isSpecification(
+  value: SpecificationInterface | RepoWriteHookOptions,
+): value is SpecificationInterface {
+  return 'isSatisfiedBy' in value && typeof value.isSatisfiedBy === 'function';
+}
+
+/**
+ * Creates a write hook method decorator that accepts either a
+ * `SpecificationInterface` (as every other hook decorator does) or
+ * `RepoWriteHookOptions`.
+ *
+ * @example
+ * ```typescript
+ * @BeforeCreate()                                    // merge, caller wins (default)
+ * @BeforeCreate(RepoSpec.isEntity('user'))            // merge, scoped
+ * @BeforeCreate({ replace: true })                    // replace, hook wins
+ * @BeforeCreate(RepoSpec.isEntity('user'), { replace: true }) // both
+ * ```
+ */
+function createWriteHookDecorator(key: HookMethodKeyType) {
+  const decorate = createHookMethodDecorator(key);
+  return (
+    specOrOptions?: SpecificationInterface | RepoWriteHookOptions,
+    options?: RepoWriteHookOptions,
+  ): MethodDecorator =>
+    specOrOptions && isSpecification(specOrOptions)
+      ? decorate(specOrOptions, options)
+      : decorate(undefined, specOrOptions);
+}
+
+// =============================================================================
 // High-Level Semantic Decorators (catch-all)
 // =============================================================================
 
@@ -103,8 +176,14 @@ export const AfterRead = createHookMethodDecorator(
 
 /**
  * Runs before any write operation (create, createMany, update, upsert, replace).
+ *
+ * For single-entity writes (create/update/upsert/replace), accepts
+ * `{ replace: true }` to make this hook's output win over the caller's
+ * payload instead of the default (caller wins) — see `RepoWriteHookOptions`.
+ * `createMany` already treats hook output as authoritative regardless of
+ * this option.
  */
-export const BeforeWrite = createHookMethodDecorator(
+export const BeforeWrite = createWriteHookDecorator(
   RepoHookMethodKey.BEFORE_WRITE,
 );
 
@@ -209,8 +288,12 @@ export const AfterFindAndCount = createHookMethodDecorator(
 
 /**
  * Runs before create() - create a single entity.
+ *
+ * Accepts `{ replace: true }` to make this hook's output win over the
+ * caller's payload instead of the default (caller wins) — see
+ * `RepoWriteHookOptions`.
  */
-export const BeforeCreate = createHookMethodDecorator(
+export const BeforeCreate = createWriteHookDecorator(
   RepoHookMethodKey.BEFORE_CREATE,
 );
 
@@ -241,8 +324,12 @@ export const AfterCreateMany = createHookMethodDecorator(
 
 /**
  * Runs before update() - update an existing entity.
+ *
+ * Accepts `{ replace: true }` to make this hook's output win over the
+ * caller's payload instead of the default (caller wins) — see
+ * `RepoWriteHookOptions`.
  */
-export const BeforeUpdate = createHookMethodDecorator(
+export const BeforeUpdate = createWriteHookDecorator(
   RepoHookMethodKey.BEFORE_UPDATE,
 );
 
@@ -255,8 +342,12 @@ export const AfterUpdate = createHookMethodDecorator(
 
 /**
  * Runs before upsert() - create or update an entity.
+ *
+ * Accepts `{ replace: true }` to make this hook's output win over the
+ * caller's payload instead of the default (caller wins) — see
+ * `RepoWriteHookOptions`.
  */
-export const BeforeUpsert = createHookMethodDecorator(
+export const BeforeUpsert = createWriteHookDecorator(
   RepoHookMethodKey.BEFORE_UPSERT,
 );
 
@@ -269,8 +360,12 @@ export const AfterUpsert = createHookMethodDecorator(
 
 /**
  * Runs before replace() - fully replace an existing entity.
+ *
+ * Accepts `{ replace: true }` to make this hook's output win over the
+ * caller's payload instead of the default (caller wins) — see
+ * `RepoWriteHookOptions`.
  */
-export const BeforeReplace = createHookMethodDecorator(
+export const BeforeReplace = createWriteHookDecorator(
   RepoHookMethodKey.BEFORE_REPLACE,
 );
 

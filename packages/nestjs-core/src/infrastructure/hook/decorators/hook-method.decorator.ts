@@ -1,3 +1,5 @@
+import { type PlainLiteralObject } from '@nestjs/common';
+
 import { HOOK_METHOD_METADATA_KEY } from '../hook.constants.js';
 import { type HookMethodMetadataInterface } from '../hook.interfaces.js';
 import { type SpecificationInterface } from '../interfaces/specification.interface.js';
@@ -18,7 +20,8 @@ export type HookMethodKeyType = string;
  * Multiple hook decorators can be stacked on the same method.
  *
  * @param key - The hook method key (subsystems define their own keys)
- * @returns A decorator factory that optionally accepts a specification
+ * @returns A decorator factory that optionally accepts a specification and
+ *   subsystem-defined options
  *
  * @example
  * ```typescript
@@ -38,12 +41,26 @@ export type HookMethodKeyType = string;
  * @BeforeFind()
  * @BeforeFindOne()
  * addTenantFilter(options) { ... }
+ *
+ * // With subsystem-defined options (opaque to core, read back via a
+ * // HookMethodFilter). This is createHookMethodDecorator's own two-arg
+ * // (spec, options) shape — a subsystem can wrap it to offer a friendlier
+ * // single-arg form instead; see nestjs-repository's
+ * // `@BeforeCreate({ replace: true })` for exactly that.
+ * @MyWriteHook(undefined, { replace: true })
+ * stampTenant(data) { ... }
  * ```
  */
 export function createHookMethodDecorator(
   key: HookMethodKeyType,
-): (spec?: SpecificationInterface) => MethodDecorator {
-  return (spec?: SpecificationInterface): MethodDecorator => {
+): (
+  spec?: SpecificationInterface,
+  options?: PlainLiteralObject,
+) => MethodDecorator {
+  return (
+    spec?: SpecificationInterface,
+    options?: PlainLiteralObject,
+  ): MethodDecorator => {
     return (
       _target: object,
       _propertyKey: string | symbol,
@@ -59,7 +76,7 @@ export function createHookMethodDecorator(
         Reflect.getMetadata(HOOK_METHOD_METADATA_KEY, method) ?? [];
 
       // Add this hook's metadata
-      const metadata: HookMethodMetadataInterface = { key, spec };
+      const metadata: HookMethodMetadataInterface = { key, spec, options };
       Reflect.defineMetadata(
         HOOK_METHOD_METADATA_KEY,
         [...existing, metadata],

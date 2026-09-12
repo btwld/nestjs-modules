@@ -4,9 +4,11 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import {
   AppContextHost,
+  type AppContextInterface,
   DeepPartial,
   CoreModule,
   HooksCtx,
+  OverlayRef,
 } from '@concepta/nestjs-core';
 import {
   RepositoryModule,
@@ -861,6 +863,121 @@ describe('TypeOrmRepository Hooks', () => {
       expect(result.lastName).toBe('Added by hook');
     });
 
+    it('should let a { replace: true } hook override caller-supplied data on write', async () => {
+      await moduleFixture.close();
+
+      // Hook is declared authoritative — its output should win even though
+      // the caller supplied a conflicting value.
+      @RepoHook()
+      class TenantStampHook {
+        @BeforeCreate({ replace: true })
+        async beforeCreate(data: DeepPartial<TestEntityFixture>) {
+          return { ...data, lastName: 'Stamped by hook' };
+        }
+      }
+
+      moduleFixture = await Test.createTestingModule({
+        imports: [
+          TypeOrmModule.forRoot(ormConfig),
+          CoreModule.forRoot(),
+          RepositoryModule.forRoot({}),
+          RepositoryModule.forFeature({
+            module: TypeOrmRepositoryModule,
+            entities: [
+              {
+                key: TEST_ENTITY_TOKEN,
+                entity: TestEntityFixture,
+              },
+            ],
+          }),
+        ],
+        providers: [TenantStampHook],
+      }).compile();
+
+      const repo = moduleFixture.get<TypeOrmRepository<TestEntityFixture>>(
+        getDynamicRepositoryToken(TEST_ENTITY_TOKEN),
+      );
+
+      // Caller explicitly supplies lastName — a plain @BeforeCreate() hook
+      // would lose here (see "should preserve caller original data..."
+      // above); { replace: true } must win instead.
+      const result = await repo.create(
+        { firstName: 'Alice', lastName: 'Caller supplied' },
+        {
+          ctx: createHookContext(TenantStampHook),
+        },
+      );
+
+      expect(result.firstName).toBe('Alice');
+      expect(result.lastName).toBe('Stamped by hook');
+    });
+
+    it('should still let a plain @BeforeCreate() hook merge alongside a { replace: true } one', async () => {
+      await moduleFixture.close();
+
+      // Non-authoritative hook adds a field the caller omitted; authoritative
+      // hook overrides a field the caller supplied. Both should apply — and
+      // both must actually run, not just "caller's value happens to survive
+      // regardless." callLog proves execution independently of the merge
+      // outcome on firstName, since a merge hook losing to the caller looks
+      // identical to a merge hook never running at all if callLog isn't checked.
+      @RepoHook()
+      class MixedHook {
+        callLog: string[] = [];
+
+        @BeforeCreate()
+        async enrich(data: DeepPartial<TestEntityFixture>) {
+          this.callLog.push('enrich');
+          return { ...data, firstName: 'Hook default (should lose)' };
+        }
+
+        @BeforeCreate({ replace: true })
+        async stamp(data: DeepPartial<TestEntityFixture>) {
+          this.callLog.push('stamp');
+          return { ...data, lastName: 'Stamped by hook' };
+        }
+      }
+
+      moduleFixture = await Test.createTestingModule({
+        imports: [
+          TypeOrmModule.forRoot(ormConfig),
+          CoreModule.forRoot(),
+          RepositoryModule.forRoot({}),
+          RepositoryModule.forFeature({
+            module: TypeOrmRepositoryModule,
+            entities: [
+              {
+                key: TEST_ENTITY_TOKEN,
+                entity: TestEntityFixture,
+              },
+            ],
+          }),
+        ],
+        providers: [MixedHook],
+      }).compile();
+
+      const repo = moduleFixture.get<TypeOrmRepository<TestEntityFixture>>(
+        getDynamicRepositoryToken(TEST_ENTITY_TOKEN),
+      );
+      const mixedHook = moduleFixture.get(MixedHook);
+
+      const result = await repo.create(
+        { firstName: 'Alice', lastName: 'Caller supplied' },
+        {
+          ctx: createHookContext(MixedHook),
+        },
+      );
+
+      // Both hooks actually ran (not just "caller's value happened to win").
+      expect(mixedHook.callLog).toEqual(
+        expect.arrayContaining(['enrich', 'stamp']),
+      );
+      // Caller's firstName wins over the merge-phase hook (default behavior).
+      expect(result.firstName).toBe('Alice');
+      // The replace-phase hook wins over the caller's lastName.
+      expect(result.lastName).toBe('Stamped by hook');
+    });
+
     it('should allow BeforeFind to add where conditions', async () => {
       await moduleFixture.close();
 
@@ -920,6 +1037,135 @@ describe('TypeOrmRepository Hooks', () => {
       // Hook filters to only return 'Bob'
       expect(result.length).toBe(1);
       expect(result[0].firstName).toBe('Bob');
+    });
+  });
+
+  // ===========================================================================
+  // README tenant-isolation example (nestjs-repository's "Defining a Hook")
+  //
+  // Reproduces the README's TenantScopeHook verbatim (OverlayRef + ctx.with +
+  // Where helpers + { replace: true }), standing lastName in for tenantId
+  // since TestEntityFixture has no dedicated tenant column. This is both a
+  // type-check of the documented pattern and a behavioral proof of the two
+  // scenarios an external evaluation flagged as broken: a cross-tenant read
+  // returning nothing, and a caller-smuggled tenant value being overridden
+  // on create.
+  // ===========================================================================
+
+  describe('README tenant-isolation example', () => {
+    const TenantCtx = new OverlayRef<'withTenant', { tenantId: string }>(
+      'withTenant',
+    );
+
+    @RepoHook()
+    class TenantScopeHook {
+      @BeforeFind()
+      async addTenantFilter(
+        options: RepositoryFindOptions<TestEntityFixture>,
+        ctx?: AppContextInterface,
+      ): Promise<RepositoryFindOptions<TestEntityFixture>> {
+        const tenant = ctx?.supports(TenantCtx)
+          ? ctx.with(TenantCtx)
+          : undefined;
+        if (!tenant) return options;
+
+        const condition = Where.eq('lastName', tenant.tenantId);
+        return {
+          ...options,
+          where: options.where
+            ? Where.and(options.where, condition)
+            : condition,
+        };
+      }
+
+      @BeforeCreate({ replace: true })
+      async stampTenant(
+        data: DeepPartial<TestEntityFixture>,
+        ctx?: AppContextInterface,
+      ): Promise<DeepPartial<TestEntityFixture>> {
+        const tenant = ctx?.supports(TenantCtx)
+          ? ctx.with(TenantCtx)
+          : undefined;
+        if (!tenant) return data;
+
+        return { ...data, lastName: tenant.tenantId };
+      }
+    }
+
+    function tenantCtx(tenantId: string): AppContextHost {
+      const ctx = createHookContext(TenantScopeHook);
+      ctx.defineOverlay(TenantCtx, { tenantId });
+      return ctx;
+    }
+
+    it('excludes another tenant’s rows from a scoped read', async () => {
+      await moduleFixture.close();
+
+      moduleFixture = await Test.createTestingModule({
+        imports: [
+          TypeOrmModule.forRoot(ormConfig),
+          CoreModule.forRoot(),
+          RepositoryModule.forRoot({}),
+          RepositoryModule.forFeature({
+            module: TypeOrmRepositoryModule,
+            entities: [{ key: TEST_ENTITY_TOKEN, entity: TestEntityFixture }],
+          }),
+        ],
+        providers: [TenantScopeHook],
+      }).compile();
+
+      const repo = moduleFixture.get<TypeOrmRepository<TestEntityFixture>>(
+        getDynamicRepositoryToken(TEST_ENTITY_TOKEN),
+      );
+
+      const localSeedingSource = new SeedingSource({
+        dataSource: moduleFixture.get(getDataSourceToken()),
+      });
+      await localSeedingSource.initialize();
+      const localFactory = new TestFactoryFixture({
+        entity: TestEntityFixture,
+        seedingSource: localSeedingSource,
+      });
+
+      await localFactory.create({
+        firstName: 'Orlando Site',
+        lastName: 'orlando',
+      });
+      await localFactory.create({ firstName: 'Tampa Site', lastName: 'tampa' });
+
+      const result = await repo.find({ ctx: tenantCtx('orlando') });
+
+      expect(result.length).toBe(1);
+      expect(result[0].lastName).toBe('orlando');
+    });
+
+    it('overrides a caller-smuggled tenant value on create', async () => {
+      await moduleFixture.close();
+
+      moduleFixture = await Test.createTestingModule({
+        imports: [
+          TypeOrmModule.forRoot(ormConfig),
+          CoreModule.forRoot(),
+          RepositoryModule.forRoot({}),
+          RepositoryModule.forFeature({
+            module: TypeOrmRepositoryModule,
+            entities: [{ key: TEST_ENTITY_TOKEN, entity: TestEntityFixture }],
+          }),
+        ],
+        providers: [TenantScopeHook],
+      }).compile();
+
+      const repo = moduleFixture.get<TypeOrmRepository<TestEntityFixture>>(
+        getDynamicRepositoryToken(TEST_ENTITY_TOKEN),
+      );
+
+      // Caller (an Orlando-scoped request) tries to smuggle a Tampa tenant id.
+      const result = await repo.create(
+        { firstName: 'New Site', lastName: 'tampa' },
+        { ctx: tenantCtx('orlando') },
+      );
+
+      expect(result.lastName).toBe('orlando');
     });
   });
 

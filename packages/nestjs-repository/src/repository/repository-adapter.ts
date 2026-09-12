@@ -5,6 +5,7 @@ import {
   type DeepPartial,
   isObject,
   RuntimeException,
+  type HookMethodFilter,
   type HookMethodKeyType,
   type HookResolverService,
 } from '@concepta/nestjs-core';
@@ -32,6 +33,11 @@ import {
   isWhereCompound,
 } from './interfaces/where-clause.interface.js';
 import { WhereCompoundOperator } from './repository.types.js';
+
+// Module-scoped: the root cause (CoreModule not imported) is identical no
+// matter how many repositories/entities hit it, so warn once per process
+// rather than once per repository construction.
+let warnedHooksNotWired = false;
 
 /**
  * Abstract repository adapter that implements entity hydration.
@@ -66,6 +72,17 @@ export abstract class RepositoryAdapter<
     protected readonly hookResolver?: HookResolverService,
   ) {
     this.entityKey = entityKey;
+
+    if (!hookResolver && !warnedHooksNotWired) {
+      warnedHooksNotWired = true;
+      process.emitWarning(
+        `Repository "${entityKey}" was constructed without a HookResolverService — ` +
+          'hooks registered via @UseHooks() will never run for this repository ' +
+          '(or any other, until CoreModule is imported), silently. Import ' +
+          'CoreModule (e.g. CoreModule.forRoot()) to enable them.',
+        { code: 'ROCKETS_HOOKS_NOT_WIRED' },
+      );
+    }
   }
 
   /**
@@ -498,17 +515,21 @@ export abstract class RepositoryAdapter<
    * @param methodKey - The hook method key (e.g., 'beforeFind', 'afterCreate')
    * @param payload - The payload to pass through hooks
    * @param ctx - The hook context
+   * @param filter - Optional predicate over each method's metadata (e.g.
+   *   `RepoHookStrategy.merge`/`.replace`), letting a single method key be
+   *   split into disjoint execution passes
    * @returns The payload after processing by applicable hooks
    */
   protected async runHooks<T>(
     methodKey: HookMethodKeyType,
     payload: T,
     ctx: PlainLiteralObject | undefined,
+    filter?: HookMethodFilter,
   ): Promise<T> {
     if (!this.hookResolver) {
       return payload;
     }
 
-    return this.hookResolver.execute(RepoHook, methodKey, payload, ctx);
+    return this.hookResolver.execute(RepoHook, methodKey, payload, ctx, filter);
   }
 }

@@ -109,6 +109,9 @@ export {
   RepoHookMethodKey,
   // Repository hook type decorator
   RepoHook,
+  // Write hook opt-in replace semantics
+  RepoWriteHookOptions,
+  RepoHookStrategy,
   // High-level semantic decorators
   BeforeRead,
   AfterRead,

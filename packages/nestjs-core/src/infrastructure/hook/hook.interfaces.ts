@@ -1,3 +1,5 @@
+import { type PlainLiteralObject } from '@nestjs/common';
+
 import { type HookMethodKeyType } from './decorators/hook-method.decorator.js';
 import { type SpecificationInterface } from './interfaces/specification.interface.js';
 
@@ -21,7 +23,23 @@ export interface HookMetadataInterface {
 export interface HookMethodMetadataInterface {
   key: HookMethodKeyType;
   spec?: SpecificationInterface;
+  /**
+   * Opaque, subsystem-defined options carried alongside the spec. Core never
+   * interprets this — it's populated verbatim from whatever the subsystem's
+   * decorator was called with (e.g. `@BeforeCreate({ replace: true })` in
+   * `@concepta/nestjs-repository`), and read back via a `HookMethodFilter`.
+   */
+  options?: PlainLiteralObject;
 }
+
+/**
+ * Predicate over a hook method's metadata, used by `HookResolverService.execute`
+ * to select which registered methods run for a given call — e.g. to split a
+ * single method key into disjoint groups based on subsystem-defined `options`.
+ */
+export type HookMethodFilter = (
+  metadata: HookMethodMetadataInterface,
+) => boolean;
 
 /**
  * Cached method mapping for a hook.
