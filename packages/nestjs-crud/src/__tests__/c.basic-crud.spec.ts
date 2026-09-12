@@ -767,6 +767,12 @@ describe('#crud-typeorm', () => {
             description: null,
           });
       });
+      it('should return status 409 when updating a soft-deleted entity, even with includeDeleted', () => {
+        return request(server)
+          .patch('/companies/9?includeDeleted=1')
+          .send({ name: 'updated9' })
+          .expect(409);
+      });
     });
 
     describe('#replace', () => {

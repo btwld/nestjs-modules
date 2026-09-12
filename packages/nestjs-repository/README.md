@@ -203,6 +203,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | `prepare(dto)` | public | Returns `dto` unchanged if it is already an entity instance, otherwise `Object.assign(new entityType(), dto)` |
 | `getPrimaryColumns()` | protected | Get primary key column names from metadata (subclass-author API) |
 | `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any (subclass-author API) |
+| `getDeleteDateColumn()` | protected | Get the soft-remove date column name from metadata, if any (subclass-author API) |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
 | `runHooks(methodKey, payload, ctx)` | protected | Execute repository hooks for a lifecycle event (subclass-author API) |
 | `resolveJoinClauses(join?)` | protected | Resolve structural join properties from relation metadata (subclass-author API) |
@@ -232,6 +233,34 @@ Each entry in `metadata.columns` must supply `name`, `isPrimary`,
 optimistic-locking version column, if the driver has one — `getVersionColumn()`
 reads it. Adapters that leave it `false` everywhere simply get no
 optimistic-locking support.
+
+### Soft-Deleted Immutability
+
+A soft-deleted row is immutable: `update`, `replace`, and `upsert` all reject
+it with `SoftDeletedImmutableException` (409 Conflict), for every driver —
+the guard lives in `RepositoryAdapter` itself, above the `do*` methods, so no
+driver implementation can forget it or diverge from it. `restore()` is the
+sanctioned way back.
+
+```ts
+import { SoftDeletedImmutableException } from '@concepta/nestjs-repository';
+
+try {
+  await repository.update(entity, { name: 'New Name' });
+} catch (err) {
+  if (err instanceof SoftDeletedImmutableException) {
+    // entity is soft-deleted — restore it first, or use { force: true }
+  }
+}
+```
+
+Pass `{ force: true }` to bypass the guard for server-side carve-outs (e.g.
+pre-purge PII masking, admin data-integrity corrections). It is not exposed
+over HTTP by `nestjs-crud` — only server-side callers can opt in.
+
+Soft-deleting an already-soft-deleted row is a no-op rather than an error:
+`softDelete()` returns the entity unchanged instead of re-stamping its delete
+date, since a retried HTTP DELETE must not fail.
 
 ## Relations and Joins
 

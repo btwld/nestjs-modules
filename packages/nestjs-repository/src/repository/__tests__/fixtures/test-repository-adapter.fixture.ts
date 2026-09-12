@@ -22,12 +22,14 @@ export interface TestEntity extends PlainLiteralObject {
   id: string;
   name: string;
   version: number;
+  dateDeleted: Date | null;
 }
 
 export class TestEntityClass {
   declare id: string;
   declare name: string;
   declare version: number;
+  declare dateDeleted: Date | null;
 }
 
 // ─── Concrete subclass to expose protected methods ───────────────────────────
@@ -47,6 +49,12 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
         isPrimary: false,
         isRemoveDate: false,
         isVersion: true,
+      },
+      {
+        name: 'dateDeleted',
+        isPrimary: false,
+        isRemoveDate: true,
+        isVersion: false,
       },
     ],
     relations: [
@@ -174,5 +182,9 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
 
   exposedGetVersionColumn(): (keyof TestEntity & string) | undefined {
     return this.getVersionColumn();
+  }
+
+  exposedGetDeleteDateColumn(): (keyof TestEntity & string) | undefined {
+    return this.getDeleteDateColumn();
   }
 }

@@ -216,6 +216,15 @@ whose message names the entity and points at `RepositoryModule.forRoot()` —
 rather than silently running the guard and the write as two separate,
 unprotected statements. This is a configuration error surfaced at call
 time, not a runtime conflict; it is not an `OptimisticLockException`.
+
+### Soft-Deleted Immutability
+
+`update`, `replace`, and `upsert` reject a soft-deleted target with
+`SoftDeletedImmutableException` (HTTP 409) — enforced once in
+`RepositoryAdapter` itself, so this driver has no separate opt-out logic to
+maintain. See [nestjs-repository's Soft-Deleted Immutability
+section](../nestjs-repository/README.md#soft-deleted-immutability) for the
+`{ force: true }` escape hatch and the `softDelete()` no-op behavior.
 A version value supplied by the caller in `data` is always ignored — only
 the version read from the `entity` argument, and the row's own
 auto-incrementing column, ever determine the real version.

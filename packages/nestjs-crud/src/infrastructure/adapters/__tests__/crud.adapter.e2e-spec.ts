@@ -13,6 +13,7 @@ import {
   getDynamicRepositoryToken,
   RepoCtx,
   RepositoryModule,
+  SoftDeletedImmutableException,
   Where,
 } from '@concepta/nestjs-repository';
 import {
@@ -860,6 +861,25 @@ describe('CrudAdapter (e2e)', () => {
           { firstName: 'X' },
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject updating a soft-deleted entity via includeDeleted=1', async () => {
+      const entity = await seed({ firstName: 'Alice' });
+      await repository.softDelete(entity);
+
+      await expect(
+        adapter.update(
+          ctx({
+            params: { id: entity.id },
+            query: {
+              ...mockCrudParsedQuery(),
+              filter: [Where.eq('id', entity.id)],
+              includeDeleted: 1,
+            },
+          }),
+          { firstName: 'Bob' },
+        ),
+      ).rejects.toThrow(SoftDeletedImmutableException);
     });
   });
 

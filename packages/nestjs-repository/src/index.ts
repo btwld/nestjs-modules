@@ -26,6 +26,7 @@ export {
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
 export { RepositoryQueryException } from './exceptions/repository-query.exception.js';
 export { OptimisticLockException } from './exceptions/optimistic-lock.exception.js';
+export { SoftDeletedImmutableException } from './exceptions/soft-deleted-immutable.exception.js';
 export { FederationException } from './federation/exceptions/federation.exception.js';
 export { TransactionTimeoutException } from './exceptions/transaction-timeout.exception.js';
 export { TransactionClosedException } from './exceptions/transaction-closed.exception.js';

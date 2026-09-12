@@ -43,12 +43,28 @@ export interface RepositoryCreateOptions extends RepositoryBaseOptions {}
 /**
  * Options for update operations.
  */
-export interface RepositoryUpdateOptions extends RepositoryBaseOptions {}
+export interface RepositoryUpdateOptions extends RepositoryBaseOptions {
+  /**
+   * Bypass the soft-deleted immutability guard, letting this write reach a
+   * currently soft-deleted row. Not exposed over HTTP — for server-side
+   * carve-outs only (e.g. pre-purge PII masking, admin data-integrity
+   * corrections).
+   */
+  force?: boolean;
+}
 
 /**
  * Options for upsert operations.
  */
-export interface RepositoryUpsertOptions extends RepositoryBaseOptions {}
+export interface RepositoryUpsertOptions extends RepositoryBaseOptions {
+  /**
+   * Bypass the soft-deleted immutability guard, letting this write reach a
+   * currently soft-deleted row. Not exposed over HTTP — for server-side
+   * carve-outs only (e.g. pre-purge PII masking, admin data-integrity
+   * corrections).
+   */
+  force?: boolean;
+}
 
 /**
  * Options for delete operations.

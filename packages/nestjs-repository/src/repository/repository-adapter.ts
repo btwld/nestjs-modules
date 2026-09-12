@@ -11,6 +11,7 @@ import {
 } from '@concepta/nestjs-core';
 
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
+import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { type FederationOrchestrator } from '../federation/federation-orchestrator.service.js';
 import { RepoPermeatorFactory } from '../hooks/repo-permeator-factory.js';
 import { RepoHook } from '../hooks/repository-hook.decorators.js';
@@ -33,6 +34,7 @@ import {
   isWhereCompound,
 } from './interfaces/where-clause.interface.js';
 import { WhereCompoundOperator } from './repository.types.js';
+import { Where } from './where.helpers.js';
 
 // Module-scoped: the root cause (CoreModule not imported) is identical no
 // matter how many repositories/entities hit it, so warn once per process
@@ -239,6 +241,7 @@ export abstract class RepositoryAdapter<
     data: DeepPartial<Entity>,
     options?: RepositoryUpdateOptions,
   ): Promise<Entity> {
+    this.assertMutable(entity, options);
     return this.permeator.update.permeate(
       data,
       (scoped) => this.doUpdate(entity, scoped, options),
@@ -256,6 +259,7 @@ export abstract class RepositoryAdapter<
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
+    await this.assertUpsertMutable(entity, options);
     return this.permeator.upsert.permeate(
       entity,
       (scoped) => this.doUpsert(scoped, options),
@@ -273,6 +277,7 @@ export abstract class RepositoryAdapter<
     data: DeepPartial<Entity>,
     options?: RepositoryUpdateOptions,
   ): Promise<Entity> {
+    this.assertMutable(entity, options);
     return this.permeator.replace.permeate(
       data,
       (scoped) => this.doReplace(entity, scoped, options),
@@ -395,6 +400,92 @@ export abstract class RepositoryAdapter<
    */
   protected getVersionColumn(): (keyof Entity & string) | undefined {
     return this.metadata.columns.find((col) => col.isVersion)?.name;
+  }
+
+  /**
+   * Get the soft-remove date column name from metadata, if any.
+   */
+  protected getDeleteDateColumn(): (keyof Entity & string) | undefined {
+    return this.metadata.columns.find((col) => col.isRemoveDate)?.name;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Soft-deleted immutability
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * A soft-deleted row is immutable everywhere except through `restore()`.
+   * Enforced here — once, for every driver — rather than per-implementation,
+   * so no driver can forget or diverge from the invariant. See #471.
+   */
+  private isSoftDeleted(
+    entity: PlainLiteralObject,
+    deleteDateColumn: keyof Entity & string,
+  ): boolean {
+    return entity[deleteDateColumn] != null;
+  }
+
+  /**
+   * Throw `SoftDeletedImmutableException` if `entity` is currently
+   * soft-deleted, unless the caller opted out via `{ force: true }`.
+   */
+  private assertMutable(entity: Entity, options?: { force?: boolean }): void {
+    if (options?.force) return;
+
+    const deleteDateColumn = this.getDeleteDateColumn();
+    if (!deleteDateColumn) return;
+
+    if (this.isSoftDeleted(entity, deleteDateColumn)) {
+      throw new SoftDeletedImmutableException(this.metadata.name);
+    }
+  }
+
+  /**
+   * Same guard as `assertMutable`, but for `upsert()` — the caller only
+   * supplies a partial entity, not an existing row, so whether the target is
+   * soft-deleted has to be read first. `prepare()` materializes a typed
+   * `Entity` so the primary key columns can be read without a cast. Reads
+   * via the protected `doFindOne` rather than the public `findOne`,
+   * deliberately bypassing the find permeator so a tenant-scoping
+   * `beforeFindOne` hook can't decide this guard. Uses `withDeleted: true`
+   * since the row being checked is expected to be soft-deleted.
+   */
+  private async assertUpsertMutable(
+    entity: DeepPartial<Entity>,
+    options?: { force?: boolean; ctx?: PlainLiteralObject },
+  ): Promise<void> {
+    if (options?.force) return;
+
+    const deleteDateColumn = this.getDeleteDateColumn();
+    if (!deleteDateColumn) return;
+
+    const primaryColumns = this.getPrimaryColumns();
+    if (primaryColumns.length === 0) return;
+
+    const prepared = this.prepare(entity);
+    if (!prepared) return;
+
+    const conditions: WhereClause[] = [];
+    for (const col of primaryColumns) {
+      const value = prepared[col];
+      // No primary key supplied — this is a fresh insert, not a write
+      // against an existing (possibly soft-deleted) row.
+      if (value === undefined) return;
+      conditions.push(Where.eq(col, value));
+    }
+
+    const where =
+      conditions.length === 1 ? conditions[0] : Where.and(...conditions);
+
+    const existing = await this.doFindOne({
+      where,
+      withDeleted: true,
+      ctx: options?.ctx,
+    });
+
+    if (existing && this.isSoftDeleted(existing, deleteDateColumn)) {
+      throw new SoftDeletedImmutableException(this.metadata.name);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

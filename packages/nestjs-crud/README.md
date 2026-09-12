@@ -751,6 +751,12 @@ via `CrudQueryParser`.
 | `includeDeleted` | `1` or `0` | `?includeDeleted=1` |
 | `s` | JSON search object | `?s={"name":{"$contains":"sunset"}}` |
 
+`includeDeleted` only affects reads (list, read). A write (update, replace,
+upsert) targeting a soft-deleted row always returns 409 Conflict — soft-deleted
+rows are immutable at the repository level regardless of this parameter. See
+[nestjs-repository's Soft-Deleted Immutability
+section](../nestjs-repository/README.md#soft-deleted-immutability).
+
 ### Comparison Operators
 
 | Operator | Description |

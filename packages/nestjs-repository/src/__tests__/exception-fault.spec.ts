@@ -9,6 +9,7 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
 import { RepositoryDuplicateKeyException } from '../exceptions/repository-duplicate-key.exception.js';
 import { RepositoryQueryException } from '../exceptions/repository-query.exception.js';
+import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { TransactionClosedException } from '../exceptions/transaction-closed.exception.js';
 import { TransactionHeuristicCommitException } from '../exceptions/transaction-heuristic-commit.exception.js';
 import { TransactionReadOnlyConflictException } from '../exceptions/transaction-read-only-conflict.exception.js';
@@ -42,6 +43,11 @@ const CASES: {
     name: 'RepositoryQueryException',
     build: () => new RepositoryQueryException('SomeEntity'),
     fault: 'internal',
+  },
+  {
+    name: 'SoftDeletedImmutableException',
+    build: () => new SoftDeletedImmutableException('SomeEntity'),
+    fault: 'client',
   },
   {
     name: 'TransactionClosedException',

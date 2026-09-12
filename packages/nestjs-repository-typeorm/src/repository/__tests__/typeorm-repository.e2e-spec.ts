@@ -6,6 +6,7 @@ import {
   getDynamicRepositoryToken,
   OptimisticLockException,
   RepositoryQueryException,
+  SoftDeletedImmutableException,
   TransactionScope,
   Where,
 } from '@concepta/nestjs-repository';
@@ -509,6 +510,44 @@ describe(TypeOrmRepository, () => {
 
       expect(updated.version).toBe(entity.version + 1);
     });
+
+    it('should reject updating a soft-deleted entity', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      await expect(
+        testRepository.update(deleted, { firstName: 'Bob' }),
+      ).rejects.toThrow(SoftDeletedImmutableException);
+    });
+
+    it('should update a soft-deleted entity when force is set', async () => {
+      const created = await testFactory.create({
+        firstName: 'Alice',
+        lastName: 'Smith',
+      });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      const updated = await testRepository.update(
+        deleted,
+        { firstName: 'Bob' },
+        { force: true },
+      );
+
+      expect(updated.firstName).toBe('Bob');
+      expect(updated.lastName).toBe('Smith');
+      expect(updated.version).toBe(deleted.version + 1);
+      expect(updated.dateDeleted).not.toBeNull();
+    });
   });
 
   describe('replace', () => {
@@ -553,6 +592,44 @@ describe(TypeOrmRepository, () => {
         testRepository.replace(entity, { firstName: 'Bob', lastName: 'Jones' }),
       ).rejects.toThrow(OptimisticLockException);
     });
+
+    it('should reject replacing a soft-deleted entity', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      await expect(
+        testRepository.replace(deleted, { firstName: 'Bob' }),
+      ).rejects.toThrow(SoftDeletedImmutableException);
+    });
+
+    it('should replace a soft-deleted entity when force is set', async () => {
+      const created = await testFactory.create({
+        firstName: 'Alice',
+        lastName: 'Smith',
+      });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      const replaced = await testRepository.replace(
+        deleted,
+        { firstName: 'Bob', lastName: 'Jones' },
+        { force: true },
+      );
+
+      expect(replaced.firstName).toBe('Bob');
+      expect(replaced.lastName).toBe('Jones');
+      expect(replaced.version).toBe(deleted.version + 1);
+      expect(replaced.dateDeleted).not.toBeNull();
+    });
   });
 
   describe('upsert', () => {
@@ -573,6 +650,28 @@ describe(TypeOrmRepository, () => {
       });
 
       expect(result.id).toBe(entity.id);
+      expect(result.firstName).toBe('Bob');
+    });
+
+    it('should reject upserting over a soft-deleted row', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+
+      await expect(
+        testRepository.upsert({ id: created.id, firstName: 'Bob' }),
+      ).rejects.toThrow(SoftDeletedImmutableException);
+    });
+
+    it('should upsert over a soft-deleted row when force is set', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+
+      const result = await testRepository.upsert(
+        { id: created.id, firstName: 'Bob' },
+        { force: true },
+      );
+
+      expect(result.id).toBe(created.id);
       expect(result.firstName).toBe('Bob');
     });
   });
