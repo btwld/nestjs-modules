@@ -365,6 +365,87 @@ to be imported (it provides `TransactionScope`) — see
 [Optimistic Locking](../nestjs-repository-typeorm/README.md#optimistic-locking)
 in `@concepta/nestjs-repository-typeorm`.
 
+That in-request guard can't stop the case optimistic locking exists for:
+two people editing the same record from a screen. A and B both open a form
+at version 1; B saves first (→ version 2); A saves and, without the
+mechanism below, still succeeds (→ version 3), silently discarding B's
+change — each request only ever compares against its own fresh read.
+
+### Optimistic Locking Over HTTP (`If-Match` / `ETag`)
+
+`nestjs-crud` closes that gap by accepting the client's expected version
+as a request header and threading it down to the repository's
+`expectedVersion` option (see [nestjs-repository's Expected Version
+section](../nestjs-repository/README.md#expected-version)):
+
+```text
+GET   /users/1                  -> 200  ETag: "3"
+PATCH /users/1  If-Match: "3"   -> 200  ETag: "4"     (wins)
+PATCH /users/1  If-Match: "3"   -> 409                (stale, rejected)
+```
+
+- **`ETag`** is emitted on Read and on any successful write, derived from
+  the entity's version column — never from a `version` key in the response
+  body, so an unrelated field of that name never produces a bogus
+  validator. Narrowing with `?select=` suppresses it defensively, since the
+  tag is a row validator that doesn't vary by representation and a client
+  that cached the full body must not get served a validator for the wrong
+  shape. There is no `ETag` on List or CreateBatch — HTTP has no per-item
+  entity-tag inside a collection body. Suppressing our own `ETag` doesn't
+  disable conditional `GET` entirely: Express (or Fastify) still
+  auto-generates its own weak, content-hash `ETag` for any response that
+  doesn't already carry one, which is a reasonable fallback for
+  representation-varying caching — just not the strong, version-based
+  validator this feature emits.
+- **`If-Match`** accepts exactly one strong entity-tag (`"3"`) or `*`.
+  Comma-separated tag lists and weak tags (`W/"3"`) are RFC 9110 features
+  for cache revalidation, not lost-update prevention, and are rejected
+  with `400 Bad Request`, as is any non-numeric or unquoted value.
+  `If-Match: *` states only "the resource must exist," which
+  `getOneOrFail`'s 404 already covers with no header at all — it carries
+  no version, so it does **not** satisfy `@CrudRequireVersion()` below.
+- **A mismatch returns `409 Conflict`** (`OptimisticLockException`,
+  `OPTIMISTIC_LOCK_CONFLICT`) — the same exception and error code the
+  in-request guard already used, not RFC 9110's `412 Precondition
+  Failed`, so clients handle every version conflict on this API the same
+  way regardless of which guard caught it.
+- **Sending `If-Match` at all is optional** by default — omit it and
+  behavior is unchanged from before this feature existed. `Update`,
+  `Replace`, `Delete`, `SoftDelete`, and `Restore` all honor it; a read
+  route never evaluates it — a stale or malformed `If-Match` on a `GET`
+  is simply not checked, since a lost-update precondition has no meaning
+  on a read.
+- **`If-Match` targeting an entity with no version column returns `400`**
+  — the resource can't honor a precondition it has no way to check.
+
+If a resource should *require* a precondition rather than merely accept
+one, annotate it with `@CrudRequireVersion()` — at the controller level
+(`@CrudController({ request: { requireVersion: true } })`) or per route
+(`@CrudUpdate({ request: { requireVersion: true } })`, and similarly for
+`Replace`/`Delete`/`SoftDelete`/`Restore`), with the route-level setting
+overriding the controller default. A request with no `If-Match` naming a
+version — including `If-Match: *` — is rejected with
+`428 Precondition Required` before the handler ever runs.
+
+Expose the version column in the resource's response schema so
+list-then-edit clients have a value to send without an extra `GET`:
+
+```ts
+export const userSchema = withNamedComponent(
+  conformsTo<UserInterface>()(
+    referenceIdSchema.extend({
+      name: z.string(),
+      version: z.number(),
+    }),
+  ),
+  'User',
+);
+```
+
+`?select=`/`allow`/`exclude` narrowing drops any field not explicitly
+selected, `version` included — use `persist` in the route's query options
+if a narrowing client still needs it.
+
 ## Controller Build Modes
 
 `ConfigurableCrudBuilder` supports three controller build paths.

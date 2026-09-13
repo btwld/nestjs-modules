@@ -6,6 +6,7 @@ import { type CrudParsedQueryInterface } from '../../request/interfaces/crud-par
 import { type CrudSpecContextInterface } from '../../specifications/interfaces/crud-spec-context.interface.js';
 
 import { type CrudContextOptionsInterface } from './crud-context-options.interface.js';
+import { type CrudPreconditionInterface } from './crud-precondition.interface.js';
 
 export interface CrudContextInterface<
   T extends PlainLiteralObject = PlainLiteralObject,
@@ -36,4 +37,15 @@ export interface CrudContextInterface<
    * The action category (CREATE, READ, UPDATE, DELETE).
    */
   action: ActionEnum;
+  /**
+   * The parsed `If-Match` precondition, if the client sent one. Populated
+   * by `CrudContextOverlay` — resolved lazily, only when a precondition is
+   * present or the route requires one.
+   */
+  precondition?: CrudPreconditionInterface;
+  /**
+   * The entity's version column name, resolved alongside `precondition`.
+   * Lets `CrudETagInterceptor` emit `ETag` without a second adapter lookup.
+   */
+  versionColumn?: string;
 }

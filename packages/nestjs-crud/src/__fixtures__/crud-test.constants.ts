@@ -12,3 +12,5 @@ export const CRUD_TEST_PHOTO_CCB_ENTITY_NAME = 'PhotoCcb';
 export const CRUD_TEST_PHOTO_CCB_SUB_ENTITY_NAME = 'PhotoCcbSub';
 export const CRUD_TEST_PHOTO_CCB_CUSTOM_ENTITY_NAME = 'PhotoCcbCustom';
 export const CRUD_TEST_PHOTO_BODY_FALLBACK_ENTITY_NAME = 'PhotoBodyFallback';
+export const CRUD_TEST_VERSIONED_ENTITY_NAME = 'Versioned';
+export const CRUD_TEST_VERSIONED_REQUIRED_ENTITY_NAME = 'VersionedRequired';

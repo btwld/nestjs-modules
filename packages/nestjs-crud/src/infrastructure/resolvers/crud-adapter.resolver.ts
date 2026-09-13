@@ -7,7 +7,7 @@ import { CrudAdapter } from '../adapters/crud.adapter.js';
 import { CrudContextInterface } from '../interceptors/interfaces/crud-context.interface.js';
 import { CrudCreateBatchInterface } from '../interfaces/crud-create-batch.interface.js';
 import { CrudResponsePaginatedInterface } from '../interfaces/crud-response-paginated.interface.js';
-import { getDynamicAdapterToken } from '../utils/crud-infra.utils.js';
+import { resolveCrudAdapter } from '../utils/resolve-crud-adapter.js';
 
 import { CrudResolverInterface } from './interfaces/crud-resolver.interface.js';
 
@@ -100,7 +100,6 @@ export class CrudAdapterResolver implements CrudResolverInterface {
   protected resolveAdapter<Entity extends PlainLiteralObject>(
     ctx: CrudContextInterface<Entity>,
   ): CrudAdapter<Entity> {
-    const adapterToken = getDynamicAdapterToken(ctx.entity);
-    return this.moduleRef.get(adapterToken, { strict: false });
+    return resolveCrudAdapter(this.moduleRef, ctx.entity);
   }
 }

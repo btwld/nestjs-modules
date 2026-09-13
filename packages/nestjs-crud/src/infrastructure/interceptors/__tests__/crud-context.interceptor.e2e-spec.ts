@@ -18,6 +18,7 @@ import { CrudModule } from '../../../crud.module.js';
 import { CrudController } from '../../decorators/controller/crud-controller.decorator.js';
 import { CrudList } from '../../decorators/operations/crud-list.decorator.js';
 import { CrudRead } from '../../decorators/operations/crud-read.decorator.js';
+import { CrudUpdate } from '../../decorators/operations/crud-update.decorator.js';
 import { CrudQueryBuilder } from '../../request/crud-query.builder.js';
 import { paginatedSchema } from '../../schemas/crud-response-paginated.schema.js';
 import { CrudCtx } from '../crud-context.overlay.js';
@@ -58,6 +59,18 @@ describe('#crud', () => {
     @CrudRead({ path: '/other2/:someParam' })
     async routeWithParam(@Param('someParam', ParseIntPipe) p: number) {
       return { p };
+    }
+
+    @CrudRead({ path: '/precondition/:someParam' })
+    async precondition(@Ctx(CrudCtx) ctx: CrudContextInterface<TestModel>) {
+      return { precondition: ctx.withCrud().precondition };
+    }
+
+    // No version column on this entity's mock metadata (see below) — an
+    // `If-Match` naming a version here must 400, not reach this body.
+    @CrudUpdate({ path: '/update/:someParam' })
+    async update(@Ctx(CrudCtx) ctx: CrudContextInterface<TestModel>) {
+      return { precondition: ctx.withCrud().precondition };
     }
   }
 
@@ -246,6 +259,51 @@ describe('#crud', () => {
     it('should work like before', async () => {
       const res = await $.get('/test2/normal/0').expect(200);
       expect(res.body.params).toHaveProperty('id', 0);
+    });
+  });
+
+  describe('If-Match precondition parsing', () => {
+    // `If-Match` only governs Update/Replace/Delete/SoftDelete/Restore — a
+    // read route never computes `precondition` at all, regardless of what
+    // header is sent, so a stale or malformed `If-Match` on a GET is
+    // simply not evaluated rather than rejected.
+    it('should never compute precondition on a read route, even with a header sent', async () => {
+      const res = await $.get('/test/precondition/1')
+        .set('If-Match', '"3"')
+        .expect(200);
+      expect(res.body.precondition).toBeUndefined();
+    });
+
+    // This fixture's mock metadata marks every column `isVersion: false`
+    // (see the module setup above) — so a *well-formed* entity-tag on the
+    // write route still 400s, just for a different reason (no version
+    // column to check it against) than a malformed one (fails parsing
+    // before that check ever runs). `undefined`/`*` never reach the
+    // version-column lookup at all — `precondition?.version` is undefined
+    // for both — so those two are the only cases observable as a 200 on a
+    // version-less entity.
+
+    it('should leave precondition undefined when no header is sent', async () => {
+      const res = await $.patch('/test/update/1').expect(200);
+      expect(res.body.precondition).toBeUndefined();
+    });
+
+    it('should parse * into an empty precondition without checking for a version column', async () => {
+      const res = await $.patch('/test/update/1')
+        .set('If-Match', '*')
+        .expect(200);
+      expect(res.body.precondition).toEqual({});
+    });
+
+    it.each(['W/"3"', '"3", "4"', '"abc"', '3'])(
+      'should reject %s with 400 (fails parsing)',
+      async (value) => {
+        await $.patch('/test/update/1').set('If-Match', value).expect(400);
+      },
+    );
+
+    it('should reject a well-formed "3" with 400 (parses fine, but no version column)', async () => {
+      await $.patch('/test/update/1').set('If-Match', '"3"').expect(400);
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   HttpStatus,
   type PlainLiteralObject,
 } from '@nestjs/common';
+import { ApiHeader } from '@nestjs/swagger';
 
 import { Operation } from '@concepta/nestjs-core';
 
@@ -13,12 +14,14 @@ import { CrudSoftDeleteCommand } from '../../../application/commands/impl/crud-s
 import { CRUD_MODULE_ROUTE_ID_DEFAULT_PATH } from '../../../crud.constants.js';
 import { type CrudRouteCommandOptionsInterface } from '../../interfaces/crud-route-ctlr-options.interface.js';
 import { getTransactionalDecorators } from '../../utils/get-transactional-decorators.js';
+import { Swagger } from '../../utils/swagger.helper.js';
 import { CrudApiOperation } from '../openapi/crud-api-operation.decorator.js';
 import { CrudApiParam } from '../openapi/crud-api-param.decorator.js';
 import { CrudApiResponse } from '../openapi/crud-api-response.decorator.js';
 import { CrudCommandHandler } from '../routes/crud-command-handler.decorator.js';
 import { CrudCommand } from '../routes/crud-command.decorator.js';
 import { CrudOperation } from '../routes/crud-operation.decorator.js';
+import { CrudRequireVersion } from '../routes/crud-require-version.decorator.js';
 import { CrudReturnDeleted } from '../routes/crud-return-deleted.decorator.js';
 import { CrudSerialize } from '../routes/crud-serialize.decorator.js';
 import { CrudValidate } from '../routes/crud-validate.decorator.js';
@@ -58,9 +61,11 @@ export const CrudSoftDelete = <
     }),
     CrudReturnDeleted(response?.returnDeleted),
     CrudValidate(request?.validation),
+    CrudRequireVersion(request?.requireVersion),
     CrudSerialize(response?.serialization),
     CrudApiOperation(api?.operation),
     CrudApiParam(api?.params),
+    ApiHeader(Swagger.createPreconditionHeaderMeta()),
     CrudApiResponse(api?.response),
     ...getTransactionalDecorators(transactional),
   );

@@ -13,6 +13,7 @@ import { CrudName } from '../routes/crud-name.decorator.js';
 import { CrudParams } from '../routes/crud-params.decorator.js';
 import { CrudRequestBodyBatch } from '../routes/crud-request-body-batch.decorator.js';
 import { CrudRequestBody } from '../routes/crud-request-body.decorator.js';
+import { CrudRequireVersion } from '../routes/crud-require-version.decorator.js';
 import { CrudResolver } from '../routes/crud-resolver.decorator.js';
 import { CrudResponsePaginated } from '../routes/crud-response-paginated.decorator.js';
 import { CrudResponseResource } from '../routes/crud-response-resource.decorator.js';
@@ -50,6 +51,7 @@ export function CrudController<
     CrudResolver(resolver),
     CrudParams<T>(request?.params ?? CRUD_MODULE_DEFAULT_PARAMS_OPTIONS),
     CrudValidate(request?.validation),
+    CrudRequireVersion(request?.requireVersion),
     CrudRequestBody(request?.body),
     CrudRequestBodyBatch(request?.bodyBatch),
     CrudResponseResource(response?.resource),

@@ -1,12 +1,18 @@
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
+import { type PlainLiteralObject } from '@nestjs/common';
+
 import { ActionEnum, AppContextHost, Operation } from '@concepta/nestjs-core';
 import {
   createMockCommandBus,
   createMockEventPublisher,
   createTestEventContext,
 } from '@concepta/nestjs-core/testing';
-import { type CrudContextInterface, CrudCtx } from '@concepta/nestjs-crud';
+import {
+  type CrudContextInterface,
+  type CrudParsedQueryInterface,
+  CrudCtx,
+} from '@concepta/nestjs-crud';
 import { createMockTransaction } from '@concepta/nestjs-repository/testing';
 
 import { type Cache } from '../../domain/aggregates/cache.js';
@@ -17,6 +23,19 @@ import { type CacheRepository } from '../../infrastructure/persistence/cache.rep
 import { type CacheEntityInterface } from '../../infrastructure/persistence/interfaces/cache-entity.interface.js';
 
 export const DEFAULT_CACHE_NAMESPACE = 'UserCache';
+
+const DEFAULT_PARSED_QUERY: CrudParsedQueryInterface<PlainLiteralObject> = {
+  fields: [],
+  search: undefined,
+  filter: [],
+  or: [],
+  sort: [],
+  limit: undefined,
+  offset: undefined,
+  page: undefined,
+  cache: undefined,
+  includeDeleted: undefined,
+};
 
 export {
   createMockCommandBus,
@@ -68,7 +87,7 @@ export function createMockCacheContext(
   ctx.defineOverlay(CrudCtx, {
     entity: crudOverrides.entity ?? 'UserCache',
     params: crudOverrides.params ?? {},
-    query: crudOverrides.query ?? {},
+    query: crudOverrides.query ?? DEFAULT_PARSED_QUERY,
     options: crudOverrides.options ?? {},
     operation: crudOverrides.operation ?? Operation.Read,
     action: crudOverrides.action ?? ActionEnum.READ,

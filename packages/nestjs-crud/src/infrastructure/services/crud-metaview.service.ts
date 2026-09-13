@@ -51,6 +51,7 @@ import {
 } from '../decorators/routes/crud-query.decorator.js';
 import { CrudRequestBodyBatch } from '../decorators/routes/crud-request-body-batch.decorator.js';
 import { CrudRequestBody } from '../decorators/routes/crud-request-body.decorator.js';
+import { CrudRequireVersion } from '../decorators/routes/crud-require-version.decorator.js';
 import { CrudResolver } from '../decorators/routes/crud-resolver.decorator.js';
 import { CrudResponsePaginated } from '../decorators/routes/crud-response-paginated.decorator.js';
 import { CrudResponseResource } from '../decorators/routes/crud-response-resource.decorator.js';
@@ -207,6 +208,15 @@ export class CrudMetaview<
   ): boolean {
     return (
       CrudMetadata.getHierarchy(CrudReturnRestored, handler, target) ?? false
+    );
+  }
+
+  public getRequireVersion(
+    target: ControllerTarget,
+    handler: MethodHandler,
+  ): boolean {
+    return (
+      CrudMetadata.getHierarchy(CrudRequireVersion, handler, target) ?? false
     );
   }
 

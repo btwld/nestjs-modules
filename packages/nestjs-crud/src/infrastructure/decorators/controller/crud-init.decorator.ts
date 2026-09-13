@@ -5,6 +5,7 @@ import { CrudInitApiParams } from './crud-init-api-params.decorator.js';
 import { CrudInitApiQuery } from './crud-init-api-query.decorator.js';
 import { CrudInitApiResponse } from './crud-init-api-response.decorator.js';
 import { CrudInitCommand } from './crud-init-command.decorator.js';
+import { CrudInitETag } from './crud-init-etag.decorator.js';
 import { CrudInitQuery } from './crud-init-query.decorator.js';
 import { CrudInitSerialization } from './crud-init-serialization.decorator.js';
 import { CrudInitValidation } from './crud-init-validation.decorator.js';
@@ -14,11 +15,15 @@ import { CrudInitValidation } from './crud-init-validation.decorator.js';
  *
  * Runs all init decorators that resolve metadata and apply NestJS decorators.
  * Can be re-run safely after metadata changes (e.g., by ConfigurableCrudBuilder).
+ *
+ * `CrudInitETag()` must stay immediately after `CrudInitSerialization()` —
+ * see that decorator's doc comment for why the order is load-bearing.
  */
 export const CrudInit = () =>
   applyDecorators(
     CrudInitValidation(),
     CrudInitSerialization(),
+    CrudInitETag(),
     CrudInitQuery(),
     CrudInitCommand(),
     CrudInitApiBody(),

@@ -8,6 +8,7 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 
 import { CrudContextException } from '../infrastructure/exceptions/crud-context.exception.js';
 import { CrudDecoratorException } from '../infrastructure/exceptions/crud-decorator.exception.js';
+import { CrudPreconditionRequiredException } from '../infrastructure/exceptions/crud-precondition-required.exception.js';
 import { CrudQueryException } from '../infrastructure/exceptions/crud-query.exception.js';
 import { CrudException } from '../infrastructure/exceptions/crud.exception.js';
 import { CrudQueryParserException } from '../infrastructure/request/exceptions/crud-query-parser.exception.js';
@@ -52,6 +53,11 @@ const CASES: {
   {
     name: 'CrudQueryValidatorException',
     build: () => new CrudQueryValidatorException(),
+    fault: 'client',
+  },
+  {
+    name: 'CrudPreconditionRequiredException',
+    build: () => new CrudPreconditionRequiredException('SomeEntity'),
     fault: 'client',
   },
 ];

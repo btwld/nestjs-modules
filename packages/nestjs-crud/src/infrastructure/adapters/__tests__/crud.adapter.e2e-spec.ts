@@ -11,6 +11,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActionEnum, AppContextHost, Operation } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
+  OptimisticLockException,
   RepoCtx,
   RepositoryModule,
   SoftDeletedImmutableException,
@@ -880,6 +881,42 @@ describe('CrudAdapter (e2e)', () => {
           { firstName: 'Bob' },
         ),
       ).rejects.toThrow(SoftDeletedImmutableException);
+    });
+
+    it('should update when the precondition version matches', async () => {
+      const entity = await seed({ firstName: 'Alice', lastName: 'Smith' });
+
+      const result = await adapter.update(
+        ctx({
+          params: { id: entity.id },
+          query: {
+            ...mockCrudParsedQuery(),
+            filter: [Where.eq('id', entity.id)],
+          },
+          precondition: { version: entity.version },
+        }),
+        { firstName: 'Bob' },
+      );
+
+      expect(result.firstName).toBe('Bob');
+    });
+
+    it('should throw OptimisticLockException when the precondition version is stale', async () => {
+      const entity = await seed({ firstName: 'Alice', lastName: 'Smith' });
+
+      await expect(
+        adapter.update(
+          ctx({
+            params: { id: entity.id },
+            query: {
+              ...mockCrudParsedQuery(),
+              filter: [Where.eq('id', entity.id)],
+            },
+            precondition: { version: entity.version + 1 },
+          }),
+          { firstName: 'Bob' },
+        ),
+      ).rejects.toThrow(OptimisticLockException);
     });
   });
 

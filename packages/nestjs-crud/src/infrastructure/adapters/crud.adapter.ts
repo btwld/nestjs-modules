@@ -35,6 +35,8 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
 
   protected entityHasDeleteColumn = false;
 
+  protected entityVersionColumn: EntityColumn<Entity> | undefined;
+
   constructor(protected repository: RepositoryInterface<Entity>) {
     this.initColumnMetadata();
   }
@@ -51,6 +53,14 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     return this.repository.metadata.type;
   }
 
+  /**
+   * The entity's optimistic-locking version column, if it has one. Used to
+   * derive `ETag`/`If-Match` support without a separate repository lookup.
+   */
+  versionColumn(): EntityColumn<Entity> | undefined {
+    return this.entityVersionColumn;
+  }
+
   protected initColumnMetadata(): void {
     const { columns } = this.repository.metadata;
 
@@ -59,6 +69,7 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
       .filter((col) => col.isPrimary)
       .map((col) => col.name);
     this.entityHasDeleteColumn = columns.some((col) => col.isRemoveDate);
+    this.entityVersionColumn = columns.find((col) => col.isVersion)?.name;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -304,7 +315,10 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     const found = await this.getOneOrFail(context);
     const data = { ...dto, ...context.params };
 
-    return this.repository.update(found, data, { ctx: context });
+    return this.repository.update(found, data, {
+      ctx: context,
+      expectedVersion: context.precondition?.version,
+    });
   }
 
   /**
@@ -321,7 +335,10 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     const found = await this.getOneOrFail(context);
     const data = { ...dto, ...context.params };
 
-    return this.repository.replace(found, data, { ctx: context });
+    return this.repository.replace(found, data, {
+      ctx: context,
+      expectedVersion: context.precondition?.version,
+    });
   }
 
   /**
@@ -333,7 +350,10 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
   async delete(context: CrudContextInterface<Entity>): Promise<Entity | null> {
     const { returnDeleted = false } = context.options?.route ?? {};
     const found = await this.getOneOrFail(context);
-    const deleted = await this.repository.delete(found, { ctx: context });
+    const deleted = await this.repository.delete(found, {
+      ctx: context,
+      expectedVersion: context.precondition?.version,
+    });
 
     return returnDeleted ? deleted : null;
   }
@@ -349,7 +369,10 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
   ): Promise<Entity | null> {
     const { returnDeleted = false } = context.options?.route ?? {};
     const found = await this.getOneOrFail(context);
-    const deleted = await this.repository.softDelete(found, { ctx: context });
+    const deleted = await this.repository.softDelete(found, {
+      ctx: context,
+      expectedVersion: context.precondition?.version,
+    });
 
     return returnDeleted ? deleted : null;
   }
@@ -363,7 +386,10 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
   async restore(context: CrudContextInterface<Entity>): Promise<Entity | null> {
     const { returnRestored = false } = context.options?.route ?? {};
     const found = await this.getOneOrFail(context, true);
-    const restored = await this.repository.restore(found, { ctx: context });
+    const restored = await this.repository.restore(found, {
+      ctx: context,
+      expectedVersion: context.precondition?.version,
+    });
 
     return returnRestored ? restored : null;
   }

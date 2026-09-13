@@ -27,4 +27,6 @@ export interface CrudRouteOptionsInterface<T extends PlainLiteralObject> {
   returnDeleted?: boolean;
   /** Return restored entity on restore operation */
   returnRestored?: boolean;
+  /** Require an `If-Match` header naming a version (428 if absent) */
+  requireVersion?: boolean;
 }

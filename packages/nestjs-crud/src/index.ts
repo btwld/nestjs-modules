@@ -3,6 +3,7 @@ export { CrudModule } from './crud.module.js';
 
 // interfaces
 export { CrudContextInterface } from './infrastructure/interceptors/interfaces/crud-context.interface.js';
+export { CrudPreconditionInterface } from './infrastructure/interceptors/interfaces/crud-precondition.interface.js';
 export { CrudParsedQueryInterface } from './infrastructure/request/interfaces/crud-parsed-query.interface.js';
 export { CrudResponsePaginatedInterface } from './infrastructure/interfaces/crud-response-paginated.interface.js';
 export { CrudResponseMetrics } from './infrastructure/interfaces/crud-response-metrics.interface.js';
@@ -62,6 +63,7 @@ export { CrudResponseResource } from './infrastructure/decorators/routes/crud-re
 export { CrudResponsePaginated } from './infrastructure/decorators/routes/crud-response-paginated.decorator.js';
 export { CrudReturnDeleted } from './infrastructure/decorators/routes/crud-return-deleted.decorator.js';
 export { CrudReturnRestored } from './infrastructure/decorators/routes/crud-return-restored.decorator.js';
+export { CrudRequireVersion } from './infrastructure/decorators/routes/crud-require-version.decorator.js';
 export { CrudSerialize } from './infrastructure/decorators/routes/crud-serialize.decorator.js';
 export { CrudSort } from './infrastructure/decorators/routes/crud-sort.decorator.js';
 export { CrudValidate } from './infrastructure/decorators/routes/crud-validate.decorator.js';
@@ -92,6 +94,7 @@ export { CrudException } from './infrastructure/exceptions/crud.exception.js';
 export { CrudContextException } from './infrastructure/exceptions/crud-context.exception.js';
 export { CrudDecoratorException } from './infrastructure/exceptions/crud-decorator.exception.js';
 export { CrudQueryException } from './infrastructure/exceptions/crud-query.exception.js';
+export { CrudPreconditionRequiredException } from './infrastructure/exceptions/crud-precondition-required.exception.js';
 
 // configurable crud builder
 export {

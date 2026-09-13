@@ -31,4 +31,13 @@ export interface CrudRequestConfig<T extends PlainLiteralObject> {
    * Validation options for request processing.
    */
   validation?: CrudValidationOptions<T>;
+
+  /**
+   * Require an `If-Match` header naming a version before this route will
+   * run. Only meaningful on entities with a version column; the route
+   * rejects with 428 Precondition Required when the header is absent.
+   * `If-Match: *` does not satisfy this — it states no version at all,
+   * which is exactly the blind write this flag exists to forbid.
+   */
+  requireVersion?: boolean;
 }

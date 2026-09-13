@@ -136,6 +136,25 @@ export class Swagger {
     }
   }
 
+  /**
+   * Documents the `If-Match` precondition header shared by Update, Replace,
+   * Delete, SoftDelete and Restore. Always `required: false` here — a route
+   * annotated `@CrudRequireVersion()` adds its own 428 response instead of
+   * re-declaring this header as required, since a second `ApiHeader` with
+   * the same name would emit a duplicate OpenAPI parameter.
+   */
+  static createPreconditionHeaderMeta() {
+    return {
+      name: 'If-Match',
+      description:
+        'The version the client last read, as a quoted integer (e.g. ' +
+        '`"3"`) or `*`. Honored only on entities with a version column; ' +
+        'a mismatch returns 409 Conflict.',
+      required: false,
+      schema: { type: 'string' },
+    };
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getQueryParamsNames(): any {
     const qbOptions = CrudQueryBuilder.getOptions();
