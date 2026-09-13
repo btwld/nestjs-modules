@@ -548,6 +548,30 @@ describe(TypeOrmRepository, () => {
       expect(updated.version).toBe(deleted.version + 1);
       expect(updated.dateDeleted).not.toBeNull();
     });
+
+    it('should reject when a caller-supplied expectedVersion does not match, even though the row itself is current', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await expect(
+        testRepository.update(
+          entity,
+          { firstName: 'Bob' },
+          { expectedVersion: entity.version + 1 },
+        ),
+      ).rejects.toThrow(OptimisticLockException);
+    });
+
+    it('should update when a caller-supplied expectedVersion matches', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      const updated = await testRepository.update(
+        entity,
+        { firstName: 'Bob' },
+        { expectedVersion: entity.version },
+      );
+
+      expect(updated.firstName).toBe('Bob');
+    });
   });
 
   describe('replace', () => {
@@ -630,6 +654,30 @@ describe(TypeOrmRepository, () => {
       expect(replaced.version).toBe(deleted.version + 1);
       expect(replaced.dateDeleted).not.toBeNull();
     });
+
+    it('should reject when a caller-supplied expectedVersion does not match, even though the row itself is current', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await expect(
+        testRepository.replace(
+          entity,
+          { firstName: 'Bob' },
+          { expectedVersion: entity.version + 1 },
+        ),
+      ).rejects.toThrow(OptimisticLockException);
+    });
+
+    it('should replace when a caller-supplied expectedVersion matches', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      const replaced = await testRepository.replace(
+        entity,
+        { firstName: 'Bob' },
+        { expectedVersion: entity.version },
+      );
+
+      expect(replaced.firstName).toBe('Bob');
+    });
   });
 
   describe('upsert', () => {
@@ -686,6 +734,52 @@ describe(TypeOrmRepository, () => {
       });
       expect(result).toBeNull();
     });
+
+    it('should reject without deleting when expectedVersion mismatches', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await expect(
+        testRepository.delete(entity, {
+          expectedVersion: entity.version + 1,
+        }),
+      ).rejects.toThrow(OptimisticLockException);
+
+      const result = await testRepository.findOne({
+        where: Where.eq('id', entity.id),
+      });
+      expect(result).not.toBeNull();
+    });
+
+    it('should delete when expectedVersion matches', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await testRepository.delete(entity, { expectedVersion: entity.version });
+
+      const result = await testRepository.findOne({
+        where: Where.eq('id', entity.id),
+      });
+      expect(result).toBeNull();
+    });
+
+    it('should reject a stale expectedVersion even though it matches the caller entity, when a concurrent write has since landed', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      // A concurrent writer updates first, bumping the row's real version.
+      await testRepository.update(entity, { firstName: 'Concurrent' });
+
+      // Our caller still holds the stale, pre-update `entity` and honestly
+      // states its own (also stale) version — the in-memory check alone
+      // would pass this; only the driver's atomic compare-and-swap against
+      // the live row catches it.
+      await expect(
+        testRepository.delete(entity, { expectedVersion: entity.version }),
+      ).rejects.toThrow(OptimisticLockException);
+
+      const result = await testRepository.findOne({
+        where: Where.eq('id', entity.id),
+      });
+      expect(result).not.toBeNull();
+    });
   });
 
   describe('softDelete', () => {
@@ -722,6 +816,52 @@ describe(TypeOrmRepository, () => {
       expect(secondDeleted.dateDeleted).toEqual(firstDeleted.dateDeleted);
       expect(secondDeleted.version).toBe(firstDeleted.version);
     });
+
+    it('should reject without soft-deleting when expectedVersion mismatches', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await expect(
+        testRepository.softDelete(entity, {
+          expectedVersion: entity.version + 1,
+        }),
+      ).rejects.toThrow(OptimisticLockException);
+
+      const result = await testRepository.findOne({
+        where: Where.eq('id', entity.id),
+      });
+      expect(result).not.toBeNull();
+    });
+
+    it('should soft-delete when expectedVersion matches', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await testRepository.softDelete(entity, {
+        expectedVersion: entity.version,
+      });
+
+      const result = await testRepository.findOne({
+        where: Where.eq('id', entity.id),
+      });
+      expect(result).toBeNull();
+    });
+
+    it('should reject a stale expectedVersion even though it matches the caller entity, when a concurrent write has since landed', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      // A concurrent writer updates first, bumping the row's real version.
+      await testRepository.update(entity, { firstName: 'Concurrent' });
+
+      await expect(
+        testRepository.softDelete(entity, {
+          expectedVersion: entity.version,
+        }),
+      ).rejects.toThrow(OptimisticLockException);
+
+      const result = await testRepository.findOne({
+        where: Where.eq('id', entity.id),
+      });
+      expect(result).not.toBeNull();
+    });
   });
 
   describe('restore', () => {
@@ -745,6 +885,69 @@ describe(TypeOrmRepository, () => {
       });
       expect(recovered).not.toBeNull();
       expect(recovered?.dateDeleted).toBeNull();
+    });
+
+    it('should reject without restoring when expectedVersion mismatches', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      await expect(
+        testRepository.restore(deleted, {
+          expectedVersion: deleted.version + 1,
+        }),
+      ).rejects.toThrow(OptimisticLockException);
+
+      const stillDeleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      expect(stillDeleted?.dateDeleted).not.toBeNull();
+    });
+
+    it('should restore when expectedVersion matches', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      await testRepository.restore(deleted, {
+        expectedVersion: deleted.version,
+      });
+
+      const recovered = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+      });
+      expect(recovered?.dateDeleted).toBeNull();
+    });
+
+    it('should reject a stale expectedVersion even though it matches the caller entity, when a concurrent write has since landed', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.softDelete(created);
+      const deleted = await testRepository.findOne({
+        where: Where.eq('id', created.id),
+        withDeleted: true,
+      });
+      if (!deleted) throw new Error('fixture precondition failed');
+
+      // Concurrent writer forces an update on the soft-deleted row, bumping
+      // its version.
+      await testRepository.update(
+        deleted,
+        { firstName: 'Concurrent' },
+        { force: true },
+      );
+
+      await expect(
+        testRepository.restore(deleted, { expectedVersion: deleted.version }),
+      ).rejects.toThrow(OptimisticLockException);
     });
   });
 
@@ -821,6 +1024,42 @@ describe(TypeOrmRepository, () => {
 
       expect(updated.firstName).toBe('Bob');
       expect(updated.version).toBe(entity.version + 1);
+    });
+
+    // delete/softDelete/restore only take on the transaction requirement
+    // when the caller actually supplies `expectedVersion` — this is what
+    // keeps #472 non-breaking for every existing caller of those methods.
+    it.each([
+      [
+        'delete',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.delete(e),
+      ],
+      [
+        'softDelete',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.softDelete(e),
+      ],
+      [
+        'restore',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.restore(e),
+      ],
+    ] as const)(
+      'should run %s unprotected, with no transaction requirement, when expectedVersion is omitted',
+      async (_name, call) => {
+        const entity = await testFactory.create({ firstName: 'Alice' });
+        const result = await call(bareRepository, entity);
+        expect(result).toBeDefined();
+      },
+    );
+
+    it('should throw rather than silently run delete unprotected when expectedVersion is supplied with no transaction active', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      await expect(
+        bareRepository.delete(entity, { expectedVersion: entity.version }),
+      ).rejects.toThrow(RuntimeException);
     });
   });
 });

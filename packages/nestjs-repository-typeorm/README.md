@@ -217,6 +217,45 @@ rather than silently running the guard and the write as two separate,
 unprotected statements. This is a configuration error surfaced at call
 time, not a runtime conflict; it is not an `OptimisticLockException`.
 
+A version value supplied by the caller in `data` is always ignored — only
+the version read from the `entity` argument, and the row's own
+auto-incrementing column, ever determine the real version. This is
+distinct from `options.expectedVersion`, below, which the caller *does*
+control.
+
+### Expected Version (cross-request optimistic locking)
+
+The check above guards a read-then-write inside one request; it can't stop
+two requests that each re-read before writing, since each compares against
+its own fresh value. Passing `expectedVersion` in `options` (see
+[nestjs-repository's Expected Version
+section](../nestjs-repository/README.md#expected-version)) extends the
+same atomic compare-and-swap mechanism to `delete`, `softDelete`, and
+`restore` as well — but, unlike `update`/`replace`, only when the caller
+actually supplies one. That's what keeps this non-breaking: an existing
+caller of those three methods that never passes `expectedVersion` inherits
+no new transaction requirement.
+
+This driver never decides *whether* a guard applies or *what* value to
+check — `RepositoryAdapter` resolves that into a `RepositoryVersionGuardInterface`
+descriptor and hands it down as `options.versionGuard`; the driver's only
+job is running the atomic `UPDATE ... WHERE <column> = <value>` probe
+against whatever descriptor it's given.
+
+Two caveats carried over from the in-request check: on MySQL, the probe
+relies on `affected` reflecting rows *matched*, not rows *changed* — true
+by default for Postgres and sqlite, but on MySQL only with
+`CLIENT_FOUND_ROWS` enabled, so an entity with no other auto-updating
+column (e.g. no `@UpdateDateColumn`) can see a false conflict without it.
+And supplying `expectedVersion` to `softDelete` on an already-soft-deleted
+row *voids* the idempotency guarantee below by design: a stale entity
+whose caller honestly restates its own (also stale) version passes the
+in-memory check trivially, so the no-op is skipped and the driver's CAS
+conflicts instead — the discriminating case is exactly what makes
+`expectedVersion` on delete paths meaningful. (Unreachable over HTTP:
+`nestjs-crud`'s `getOneOrFail` always re-reads with `withDeleted: false`
+before a soft-delete, so an already-soft-deleted row 404s first.)
+
 ### Soft-Deleted Immutability
 
 `update`, `replace`, and `upsert` reject a soft-deleted target with
@@ -225,9 +264,6 @@ time, not a runtime conflict; it is not an `OptimisticLockException`.
 maintain. See [nestjs-repository's Soft-Deleted Immutability
 section](../nestjs-repository/README.md#soft-deleted-immutability) for the
 `{ force: true }` escape hatch and the `softDelete()` no-op behavior.
-A version value supplied by the caller in `data` is always ignored — only
-the version read from the `entity` argument, and the row's own
-auto-incrementing column, ever determine the real version.
 
 Entities without a version column are unaffected — `update`/`replace`
 behave exactly as before.

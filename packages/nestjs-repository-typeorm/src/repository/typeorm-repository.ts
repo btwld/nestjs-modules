@@ -36,6 +36,7 @@ import {
   TrxCtx,
   RepositoryAdapter,
   type RepositoryCreateOptions,
+  type RepositoryDeleteOneOptions,
   type RepositoryDeleteOptions,
   type RepositoryFindOneOptions,
   type RepositoryFindOptions,
@@ -43,6 +44,7 @@ import {
   type RepositoryRestoreOptions,
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
+  type RepositoryVersionGuardInterface,
   type TransactionScope,
   type WhereClause,
   type WhereCondition,
@@ -349,16 +351,14 @@ export class TypeOrmRepository<
   protected async doUpdate(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity> {
-    const versionColumn = this.getVersionColumn();
-
-    if (versionColumn) {
-      return this.saveWithVersionCheck(
+    if (options?.versionGuard) {
+      return this.saveWithVersionGuard(
         entity,
         data,
-        versionColumn,
-        options?.ctx,
+        options.versionGuard,
+        options.ctx,
       );
     }
 
@@ -407,16 +407,14 @@ export class TypeOrmRepository<
   protected async doReplace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity> {
-    const versionColumn = this.getVersionColumn();
-
-    if (versionColumn) {
-      return this.saveWithVersionCheck(
+    if (options?.versionGuard) {
+      return this.saveWithVersionGuard(
         entity,
         data,
-        versionColumn,
-        options?.ctx,
+        options.versionGuard,
+        options.ctx,
       );
     }
 
@@ -426,8 +424,8 @@ export class TypeOrmRepository<
   }
 
   /**
-   * Persist `data` onto `entity` guarded by an atomic optimistic-lock check
-   * on the version column read at fetch time.
+   * Run `op` guarded by an atomic optimistic-lock compare-and-swap on
+   * `guard.column`, identifying the row by `entity`'s primary key.
    *
    * `repo.increment(conditions, propertyPath, value)` is used for the guard
    * itself — unlike `repo.createQueryBuilder().update().set(...)`, its
@@ -435,39 +433,37 @@ export class TypeOrmRepository<
    * so it doesn't hit the generics wall that makes TypeORM's `.set()`
    * impossible to satisfy for a library-level generic `Entity` type
    * parameter. It performs a single atomic
-   * `UPDATE ... SET version = version + 0 WHERE id = :id AND version = :expected`
+   * `UPDATE ... SET <column> = <column> + 0 WHERE <primary key> AND <column> = :expected`
    * statement and reports 0 affected rows on a mismatch — exactly the
    * compare-and-swap this needs. The `+ 0` is deliberate, not a typo: it's a
-   * pure atomic check with no real effect of its own (verified against both
-   * this repo's supported drivers — Postgres's `rowCount` and TypeORM's own
-   * sqlite driver both report `affected` based on rows *matched* by WHERE,
-   * not rows whose value actually changed, unlike MySQL's default
-   * behavior). The real, sole version bump happens in the `repo.save()`
-   * below — `@VersionColumn` entities auto-increment on every `save()`
-   * regardless of whether the value you hand it changed, so doing a real
-   * `+1` here as well would double-bump every successful update.
+   * pure atomic probe (verified against both this repo's supported drivers
+   * — Postgres's `rowCount` and TypeORM's own sqlite driver both report
+   * `affected` based on rows *matched* by WHERE, not rows whose value
+   * actually changed; MySQL's default `affectedRows` behaves the same only
+   * with `CLIENT_FOUND_ROWS` enabled, so on an entity with no other
+   * auto-updating column a plain MySQL connection can see a false
+   * conflict). It is not side-effect-free on every driver, though: TypeORM
+   * also stamps any `@UpdateDateColumn` on the same statement — a real
+   * write on a row `op` may be about to hard-delete.
    *
-   * That guard statement and the follow-up field write are two separate SQL
-   * statements, so — unless both run inside one DB transaction — a third
-   * writer could still interleave between them and reintroduce a lost
-   * update. `TransactionScope.run()` closes that window: it joins the
-   * caller's transaction if one is already active (e.g. via
-   * `@Transactional()`), or opens a short-lived one scoped to just this
-   * call if not, so every caller gets the same guarantee without having to
-   * opt in.
-   *
-   * `merged[versionColumn]` is forced back to the freshly-read value
-   * immediately after merging so a client-supplied `version` in `data` can
-   * never override it — `repo.save()`'s own auto-increment is what actually
-   * advances it from there.
+   * That guard statement and `op` are two separate SQL statements, so —
+   * unless both run inside one DB transaction — a third writer could still
+   * interleave between them and reintroduce a lost update. `TransactionScope.run()`
+   * closes that window: it joins the caller's transaction if one is already
+   * active (e.g. via `@Transactional()`), or opens a short-lived one scoped
+   * to just this call if not, so every caller gets the same guarantee
+   * without having to opt in.
    */
-  private async saveWithVersionCheck(
+  private async withVersionGuard<T>(
     entity: Entity,
-    data: DeepPartial<Entity>,
-    versionColumn: keyof Entity & string,
-    ctx?: PlainLiteralObject,
-  ): Promise<Entity> {
-    const run = async (txCtx?: AppContextLike): Promise<Entity> => {
+    guard: RepositoryVersionGuardInterface<Entity>,
+    ctx: PlainLiteralObject | undefined,
+    op: (
+      repo: Repository<Entity>,
+      primaryWhere: FindOptionsWhere<Entity>,
+    ) => Promise<T>,
+  ): Promise<T> {
+    const run = async (txCtx?: AppContextLike): Promise<T> => {
       const repo = await this.getRepo(txCtx);
 
       const primaryWhere: FindOptionsWhere<Entity> = {};
@@ -476,41 +472,15 @@ export class TypeOrmRepository<
       }
 
       const lockWhere: FindOptionsWhere<Entity> = { ...primaryWhere };
-      lockWhere[versionColumn] = entity[versionColumn];
+      lockWhere[guard.column] = guard.value;
 
-      const lockResult = await repo.increment(lockWhere, versionColumn, 0);
+      const lockResult = await repo.increment(lockWhere, guard.column, 0);
 
       if (lockResult.affected === 0) {
         throw new OptimisticLockException(this.metadata.name);
       }
 
-      // `withDeleted: true` — identity re-read of the row the `increment`
-      // guard above just matched (full primary key + version); it may
-      // legitimately be soft-deleted (e.g. via `{ force: true }` at the
-      // abstraction level), and without this it would wrongly come back
-      // null and throw below for a row that demonstrably exists (#471).
-      const fresh = await repo.findOne({
-        where: primaryWhere,
-        withDeleted: true,
-      });
-
-      if (!fresh) {
-        throw new RuntimeException({
-          message: 'Entity "%s" not found after update',
-          messageParams: [this.metadata.name],
-          fault: 'internal',
-        });
-      }
-
-      // `repo.merge()` mutates `fresh` in place and returns the same
-      // reference, so the true version must be captured *before* merging —
-      // reading `fresh[versionColumn]` afterward would just be reading back
-      // whatever `data` already overwrote it with.
-      const trueVersion = fresh[versionColumn];
-      const merged = repo.merge(fresh, data);
-      merged[versionColumn] = trueVersion;
-
-      return repo.save(merged);
+      return op(repo, primaryWhere);
     };
 
     if (this.options.transactionScope) {
@@ -545,12 +515,74 @@ export class TypeOrmRepository<
     return run(ctx);
   }
 
+  /**
+   * `update`/`replace`'s operation for `withVersionGuard`: merge `data`
+   * onto a freshly re-read row and save it.
+   *
+   * `merged[guard.column]` is forced back to the freshly-read value
+   * immediately after merging so a client-supplied value for the version
+   * column in `data` can never override it. TypeORM only auto-increments a
+   * version column when its own diff of the entity finds no other pending
+   * change to it, so without this line a spoofed `data` value would both
+   * survive as written *and* suppress the real auto-increment.
+   */
+  private async saveWithVersionGuard(
+    entity: Entity,
+    data: DeepPartial<Entity>,
+    guard: RepositoryVersionGuardInterface<Entity>,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<Entity> {
+    return this.withVersionGuard(
+      entity,
+      guard,
+      ctx,
+      async (repo, primaryWhere) => {
+        // `withDeleted: true` — identity re-read of the row the `increment`
+        // guard above just matched (full primary key + version); it may
+        // legitimately be soft-deleted (e.g. via `{ force: true }` at the
+        // abstraction level), and without this it would wrongly come back
+        // null and throw below for a row that demonstrably exists (#471).
+        const fresh = await repo.findOne({
+          where: primaryWhere,
+          withDeleted: true,
+        });
+
+        if (!fresh) {
+          throw new RuntimeException({
+            message: 'Entity "%s" not found after update',
+            messageParams: [this.metadata.name],
+            fault: 'internal',
+          });
+        }
+
+        // `repo.merge()` mutates `fresh` in place and returns the same
+        // reference, so the true version must be captured *before*
+        // merging — reading `fresh[guard.column]` afterward would just be
+        // reading back whatever `data` already overwrote it with.
+        const trueVersion = fresh[guard.column];
+        const merged = repo.merge(fresh, data);
+        merged[guard.column] = trueVersion;
+
+        return repo.save(merged);
+      },
+    );
+  }
+
   // Delete operations
 
   protected async doDelete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity> {
+    if (options?.versionGuard) {
+      return this.withVersionGuard(
+        entity,
+        options.versionGuard,
+        options.ctx,
+        (repo) => repo.remove(entity),
+      );
+    }
+
     const repo = await this.getRepo(options?.ctx);
     return repo.remove(entity);
   }
@@ -565,16 +597,34 @@ export class TypeOrmRepository<
 
   protected async doSoftDelete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity> {
+    if (options?.versionGuard) {
+      return this.withVersionGuard(
+        entity,
+        options.versionGuard,
+        options.ctx,
+        (repo) => repo.softRemove(entity),
+      );
+    }
+
     const repo = await this.getRepo(options?.ctx);
     return repo.softRemove(entity);
   }
 
   protected async doRestore(
     entity: Entity,
-    options?: RepositoryRestoreOptions,
+    options?: RepositoryRestoreOptions<Entity>,
   ): Promise<Entity> {
+    if (options?.versionGuard) {
+      return this.withVersionGuard(
+        entity,
+        options.versionGuard,
+        options.ctx,
+        (repo) => repo.recover(entity),
+      );
+    }
+
     const repo = await this.getRepo(options?.ctx);
     return repo.recover(entity);
   }
