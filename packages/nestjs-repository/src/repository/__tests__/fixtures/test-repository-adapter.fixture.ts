@@ -11,6 +11,7 @@ import {
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
   type RepositoryDeleteOptions,
+  type RepositoryDeleteOneOptions,
   type RepositoryRestoreOptions,
 } from '../../interfaces/repository-options.interface.js';
 import { type WhereClause } from '../../interfaces/where-clause.interface.js';
@@ -113,7 +114,7 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   protected doUpdate(
     _entity: TestEntity,
     _data: DeepPartial<TestEntity>,
-    _options?: RepositoryUpdateOptions,
+    _options?: RepositoryUpdateOptions<TestEntity>,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
@@ -126,13 +127,13 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   protected doReplace(
     _entity: TestEntity,
     _data: DeepPartial<TestEntity>,
-    _options?: RepositoryUpdateOptions,
+    _options?: RepositoryUpdateOptions<TestEntity>,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
   protected doDelete(
     _entity: TestEntity,
-    _options?: RepositoryDeleteOptions,
+    _options?: RepositoryDeleteOneOptions<TestEntity>,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
@@ -144,13 +145,13 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   }
   protected doSoftDelete(
     _entity: TestEntity,
-    _options?: RepositoryDeleteOptions,
+    _options?: RepositoryDeleteOneOptions<TestEntity>,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
   protected doRestore(
     _entity: TestEntity,
-    _options?: RepositoryRestoreOptions,
+    _options?: RepositoryRestoreOptions<TestEntity>,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
@@ -187,4 +188,129 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   exposedGetDeleteDateColumn(): (keyof TestEntity & string) | undefined {
     return this.getDeleteDateColumn();
   }
+}
+
+// ─── Version-less variant ─────────────────────────────────────────────────────
+//
+// Same entity shape, but no column is marked `isVersion` — for asserting the
+// behavior of an entity that has no optimistic-locking support at all.
+
+export class TestRepositoryAdapterNoVersion extends TestRepositoryAdapter {
+  readonly metadata: RepositoryMetadataInterface<TestEntity> = {
+    ...this.metadata,
+    columns: this.metadata.columns.map((col) => ({ ...col, isVersion: false })),
+  };
+}
+
+// ─── Tracking subclass ──────────────────────────────────────────────────────
+//
+// The base fixture's `doX` methods throw 'not implemented', which already
+// proves a guard fired before delegation (a different error than a guard
+// exception would surface). This subclass additionally makes them succeed,
+// tracking call counts and the options each call received, so the allowed
+// paths (`{ force: true }`, a matching `expectedVersion`, live entities, no
+// existing row) can assert a write actually went through with the right
+// options.
+export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
+  doUpdateCalls = 0;
+  doReplaceCalls = 0;
+  doUpsertCalls = 0;
+  doDeleteCalls = 0;
+  doSoftDeleteCalls = 0;
+  doRestoreCalls = 0;
+  doFindOneCalls: RepositoryFindOneOptions<TestEntity>[] = [];
+  findOneResult: TestEntity | null = null;
+
+  lastUpdateOptions?: RepositoryUpdateOptions<TestEntity>;
+  lastReplaceOptions?: RepositoryUpdateOptions<TestEntity>;
+  lastDeleteOptions?: RepositoryDeleteOneOptions<TestEntity>;
+  lastSoftDeleteOptions?: RepositoryDeleteOneOptions<TestEntity>;
+  lastRestoreOptions?: RepositoryRestoreOptions<TestEntity>;
+
+  protected override doUpdate(
+    entity: TestEntity,
+    data: DeepPartial<TestEntity>,
+    options?: RepositoryUpdateOptions<TestEntity>,
+  ): Promise<TestEntity> {
+    this.doUpdateCalls++;
+    this.lastUpdateOptions = options;
+    return Promise.resolve(mergeEntity(entity, data));
+  }
+
+  protected override doReplace(
+    entity: TestEntity,
+    data: DeepPartial<TestEntity>,
+    options?: RepositoryUpdateOptions<TestEntity>,
+  ): Promise<TestEntity> {
+    this.doReplaceCalls++;
+    this.lastReplaceOptions = options;
+    return Promise.resolve(mergeEntity(entity, data));
+  }
+
+  protected override doUpsert(
+    entity: DeepPartial<TestEntity>,
+  ): Promise<TestEntity> {
+    this.doUpsertCalls++;
+    return Promise.resolve(this.prepare(entity) ?? new TestEntityClass());
+  }
+
+  protected override doDelete(
+    entity: TestEntity,
+    options?: RepositoryDeleteOneOptions<TestEntity>,
+  ): Promise<TestEntity> {
+    this.doDeleteCalls++;
+    this.lastDeleteOptions = options;
+    return Promise.resolve(entity);
+  }
+
+  protected override doSoftDelete(
+    entity: TestEntity,
+    options?: RepositoryDeleteOneOptions<TestEntity>,
+  ): Promise<TestEntity> {
+    this.doSoftDeleteCalls++;
+    this.lastSoftDeleteOptions = options;
+    return Promise.resolve({ ...entity, dateDeleted: new Date() });
+  }
+
+  protected override doRestore(
+    entity: TestEntity,
+    options?: RepositoryRestoreOptions<TestEntity>,
+  ): Promise<TestEntity> {
+    this.doRestoreCalls++;
+    this.lastRestoreOptions = options;
+    return Promise.resolve({ ...entity, dateDeleted: null });
+  }
+
+  protected override doFindOne(
+    options: RepositoryFindOneOptions<TestEntity>,
+  ): Promise<TestEntity | null> {
+    this.doFindOneCalls.push(options);
+    return Promise.resolve(this.findOneResult);
+  }
+}
+
+// Same tracking behavior, but on the version-less metadata — for asserting
+// that update/replace never receive a versionGuard when the entity has no
+// version column.
+export class TrackingTestRepositoryAdapterNoVersion extends TrackingTestRepositoryAdapter {
+  readonly metadata: RepositoryMetadataInterface<TestEntity> = {
+    ...this.metadata,
+    columns: this.metadata.columns.map((col) => ({ ...col, isVersion: false })),
+  };
+}
+
+// A plain `{ ...entity, ...data }` spread widens `dateDeleted` to
+// `DeepPartial<Date>` (an object with every `Date` method optional), since
+// `data` is typed `DeepPartial<TestEntity>` — this merges by field instead
+// so the mocked `doUpdate`/`doReplace` stay `TestEntity`-typed.
+export function mergeEntity(
+  entity: TestEntity,
+  data: DeepPartial<TestEntity>,
+): TestEntity {
+  const merged = new TestEntityClass();
+  merged.id = entity.id;
+  merged.name = data.name ?? entity.name;
+  merged.version = entity.version;
+  merged.dateDeleted = entity.dateDeleted;
+  return merged;
 }

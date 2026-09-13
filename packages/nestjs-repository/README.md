@@ -202,7 +202,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | --- | --- | --- |
 | `prepare(dto)` | public | Returns `dto` unchanged if it is already an entity instance, otherwise `Object.assign(new entityType(), dto)` |
 | `getPrimaryColumns()` | protected | Get primary key column names from metadata (subclass-author API) |
-| `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any (subclass-author API) |
+| `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any — backs both the in-request lock and `expectedVersion` (subclass-author API) |
 | `getDeleteDateColumn()` | protected | Get the soft-remove date column name from metadata, if any (subclass-author API) |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
 | `runHooks(methodKey, payload, ctx)` | protected | Execute repository hooks for a lifecycle event (subclass-author API) |
@@ -261,6 +261,42 @@ over HTTP by `nestjs-crud` — only server-side callers can opt in.
 Soft-deleting an already-soft-deleted row is a no-op rather than an error:
 `softDelete()` returns the entity unchanged instead of re-stamping its delete
 date, since a retried HTTP DELETE must not fail.
+
+### Expected Version
+
+The in-request optimistic lock (see
+[nestjs-repository-typeorm's Optimistic Locking](../nestjs-repository-typeorm/README.md#optimistic-locking))
+guards a read-then-write inside one request, but two requests that each
+re-read before writing both pass it, since each compares against its own
+fresh value. `expectedVersion` closes that gap: pass the version the caller
+last read, and `update`, `replace`, `delete`, `softDelete`, and `restore`
+all reject a mismatch with `OptimisticLockException` (409 Conflict) —
+enforced once in `RepositoryAdapter`, for every driver.
+
+```ts
+import { OptimisticLockException } from '@concepta/nestjs-repository';
+
+try {
+  await repository.update(entity, { name: 'New Name' }, { expectedVersion: 3 });
+} catch (err) {
+  if (err instanceof OptimisticLockException) {
+    // someone else changed this row since the caller last read it
+  }
+}
+```
+
+Passing `expectedVersion` against an entity with no version column throws a
+`RuntimeException` with `fault: 'usage'` — a caller asking for a guarantee
+the entity cannot provide is a wiring mistake, not a client error.
+`upsert()` and `deleteMany()` don't accept it: neither has a single
+caller-held row whose version the client could have read.
+
+Drivers never decide any of this — `RepositoryAdapter` resolves a
+`RepositoryVersionGuardInterface` descriptor (`{ column, value }`) and
+passes it down via `options.versionGuard`; a driver's only job is to
+execute an atomic compare-and-swap on `column === value` before writing.
+Passing `versionGuard` directly is a no-op — the adapter always overwrites
+it with its own resolution.
 
 ## Relations and Joins
 

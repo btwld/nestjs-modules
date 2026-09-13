@@ -1,82 +1,12 @@
-import { type DeepPartial } from '@concepta/nestjs-core';
-
 import { SoftDeletedImmutableException } from '../../exceptions/soft-deleted-immutable.exception.js';
-import { type RepositoryFindOneOptions } from '../interfaces/repository-options.interface.js';
 
 import {
   type TestEntity,
   TestEntityClass,
-  TestRepositoryAdapter,
+  TrackingTestRepositoryAdapter,
 } from './fixtures/test-repository-adapter.fixture.js';
 
-// ─── Tracking subclass ──────────────────────────────────────────────────────
-//
-// The shared fixture's `doX` methods throw 'not implemented', which already
-// proves a guard fired before delegation (a different error than
-// `SoftDeletedImmutableException` would surface). This subclass additionally
-// makes them succeed, so the allowed paths (`{ force: true }`, live
-// entities, no existing row) can assert a write actually went through.
-class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
-  doUpdateCalls = 0;
-  doReplaceCalls = 0;
-  doUpsertCalls = 0;
-  doSoftDeleteCalls = 0;
-  doFindOneCalls: RepositoryFindOneOptions<TestEntity>[] = [];
-  findOneResult: TestEntity | null = null;
-
-  protected override doUpdate(
-    entity: TestEntity,
-    data: DeepPartial<TestEntity>,
-  ): Promise<TestEntity> {
-    this.doUpdateCalls++;
-    return Promise.resolve(mergeEntity(entity, data));
-  }
-
-  protected override doReplace(
-    entity: TestEntity,
-    data: DeepPartial<TestEntity>,
-  ): Promise<TestEntity> {
-    this.doReplaceCalls++;
-    return Promise.resolve(mergeEntity(entity, data));
-  }
-
-  protected override doUpsert(
-    entity: DeepPartial<TestEntity>,
-  ): Promise<TestEntity> {
-    this.doUpsertCalls++;
-    return Promise.resolve(this.prepare(entity) ?? new TestEntityClass());
-  }
-
-  protected override doSoftDelete(entity: TestEntity): Promise<TestEntity> {
-    this.doSoftDeleteCalls++;
-    return Promise.resolve({ ...entity, dateDeleted: new Date() });
-  }
-
-  protected override doFindOne(
-    options: RepositoryFindOneOptions<TestEntity>,
-  ): Promise<TestEntity | null> {
-    this.doFindOneCalls.push(options);
-    return Promise.resolve(this.findOneResult);
-  }
-}
-
 // ─── Fixtures ───────────────────────────────────────────────────────────────
-
-// A plain `{ ...entity, ...data }` spread widens `dateDeleted` to
-// `DeepPartial<Date>` (an object with every `Date` method optional), since
-// `data` is typed `DeepPartial<TestEntity>` — this merges by field instead
-// so the mocked `doUpdate`/`doReplace` stay `TestEntity`-typed.
-function mergeEntity(
-  entity: TestEntity,
-  data: DeepPartial<TestEntity>,
-): TestEntity {
-  const merged = new TestEntityClass();
-  merged.id = entity.id;
-  merged.name = data.name ?? entity.name;
-  merged.version = entity.version;
-  merged.dateDeleted = entity.dateDeleted;
-  return merged;
-}
 
 function softDeletedEntity(): TestEntity {
   const entity = new TestEntityClass();

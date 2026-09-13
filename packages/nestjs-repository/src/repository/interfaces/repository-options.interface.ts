@@ -3,6 +3,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type OrderClause } from '../repository.types.js';
 
 import { type JoinClause } from './join-clause.interface.js';
+import { type RepositoryVersionGuardInterface } from './repository-version-guard.interface.js';
 import { type WhereClause } from './where-clause.interface.js';
 
 /**
@@ -43,7 +44,9 @@ export interface RepositoryCreateOptions extends RepositoryBaseOptions {}
 /**
  * Options for update operations.
  */
-export interface RepositoryUpdateOptions extends RepositoryBaseOptions {
+export interface RepositoryUpdateOptions<
+  Entity extends PlainLiteralObject = PlainLiteralObject,
+> extends RepositoryBaseOptions {
   /**
    * Bypass the soft-deleted immutability guard, letting this write reach a
    * currently soft-deleted row. Not exposed over HTTP — for server-side
@@ -51,6 +54,19 @@ export interface RepositoryUpdateOptions extends RepositoryBaseOptions {
    * corrections).
    */
   force?: boolean;
+
+  /**
+   * The version the caller believes this row is currently at. A mismatch
+   * throws `OptimisticLockException`, preventing a lost update against a
+   * row the caller last read before someone else changed it.
+   */
+  expectedVersion?: number;
+
+  /**
+   * Resolved by `RepositoryAdapter` — drivers consume this, callers never
+   * set it. Any caller-supplied value is overwritten.
+   */
+  versionGuard?: RepositoryVersionGuardInterface<Entity>;
 }
 
 /**
@@ -67,11 +83,46 @@ export interface RepositoryUpsertOptions extends RepositoryBaseOptions {
 }
 
 /**
- * Options for delete operations.
+ * Options for delete operations (including `deleteMany`).
  */
 export interface RepositoryDeleteOptions extends RepositoryBaseOptions {}
 
 /**
+ * Options for single-entity delete operations (`delete`, `softDelete`).
+ * Not used by `deleteMany` — there is no single caller-held row for an
+ * expected version to describe.
+ */
+export interface RepositoryDeleteOneOptions<
+  Entity extends PlainLiteralObject = PlainLiteralObject,
+> extends RepositoryDeleteOptions {
+  /**
+   * The version the caller believes this row is currently at. A mismatch
+   * throws `OptimisticLockException`.
+   */
+  expectedVersion?: number;
+
+  /**
+   * Resolved by `RepositoryAdapter` — drivers consume this, callers never
+   * set it. Any caller-supplied value is overwritten.
+   */
+  versionGuard?: RepositoryVersionGuardInterface<Entity>;
+}
+
+/**
  * Options for restore operations.
  */
-export interface RepositoryRestoreOptions extends RepositoryBaseOptions {}
+export interface RepositoryRestoreOptions<
+  Entity extends PlainLiteralObject = PlainLiteralObject,
+> extends RepositoryBaseOptions {
+  /**
+   * The version the caller believes this row is currently at. A mismatch
+   * throws `OptimisticLockException`.
+   */
+  expectedVersion?: number;
+
+  /**
+   * Resolved by `RepositoryAdapter` — drivers consume this, callers never
+   * set it. Any caller-supplied value is overwritten.
+   */
+  versionGuard?: RepositoryVersionGuardInterface<Entity>;
+}

@@ -174,8 +174,10 @@ export {
   RepositoryUpdateOptions,
   RepositoryUpsertOptions,
   RepositoryDeleteOptions,
+  RepositoryDeleteOneOptions,
   RepositoryRestoreOptions,
 } from './repository/interfaces/repository-options.interface.js';
+export { RepositoryVersionGuardInterface } from './repository/interfaces/repository-version-guard.interface.js';
 
 // Repository query types
 export {

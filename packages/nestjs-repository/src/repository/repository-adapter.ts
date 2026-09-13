@@ -11,6 +11,7 @@ import {
 } from '@concepta/nestjs-core';
 
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
+import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { type FederationOrchestrator } from '../federation/federation-orchestrator.service.js';
 import { RepoPermeatorFactory } from '../hooks/repo-permeator-factory.js';
@@ -25,8 +26,10 @@ import {
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
   type RepositoryDeleteOptions,
+  type RepositoryDeleteOneOptions,
   type RepositoryRestoreOptions,
 } from './interfaces/repository-options.interface.js';
+import { type RepositoryVersionGuardInterface } from './interfaces/repository-version-guard.interface.js';
 import { type RepositoryInterface } from './interfaces/repository.interface.js';
 import {
   type WhereClause,
@@ -239,12 +242,13 @@ export abstract class RepositoryAdapter<
   async update(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity> {
+    const versionGuard = this.resolveVersionGuard(entity, options, 'guard');
     this.assertMutable(entity, options);
     return this.permeator.update.permeate(
       data,
-      (scoped) => this.doUpdate(entity, scoped, options),
+      (scoped) => this.doUpdate(entity, scoped, { ...options, versionGuard }),
       this.entityCtx(options?.ctx),
     );
   }
@@ -252,7 +256,7 @@ export abstract class RepositoryAdapter<
   protected abstract doUpdate(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity>;
 
   async upsert(
@@ -275,12 +279,13 @@ export abstract class RepositoryAdapter<
   async replace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity> {
+    const versionGuard = this.resolveVersionGuard(entity, options, 'guard');
     this.assertMutable(entity, options);
     return this.permeator.replace.permeate(
       data,
-      (scoped) => this.doReplace(entity, scoped, options),
+      (scoped) => this.doReplace(entity, scoped, { ...options, versionGuard }),
       this.entityCtx(options?.ctx),
     );
   }
@@ -288,25 +293,26 @@ export abstract class RepositoryAdapter<
   protected abstract doReplace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity>;
 
   // Delete operations
 
   async delete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity> {
+    const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
       entity,
-      (scoped) => this.doDelete(scoped, options),
+      (scoped) => this.doDelete(scoped, { ...options, versionGuard }),
       this.entityCtx(options?.ctx),
     );
   }
 
   protected abstract doDelete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity>;
 
   async deleteMany(
@@ -327,8 +333,13 @@ export abstract class RepositoryAdapter<
 
   async softDelete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity> {
+    // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
+    // below, so a stale precondition against a row someone else already
+    // deleted conflicts instead of quietly succeeding.
+    const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
+
     const deleteDateColumn = this.getDeleteDateColumn();
     if (deleteDateColumn && this.isSoftDeleted(entity, deleteDateColumn)) {
       // Idempotent rather than rejected: a retried delete must not fail.
@@ -337,30 +348,31 @@ export abstract class RepositoryAdapter<
 
     return this.permeator.softDelete.permeate(
       entity,
-      (scoped) => this.doSoftDelete(scoped, options),
+      (scoped) => this.doSoftDelete(scoped, { ...options, versionGuard }),
       this.entityCtx(options?.ctx),
     );
   }
 
   protected abstract doSoftDelete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity>;
 
   async restore(
     entity: Entity,
-    options?: RepositoryRestoreOptions,
+    options?: RepositoryRestoreOptions<Entity>,
   ): Promise<Entity> {
+    const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,
-      (scoped) => this.doRestore(scoped, options),
+      (scoped) => this.doRestore(scoped, { ...options, versionGuard }),
       this.entityCtx(options?.ctx),
     );
   }
 
   protected abstract doRestore(
     entity: Entity,
-    options?: RepositoryRestoreOptions,
+    options?: RepositoryRestoreOptions<Entity>,
   ): Promise<Entity>;
 
   // Utility methods
@@ -492,6 +504,70 @@ export abstract class RepositoryAdapter<
     if (existing && this.isSoftDeleted(existing, deleteDateColumn)) {
       throw new SoftDeletedImmutableException(this.metadata.name);
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Expected version (cross-request optimistic locking)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Throw `OptimisticLockException` if `entity`'s current version doesn't
+   * match `expectedVersion` — the version the caller last read. Closes the
+   * gap the in-request compare-and-swap can't: two requests that each
+   * re-read before writing both pass it, since each compares against its
+   * own fresh value. See #472.
+   */
+  private assertExpectedVersion(
+    entity: Entity,
+    options?: { expectedVersion?: number },
+  ): void {
+    const { expectedVersion } = options ?? {};
+    if (expectedVersion === undefined) return;
+
+    const versionColumn = this.getVersionColumn();
+
+    if (!versionColumn) {
+      throw new RuntimeException({
+        message:
+          'Cannot enforce an expected version on "%s": the entity has no ' +
+          'version column',
+        messageParams: [this.metadata.name],
+        fault: 'usage',
+      });
+    }
+
+    // Numeric compare: a bigint version column hydrates as a string.
+    if (Number(entity[versionColumn]) !== expectedVersion) {
+      throw new OptimisticLockException(this.metadata.name);
+    }
+  }
+
+  /**
+   * Resolve the descriptor a driver needs to compare-and-swap on the
+   * version column — the driver executes it, it never decides whether one
+   * applies. `update`/`replace` pass `'guard'`: a versioned entity is
+   * guarded there whether or not the caller stated a version, matching the
+   * in-request behavior shipped with #469. The delete paths pass `'skip'`,
+   * so they only take on a driver-side transaction requirement for callers
+   * who actually asked for one.
+   */
+  private resolveVersionGuard(
+    entity: Entity,
+    options: { expectedVersion?: number } | undefined,
+    whenUnspecified: 'guard' | 'skip',
+  ): RepositoryVersionGuardInterface<Entity> | undefined {
+    this.assertExpectedVersion(entity, options);
+
+    const column = this.getVersionColumn();
+    if (!column) return undefined;
+
+    if (options?.expectedVersion === undefined && whenUnspecified === 'skip') {
+      return undefined;
+    }
+
+    // Safe uniformly: assertExpectedVersion has already proved this equals
+    // expectedVersion whenever the caller supplied one.
+    return { column, value: entity[column] };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

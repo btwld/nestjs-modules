@@ -5,6 +5,7 @@ import { type DeepPartial } from '@concepta/nestjs-core';
 import { type RepositoryMetadataInterface } from './repository-metadata.interface.js';
 import {
   type RepositoryCreateOptions,
+  type RepositoryDeleteOneOptions,
   type RepositoryDeleteOptions,
   type RepositoryFindOptions,
   type RepositoryFindOneOptions,
@@ -96,7 +97,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   update(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity>;
 
   /**
@@ -124,7 +125,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   replace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions,
+    options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity>;
 
   // Delete operations
@@ -136,7 +137,10 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    * @param options - Delete options
    * @returns The deleted entity
    */
-  delete(entity: Entity, options?: RepositoryDeleteOptions): Promise<Entity>;
+  delete(
+    entity: Entity,
+    options?: RepositoryDeleteOneOptions<Entity>,
+  ): Promise<Entity>;
 
   /**
    * Permanently delete multiple entities (hard delete).
@@ -159,7 +163,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    */
   softDelete(
     entity: Entity,
-    options?: RepositoryDeleteOptions,
+    options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity>;
 
   /**
@@ -169,7 +173,10 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    * @param options - Restore options
    * @returns The restored entity
    */
-  restore(entity: Entity, options?: RepositoryRestoreOptions): Promise<Entity>;
+  restore(
+    entity: Entity,
+    options?: RepositoryRestoreOptions<Entity>,
+  ): Promise<Entity>;
 
   // Utility methods
 
