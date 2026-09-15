@@ -387,6 +387,28 @@ with the `TransactionFactoryRegistry` when using `RepositoryModule.forFeature()`
 The transaction key follows the pattern `typeorm:<dataSourceName>` (e.g.,
 `typeorm:default`).
 
+### Single-Connection Drivers
+
+TypeORM hands out one shared `QueryRunner` per `DataSource` for `sqlite`,
+`better-sqlite3`, `sqljs`, `expo`, `capacitor`, `cordova`, `nativescript`, and
+`react-native` — unlike `postgres`, which gives each transaction its own
+connection. Two transactions started concurrently on one of these drivers
+would otherwise both try to `BEGIN` on the same connection, and the second
+fails with a driver-level error instead of running the version guard.
+
+`TypeOrmTransactionFactory` declares
+`supportsConcurrentTransactions: false` for these drivers, which makes
+`TransactionManager` queue transactions for that data source: a second,
+independent `TransactionScope.run()` (or a versioned `update`/`replace`,
+which opens one) on the same data source waits for the first to commit or
+roll back rather than racing it — a nested/joining `run()` on the same scope
+shares the already-started transaction and never waits. A real conflict
+still surfaces as `OptimisticLockException`; it just can't be mistaken for a
+driver error anymore. This trades write concurrency for correctness on that
+data source: transactions against it run one at a time, so its throughput is
+bounded by the longest-running scope rather than by the connection pool it
+doesn't have.
+
 ### Automatic Transaction Integration
 
 When `TypeOrmRepositoryModule` is used via `RepositoryModule.forFeature()`,

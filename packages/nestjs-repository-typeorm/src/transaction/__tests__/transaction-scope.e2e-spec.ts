@@ -174,3 +174,61 @@ describe('TransactionScope — concurrent repository calls share one connection'
     expect(createQueryRunnerSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Regression coverage for #476 — SQLite (and the other TypeORM drivers that
+ * share one QueryRunner per DataSource) can reject a second BEGIN issued
+ * while the first is still open. Two *separate* contexts each open their
+ * own scope, so — unlike the "concurrent repository calls" describe above —
+ * they don't share a TransactionManager and would previously race two
+ * concurrent tx.start() calls onto the same shared connection.
+ *
+ * This asserts the end-to-end outcome (both independent scopes commit
+ * correctly through the real driver) rather than trying to force the exact
+ * BEGIN-vs-BEGIN timing window in-process — that window is timing-sensitive
+ * enough that real concurrent HTTP requests hit it far more reliably than
+ * two promises kicked off back-to-back in one test process. The underlying
+ * race itself is pinned deterministically, independent of any timing luck,
+ * in `typeorm-transaction.e2e-spec.ts`; `transaction-manager.spec.ts`
+ * deterministically covers the serialization mechanism this test exercises
+ * end-to-end.
+ */
+describe('TransactionScope — two independent contexts on a single-connection driver (#476)', () => {
+  let moduleFixture: TestingModule;
+  let txScope: TransactionScope;
+  let testRepository: TypeOrmRepository<TestEntityFixture>;
+
+  beforeEach(async () => {
+    moduleFixture = await Test.createTestingModule({
+      imports: [AppModuleFixture],
+    }).compile();
+
+    txScope = moduleFixture.get(TransactionScope);
+    testRepository = moduleFixture.get<TypeOrmRepository<TestEntityFixture>>(
+      getDynamicRepositoryToken(TEST_ENTITY_TOKEN),
+    );
+  });
+
+  it('should commit both scopes instead of one failing with a nested-transaction driver error', async () => {
+    const ctxA = new AppContextHost();
+    const ctxB = new AppContextHost();
+
+    const runA = txScope.run(
+      ctxA,
+      async (txCtx: TransactionContextInterface) => {
+        return testRepository.create({ firstName: 'Alice' }, { ctx: txCtx });
+      },
+    );
+    const runB = txScope.run(
+      ctxB,
+      async (txCtx: TransactionContextInterface) => {
+        return testRepository.create({ firstName: 'Bob' }, { ctx: txCtx });
+      },
+    );
+
+    await expect(Promise.all([runA, runB])).resolves.toBeDefined();
+
+    const result = await testRepository.find();
+    expect(result.map((e) => e.firstName).sort()).toEqual(['Alice', 'Bob']);
+  });
+});

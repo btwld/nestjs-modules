@@ -27,6 +27,7 @@ export class TransactionManager implements TransactionManagerInterface {
   >();
   private readonly commitCallbacks: (() => void | Promise<void>)[] = [];
   private readonly rollbackCallbacks: (() => void | Promise<void>)[] = [];
+  private readonly queueReleases: (() => void)[] = [];
   private readonly abortController = new AbortController();
   private depth = 0;
   private closed = false;
@@ -122,18 +123,60 @@ export class TransactionManager implements TransactionManagerInterface {
       throw new Error(`No transaction factory registered for key "${key}"`);
     }
 
-    const pending = this.startTransaction(factory);
+    const pending = this.startTransaction(key, factory);
     this.transactions.set(key, pending);
 
     return pending;
   }
 
   private async startTransaction(
+    key: string,
     factory: TransactionFactoryInterface,
   ): Promise<TransactionInterface> {
-    const tx = factory.create();
-    await tx.start();
-    return tx;
+    // Held from before BEGIN until commitAll()/rollbackAll() releases it
+    // below — only set when the factory can't have two transactions on
+    // its connection at once (see TransactionFactoryRegistry.queueFor).
+    // this.signal is passed through so a scope that's already doomed (e.g.
+    // timed out) rejects out of the wait immediately, rather than blocking
+    // behind a still-active holder it no longer needs to wait for — see
+    // TransactionQueue.acquire().
+    const queue = this.registry.queueFor(key);
+    const release = queue ? await queue.acquire(this.signal) : undefined;
+
+    if (release) {
+      this.queueReleases.push(release);
+    }
+
+    try {
+      const tx = factory.create();
+      await tx.start();
+      return tx;
+    } catch (error) {
+      // This transaction never began, so it'll never reach
+      // commitAll()/rollbackAll() to free its slot — release it now.
+      if (release) {
+        this.releaseOne(release);
+      }
+      throw error;
+    }
+  }
+
+  private releaseOne(release: () => void): void {
+    const index = this.queueReleases.indexOf(release);
+    if (index !== -1) {
+      this.queueReleases.splice(index, 1);
+    }
+    release();
+  }
+
+  // Unconditional, not per-transaction: a transaction that started but is
+  // no longer isActive is skipped by commitAll()/rollbackAll()'s filtering
+  // and would otherwise never free its slot.
+  private releaseQueues(): void {
+    const releases = this.queueReleases.splice(0);
+    for (const release of releases) {
+      release();
+    }
   }
 
   /**
@@ -149,38 +192,42 @@ export class TransactionManager implements TransactionManagerInterface {
    * ("heuristic") outcome across datasources.
    */
   async commitAll(): Promise<void> {
-    const active = (await this.startedTransactions()).filter(
-      (tx) => tx.isActive,
-    );
+    try {
+      const active = (await this.startedTransactions()).filter(
+        (tx) => tx.isActive,
+      );
 
-    let committedCount = 0;
-    let originalError: unknown;
+      let committedCount = 0;
+      let originalError: unknown;
 
-    for (const tx of active) {
-      try {
-        await tx.commit();
-        committedCount++;
-      } catch (error) {
-        originalError = error;
-        break;
+      for (const tx of active) {
+        try {
+          await tx.commit();
+          committedCount++;
+        } catch (error) {
+          originalError = error;
+          break;
+        }
       }
+
+      if (originalError === undefined) {
+        return;
+      }
+
+      await this.settleAll(active.slice(committedCount), (tx) => tx.rollback());
+
+      if (committedCount === 0) {
+        throw originalError;
+      }
+
+      throw new TransactionHeuristicCommitException(
+        committedCount,
+        active.length - committedCount,
+        { originalError },
+      );
+    } finally {
+      this.releaseQueues();
     }
-
-    if (originalError === undefined) {
-      return;
-    }
-
-    await this.settleAll(active.slice(committedCount), (tx) => tx.rollback());
-
-    if (committedCount === 0) {
-      throw originalError;
-    }
-
-    throw new TransactionHeuristicCommitException(
-      committedCount,
-      active.length - committedCount,
-      { originalError },
-    );
   }
 
   /**
@@ -189,11 +236,15 @@ export class TransactionManager implements TransactionManagerInterface {
    * logged rather than thrown, and never abandons the rest.
    */
   async rollbackAll(): Promise<void> {
-    const active = (await this.startedTransactions()).filter(
-      (tx) => tx.isActive,
-    );
+    try {
+      const active = (await this.startedTransactions()).filter(
+        (tx) => tx.isActive,
+      );
 
-    await this.settleAll(active, (tx) => tx.rollback());
+      await this.settleAll(active, (tx) => tx.rollback());
+    } finally {
+      this.releaseQueues();
+    }
   }
 
   /**

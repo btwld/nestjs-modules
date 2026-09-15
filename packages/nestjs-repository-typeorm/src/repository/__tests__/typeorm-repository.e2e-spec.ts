@@ -572,6 +572,44 @@ describe(TypeOrmRepository, () => {
 
       expect(updated.firstName).toBe('Bob');
     });
+
+    // Regression coverage for #476: two concurrent CRUD-style writes, each
+    // with no shared ctx (the shape a real request handler produces), used
+    // to fail with a driver-level "cannot start a transaction within a
+    // transaction" error on SQLite instead of resolving/conflicting on the
+    // version guard.
+    describe('concurrent writes (#476)', () => {
+      it('should let two concurrent updates to different rows both succeed', async () => {
+        const alice = await testFactory.create({ firstName: 'Alice' });
+        const bob = await testFactory.create({ firstName: 'Bob' });
+
+        const [updatedAlice, updatedBob] = await Promise.all([
+          testRepository.update(alice, { lastName: 'Updated' }),
+          testRepository.update(bob, { lastName: 'Updated' }),
+        ]);
+
+        expect(updatedAlice.lastName).toBe('Updated');
+        expect(updatedBob.lastName).toBe('Updated');
+      });
+
+      it('should let one of two concurrent updates to the same row succeed and reject the other with OptimisticLockException', async () => {
+        const entity = await testFactory.create({ firstName: 'Alice' });
+
+        const results = await Promise.allSettled([
+          testRepository.update(entity, { firstName: 'First' }),
+          testRepository.update(entity, { firstName: 'Second' }),
+        ]);
+
+        const fulfilled = results.filter((r) => r.status === 'fulfilled');
+        const rejected = results.filter(
+          (r): r is PromiseRejectedResult => r.status === 'rejected',
+        );
+
+        expect(fulfilled).toHaveLength(1);
+        expect(rejected).toHaveLength(1);
+        expect(rejected[0].reason).toBeInstanceOf(OptimisticLockException);
+      });
+    });
   });
 
   describe('replace', () => {

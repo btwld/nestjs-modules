@@ -158,6 +158,148 @@ describe(TransactionManager.name, () => {
     });
   });
 
+  describe('serialization for single-connection factories (supportsConcurrentTransactions: false)', () => {
+    it('should make a second manager wait for the first to commit before starting on the same key', async () => {
+      registry.register('sqlite:default', {
+        create: () => createMockTransaction({ isActive: true }),
+        supportsConcurrentTransactions: false,
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await manager.getOrStart('sqlite:default');
+
+      let started2 = false;
+      const getStart2 = manager2.getOrStart('sqlite:default').then((tx) => {
+        started2 = true;
+        return tx;
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(started2).toBe(false);
+
+      await manager.commitAll();
+      await getStart2;
+
+      expect(started2).toBe(true);
+    });
+
+    it('should let a second manager start on the same key after the first rolls back', async () => {
+      registry.register('sqlite:default', {
+        create: () => createMockTransaction({ isActive: true }),
+        supportsConcurrentTransactions: false,
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await manager.getOrStart('sqlite:default');
+
+      let started2 = false;
+      const getStart2 = manager2.getOrStart('sqlite:default').then((tx) => {
+        started2 = true;
+        return tx;
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(started2).toBe(false);
+
+      await manager.rollbackAll();
+      await getStart2;
+
+      expect(started2).toBe(true);
+    });
+
+    it('should release the slot immediately when start() rejects, without waiting for commitAll/rollbackAll', async () => {
+      let calls = 0;
+      registry.register('sqlite:default', {
+        create: () => {
+          calls++;
+          const failThisOne = calls === 1;
+          return {
+            isActive: true,
+            start: failThisOne
+              ? vi.fn().mockRejectedValue(new Error('connect failed'))
+              : vi.fn(),
+            commit: vi.fn(),
+            rollback: vi.fn(),
+            getClient: vi.fn(),
+          };
+        },
+        supportsConcurrentTransactions: false,
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await expect(manager.getOrStart('sqlite:default')).rejects.toThrow(
+        'connect failed',
+      );
+
+      await expect(
+        manager2.getOrStart('sqlite:default'),
+      ).resolves.toBeDefined();
+    });
+
+    it('should not serialize when the factory declares supportsConcurrentTransactions: true', async () => {
+      registry.register('typeorm:default', {
+        create: () => createMockTransaction({ isActive: true }),
+        supportsConcurrentTransactions: true,
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await manager.getOrStart('typeorm:default');
+
+      await expect(
+        manager2.getOrStart('typeorm:default'),
+      ).resolves.toBeDefined();
+    });
+
+    it('should not serialize when the factory omits supportsConcurrentTransactions', async () => {
+      registry.register('typeorm:default', {
+        create: () => createMockTransaction({ isActive: true }),
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await manager.getOrStart('typeorm:default');
+
+      await expect(
+        manager2.getOrStart('typeorm:default'),
+      ).resolves.toBeDefined();
+    });
+
+    it('should reject a parked wait immediately when the waiting manager is marked failed, instead of waiting for the holder to release', async () => {
+      registry.register('sqlite:default', {
+        create: () => createMockTransaction({ isActive: true }),
+        supportsConcurrentTransactions: false,
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await manager.getOrStart('sqlite:default');
+
+      // manager2 is now parked, waiting on manager's queue slot.
+      const getStart2 = manager2.getOrStart('sqlite:default');
+
+      const reason = new Error('timed out');
+      manager2.markFailed(reason);
+
+      await expect(getStart2).rejects.toBe(reason);
+
+      // The original holder is unaffected by manager2 giving up its wait.
+      await expect(manager.commitAll()).resolves.toBeUndefined();
+    });
+
+    it('should free the slot after settling even when the started transaction is no longer isActive (skipped by commitAll/rollbackAll filtering)', async () => {
+      registry.register('sqlite:default', {
+        create: () => createMockTransaction({ isActive: false }),
+        supportsConcurrentTransactions: false,
+      });
+      const manager2 = new TransactionManager(registry);
+
+      await manager.getOrStart('sqlite:default');
+      await manager.commitAll();
+
+      await expect(
+        manager2.getOrStart('sqlite:default'),
+      ).resolves.toBeDefined();
+    });
+  });
+
   describe('lifecycle state', () => {
     it('should default to not read-only, not closed, not failed', () => {
       expect(manager.isReadOnly).toBe(false);

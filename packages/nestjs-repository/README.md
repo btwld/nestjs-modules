@@ -911,12 +911,27 @@ Each driver/datasource provides a `TransactionFactoryInterface`:
 ```ts
 interface TransactionFactoryInterface {
   create(): TransactionInterface;
+  readonly supportsConcurrentTransactions?: boolean;
 }
 ```
 
 Factories are registered automatically when using `RepositoryModule.forFeature()`
 with a driver module that returns `transactionFactories` in its
 `DynamicRepositoryModule`.
+
+`supportsConcurrentTransactions` defaults to `true` when omitted — the normal
+case for a pooled/multi-connection backend, where each transaction gets its
+own connection. A driver whose connections are shared (one connection per
+data source, not per transaction) should declare `false`: `TransactionManager`
+then queues transactions for that factory's key, so a second transaction on
+the same connection waits for the first to commit or roll back instead of
+racing its `BEGIN` — see
+[nestjs-repository-typeorm's Single-Connection Drivers](../nestjs-repository-typeorm/README.md#single-connection-drivers)
+for the concrete case this exists for. A queued wait still counts against
+`run()`'s own `timeout` (see Cancellation and timeouts, above): a scope can
+time out while still queued, before its own transaction ever starts, and it
+releases its slot immediately rather than blocking whichever scope is next
+in line.
 
 ## Transactional Decorator
 

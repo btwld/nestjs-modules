@@ -1,4 +1,9 @@
-import { type DataSource, type EntityManager, type QueryRunner } from 'typeorm';
+import {
+  type DataSource,
+  type DataSourceOptions,
+  type EntityManager,
+  type QueryRunner,
+} from 'typeorm';
 import { type Mock } from 'vitest';
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
@@ -197,12 +202,26 @@ describe(TypeOrmTransaction.name, () => {
   });
 });
 
+// DataSource.options is declared readonly; mockDeep<DataSource>() preserves
+// that in its type, but each test needs to swap in a different driver type,
+// so it's set via defineProperty rather than direct assignment.
+function setDataSourceOptions(
+  dataSource: DataSource,
+  options: DataSourceOptions,
+): void {
+  Object.defineProperty(dataSource, 'options', {
+    value: options,
+    configurable: true,
+  });
+}
+
 describe(TypeOrmTransactionFactory.name, () => {
   let factory: TypeOrmTransactionFactory;
   let mockDataSource: DeepMockProxy<DataSource>;
 
   beforeEach(() => {
     mockDataSource = mockDeep<DataSource>();
+    setDataSourceOptions(mockDataSource, { type: 'postgres' });
     factory = new TypeOrmTransactionFactory(mockDataSource);
   });
 
@@ -216,6 +235,38 @@ describe(TypeOrmTransactionFactory.name, () => {
       const tx1 = factory.create();
       const tx2 = factory.create();
       expect(tx1).not.toBe(tx2);
+    });
+  });
+
+  describe('supportsConcurrentTransactions', () => {
+    it('should be true for postgres, which gives each transaction its own connection', () => {
+      setDataSourceOptions(mockDataSource, { type: 'postgres' });
+      expect(
+        new TypeOrmTransactionFactory(mockDataSource)
+          .supportsConcurrentTransactions,
+      ).toBe(true);
+    });
+
+    it('should be false for sqlite, which shares one QueryRunner per data source', () => {
+      setDataSourceOptions(mockDataSource, {
+        type: 'sqlite',
+        database: ':memory:',
+      });
+      expect(
+        new TypeOrmTransactionFactory(mockDataSource)
+          .supportsConcurrentTransactions,
+      ).toBe(false);
+    });
+
+    it('should be false for better-sqlite3', () => {
+      setDataSourceOptions(mockDataSource, {
+        type: 'better-sqlite3',
+        database: ':memory:',
+      });
+      expect(
+        new TypeOrmTransactionFactory(mockDataSource)
+          .supportsConcurrentTransactions,
+      ).toBe(false);
     });
   });
 });
