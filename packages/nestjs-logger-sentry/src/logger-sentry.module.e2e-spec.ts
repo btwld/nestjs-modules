@@ -1,7 +1,7 @@
 import supertest from 'supertest';
 
-import { INestApplication } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type INestApplication } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { AppErrorModuleFixture } from './__fixture__/app-error.module.fixture';
 import { AppWarnModuleFixture } from './__fixture__/app-warn.module.fixture';

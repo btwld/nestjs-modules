@@ -1,7 +1,7 @@
 import { ConfigModule } from '@nestjs/config';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
-import { LoggerCoralogixSettingsInterface } from '../interfaces/logger-coralogix-settings.interface';
+import { type LoggerCoralogixSettingsInterface } from '../interfaces/logger-coralogix-settings.interface';
 
 import {
   coralogixConfig,

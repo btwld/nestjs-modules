@@ -1,4 +1,3 @@
-import { Expose } from 'class-transformer';
 import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
@@ -7,7 +6,6 @@ import {
 
 export class BaseEntity {
   @PrimaryGeneratedColumn()
-  @Expose()
   id?: number;
 
   @CreateDateColumn({ nullable: true })

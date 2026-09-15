@@ -1,7 +1,7 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -12,9 +12,9 @@ import {
   FILE_MODULE_SETTINGS_TOKEN,
   FILE_STRATEGY_SERVICE_KEY,
 } from './file.constants';
-import { FileOptionsExtrasInterface } from './interfaces/file-options-extras.interface';
-import { FileOptionsInterface } from './interfaces/file-options.interface';
-import { FileSettingsInterface } from './interfaces/file-settings.interface';
+import { type FileOptionsExtrasInterface } from './interfaces/file-options-extras.interface';
+import { type FileOptionsInterface } from './interfaces/file-options.interface';
+import { type FileSettingsInterface } from './interfaces/file-settings.interface';
 import { FileModelService } from './services/file-model.service';
 import { FileStrategyService } from './services/file-strategy.service';
 import { FileService } from './services/file.service';

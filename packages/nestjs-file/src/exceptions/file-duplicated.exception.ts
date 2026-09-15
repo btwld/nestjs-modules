@@ -1,8 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
 
 import {
-  RuntimeException,
-  RuntimeExceptionOptions,
+  type RuntimeException,
+  type RuntimeExceptionOptions,
 } from '@concepta/nestjs-common';
 
 import { FileException } from './file.exception';
@@ -28,7 +28,7 @@ export class FileDuplicateEntryException extends FileException {
     this.errorCode = 'FILE_DUPLICATE_ENTRY_ERROR';
 
     this.context = {
-      ...super.context,
+      ...this.context,
       serviceKey,
       fileName,
     };

@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 
-import { OrgEntityInterface } from '@concepta/nestjs-common';
+import { type OrgEntityInterface } from '@concepta/nestjs-common';
 import { Factory } from '@concepta/typeorm-seeding';
 
 import { OrgOwnerFactory } from './org-owner.factory';

@@ -1,153 +1,143 @@
 import { Inject } from '@nestjs/common';
 
-import { CrudBaseController } from '../../crud/controllers/crud-base.controller';
-import { CrudBody } from '../../crud/decorators/params/crud-body.decorator';
-import { CrudRequest } from '../../crud/decorators/params/crud-request.decorator';
-import { CrudSoftDelete } from '../../crud/decorators/routes/crud-soft-delete.decorator';
-import { CrudRequestInterface } from '../../crud/interfaces/crud-request.interface';
-import { CrudService } from '../../services/crud.service';
-import { ConfigurableCrudBuilder } from '../../util/configurable-crud.builder';
-import { PhotoCreateManyDtoFixture } from '../photo/dto/photo-create-many.dto.fixture';
-import { PhotoCreateDtoFixture } from '../photo/dto/photo-create.dto.fixture';
-import { PhotoPaginatedDtoFixture } from '../photo/dto/photo-paginated.dto.fixture';
-import { PhotoUpdateDtoFixture } from '../photo/dto/photo-update.dto.fixture';
-import { PhotoDtoFixture } from '../photo/dto/photo.dto.fixture';
-import { PhotoCreatableInterfaceFixture } from '../photo/interfaces/photo-creatable.interface.fixture';
-import { PhotoEntityInterfaceFixture } from '../photo/interfaces/photo-entity.interface.fixture';
-import { PhotoUpdatableInterfaceFixture } from '../photo/interfaces/photo-updatable.interface.fixture';
-import { PhotoTypeOrmCrudAdapterFixture } from '../photo/photo-typeorm-crud.adapter.fixture';
+import { Ctx } from '@concepta/nestjs-core';
 
-export const PHOTO_CRUD_SERVICE_TOKEN = Symbol('__PHOTO_CRUD_SERVICE_TOKEN__');
+import { CrudController } from '../../infrastructure/decorators/controller/crud-controller.decorator.js';
+import { CrudCreateBatch } from '../../infrastructure/decorators/operations/crud-create-batch.decorator.js';
+import { CrudCreate } from '../../infrastructure/decorators/operations/crud-create.decorator.js';
+import { CrudDelete } from '../../infrastructure/decorators/operations/crud-delete.decorator.js';
+import { CrudList } from '../../infrastructure/decorators/operations/crud-list.decorator.js';
+import { CrudRead } from '../../infrastructure/decorators/operations/crud-read.decorator.js';
+import { CrudReplace } from '../../infrastructure/decorators/operations/crud-replace.decorator.js';
+import { CrudRestore } from '../../infrastructure/decorators/operations/crud-restore.decorator.js';
+import { CrudSoftDelete } from '../../infrastructure/decorators/operations/crud-soft-delete.decorator.js';
+import { CrudUpdate } from '../../infrastructure/decorators/operations/crud-update.decorator.js';
+import { CrudBody } from '../../infrastructure/decorators/params/crud-body.decorator.js';
+import { CrudCtx } from '../../infrastructure/interceptors/crud-context.overlay.js';
+import { CrudContextInterface } from '../../infrastructure/interceptors/interfaces/crud-context.interface.js';
+import { CrudCreateBatchInterface } from '../../infrastructure/interfaces/crud-create-batch.interface.js';
+import { CrudAdapterResolver } from '../../infrastructure/resolvers/crud-adapter.resolver.js';
+import { CrudResolverInterface } from '../../infrastructure/resolvers/interfaces/crud-resolver.interface.js';
+import { ConfigurableCrudBuilder } from '../../infrastructure/utils/configurable-crud.builder.js';
+import { CRUD_TEST_PHOTO_CCB_CUSTOM_ENTITY_NAME } from '../crud-test.constants.js';
+import { PhotoCreatableInterfaceFixture } from '../photo/interfaces/photo-creatable.interface.fixture.js';
+import { PhotoEntityInterfaceFixture } from '../photo/interfaces/photo-entity.interface.fixture.js';
+import { PhotoUpdatableInterfaceFixture } from '../photo/interfaces/photo-updatable.interface.fixture.js';
+import {
+  photoCreateBatchResponseSchema,
+  photoCreateBatchSchema,
+} from '../photo/schemas/photo-create-batch.schema.fixture.js';
+import { photoCreateSchema } from '../photo/schemas/photo-create.schema.fixture.js';
+import { photoPaginatedSchema } from '../photo/schemas/photo-paginated.schema.fixture.js';
+import { photoUpdateSchema } from '../photo/schemas/photo-update.schema.fixture.js';
+import { photoSchema } from '../photo/schemas/photo.schema.fixture.js';
 
-const crudBuilder = new ConfigurableCrudBuilder<
-  PhotoEntityInterfaceFixture,
-  PhotoCreatableInterfaceFixture,
-  PhotoUpdatableInterfaceFixture
->({
-  service: {
-    adapterToken: PhotoTypeOrmCrudAdapterFixture,
-    serviceToken: PHOTO_CRUD_SERVICE_TOKEN,
-  },
-  controller: {
-    path: 'photo',
-    model: {
-      type: PhotoDtoFixture,
-      paginatedType: PhotoPaginatedDtoFixture,
-    },
-  },
-  getMany: {},
-  getOne: {},
-  createMany: {
-    dto: PhotoCreateManyDtoFixture,
-  },
-  createOne: {
-    dto: PhotoCreateDtoFixture,
-  },
-  updateOne: {
-    dto: PhotoUpdateDtoFixture,
-  },
-  replaceOne: {
-    dto: PhotoUpdateDtoFixture,
-  },
-  deleteOne: {
-    extraDecorators: [CrudSoftDelete(true)],
-  },
-  recoverOne: { path: 'recover/:id' },
-});
-
-const {
-  ConfigurableServiceClass,
-  CrudController,
-  CrudGetMany,
-  CrudGetOne,
-  CrudCreateMany,
-  CrudCreateOne,
-  CrudUpdateOne,
-  CrudReplaceOne,
-  CrudDeleteOne,
-  CrudRecoverOne,
-} = crudBuilder.build();
-
-export class PhotoCcbCustomCrudServiceFixture extends ConfigurableServiceClass {}
-
-@CrudController
-export class PhotoCcbCustomControllerFixture extends CrudBaseController<
-  PhotoEntityInterfaceFixture,
-  PhotoCreatableInterfaceFixture,
-  PhotoUpdatableInterfaceFixture
-> {
+@CrudController({
+  path: 'photo',
+  entity: CRUD_TEST_PHOTO_CCB_CUSTOM_ENTITY_NAME,
+  request: { body: photoSchema },
+  response: { resource: photoSchema, paginated: photoPaginatedSchema },
+})
+export class PhotoCcbCustomControllerFixture {
   constructor(
-    @Inject(PHOTO_CRUD_SERVICE_TOKEN)
-    protected crudService: CrudService<PhotoEntityInterfaceFixture>,
+    @Inject(CrudAdapterResolver)
+    protected readonly crudResolver: CrudResolverInterface,
+  ) {}
+
+  @CrudList()
+  async list(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
   ) {
-    super(crudService);
+    return this.crudResolver.list(ctx);
   }
 
-  @CrudGetMany
-  async getMany(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  @CrudRead()
+  async read(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
   ) {
-    return this.crudService.getMany(crudRequest);
+    return this.crudResolver.read(ctx);
   }
 
-  @CrudGetOne
-  async getOne(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  @CrudCreateBatch({
+    request: { bodyBatch: photoCreateBatchSchema },
+    response: {
+      serialization: { resource: photoCreateBatchResponseSchema },
+    },
+  })
+  async createBatch(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
+    // Explicit schema — validation would also resolve from this operation's
+    // `request.body`/`bodyBatch` fallback; passing it here pins it on the
+    // parameter itself.
+    @CrudBody({ schema: photoCreateBatchSchema })
+    dto: CrudCreateBatchInterface<PhotoCreatableInterfaceFixture>,
   ) {
-    return this.crudService.getOne(crudRequest);
+    return this.crudResolver.createBatch(ctx, dto);
   }
 
-  @CrudCreateMany
-  async createMany(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
-    @CrudBody() dto: PhotoCreateManyDtoFixture,
+  @CrudCreate({ request: { body: photoCreateSchema } })
+  async create(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
+    @CrudBody({ schema: photoCreateSchema })
+    dto: PhotoCreatableInterfaceFixture,
   ) {
-    return this.crudService.createMany(crudRequest, dto);
+    return this.crudResolver.create(ctx, dto);
   }
 
-  @CrudCreateOne
-  async createOne(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
-    @CrudBody() dto: PhotoCreateDtoFixture,
+  @CrudUpdate({ request: { body: photoUpdateSchema } })
+  async update(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
+    @CrudBody({ schema: photoUpdateSchema })
+    dto: PhotoUpdatableInterfaceFixture,
   ) {
-    return this.crudService.createOne(crudRequest, dto);
+    return this.crudResolver.update(ctx, dto);
   }
 
-  @CrudUpdateOne
-  async updateOne(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
-    @CrudBody() dto: PhotoUpdateDtoFixture,
+  @CrudReplace({ request: { body: photoUpdateSchema } })
+  async replace(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
+    @CrudBody({ schema: photoUpdateSchema })
+    dto: PhotoUpdatableInterfaceFixture,
   ) {
-    return this.crudService.updateOne(crudRequest, dto);
+    return this.crudResolver.replace(ctx, dto);
   }
 
-  @CrudReplaceOne
-  async replaceOne(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
-    @CrudBody() dto: PhotoUpdateDtoFixture,
+  @CrudDelete()
+  async delete(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
   ) {
-    return this.crudService.replaceOne(crudRequest, dto);
+    return this.crudResolver.delete(ctx);
   }
 
-  @CrudDeleteOne
-  async deleteOne(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  @CrudSoftDelete({ path: 'soft/:id' })
+  async softDelete(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
   ) {
-    return this.crudService.deleteOne(crudRequest);
+    return this.crudResolver.softDelete(ctx);
   }
 
-  @CrudRecoverOne
-  async recoverOne(
-    @CrudRequest()
-    crudRequest: CrudRequestInterface<PhotoEntityInterfaceFixture>,
+  @CrudRestore({ path: 'restore/:id' })
+  async restore(
+    @Ctx(CrudCtx)
+    ctx: CrudContextInterface<PhotoEntityInterfaceFixture>,
   ) {
-    return this.crudService.recoverOne(crudRequest);
+    return this.crudResolver.restore(ctx);
   }
 }
+
+// Use controller.class path to generate handlers from the decorated class
+const crudBuilder = new ConfigurableCrudBuilder<PhotoEntityInterfaceFixture>({
+  controller: {
+    class: PhotoCcbCustomControllerFixture,
+  },
+});
+
+export const PhotoCcbCustomProviders = crudBuilder.build().providers;

@@ -1,16 +1,16 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { createSettingsProvider } from '@concepta/nestjs-common';
 
 import { swaggerUiDefaultConfig } from './config/swagger-ui-default.config';
-import { SwaggerUiOptionsExtrasInterface } from './interfaces/swagger-ui-options-extras.interface';
-import { SwaggerUiOptionsInterface } from './interfaces/swagger-ui-options.interface';
-import { SwaggerUiSettingsInterface } from './interfaces/swagger-ui-settings.interface';
+import { type SwaggerUiOptionsExtrasInterface } from './interfaces/swagger-ui-options-extras.interface';
+import { type SwaggerUiOptionsInterface } from './interfaces/swagger-ui-options.interface';
+import { type SwaggerUiSettingsInterface } from './interfaces/swagger-ui-settings.interface';
 import {
   SWAGGER_UI_MODULE_DOCUMENT_BUILDER_TOKEN,
   SWAGGER_UI_MODULE_SETTINGS_TOKEN,

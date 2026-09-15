@@ -1,5 +1,9 @@
 export { ReportModule } from './report.module';
 
+// entities
+export { ReportSqliteEntity } from './entities/report-sqlite.entity';
+export { ReportPostgresEntity } from './entities/report-postgres.entity';
+
 export { ReportServiceInterface } from './interfaces/report-service.interface';
 export { ReportGeneratorServiceInterface } from './interfaces/report-generator-service.interface';
 export { ReportGeneratorResultInterface } from './interfaces/report-generator-result.interface';

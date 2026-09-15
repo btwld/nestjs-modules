@@ -1,10 +1,14 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_INTERCEPTOR, BaseExceptionFilter } from '@nestjs/core';
+import {
+  APP_FILTER,
+  APP_INTERCEPTOR,
+  type BaseExceptionFilter,
+} from '@nestjs/core';
 
 import { createSettingsProvider } from '@concepta/nestjs-common';
 
@@ -12,9 +16,9 @@ import {
   LOGGER_MODULE_SETTINGS_TOKEN,
   loggerConfig,
 } from './config/logger.config';
-import { LoggerOptionsExtrasInterface } from './interfaces/logger-options-extras.interface';
-import { LoggerOptionsInterface } from './interfaces/logger-options.interface';
-import { LoggerSettingsInterface } from './interfaces/logger-settings.interface';
+import { type LoggerOptionsExtrasInterface } from './interfaces/logger-options-extras.interface';
+import { type LoggerOptionsInterface } from './interfaces/logger-options.interface';
+import { type LoggerSettingsInterface } from './interfaces/logger-settings.interface';
 import { LoggerExceptionFilter } from './logger-exception.filter';
 import { LoggerRequestInterceptor } from './logger-request.interceptor';
 import { LoggerTransportService } from './logger-transport.service';

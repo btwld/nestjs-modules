@@ -1,0 +1,9 @@
+import { CrudReplaceCommand } from '@concepta/nestjs-crud';
+
+import { type RoleCreatableInterface } from '../../../../domain/interfaces/role-creatable.interface.js';
+import { type RoleInterface } from '../../../../domain/interfaces/role.interface.js';
+
+export class ReplaceRoleRequest extends CrudReplaceCommand<
+  RoleInterface,
+  RoleCreatableInterface
+> {}

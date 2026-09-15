@@ -1,9 +1,9 @@
 import { EventListenerOn } from '@concepta/nestjs-event';
 
 import {
-  OrderCreatedEvent,
-  OrderCreatedEventAsync,
-  OrderCreatedEventInterface,
+  type OrderCreatedEvent,
+  type OrderCreatedEventAsync,
+  type OrderCreatedEventInterface,
 } from '../events/order-created.event';
 
 // example listener class

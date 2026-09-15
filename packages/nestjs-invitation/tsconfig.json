@@ -4,10 +4,13 @@
     "composite": true,
     "rootDir": "./src",
     "outDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "typeRoots": [
       "./node_modules/@types",
-      "../../node_modules/@types"
-    ]
+      "../../node_modules/@types",
+      "../../node_modules"
+    ],
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "src/**/*.ts"

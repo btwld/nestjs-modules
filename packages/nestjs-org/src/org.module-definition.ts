@@ -1,21 +1,21 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import {
   createSettingsProvider,
-  RepositoryInterface,
+  type RepositoryInterface,
   getDynamicRepositoryToken,
-  OrgEntityInterface,
+  type OrgEntityInterface,
 } from '@concepta/nestjs-common';
 
 import { orgDefaultConfig } from './config/org-default.config';
-import { OrgOptionsExtrasInterface } from './interfaces/org-options-extras.interface';
-import { OrgOptionsInterface } from './interfaces/org-options.interface';
-import { OrgSettingsInterface } from './interfaces/org-settings.interface';
+import { type OrgOptionsExtrasInterface } from './interfaces/org-options-extras.interface';
+import { type OrgOptionsInterface } from './interfaces/org-options.interface';
+import { type OrgSettingsInterface } from './interfaces/org-settings.interface';
 import { InvitationAcceptedListener } from './listeners/invitation-accepted-listener';
 import {
   ORG_MODULE_SETTINGS_TOKEN,

@@ -1,9 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
   FederatedOAuthService,
-  FederatedCredentialsInterface,
+  type FederatedCredentialsInterface,
 } from '@concepta/nestjs-federated';
 
 import {
@@ -13,8 +13,8 @@ import {
 import { AuthGithubStrategy } from './auth-github.strategy';
 import { AuthGithubMissingEmailException } from './exceptions/auth-github-missing-email.exception';
 import { AuthGithubMissingIdException } from './exceptions/auth-github-missing-id.exception';
-import { AuthGithubProfileInterface } from './interfaces/auth-github-profile.interface';
-import { AuthGithubSettingsInterface } from './interfaces/auth-github-settings.interface';
+import { type AuthGithubProfileInterface } from './interfaces/auth-github-profile.interface';
+import { type AuthGithubSettingsInterface } from './interfaces/auth-github-settings.interface';
 import { mapProfile } from './utils/auth-github-map-profile';
 
 // Mock the PassportStrategy class

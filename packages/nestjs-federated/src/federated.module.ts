@@ -4,15 +4,9 @@ import {
   FederatedAsyncOptions,
   FederatedModuleClass,
   FederatedOptions,
-} from './federated.module-definition';
-import { FederatedModelService } from './services/federated-model.service';
-import { FederatedOAuthService } from './services/federated-oauth.service';
-import { FederatedService } from './services/federated.service';
+} from './federated.module-definition.js';
 
-@Module({
-  providers: [FederatedService, FederatedOAuthService, FederatedModelService],
-  exports: [FederatedService, FederatedOAuthService, FederatedModelService],
-})
+@Module({})
 export class FederatedModule extends FederatedModuleClass {
   static register(options: FederatedOptions): DynamicModule {
     return super.register(options);

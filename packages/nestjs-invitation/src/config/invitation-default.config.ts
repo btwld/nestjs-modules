@@ -1,32 +1,21 @@
 import { registerAs } from '@nestjs/config';
 
-import { InvitationSettingsInterface } from '../interfaces/options/invitation-settings.interface';
-import { INVITATION_MODULE_DEFAULT_SETTINGS_TOKEN } from '../invitation.constants';
+import { type DeepPartial } from '@concepta/nestjs-core';
+
+import { type InvitationSettingsInterface } from '../interfaces/options/invitation-settings.interface.js';
+import { INVITATION_MODULE_DEFAULT_SETTINGS_TOKEN } from '../invitation.constants.js';
 
 /**
  * Default configuration for invitation.
+ *
+ * External port command/query types must be provided by the consumer
+ * through module options. These defaults only cover scalar settings.
  */
 export const invitationDefaultConfig = registerAs(
   INVITATION_MODULE_DEFAULT_SETTINGS_TOKEN,
-  (): InvitationSettingsInterface => ({
-    email: {
-      from: 'no-reply@dispostable.com',
-      baseUrl: 'http://localhost:3000',
-      templates: {
-        invitation: {
-          logo: 'public/logo.svg',
-          fileName: __dirname + '/../assets/invitation.template.hbs',
-          subject: 'Access Invitation',
-        },
-        invitationAccepted: {
-          logo: 'public/logo.svg',
-          fileName: __dirname + '/../assets/invitation-accepted.template.hbs',
-          subject: 'Invitation Accepted',
-        },
-      },
-    },
+  (): DeepPartial<InvitationSettingsInterface> => ({
     otp: {
-      assignment: 'user-otp',
+      namespace: 'user-otp',
       type: 'uuid',
       expiresIn: '7d',
       clearOtpOnCreate: process.env.INVITATION_OTP_CLEAR_ON_CREATE

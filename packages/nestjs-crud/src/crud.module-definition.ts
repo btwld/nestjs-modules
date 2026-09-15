@@ -1,18 +1,25 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
-import { createSettingsProvider } from '@concepta/nestjs-common';
+import { createSettingsProvider } from '@concepta/nestjs-core';
 
-import { crudDefaultConfig } from './config/crud-default.config';
-import { CRUD_MODULE_SETTINGS_TOKEN } from './crud.constants';
-import { CrudModuleOptionsExtrasInterface } from './interfaces/crud-module-options-extras.interface';
-import { CrudModuleOptionsInterface } from './interfaces/crud-module-options.interface';
-import { CrudModuleSettingsInterface } from './interfaces/crud-module-settings.interface';
-import { CrudReflectionService } from './services/crud-reflection.service';
+import {
+  CRUD_DEFAULT_RESOLVER_TOKEN,
+  CRUD_MODULE_SETTINGS_TOKEN,
+} from './crud.constants.js';
+import { crudDefaultConfig } from './infrastructure/config/crud-default.config.js';
+import { type CrudModuleOptionsExtrasInterface } from './infrastructure/config/interfaces/crud-module-options-extras.interface.js';
+import { type CrudModuleOptionsInterface } from './infrastructure/config/interfaces/crud-module-options.interface.js';
+import { type CrudModuleSettingsInterface } from './infrastructure/config/interfaces/crud-module-settings.interface.js';
+import { CrudContextOverlay } from './infrastructure/interceptors/crud-context.overlay.js';
+import { CrudAdapterResolver } from './infrastructure/resolvers/crud-adapter.resolver.js';
+import { CrudOperationResolver } from './infrastructure/resolvers/crud-operation.resolver.js';
+import { CrudMetaview } from './infrastructure/services/crud-metaview.service.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__CRUD_MODULE_RAW_OPTIONS_TOKEN__');
 
@@ -38,14 +45,18 @@ function definitionTransform(
   extras: CrudModuleOptionsExtrasInterface,
 ): DynamicModule {
   const { providers = [] } = definition;
-  const { global = false, imports } = extras;
+  const { global = false, imports, defaultResolver } = extras;
 
   return {
     ...definition,
     global,
     imports: createCrudImports({ imports }),
-    providers: createCrudProviders({ providers }),
-    exports: [ConfigModule, RAW_OPTIONS_TOKEN, ...createCrudExports()],
+    providers: createCrudProviders({ providers, defaultResolver }),
+    exports: [
+      ConfigModule,
+      RAW_OPTIONS_TOKEN,
+      ...createCrudExports({ defaultResolver }),
+    ],
   };
 }
 
@@ -61,18 +72,43 @@ export function createCrudImports(
   }
 }
 
-export function createCrudExports() {
-  return [CRUD_MODULE_SETTINGS_TOKEN, CrudReflectionService];
+export function createCrudExports(options?: {
+  defaultResolver?: CrudModuleOptionsExtrasInterface['defaultResolver'];
+}) {
+  const resolverClass = options?.defaultResolver ?? CrudAdapterResolver;
+
+  return [
+    CRUD_MODULE_SETTINGS_TOKEN,
+    CrudContextOverlay,
+    CrudMetaview,
+    CrudAdapterResolver,
+    CrudOperationResolver,
+    CRUD_DEFAULT_RESOLVER_TOKEN,
+    resolverClass,
+  ];
 }
 
 export function createCrudProviders(options: {
-  overrides?: CrudOptions;
   providers?: Provider[];
+  defaultResolver?: CrudModuleOptionsExtrasInterface['defaultResolver'];
 }): Provider[] {
+  const { providers = [], defaultResolver } = options;
+
+  const resolverClass = defaultResolver ?? CrudAdapterResolver;
+
   return [
-    ...(options.providers ?? []),
-    CrudReflectionService,
-    createCrudSettingsProvider(options.overrides),
+    ...providers,
+    CrudContextOverlay,
+    CrudMetaview,
+    CrudAdapterResolver,
+    CrudOperationResolver,
+    resolverClass,
+    {
+      provide: CRUD_DEFAULT_RESOLVER_TOKEN,
+      useExisting: resolverClass,
+    },
+    createCrudSettingsProvider(),
+    { provide: APP_INTERCEPTOR, useClass: CrudContextOverlay },
   ];
 }
 

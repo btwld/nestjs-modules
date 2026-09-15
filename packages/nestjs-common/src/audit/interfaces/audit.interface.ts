@@ -1,10 +1,12 @@
-import { AuditDateCreatedInterface } from './audit-date-created.interface';
-import { AuditDateDeletedInterface } from './audit-date-deleted.interface';
-import { AuditDateUpdatedInterface } from './audit-date-updated.interface';
-import { AuditVersionInterface } from './audit-version.interface';
+import { type AuditDateCreatedInterface } from './audit-date-created.interface';
+import { type AuditDateDeletedInterface } from './audit-date-deleted.interface';
+import { type AuditDateUpdatedInterface } from './audit-date-updated.interface';
 
+/**
+ * Audit metadata for persistence tracking.
+ */
 export interface AuditInterface
-  extends AuditDateCreatedInterface,
+  extends
+    AuditDateCreatedInterface,
     AuditDateUpdatedInterface,
-    AuditDateDeletedInterface,
-    AuditVersionInterface {}
+    AuditDateDeletedInterface {}

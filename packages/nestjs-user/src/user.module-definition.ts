@@ -1,108 +1,166 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
+  type Type,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CommandBus, CqrsModule } from '@nestjs/cqrs';
 
-import {
-  RepositoryInterface,
-  createSettingsProvider,
-  getDynamicRepositoryToken,
-  UserEntityInterface,
-  UserPasswordHistoryEntityInterface,
-} from '@concepta/nestjs-common';
-import {
-  PasswordCreationService,
-  PasswordStorageService,
-} from '@concepta/nestjs-password';
+import { createSettingsProvider } from '@concepta/nestjs-core';
 
-import { userDefaultConfig } from './config/user-default.config';
-import { UserModelServiceInterface } from './interfaces/user-model-service.interface';
-import { UserOptionsExtrasInterface } from './interfaces/user-options-extras.interface';
-import { UserOptionsInterface } from './interfaces/user-options.interface';
-import { UserSettingsInterface } from './interfaces/user-settings.interface';
-import { InvitationAcceptedListener } from './listeners/invitation-accepted-listener';
-import { UserAccessQueryService } from './services/user-access-query.service';
-import { UserModelService } from './services/user-model.service';
-import { UserPasswordHistoryModelService } from './services/user-password-history-model.service';
-import { UserPasswordHistoryService } from './services/user-password-history.service';
-import { UserPasswordService } from './services/user-password.service';
-import {
-  USER_MODULE_SETTINGS_TOKEN,
-  USER_MODULE_USER_ENTITY_KEY,
-  USER_MODULE_USER_PASSWORD_HISTORY_ENTITY_KEY,
-} from './user.constants';
+import { CreateUserCredentialHandler } from './application/commands/handlers/create-user-credential.handler.js';
+import { CreateUserHandler } from './application/commands/handlers/create-user.handler.js';
+import { RemoveUserHandler } from './application/commands/handlers/remove-user.handler.js';
+import { SetUserPasswordHandler } from './application/commands/handlers/set-user-password.handler.js';
+import { UpdateUserCredentialHandler } from './application/commands/handlers/update-user-credential.handler.js';
+import { UpdateUserPasswordHandler } from './application/commands/handlers/update-user-password.handler.js';
+import { UpdateUserHandler } from './application/commands/handlers/update-user.handler.js';
+import { GetUserByEmailHandler } from './application/queries/handlers/get-user-by-email.handler.js';
+import { GetUserBySubjectHandler } from './application/queries/handlers/get-user-by-subject.handler.js';
+import { GetUserByUsernameHandler } from './application/queries/handlers/get-user-by-username.handler.js';
+import { GetUserHandler } from './application/queries/handlers/get-user.handler.js';
+import { UserPasswordPort } from './domain/ports/user-password.port.js';
+import { type UserCredentialsRepositoryInterface } from './domain/repositories/user-credentials-repository.interface.js';
+import { UserCredentialsService } from './domain/services/user-credentials.service.js';
+import { type UserExtrasInterface } from './infrastructure/config/interfaces/user-extras.interface.js';
+import { type UserOptionsInterface } from './infrastructure/config/interfaces/user-options.interface.js';
+import { type UserSettingsInterface } from './infrastructure/config/interfaces/user-settings.interface.js';
+import { userDefaultConfig } from './infrastructure/config/user-default.config.js';
+import { UserCredentialsMapper } from './infrastructure/persistence/user-credentials.mapper.js';
+import { UserMapper } from './infrastructure/persistence/user.mapper.js';
+import { createPasswordPolicyProvider } from './infrastructure/utils/create-password-policy-provider.js';
+import { createUserCredentialsRepositoryProvider } from './infrastructure/utils/create-user-credentials-repository-provider.js';
+import { createUserRepositoryProvider } from './infrastructure/utils/create-user-repository-provider.js';
+import { USER_MODULE_SETTINGS_TOKEN } from './user.constants.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__USER_MODULE_RAW_OPTIONS_TOKEN__');
 
 export const {
   ConfigurableModuleClass: UserModuleClass,
   OPTIONS_TYPE: USER_OPTIONS_TYPE,
-  ASYNC_OPTIONS_TYPE: User_ASYNC_OPTIONS_TYPE,
+  ASYNC_OPTIONS_TYPE: USER_ASYNC_OPTIONS_TYPE,
 } = new ConfigurableModuleBuilder<UserOptionsInterface>({
   moduleName: 'User',
   optionsInjectionToken: RAW_OPTIONS_TOKEN,
 })
-  .setExtras<UserOptionsExtrasInterface>({ global: false }, definitionTransform)
+  .setExtras<UserExtrasInterface>(
+    { global: false, entities: { user: 'user' } },
+    definitionTransform,
+  )
   .build();
 
-export type UserOptions = Omit<typeof USER_OPTIONS_TYPE, 'global'>;
-export type UserAsyncOptions = Omit<typeof User_ASYNC_OPTIONS_TYPE, 'global'>;
+export type UserOptions = typeof USER_OPTIONS_TYPE;
+export type UserAsyncOptions = typeof USER_ASYNC_OPTIONS_TYPE;
 
 function definitionTransform(
   definition: DynamicModule,
-  extras: UserOptionsExtrasInterface,
+  {
+    global,
+    providers: overrideProviders,
+    entities,
+    repositories,
+  }: UserExtrasInterface,
 ): DynamicModule {
   const { providers = [], imports = [] } = definition;
-  const { global = false } = extras;
 
   return {
     ...definition,
     global,
     imports: createUserImports({ imports }),
-    providers: createUserProviders({ providers }),
+    providers: createUserProviders({
+      providers: [...providers, ...(overrideProviders ?? [])],
+      entities,
+      repositories,
+    }),
     exports: [ConfigModule, RAW_OPTIONS_TOKEN, ...createUserExports()],
   };
 }
 
-export function createUserImports(
-  options: Pick<DynamicModule, 'imports'>,
-): Required<Pick<DynamicModule, 'imports'>>['imports'] {
+export function createUserImports(options: {
+  imports: DynamicModule['imports'];
+}): DynamicModule['imports'] {
   return [
-    ...(options.imports ?? []),
+    ...(options.imports || []),
     ConfigModule.forFeature(userDefaultConfig),
+    CqrsModule.forRoot(),
   ];
 }
 
 export function createUserProviders(options: {
   overrides?: UserOptions;
   providers?: Provider[];
+  entities: UserExtrasInterface['entities'];
+  repositories?: UserExtrasInterface['repositories'];
 }): Provider[] {
   return [
-    ...(options.providers ?? []),
-    PasswordCreationService,
-    InvitationAcceptedListener,
     createUserSettingsProvider(options.overrides),
-    createUserModelServiceProvider(options.overrides),
-    createUserPasswordServiceProvider(options.overrides),
-    createUserPasswordHistoryServiceProvider(options.overrides),
-    createUserPasswordHistoryModelServiceProvider(),
-    createUserAccessQueryServiceProvider(options.overrides),
+    UserMapper,
+    // User repository
+    ...createUserRepositoryProvider(
+      options.entities.user,
+      options.repositories?.user,
+    ),
+    // User CRUD command handlers
+    CreateUserHandler,
+    UpdateUserHandler,
+    RemoveUserHandler,
+    // Password command handlers (dispatch to credential commands via CommandBus)
+    SetUserPasswordHandler,
+    UpdateUserPasswordHandler,
+    // User CRUD query handlers
+    GetUserHandler,
+    GetUserByEmailHandler,
+    GetUserByUsernameHandler,
+    GetUserBySubjectHandler,
+    // Credentials infrastructure (only when credentials entity is configured)
+    ...createUserCredentialProviders(
+      options.entities.credentials,
+      options.repositories?.userCredentials,
+    ),
+    // Consumer overrides (last provider for a token wins)
+    ...(options.providers ?? []),
+  ];
+}
+
+function createUserCredentialProviders(
+  entityKey?: string,
+  customRepository?: Type<UserCredentialsRepositoryInterface>,
+): Provider[] {
+  if (!entityKey && !customRepository) {
+    return [];
+  }
+
+  return [
+    createPasswordPolicyProvider(),
+    createUserPasswordPortProvider(),
+    UserCredentialsMapper,
+    ...createUserCredentialsRepositoryProvider(entityKey, customRepository),
+    CreateUserCredentialHandler,
+    UpdateUserCredentialHandler,
+    UserCredentialsService,
   ];
 }
 
 export function createUserExports(): Required<
   Pick<DynamicModule, 'exports'>
 >['exports'] {
-  return [
-    USER_MODULE_SETTINGS_TOKEN,
-    UserModelService,
-    UserPasswordService,
-    UserPasswordHistoryService,
-    UserPasswordHistoryModelService,
-    UserAccessQueryService,
-  ];
+  return [USER_MODULE_SETTINGS_TOKEN];
+}
+
+function createUserPasswordPortProvider(): Provider {
+  return {
+    provide: UserPasswordPort,
+    inject: [RAW_OPTIONS_TOKEN, CommandBus],
+    useFactory: (options: UserOptionsInterface, commandBus: CommandBus) => {
+      if (!options.ports?.password) {
+        throw new Error(
+          'UserModule: ports.password is required when credentials entity is configured',
+        );
+      }
+      return new UserPasswordPort(options.ports.password, commandBus);
+    },
+  };
 }
 
 export function createUserSettingsProvider(
@@ -114,146 +172,4 @@ export function createUserSettingsProvider(
     settingsKey: userDefaultConfig.KEY,
     optionsOverrides,
   });
-}
-
-export function createUserModelServiceProvider(
-  optionsOverrides?: UserOptions,
-): Provider {
-  return {
-    provide: UserModelService,
-    inject: [
-      RAW_OPTIONS_TOKEN,
-      getDynamicRepositoryToken(USER_MODULE_USER_ENTITY_KEY),
-    ],
-    useFactory: async (
-      options: UserOptionsInterface,
-      userRepo: RepositoryInterface<UserEntityInterface>,
-    ) =>
-      optionsOverrides?.userModelService ??
-      options.userModelService ??
-      new UserModelService(userRepo),
-  };
-}
-
-export function createUserPasswordServiceProvider(
-  optionsOverrides?: UserOptions,
-): Provider {
-  return {
-    provide: UserPasswordService,
-    inject: [
-      RAW_OPTIONS_TOKEN,
-      UserModelService,
-      PasswordCreationService,
-      PasswordStorageService,
-      {
-        token: UserPasswordHistoryService,
-        optional: true,
-      },
-    ],
-    useFactory: async (
-      options: UserOptionsInterface,
-      userModelService: UserModelServiceInterface,
-      passwordCreationService: PasswordCreationService,
-      passwordStorageService: PasswordStorageService,
-      userPasswordHistoryService?: UserPasswordHistoryService,
-    ) =>
-      optionsOverrides?.userPasswordService ??
-      options.userPasswordService ??
-      new UserPasswordService(
-        userModelService,
-        passwordCreationService,
-        passwordStorageService,
-        userPasswordHistoryService,
-      ),
-  };
-}
-
-export function createUserPasswordHistoryModelServiceProvider(): Provider {
-  return {
-    provide: UserPasswordHistoryModelService,
-    inject: [
-      USER_MODULE_SETTINGS_TOKEN,
-      {
-        token: getDynamicRepositoryToken(
-          USER_MODULE_USER_PASSWORD_HISTORY_ENTITY_KEY,
-        ),
-        optional: true,
-      },
-    ],
-    useFactory: async (
-      settings: UserSettingsInterface,
-      userPasswordHistoryRepoToken?: RepositoryInterface<UserPasswordHistoryEntityInterface>,
-    ) => {
-      if (
-        settings?.passwordHistory?.enabled === true &&
-        userPasswordHistoryRepoToken
-      ) {
-        return new UserPasswordHistoryModelService(
-          userPasswordHistoryRepoToken,
-        );
-      }
-    },
-  };
-}
-
-export function createUserPasswordHistoryServiceProvider(
-  optionsOverrides?: UserOptions,
-): Provider {
-  return {
-    provide: UserPasswordHistoryService,
-    inject: [
-      RAW_OPTIONS_TOKEN,
-      USER_MODULE_SETTINGS_TOKEN,
-      {
-        token: getDynamicRepositoryToken(
-          USER_MODULE_USER_PASSWORD_HISTORY_ENTITY_KEY,
-        ),
-        optional: true,
-      },
-      {
-        token: UserPasswordHistoryModelService,
-        optional: true,
-      },
-    ],
-    useFactory: async (
-      options: UserOptionsInterface,
-      settings: UserSettingsInterface,
-      userPasswordHistoryRepoToken?: RepositoryInterface<UserPasswordHistoryEntityInterface>,
-      userPasswordHistoryModelService?: UserPasswordHistoryModelService,
-    ) => {
-      // if password history is enabled?
-      if (settings?.passwordHistory?.enabled === true) {
-        // look for an overriding service
-        const overridingServiceOption =
-          optionsOverrides?.userPasswordHistoryService ??
-          options.userPasswordHistoryService;
-
-        // user overriding service, or create default service
-        if (overridingServiceOption) {
-          return overridingServiceOption;
-        } else if (
-          userPasswordHistoryRepoToken &&
-          userPasswordHistoryModelService
-        ) {
-          return new UserPasswordHistoryService(
-            settings,
-            userPasswordHistoryModelService,
-          );
-        }
-      }
-    },
-  };
-}
-
-export function createUserAccessQueryServiceProvider(
-  optionsOverrides?: UserOptions,
-): Provider {
-  return {
-    provide: UserAccessQueryService,
-    inject: [RAW_OPTIONS_TOKEN, UserPasswordService],
-    useFactory: async (options: UserOptionsInterface) =>
-      optionsOverrides?.userAccessQueryService ??
-      options.userAccessQueryService ??
-      new UserAccessQueryService(),
-  };
 }

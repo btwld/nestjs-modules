@@ -1,4 +1,4 @@
-import { ReferenceAssignment } from './reference.types';
+import { type ReferenceAssignment } from './reference.types';
 
 /**
  * Identifiable by assignment.

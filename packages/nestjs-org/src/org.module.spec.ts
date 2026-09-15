@@ -1,7 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
-  RepositoryInterface,
+  type RepositoryInterface,
   getDynamicRepositoryToken,
 } from '@concepta/nestjs-common';
 import { CrudModule } from '@concepta/nestjs-crud';

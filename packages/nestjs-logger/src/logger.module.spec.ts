@@ -1,5 +1,5 @@
-import { DynamicModule, ModuleMetadata } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type DynamicModule, type ModuleMetadata } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { LoggerTransportService } from './logger-transport.service';
 import { LoggerModule } from './logger.module';

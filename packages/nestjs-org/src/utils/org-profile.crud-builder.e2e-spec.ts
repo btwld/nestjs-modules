@@ -1,12 +1,12 @@
 import supertest from 'supertest';
 
-import { INestApplication } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type INestApplication } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import {
-  ConfigurableCrudOptions,
-  ConfigurableCrudOptionsTransformer,
+  type ConfigurableCrudOptions,
+  type ConfigurableCrudOptionsTransformer,
   CrudModule,
 } from '@concepta/nestjs-crud';
 import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';

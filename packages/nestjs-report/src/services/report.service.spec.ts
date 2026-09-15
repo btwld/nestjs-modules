@@ -1,21 +1,21 @@
 import { randomUUID } from 'crypto';
 
-import { mock, MockProxy } from 'jest-mock-extended';
+import { mock, type MockProxy } from 'jest-mock-extended';
 
 import {
-  ReportCreatableInterface,
+  type ReportCreatableInterface,
   ReportStatusEnum,
-  ReportEntityInterface,
-  RepositoryInterface,
+  type ReportEntityInterface,
+  type RepositoryInterface,
 } from '@concepta/nestjs-common';
 
-import { ReportCreateDto } from '../dto/report-create.dto';
+import { type ReportCreateDto } from '../dto/report-create.dto';
 import { ReportDuplicateEntryException } from '../exceptions/report-duplicated.exception';
 import { ReportQueryException } from '../exceptions/report-query.exception';
-import { ReportModelServiceInterface } from '../interfaces/report-model-service.interface';
+import { type ReportModelServiceInterface } from '../interfaces/report-model-service.interface';
 
 import { ReportModelService } from './report-model.service';
-import { ReportStrategyService } from './report-strategy.service';
+import { type ReportStrategyService } from './report-strategy.service';
 import { ReportService } from './report.service';
 
 const mockReport: ReportEntityInterface = {

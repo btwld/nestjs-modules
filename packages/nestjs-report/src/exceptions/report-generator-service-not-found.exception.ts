@@ -1,6 +1,6 @@
 import {
-  RuntimeException,
-  RuntimeExceptionOptions,
+  type RuntimeException,
+  type RuntimeExceptionOptions,
 } from '@concepta/nestjs-common';
 
 import { ReportException } from './report.exception';
@@ -20,7 +20,7 @@ export class ReportGeneratorServiceNotFoundException extends ReportException {
     this.errorCode = 'REPORT_GENERATOR_SERVICE_NOT_FOUND_ERROR';
 
     this.context = {
-      ...super.context,
+      ...this.context,
       generatorServiceName,
     };
   }

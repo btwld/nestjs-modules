@@ -1,9 +1,9 @@
 import {
-  FastifyRequest as Request,
-  LightMyRequestResponse as Response,
+  type FastifyRequest as Request,
+  type LightMyRequestResponse as Response,
 } from 'fastify';
 
-import { CallHandler, ExecutionContext } from '@nestjs/common';
+import { type CallHandler, type ExecutionContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { LoggerRequestInterceptor } from './logger-request.interceptor';

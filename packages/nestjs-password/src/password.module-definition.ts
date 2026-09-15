@@ -1,21 +1,28 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CqrsModule } from '@nestjs/cqrs';
 
-import { createSettingsProvider } from '@concepta/nestjs-common';
+import { createSettingsProvider } from '@concepta/nestjs-core';
 
-import { passwordDefaultConfig } from './config/password-default.config';
-import { PasswordOptionsExtrasInterface } from './interfaces/password-options-extras.interface';
-import { PasswordOptionsInterface } from './interfaces/password-options.interface';
-import { PasswordSettingsInterface } from './interfaces/password-settings.interface';
-import { PASSWORD_MODULE_SETTINGS_TOKEN } from './password.constants';
-import { PasswordCreationService } from './services/password-creation.service';
-import { PasswordStorageService } from './services/password-storage.service';
-import { PasswordStrengthService } from './services/password-strength.service';
-import { PasswordValidationService } from './services/password-validation.service';
+import { CreatePasswordHandler } from './application/commands/handlers/create-password.handler.js';
+import { ValidateCurrentPasswordHandler } from './application/commands/handlers/validate-current-password.handler.js';
+import { ValidatePasswordHistoryHandler } from './application/commands/handlers/validate-password-history.handler.js';
+import { ValidatePasswordHandler } from './application/commands/handlers/validate-password.handler.js';
+import { PasswordPolicy } from './domain/policies/password.policy.js';
+import { PasswordCreationService } from './domain/services/password-creation.service.js';
+import { PasswordStorageService } from './domain/services/password-storage.service.js';
+import { PasswordStrengthService } from './domain/services/password-strength.service.js';
+import { PasswordValidationService } from './domain/services/password-validation.service.js';
+import { type PasswordOptionsExtrasInterface } from './infrastructure/config/interfaces/password-options-extras.interface.js';
+import { type PasswordOptionsInterface } from './infrastructure/config/interfaces/password-options.interface.js';
+import { type PasswordSettingsInterface } from './infrastructure/config/interfaces/password-settings.interface.js';
+import { passwordDefaultConfig } from './infrastructure/config/password-default.config.js';
+import { createPasswordPolicyProvider } from './infrastructure/utils/create-password-policy-provider.js';
+import { PASSWORD_MODULE_SETTINGS_TOKEN } from './password.constants.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__PASSWORD_MODULE_RAW_OPTIONS_TOKEN__');
 
@@ -56,7 +63,7 @@ function definitionTransform(
 }
 
 export function createPasswordImports(): DynamicModule['imports'] {
-  return [ConfigModule.forFeature(passwordDefaultConfig)];
+  return [ConfigModule.forFeature(passwordDefaultConfig), CqrsModule.forRoot()];
 }
 
 export function createPasswordProviders(overrides: {
@@ -66,10 +73,16 @@ export function createPasswordProviders(overrides: {
   return [
     ...(overrides.providers ?? []),
     createPasswordSettingsProvider(overrides.options),
+    createPasswordPolicyProvider(),
     PasswordCreationService,
     PasswordStrengthService,
     PasswordStorageService,
     PasswordValidationService,
+    // command handlers
+    CreatePasswordHandler,
+    ValidatePasswordHandler,
+    ValidateCurrentPasswordHandler,
+    ValidatePasswordHistoryHandler,
   ];
 }
 
@@ -77,7 +90,7 @@ export function createPasswordExports(): Required<
   Pick<DynamicModule, 'exports'>
 >['exports'] {
   return [
-    PASSWORD_MODULE_SETTINGS_TOKEN,
+    PasswordPolicy,
     PasswordCreationService,
     PasswordStrengthService,
     PasswordStorageService,

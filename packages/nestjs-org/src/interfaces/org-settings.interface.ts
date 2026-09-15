@@ -1,7 +1,7 @@
-import { InvitationAcceptedEventPayloadInterface } from '@concepta/nestjs-common';
+import { type InvitationAcceptedEventPayloadInterface } from '@concepta/nestjs-common';
 import {
-  EventAsyncInterface,
-  EventClassInterface,
+  type EventAsyncInterface,
+  type EventClassInterface,
 } from '@concepta/nestjs-event';
 
 export interface OrgSettingsInterface {

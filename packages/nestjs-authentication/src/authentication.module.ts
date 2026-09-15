@@ -4,7 +4,7 @@ import {
   AuthenticationAsyncOptions,
   AuthenticationModuleClass,
   AuthenticationOptions,
-} from './authentication.module-definition';
+} from './authentication.module-definition.js';
 
 /**
  * Authentication module

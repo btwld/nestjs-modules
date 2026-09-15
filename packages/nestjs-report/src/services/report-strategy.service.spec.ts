@@ -3,13 +3,13 @@ import { randomUUID } from 'crypto';
 import { mock } from 'jest-mock-extended';
 
 import {
-  ReportCreatableInterface,
-  ReportInterface,
+  type ReportCreatableInterface,
+  type ReportInterface,
   ReportStatusEnum,
 } from '@concepta/nestjs-common';
 
 import { ReportCreateDto } from '../dto/report-create.dto';
-import { ReportGeneratorServiceInterface } from '../interfaces/report-generator-service.interface';
+import { type ReportGeneratorServiceInterface } from '../interfaces/report-generator-service.interface';
 
 import { ReportStrategyService } from './report-strategy.service';
 

@@ -1,10 +1,10 @@
-import { DynamicModule, ModuleMetadata } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type DynamicModule, type ModuleMetadata } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
-  RepositoryInterface,
+  type RepositoryInterface,
   getDynamicRepositoryToken,
-  FileEntityInterface,
+  type FileEntityInterface,
 } from '@concepta/nestjs-common';
 import {
   TypeOrmExtModule,

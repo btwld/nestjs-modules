@@ -1,4 +1,4 @@
-import { LoggerTransportInterface } from './logger-transport.interface';
+import { type LoggerTransportInterface } from './logger-transport.interface';
 
 /**
  * Logger Service Interface
