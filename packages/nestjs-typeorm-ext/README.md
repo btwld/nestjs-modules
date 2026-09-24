@@ -8,9 +8,9 @@ and repositories at registration time.
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-typeorm-ext)](https://www.npmjs.com/package/@concepta/nestjs-typeorm-ext)
 [![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-typeorm-ext)](https://www.npmjs.com/package/@concepta/nestjs-typeorm-ext)
-[![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
-[![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/rockets/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
+[![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Overview
 
@@ -35,9 +35,9 @@ Designing your module to use this extension is fairly straight forward,
 but a bit too verbose for this readme.
 
 To see how this was implemented in our
-[UserModule](https://github.com/conceptadev/rockets/blob/main/packages/nestjs-user)
+[UserModule](https://github.com/btwld/nestjs-modules/blob/main/packages/nestjs-user)
 please refer to that module's
-[user.module.ts](https://github.com/conceptadev/rockets/blob/main/packages/nestjs-user/src/user.module.ts)
+[user.module.ts](https://github.com/btwld/nestjs-modules/blob/main/packages/nestjs-user/src/user.module.ts)
 
 ## Usage
 

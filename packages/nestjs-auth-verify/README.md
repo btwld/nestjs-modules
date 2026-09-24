@@ -6,9 +6,9 @@ Verify user password using email
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-auth-verify)](https://www.npmjs.com/package/@concepta/nestjs-auth-verify)
 [![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-auth-verify)](https://www.npmjs.com/package/@concepta/nestjs-auth-verify)
-[![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
-[![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/rockets/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
+[![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ this tutorial we'll demonstrate using `@concepta/nestjs-email`,
 ### Email Configuration
 
 For detailed instructions on setting up email functionality, please
-follow the tutorial in the [@concepta/nestjs-email README](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-email#tutorial).
+follow the tutorial in the [@concepta/nestjs-email README](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-email#tutorial).
 
 The tutorial covers:
 
@@ -112,12 +112,12 @@ export const authVerifyDefaultConfig = registerAs(
 Let's take advantage of the following modules to set up the verify
 module:
 
-- [@concepta/nestjs-user](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-user)
+- [@concepta/nestjs-user](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-user)
   - Provides `UserModelService` to get users and to
     update them
-- [@concepta/nestjs-otp](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-otp)
+- [@concepta/nestjs-otp](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-otp)
   - Provides `OtpService` to create one-time passwords
-- [@concepta/nestjs-email](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-email)
+- [@concepta/nestjs-email](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-email)
   - Provides `EmailService` to send emails
 
 Please refer to each module's documentation linked above to see how to
