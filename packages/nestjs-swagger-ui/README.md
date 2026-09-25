@@ -6,9 +6,9 @@ Expose your OpenApi spec on your API using the powerful Swagger UI interface.
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-swagger-ui)](https://www.npmjs.com/package/@concepta/nestjs-swagger-ui)
 [![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-swagger-ui)](https://www.npmjs.com/package/@concepta/nestjs-swagger-ui)
-[![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
-[![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/rockets/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
+[![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Overview
 
@@ -62,4 +62,4 @@ All of the options in the official docs for
 [NestJS OpenApi](https://docs.nestjs.com/openapi) are supported.
 
 To see how they are mapped to the registration options `settings` property,
-see the [SwaggerUiSettingsInterface](https://github.com/conceptadev/rockets/blob/main/packages/nestjs-swagger-ui/src/interfaces/swagger-ui-settings.interface.ts)
+see the [SwaggerUiSettingsInterface](https://github.com/btwld/nestjs-modules/blob/main/packages/nestjs-swagger-ui/src/interfaces/swagger-ui-settings.interface.ts)

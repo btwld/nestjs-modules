@@ -7,9 +7,9 @@ the request (headers, cookies, body, query, etc).
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-auth-refresh)](https://www.npmjs.com/package/@concepta/nestjs-auth-refresh)
 [![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-auth-refresh)](https://www.npmjs.com/package/@concepta/nestjs-auth-refresh)
-[![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
-[![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/rockets/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
+[![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
 
@@ -119,8 +119,8 @@ such as `@concepta/nestjs-auth-jwt`, `@concepta/nestjs-auth-local`, and
 comprehensive and secure token refresh mechanism.
 
 For more detailed instructions on setting up the authentication modules,
-please refer to the [Authentication Module Documentation](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-authentication).
-We will continue with the tutorial in the [Authentication Module Documentation](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-authentication).
+please refer to the [Authentication Module Documentation](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-authentication).
+We will continue with the tutorial in the [Authentication Module Documentation](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-authentication).
 
 ###### Adding AuthRefreshModule to your NestJS Application
 
@@ -128,7 +128,7 @@ To add the `AuthRefreshModule` to your NestJS application, import the module
 in your main application module (usually `app.module.ts`) and register it
 using the `forRoot` or `forRootAsync` method, let's use the
 `MyJwtUserModelService` created at
-[Authentication Module Documentation](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-authentication):
+[Authentication Module Documentation](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-authentication):
 
 ```ts
 //...
