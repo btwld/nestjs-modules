@@ -24,6 +24,7 @@ nesting, and a two-level repository hook system.
 - [Transaction Management](#transaction-management)
 - [Transactional Decorator](#transactional-decorator)
 - [Repository Hooks](#repository-hooks)
+- [Row Scope](#row-scope)
 - [Repository Registry](#repository-registry)
 - [Federation](#federation)
 - [Injecting Repositories](#injecting-repositories)
@@ -119,13 +120,41 @@ export class OrderModule {}
 Each entity registration creates a dynamic repository provider that can be
 injected by key using `@InjectDynamicRepository()`.
 
+Two further options matter when an entity is scoped:
+
+| Option | Description |
+| --- | --- |
+| `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
+| `imports` | Modules exporting providers this registration must resolve. **Required** when any entity declares a resolver: the resolver is bound inside the module `forFeature()` returns, which cannot see providers declared alongside it |
+
+```ts
+RepositoryModule.forFeature({
+  module: TypeOrmRepositoryModule,
+  imports: [OrdersRowScopeModule], // exports OrdersRowScope
+  entities: [
+    {
+      key: 'orders',
+      entity: Order,
+      rowScope: { access: 'scoped', resolver: OrdersRowScope },
+    },
+  ],
+});
+```
+
 ### Settings
 
 ```ts
 interface RepositoryModuleOptionsInterface {
   defaultTimeout?: number; // Transaction timeout in milliseconds (default: 30000)
+  requireRowScopeDeclaration?: boolean; // Fail startup on an undeclared entity (default: false)
 }
 ```
+
+`requireRowScopeDeclaration` turns "nobody declared this entity" into a
+startup failure rather than a silent omission. Off by default because whether
+an undeclared entity is a mistake depends on the deployment: an application
+that scopes everything wants it on, one that scopes a handful of entities
+among many does not — see [Row Scope](#row-scope).
 
 ## Architecture Overview
 
@@ -191,6 +220,37 @@ the abstract `transform`/`merge` utilities and the `metadata` property:
 | Utility | `merge` | `(mergeIntoEntity, ...entityLikes) => Entity` |
 | Utility | `metadata` | `RepositoryMetadataInterface<Entity>` (abstract property) |
 
+### Create Inserts, It Never Updates
+
+`create` and `createMany` are inserts. A primary key that already names a row
+is an error (`EntityAlreadyExistsException`), not an instruction to overwrite
+it — use `upsert` for insert-or-update.
+
+This is enforced in `RepositoryAdapter` rather than left to each driver:
+`assertNotExisting` runs immediately before `doCreate`, so a driver may still
+implement `doCreate` with a save-style primitive. The guard reads through the
+protected `doFindOne`, which bypasses both hooks and row scope — deliberately,
+because the question is whether the key is taken, not whether the caller may
+see the row that took it. A scoped read cannot tell "does not exist yet" from
+"belongs to another scope", and either answer is wrong: one refuses every
+caller-supplied key, the other permits a cross-scope overwrite.
+
+Caller-supplied primary keys are otherwise fine. A key is only checked when
+every primary column is present; a partial one cannot identify a row, so it is
+left to the database.
+
+**This is a check-then-write with a real race.** A row inserted between the
+check and the write is *overwritten* rather than rejected, because a driver
+implementing create as a save-by-key re-reads and updates — so no uniqueness
+constraint catches it. A transaction narrows the window but does not close it
+at READ COMMITTED, where the driver's own re-read sees the committed row.
+Losing the race requires a concurrent insert of the *same* primary key:
+unreachable for generated keys, narrow for caller-supplied ones.
+
+A primary key supplied through a relation object (`{ account: { id } }`) counts
+as supplied — the guard reads both routes, because a driver resolves the column
+from the relation when the scalar is absent and prefers it.
+
 ### Concrete Members
 
 The public `find`, `findOne`, `count`, `findAndCount`, `create`,
@@ -227,6 +287,12 @@ class MyDriverRepository<Entity> extends RepositoryAdapter<Entity> {
   // ... implement the remaining do* methods, transform, and merge
 }
 ```
+
+**Override `do*` methods only.** A driver must never override a public
+operation method (`find`, `create`, `update`, …): those are where row scope,
+hooks, and the soft-delete guards are invoked, so an override bypasses all of
+them for every entity that driver serves, silently. Nothing enforces this —
+it is a contract a driver author has to keep.
 
 Each entry in `metadata.columns` must supply `name`, `isPrimary`,
 `isRemoveDate`, and `isVersion`. Set `isVersion: true` on the
@@ -428,6 +494,32 @@ into driver-specific queries.
 4. Same-field conditions within a branch are merged (e.g., `gt` + `lt` on the
    same field become a combined range)
 
+### Always-False Clauses
+
+An *absent* `where` (no clause at all) and an *unsatisfiable* `where` (a
+clause that matches zero rows) are different things, and `toDnf` never
+conflates them: an absent `where` is `undefined`, `toDnf` never returns `[]`
+at all, and `Where.never()` — not an empty `IN ()`, not an empty `AND`/`OR` —
+is the only representation of "match nothing."
+
+This matters because `and(...conditions)`/`or(...conditions)` are variadic,
+and a caller building one from a possibly-empty array (a resolved set of
+allowed values, for instance) needs a defined answer for the empty case:
+
+- `Where.and()` with zero conditions **throws** — an empty `AND` has no
+  conditions to be false about, and guessing "true" (no constraint) would be
+  the wrong direction for a security-relevant clause. Callers spreading a
+  possibly-empty array into `and()` must guard emptiness themselves.
+- `Where.or()` with zero conditions returns `Where.never()` — `OR`'s
+  identity for "none of these" is unambiguous, so
+  `Where.or(...allowedIds.map((id) => Where.eq('id', id)))` is correct by
+  construction even when `allowedIds` is empty, with no caller-side guard
+  needed.
+- `Where.and(callerClause, Where.never())` still evaluates to "match
+  nothing" — a `never()` conjoined onto anything can't be flattened away by
+  `toDnf`, so a guard clause built this way can't be silently widened back
+  into "no restriction" by later composition.
+
 ### Static API
 
 Pass the entity type as a generic parameter on each call:
@@ -564,8 +656,9 @@ const orders = await orderRepo.findAndCount({
 
 | Method | Description |
 | --- | --- |
-| `and(...conditions)` | All conditions must match |
-| `or(...conditions)` | Any condition must match |
+| `and(...conditions)` | All conditions must match — **throws** if called with zero conditions (an empty `AND` has nothing to be false about; silently accepting one would let it collapse to "no constraint" whenever the input array happens to be empty) |
+| `or(...conditions)` | Any condition must match — returns `never()` if called with zero conditions, since "none of them matched" is `OR`'s unambiguous identity for the empty case |
+| `never()` | Always false — matches zero rows. Renders as a literal always-false predicate (never an operator, like an empty `IN ()`, that merely *happens* to fold to constant-false), and can never be optimized, flattened, or narrowed away back into "no constraint" — see "Always-False Clauses" above. The canonical way to express "resolved to nothing" for a fail-closed guard clause (e.g. an empty allowed-values set), instead of falling through to unscoped. |
 
 ### Utility Methods
 
@@ -1226,7 +1319,10 @@ single-entity payloads and options objects (`Membrane.object` /
   in a default the caller is free to override) but wrong for authorization
   (a hook enforcing a value the caller must not be able to override, e.g. a
   tenant id) — a caller who explicitly supplies that same field defeats the
-  hook silently, no error either way.
+  hook silently, no error either way. For tenant enforcement specifically, a
+  hook is the wrong tool entirely regardless of merge strategy: use
+  [Row Scope](#row-scope), which runs after every before-hook and immediately
+  before `do*`, and whose scope input hooks cannot influence.
 - **`{ replace: true }`** on any of the five write decorators inverts this
   for that hook only: it runs through `Membrane.objectReplace` instead, in a
   second pass after every plain (merge) hook for the same key, so its output
@@ -1255,6 +1351,404 @@ Two `OverlayRef` tokens are exported for reading repository state from an
 | --- | --- |
 | `RepoCtx` | Overlay carrying the entity key in scope: `{ entity: string }` |
 | `TrxCtx` | Overlay carrying the active `TransactionManager`: `{ trx }` |
+
+## Row Scope
+
+Row scope restricts which *rows* a caller may read and write — multi-tenancy
+being the common case. It applies to every repository operation and to direct
+repository calls, not only to calls that pass through a controller.
+
+**The division of labour is the thing to understand first.** The implementer
+owns all enforcement: the read predicate, stamping a write, refusing one, any
+visibility read. The framework owns exactly one guarantee — that your callback
+is invoked at every repository entry point, with that operation's real input,
+before the driver sees it. It never inspects or second-guesses what you
+return. There is deliberately no read-side guard: if your resolver returns an
+unscoped query, it runs.
+
+For scope expressible as column equality — one column or several — extend
+[`RowScopeBase`](#rowscopebase) rather than writing that enforcement
+yourself.
+
+**Layers above the repository are covered without knowing about it.** Because
+enforcement lives in the repository, a `@concepta/nestjs-crud` controller over a
+scoped entity is scoped too, with no row-scope code of its own: list returns
+only the caller's rows, a read, update or delete aimed at another scope is a
+`404`, and a create carrying a foreign scope column in the request body is a
+`403`. `nestjs-crud` has no row-scope awareness at all — it resolves a row and
+hands it to the repository, which is where the resolver runs. The same is true
+of any service or handler that calls a scoped repository, as long as it passes
+the request's `ctx`.
+
+### Declaring an entity
+
+Every entity is scoped, public, or undeclared:
+
+```ts
+rowScope: { access: 'scoped', resolver: OrdersRowScope }
+rowScope: { access: 'public', reason: 'shared reference data, not tenant-owned' }
+```
+
+`public` requires a reason because it is a decision someone has to defend
+later. Undeclared is allowed unless the deployment sets
+`requireRowScopeDeclaration`.
+
+### The resolver
+
+```ts
+// Whatever your overlay carries. Snippets further down read `role` and
+// `region` off it, so they are declared here too.
+interface TenantScope {
+  tenantId: string;
+  role?: string;
+  region?: string;
+}
+
+@Injectable()
+export class OrdersRowScope implements RowScopeInterface<TenantScope> {
+  constructor(
+    @InjectDynamicRepository('orders')
+    private readonly orders: RepositoryInterface<Order>,
+  ) {}
+
+  scopeQuery<Options extends { where?: WhereClause }>(
+    params: RowScopeQueryParams<Options, TenantScope>,
+  ): Options {
+    const tenantId = params.scope?.tenantId;
+    if (typeof tenantId !== 'string') {
+      throw new RuntimeException({ message: 'No tenant', fault: 'client' });
+    }
+    const scope = Where.eq('tenantId', tenantId);
+    return {
+      ...params.options,
+      where: params.options.where
+        ? Where.and(params.options.where, scope)
+        : scope,
+    };
+  }
+
+  async scopeWrite<Value extends PlainLiteralObject>(
+    params: RowScopeWriteParams<Value, TenantScope>,
+  ): Promise<Value> {
+    // Stamp an unstamped write; refuse one naming another tenant. Never
+    // silently rewrite a foreign scope to the caller's own.
+    return params.value;
+  }
+}
+```
+
+A resolver may read back through the repository it scopes — that nested read
+is itself scoped, which is the point. Injecting your own repository is not a
+circular dependency: repository tokens come from a global module, and a
+repository never depends on its resolver.
+
+### `RowScopeBase`
+
+Most resolvers are the same shape: one or more columns carry the scope value.
+`RowScopeBase` implements that, so a resolver is usually just configuration:
+
+```ts
+@Injectable()
+export class OrdersRowScope extends RowScopeBase<Order, TenantScope> {
+  constructor(
+    @InjectDynamicRepository('orders')
+    orders: RepositoryInterface<Order>,
+  ) {
+    super(orders, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
+  }
+}
+```
+
+It implements four rules and nothing else:
+
+1. **Reads inject the scope columns into the `WHERE`.**
+2. **Writes naming an existing row pre-check** with the primary key *and* the
+   scope columns in the `WHERE`. The pre-check's own clause decides, so a miss
+   is a `404` — including a row the caller can read through a widened
+   `scopeQuery` but may not write.
+3. **`create` is new data** — the scope columns are stamped onto it. There is no
+   pre-check: a create names no existing row, and the adapter
+   [already refuses](#create-inserts-it-never-updates) one whose key is taken,
+   whatever scope owns it. An `upsert` whose key names no stored row is new data
+   on the same reasoning, and is stamped rather than pre-checked; one whose key
+   names a row falls under rule 2.
+4. **The scope columns take precedence** over any same-named value in the
+   payload, and a mismatch is refused rather than rewritten — by whichever route
+   the value arrives, including a relation object that resolves to the column.
+
+`label` defaults to `Row`. Scope values and primary keys may be strings or
+numbers. Primary key columns are read from the entity's own metadata, so
+composite primary keys work too — a key counts as naming a row only when every
+primary column is present.
+
+It assumes **every scoped entity carries its own scope column**, so scope is
+decided per row without following a relation. That assumption is what makes the
+rest simple, and what makes a join safe (see
+[Relations and row scope](#relations-and-row-scope)).
+
+#### Composite scope
+
+Override `resolveScope` to return more than one column. The same values are used
+for the read predicate, the write pre-check and the stamp, so they cannot drift
+apart:
+
+```ts
+protected override resolveScope(
+  scope: TenantScope | undefined,
+): RowScopeValues<Order> {
+  const { tenantId, region } = scope ?? {};
+
+  if (typeof tenantId !== 'string' || typeof region !== 'string') {
+    this.refuse(HttpStatus.FORBIDDEN, 'No scope on the request context');
+  }
+
+  return { tenantId, region };
+}
+```
+
+Returning no columns is treated as a misconfiguration rather than as a
+superuser: such a principal reads nothing (`Where.never()`) and writes nothing.
+
+A subclass overriding `resolveScope` supplies no `scopeKey`/`column`, and none is
+required of it.
+
+#### Reading more broadly than you write
+
+A principal that reads every scope but writes only its own — an internal
+dashboard — is a `scopeQuery` override:
+
+```ts
+override scopeQuery<Options extends { where?: WhereClause }>(
+  params: RowScopeQueryParams<Options, TenantScope>,
+): Options {
+  if (params.scope?.role === 'admin') return params.options;
+
+  return super.scopeQuery(params);
+}
+```
+
+That cannot widen a write. The write pre-check carries the scope columns in its
+own `WHERE`, so the override leaves every write confined to the caller's own
+scope, and a `create` is still stamped with it.
+
+#### Checks this class cannot make
+
+A foreign key that must point inside the caller's scope is the common case:
+nothing about a scoped read on the child says which parent a child points at.
+Override `scopeWrite`, calling `super` first. Note the constructor: `RowScopeBase`
+keeps the repository it was given private, so a subclass that needs to read —
+either its own rows or another entity's — injects what it needs itself:
+
+```ts
+@Injectable()
+export class OrderLinesRowScope extends RowScopeBase<OrderLine, TenantScope> {
+  constructor(
+    @InjectDynamicRepository('order-lines')
+    private readonly orderLines: RepositoryInterface<OrderLine>,
+    @InjectDynamicRepository('orders')
+    private readonly orders: RepositoryInterface<Order>,
+  ) {
+    super(orderLines, {
+      scopeKey: 'tenantId',
+      column: 'tenantId',
+      label: 'Order line',
+    });
+  }
+
+  override async scopeWrite<Value extends PlainLiteralObject>(
+    params: RowScopeWriteParams<Value, TenantScope>,
+  ): Promise<Value> {
+    const scoped = await super.scopeWrite(params);
+
+    // `transform` settles an `order` relation *object* into the `orderId`
+    // column it backs, so one read covers both the scalar and the object. A
+    // bare id (`order: '…'`) is not settled and reads as undefined — the
+    // driver rejects that form on a declared join column.
+    const orderId = this.orderLines.transform(scoped).orderId;
+    if (orderId === undefined) return scoped;
+
+    const order = await this.orders.findOne({
+      where: Where.eq('id', orderId),
+      ctx: params.ctx,
+    });
+
+    if (!order || order.tenantId !== params.scope?.tenantId) {
+      this.refuse(HttpStatus.FORBIDDEN, 'Order line must point at your order');
+    }
+
+    return scoped;
+  }
+}
+```
+
+Read a column through `transform` rather than off the payload directly. A column
+can be supplied as its own scalar or through a relation object that resolves to
+it, and a driver prefers the relation — so reading the payload misses the
+relation route entirely. `transform` is the driver's own materialization and
+answers what the write will actually use.
+
+One foot-gun: `transform` does not fill database defaults, but it *does* apply
+class-field initializers. `@Column() tenantId: string = 'default'` makes every
+`create` refuse as scoped elsewhere. It fails closed, but the cause is not
+obvious.
+
+#### Relations and row scope
+
+A `join` — and a `Where.rel()` filter — is resolved by the driver in a single
+statement, so **the joined entity's resolver never runs**. Row scope does not
+apply to it, by design.
+
+That is safe under the model above, and the safety comes from the write side:
+
+1. every scoped entity carries its own scope column, so each row's owner is
+   decided without following a relation;
+2. a resolver checks the foreign keys it owns when a row is *written*
+   ([above](#checks-this-class-cannot-make));
+3. so by the time anything is read, every row already points inside its own
+   scope, and a join has nothing left to enforce.
+
+Reading orders with their lines is in scope precisely because every line passed
+its foreign-key check when it was written.
+
+What defeats this is a relation from an **unscoped** entity into a scoped one:
+nothing checks the unscoped side on write, so a join through it reads rows the
+caller's scope would have excluded. That is a schema design decision the
+implementer owns — the framework's guarantee is that a resolver runs at every
+repository *entry point*, and a join is not one.
+
+See also the driver's note on
+[relation cascades](../nestjs-repository-typeorm/README.md#relation-cascades-and-row-scope):
+a cascaded write reaches a related table without entering its repository, so
+`cascade` must not be enabled on a relation of a scoped entity.
+
+#### Natural keys need a serializable transaction
+
+Rule 2 is a check-then-write: the pre-check reads the row, and the write that
+follows identifies it by primary key alone. That read has to be authoritative,
+which means `SERIALIZABLE` or a row lock. `READ COMMITTED` narrows the window;
+no transaction leaves it open.
+
+This only matters when another scope can acquire the same primary key between
+the two statements, so it is unreachable for generated keys. With
+**caller-supplied natural keys** it is reachable — the row is deleted, another
+scope creates the same key, and the write lands on it — and it has been
+reproduced overwriting and re-scoping the new owner's row. Use generated keys
+for scoped entities, or run scoped writes in a serializable transaction.
+
+The create guard has the same race on the same terms; see
+[Create Inserts, It Never Updates](#create-inserts-it-never-updates).
+
+#### When not to use it
+
+Implement `RowScopeInterface` directly for any rule that is not equality on
+entity columns.
+
+### `scope` versus `ctx`
+
+`params.scope` is the authority on **who the caller is**. It is the
+`RowScopeCtx` overlay, resolved from the caller's context *before hooks run*
+so nothing downstream can change which principal you enforce against. What you
+receive is a fresh copy of the overlay's values each call, so mutating it
+affects nothing.
+
+`params.ctx` is plumbing: the context the driver will run under, after hooks.
+Pass it through unchanged on any read your resolver makes, so that read joins
+the caller's transaction. Building a fresh context instead silently drops it.
+
+**Never decide scope from `params.ctx`.** A hook can replace it, and a
+resolver reading its tenant from there lets a `beforeRead` hook choose which
+principal is enforced.
+
+Attach the overlay from a `ContextOverlayInterceptor`, before the handler
+runs — which is the answer to "the tenant arrives in a request header":
+
+```ts
+@Injectable()
+export class TenantScopeOverlay extends ContextOverlayInterceptor {
+  readonly ref = RowScopeCtx;
+
+  attach(context: ExecutionContext): void {
+    const request = context.switchToHttp().getRequest();
+    getAppContext(request).defineOverlay(
+      RowScopeCtx,
+      { tenantId: request.user?.tenantId },
+      { immutable: true },
+    );
+  }
+}
+```
+
+Derive the scope from the authenticated principal. A client-supplied header is
+a tenant-spoof unless a trusted gateway sets it.
+
+Register it — without this the overlay is never attached, no scope reaches any
+resolver, and every request is refused:
+
+```ts
+@Module({
+  providers: [{ provide: APP_INTERCEPTOR, useClass: TenantScopeOverlay }],
+})
+export class AppModule {}
+```
+
+Define it unconditionally rather than only when a tenant is present: where no
+overlay exists, something later in the request could define one. An overlay
+that is always present and immutable cannot be supplied after the fact, and a
+missing tenant then surfaces as a refusal from your resolver.
+
+### What a resolver has to check
+
+`target` is the existing row the call is aimed at (`update`, `replace`,
+`delete`, `deleteMany`, `softDelete`, `restore`, and `upsert` when its key names
+a stored row); it is `undefined` for `create` and `createMany`, which name no
+existing row, and for an `upsert` whose key matches none. `value` is what will
+be written.
+
+Both name the same row. For `update`/`replace` the repository pins it before a
+resolver runs: it refuses data that would change the primary key, and strips
+relation objects from the merge base so a relation on the caller's entity cannot
+decide which row is written.
+
+Check the right object for the operation:
+
+- `update`/`replace` — `target` is the row; `value` is the data being written.
+- `delete`/`deleteMany`/`softDelete`/`restore` — the driver acts on the *value*
+  the resolver returns, so that is the one to check.
+- `upsert` — the key comes from `value`, and `target` is the stored row that
+  key names, or `undefined` when it names none. That lookup is by primary key
+  alone and deliberately unscoped, because "no such row" and "exists, but not
+  yours" are different answers and a resolver's own reads cannot tell them
+  apart. So `target` here is not a row to trust — it answers "can the conflict
+  clause fire?", and a present one still has to be checked.
+
+If you write these yourself, read every primary key column through `transform`
+rather than off the payload — `RowScopeBase` does, and it is how a key supplied
+as `{ account: { id } }` is seen at all.
+
+`createMany` and `deleteMany` invoke the callback once per element, and a
+refusal rejects the whole call. Handle `deleteMany` explicitly: falling
+through to a permissive default removes rows by primary key across scopes.
+
+Refuse by throwing a `RuntimeException` (or subclass). Repositories sit below
+the transport layer, so `httpStatus` is a hint a transport-aware layer may
+read, not a commitment this layer makes. A bare `HttpException` is rewrapped
+into a generic 500.
+
+### Startup checks
+
+Structural only — nothing probes what a resolver decides:
+
+- every scoped entity has a resolver bound, and a declared-but-unbound
+  repository refuses to serve at all (`RowScopeUnboundException`). This also
+  catches a request-scoped resolver: its binding provider is never
+  instantiated at bootstrap, so nothing gets bound;
+- with `requireRowScopeDeclaration`, every entity carries a declaration.
+
+A `RowScopeBase` subclass adds two of its own, at construction: the entity must
+declare a primary key column (with none, the write pre-check would reduce to the
+scope columns alone and match any row in scope), and a configured `column` must
+actually exist on the entity. A subclass overriding `resolveScope` configures no
+column, so only the first applies to it.
 
 ## Repository Registry
 
@@ -1377,12 +1871,15 @@ also exported for manual provider wiring.
 | `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
 | `OptimisticLockException` | An `update`/`replace` targeted a stale version — the row was modified by another request since it was read |
 | `RepositoryDuplicateKeyException` | Duplicate repository keys detected at bootstrap |
+| `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |
 | `TransactionClosedException` | A settled scope was used again — `getOrStart`, `enter`, `onCommit`, or `onRollback` after close |
 | `TransactionHeuristicCommitException` | A multi-datasource commit failed after at least one datasource had already committed |
 | `TransactionReadOnlyConflictException` | A joining `run()`/`runReadOnly()` call's `readOnly` option conflicts with the scope it's joining |
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |
-| `FederationException` | Unsupported federated query (e.g., OR across federated relations) |
+| `FederationException` | Unsupported federated query (e.g., OR across federated relations). A `RuntimeException` from a scoped peer repository passes through unwrapped, so a refusal keeps its own status hint |
+| `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before a resolver was bound to it — it refuses rather than running unscoped |
+| `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
 
 ## Entry Points
 

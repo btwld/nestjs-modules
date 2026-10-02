@@ -5,6 +5,7 @@ import { RuntimeException } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
   OptimisticLockException,
+  PrimaryKeyImmutableException,
   RepositoryQueryException,
   SoftDeletedImmutableException,
   TransactionScope,
@@ -316,6 +317,46 @@ describe(TypeOrmRepository, () => {
           'Charlie',
         ]);
       });
+
+      // Contract test for the always-false clause: proves it renders as a
+      // real "match nothing" predicate against a live driver, not just at
+      // the AST level, and that composing it with real conditions can
+      // never widen the query back to "no restriction" — the exact bug
+      // this primitive exists to make unreachable (see README's
+      // "Always-False Clauses").
+      it('never - should match nothing', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+
+        const result = await testRepository.find({ where: Where.never() });
+        expect(result).toEqual([]);
+      });
+
+      it('and(x, never) - should short-circuit the whole clause to nothing', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+
+        const result = await testRepository.find({
+          where: Where.and(Where.eq('firstName', 'Alice'), Where.never()),
+        });
+        expect(result).toEqual([]);
+      });
+
+      it('or(never, x) - should behave exactly like x, ignoring the never branch', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+        await testFactory.create({ firstName: 'Bob' });
+
+        const result = await testRepository.find({
+          where: Where.or(Where.never(), Where.eq('firstName', 'Alice')),
+        });
+        expect(result).toHaveLength(1);
+        expect(result[0].firstName).toBe('Alice');
+      });
+
+      it('or() with zero conditions - should match nothing, same as never()', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+
+        const result = await testRepository.find({ where: Where.or() });
+        expect(result).toEqual([]);
+      });
     });
 
     it('should throw RepositoryQueryException on error', async () => {
@@ -345,6 +386,15 @@ describe(TypeOrmRepository, () => {
       });
       expect(result).not.toBeNull();
       expect(result?.firstName).toBe('Alice');
+    });
+
+    it('should return null for Where.never(), even when a matching row exists', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+
+      const result = await testRepository.findOne({
+        where: Where.and(Where.eq('id', created.id), Where.never()),
+      });
+      expect(result).toBeNull();
     });
 
     it('should throw RepositoryQueryException on error', async () => {
@@ -381,6 +431,13 @@ describe(TypeOrmRepository, () => {
       });
       expect(result).toBe(1);
     });
+
+    it('should return 0 for Where.never(), even when rows exist', async () => {
+      await testFactory.create({ firstName: 'Alice' });
+
+      const result = await testRepository.count({ where: Where.never() });
+      expect(result).toBe(0);
+    });
   });
 
   describe('findAndCount', () => {
@@ -409,6 +466,16 @@ describe(TypeOrmRepository, () => {
       expect(entities.length).toBe(1);
       expect(count).toBe(1);
       expect(entities[0].firstName).toBe('Alice');
+    });
+
+    it('should return empty array and 0 for Where.never(), even when rows exist', async () => {
+      await testFactory.create({ firstName: 'Alice' });
+
+      const [entities, count] = await testRepository.findAndCount({
+        where: Where.never(),
+      });
+      expect(entities).toEqual([]);
+      expect(count).toBe(0);
     });
 
     it('should apply pagination with correct total', async () => {
@@ -440,6 +507,43 @@ describe(TypeOrmRepository, () => {
       expect(created.id).toBeDefined();
       expect(created.firstName).toBe('Alice');
     });
+
+    it('should accept a caller-supplied primary key', async () => {
+      const created = await testRepository.create({
+        id: 'aaaaaaaa-0000-4000-8000-000000000001',
+        firstName: 'Alice',
+      });
+
+      expect(created.id).toBe('aaaaaaaa-0000-4000-8000-000000000001');
+    });
+
+    // create inserts; it does not update. Using save() here would make a
+    // create carrying an existing primary key silently overwrite that row,
+    // which is a cross-tenant write once row scope is in play: the scope stamp
+    // would then re-scope the row it just clobbered.
+    it('should reject a primary key that already exists, leaving the row intact', async () => {
+      const existing = await testFactory.create({
+        firstName: 'Alice',
+        lastName: 'Smith',
+      });
+
+      await expect(
+        testRepository.create({ id: existing.id, firstName: 'HIJACKED' }),
+      ).rejects.toThrow(RuntimeException);
+
+      const found = await testRepository.findOne({
+        where: Where.eq('id', existing.id),
+      });
+      expect(found?.firstName).toBe('Alice');
+    });
+
+    it('should return database-populated columns', async () => {
+      const created = await testRepository.create({ firstName: 'Alice' });
+
+      expect(created.dateCreated).toBeInstanceOf(Date);
+      expect(created.dateUpdated).toBeInstanceOf(Date);
+      expect(created.version).toBe(1);
+    });
   });
 
   describe('createMany', () => {
@@ -459,6 +563,40 @@ describe(TypeOrmRepository, () => {
         ]),
       );
     });
+
+    it('should return entities in input order', async () => {
+      const created = await testRepository.createMany([
+        { firstName: 'First' },
+        { firstName: 'Second' },
+        { firstName: 'Third' },
+      ]);
+
+      expect(created.map((entity) => entity.firstName)).toEqual([
+        'First',
+        'Second',
+        'Third',
+      ]);
+    });
+
+    it('should reject the whole batch on a duplicate primary key', async () => {
+      const existing = await testFactory.create({ firstName: 'Alice' });
+
+      await expect(
+        testRepository.createMany([
+          { firstName: 'Innocent' },
+          { id: existing.id, firstName: 'HIJACKED' },
+        ]),
+      ).rejects.toThrow(RuntimeException);
+
+      const found = await testRepository.findOne({
+        where: Where.eq('id', existing.id),
+      });
+      expect(found?.firstName).toBe('Alice');
+    });
+
+    it('should return an empty array for an empty input', async () => {
+      expect(await testRepository.createMany([])).toEqual([]);
+    });
   });
 
   describe('update', () => {
@@ -471,6 +609,58 @@ describe(TypeOrmRepository, () => {
 
       expect(updated.firstName).toBe('Bob');
       expect(updated.lastName).toBe('Smith');
+    });
+
+    it('should refuse data that would move the write onto a different row', async () => {
+      const mine = await testFactory.create({ firstName: 'Mine' });
+      const theirs = await testFactory.create({ firstName: 'Theirs' });
+
+      await expect(
+        testRepository.update(mine, {
+          id: theirs.id,
+          firstName: 'Redirected',
+        }),
+      ).rejects.toThrow(PrimaryKeyImmutableException);
+
+      // Both rows untouched: the one named by the entity argument and the one
+      // named by the payload. Asserting only the throw would not prove the
+      // write was stopped before reaching the driver.
+      const after = await testRepository.find({
+        where: Where.in('id', [mine.id, theirs.id]),
+      });
+      expect(
+        after
+          .map((row) => row.firstName)
+          .sort((left, right) => left.localeCompare(right)),
+      ).toEqual(['Mine', 'Theirs']);
+    });
+
+    it('should refuse a replace that would move the write onto a different row', async () => {
+      const mine = await testFactory.create({ firstName: 'Mine' });
+      const theirs = await testFactory.create({ firstName: 'Theirs' });
+
+      await expect(
+        testRepository.replace(mine, {
+          id: theirs.id,
+          firstName: 'Redirected',
+        }),
+      ).rejects.toThrow(PrimaryKeyImmutableException);
+
+      const victim = await testRepository.findOne({
+        where: Where.eq('id', theirs.id),
+      });
+      expect(victim?.firstName).toBe('Theirs');
+    });
+
+    it('should allow data that repeats the entity own primary key', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+
+      const updated = await testRepository.update(entity, {
+        id: entity.id,
+        firstName: 'Bob',
+      });
+
+      expect(updated.firstName).toBe('Bob');
     });
 
     it('should increment version by exactly 1 on a successful update', async () => {

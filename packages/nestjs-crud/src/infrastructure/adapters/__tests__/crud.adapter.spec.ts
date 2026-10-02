@@ -526,5 +526,16 @@ describe('CrudAdapter', () => {
         BadRequestException,
       );
     });
+
+    it('should not throw for a never clause — it has no field to validate', () => {
+      expect(() =>
+        adapter.exposedValidateWhereFields(Where.never()),
+      ).not.toThrow();
+    });
+
+    it('should not throw for a never clause nested inside a compound', () => {
+      const clause = Where.and(Where.eq('name', 'foo'), Where.never());
+      expect(() => adapter.exposedValidateWhereFields(clause)).not.toThrow();
+    });
   });
 });

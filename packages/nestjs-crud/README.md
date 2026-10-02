@@ -355,6 +355,15 @@ export class SomeService {
 | SoftDelete | `softDelete()` | `softDelete()` |
 | Restore | `restore()` | `restore()` |
 
+**Row-scoped entities are scoped on every route, with nothing to add here.**
+Because enforcement lives in the repository this table maps onto, a CRUD
+controller over an entity declared `rowScope` is scoped without any filter,
+guard or interceptor of its own: list returns only the caller's rows, a read,
+update or delete aimed at another scope is a `404`, and a create carrying a
+foreign scope column in the body is a `403`. This package contains no
+row-scope code — do not add a filter expecting to need one. See the Row Scope
+section of `@concepta/nestjs-repository`.
+
 **Update / Replace and optimistic locking.** When the entity carries a
 version column (`CommonPostgresEntity`/`CommonSqliteEntity`), `update`/
 `replace` are guarded by an atomic version compare-and-swap in the

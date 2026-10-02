@@ -21,9 +21,40 @@ export {
 } from './interfaces/repository-module.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
+// Row Scope
+// ═══════════════════════════════════════════════════════════════════
+export {
+  RowScopeOperation,
+  RowScopeQueryOperation,
+  RowScopeValues,
+  RowScopeWriteOperation,
+  ScalarValue,
+} from './row-scope/row-scope.types.js';
+export {
+  RowScopeInterface,
+  RowScopeQueryParams,
+  RowScopeWriteParams,
+} from './row-scope/interfaces/row-scope.interface.js';
+export { RowScopeCtx } from './row-scope/interfaces/row-scope-context.interface.js';
+export {
+  RowScopeBase,
+  RowScopeBaseOptions,
+  RowScopeBaseRepository,
+} from './row-scope/row-scope-base.js';
+export {
+  RowScopeRegistration,
+  RowScopeScopedRegistration,
+  RowScopePublicRegistration,
+} from './row-scope/interfaces/row-scope-registration.interface.js';
+
+// ═══════════════════════════════════════════════════════════════════
 // Exceptions
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
+export { EntityAlreadyExistsException } from './exceptions/entity-already-exists.exception.js';
+export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
+export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
+export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
 export { RepositoryQueryException } from './exceptions/repository-query.exception.js';
 export { OptimisticLockException } from './exceptions/optimistic-lock.exception.js';
 export { SoftDeletedImmutableException } from './exceptions/soft-deleted-immutable.exception.js';
@@ -213,9 +244,11 @@ export {
   WhereConditionPair,
   WhereCondition,
   WhereCompound,
+  WhereNever,
   WhereClause,
   isWhereCondition,
   isWhereCompound,
+  isWhereNever,
   isNullaryCondition,
   isArrayCondition,
   isPairCondition,

@@ -62,9 +62,20 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   /**
    * Create a single entity.
    *
+   * **An insert, never an update.** A primary key that already names a row
+   * throws `EntityAlreadyExistsException` rather than overwriting it — use
+   * `upsert` for insert-or-update. Enforced by `RepositoryAdapter` before the
+   * driver is called, because a save-by-primary-key implementation would
+   * otherwise let a caller supplying someone else's key overwrite that row,
+   * and no permission check above this layer could see it happen.
+   *
+   * Caller-supplied primary keys are otherwise fine; the key space is the
+   * database's to enforce.
+   *
    * @param entity - Partial entity data to create
    * @param options - Create options
-   * @returns The created entity
+   * @returns The created entity, including database defaults and generated
+   * columns
    */
   create(
     entity: DeepPartial<Entity>,
@@ -74,9 +85,12 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   /**
    * Create multiple entities.
    *
+   * Inserts, never updates — see {@link RepositoryInterface.create}. A
+   * duplicate primary key anywhere in the batch fails the whole call.
+   *
    * @param entities - Array of partial entity data to create
    * @param options - Create options
-   * @returns Array of created entities
+   * @returns Array of created entities, in the order given
    */
   createMany(
     entities: DeepPartial<Entity>[],

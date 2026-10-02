@@ -6,7 +6,9 @@ import {
 } from '@concepta/nestjs-core';
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
+import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
+import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
 import { RepositoryDuplicateKeyException } from '../exceptions/repository-duplicate-key.exception.js';
 import { RepositoryQueryException } from '../exceptions/repository-query.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
@@ -16,6 +18,8 @@ import { TransactionReadOnlyConflictException } from '../exceptions/transaction-
 import { TransactionScopeFailedException } from '../exceptions/transaction-scope-failed.exception.js';
 import { TransactionTimeoutException } from '../exceptions/transaction-timeout.exception.js';
 import { FederationException } from '../federation/exceptions/federation.exception.js';
+import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
+import { RowScopeUnboundException } from '../row-scope/exceptions/row-scope-unbound.exception.js';
 
 /**
  * Anti-drift check: every `RuntimeException` subclass in this package states
@@ -43,6 +47,16 @@ const CASES: {
     name: 'RepositoryQueryException',
     build: () => new RepositoryQueryException('SomeEntity'),
     fault: 'internal',
+  },
+  {
+    name: 'EntityAlreadyExistsException',
+    build: () => new EntityAlreadyExistsException('SomeEntity'),
+    fault: 'client',
+  },
+  {
+    name: 'PrimaryKeyImmutableException',
+    build: () => new PrimaryKeyImmutableException('SomeEntity', ['id']),
+    fault: 'client',
   },
   {
     name: 'SoftDeletedImmutableException',
@@ -78,6 +92,16 @@ const CASES: {
     name: 'FederationException',
     build: () => new FederationException(),
     fault: 'internal',
+  },
+  {
+    name: 'RowScopeBootException',
+    build: () => new RowScopeBootException(['some failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'RowScopeUnboundException',
+    build: () => new RowScopeUnboundException('orders'),
+    fault: 'usage',
   },
 ];
 

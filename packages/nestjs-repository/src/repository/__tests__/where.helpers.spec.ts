@@ -1,6 +1,7 @@
 import {
   isWhereCondition,
   isWhereCompound,
+  isWhereNever,
   isNullaryCondition,
   isArrayCondition,
   isPairCondition,
@@ -307,6 +308,47 @@ describe('Where', () => {
         ],
       });
     });
+
+    it('should return Where.never() when called with zero conditions', () => {
+      // Not a caller-side guard case — this is the point of the design.
+      // Where.or(...tenantIds.map(...)) on an empty tenantIds array must
+      // resolve to "match nothing", not "no constraint", without the
+      // caller having to special-case emptiness itself.
+      const result = Where.or();
+      expect(result).toEqual({ never: true });
+      expect(isWhereNever(result)).toBe(true);
+    });
+  });
+
+  describe('static and()', () => {
+    it('should throw when called with zero conditions', () => {
+      // Unlike or(), AND has no safe automatic answer for the empty case
+      // (its logical identity is TRUE — the wrong direction for a
+      // security-relevant clause) — silently accepting one would let
+      // Where.and(...possiblyEmptyArray) collapse to "no constraint"
+      // whenever the array happens to be empty. Callers must guard it.
+      expect(() => Where.and()).toThrow(
+        'Where.and() requires at least one condition',
+      );
+    });
+  });
+
+  describe('static never()', () => {
+    it('should create an always-false node with no field', () => {
+      const result = Where.never();
+      expect(result).toEqual({ never: true });
+      expect('field' in result).toBe(false);
+    });
+
+    it('should return the same reference on repeated calls', () => {
+      // A frozen singleton — downstream DNF-shape checks can rely on
+      // there being exactly one representation of "always false".
+      expect(Where.never()).toBe(Where.never());
+    });
+
+    it('should be frozen', () => {
+      expect(Object.isFrozen(Where.never())).toBe(true);
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -440,6 +482,21 @@ describe('Where', () => {
       });
     });
 
+    it('or() with zero conditions should delegate to Where.or, returning never()', () => {
+      expect(w.or()).toEqual({ never: true });
+    });
+
+    it('and() with zero conditions should delegate to Where.and, throwing', () => {
+      expect(() => w.and()).toThrow(
+        'Where.and() requires at least one condition',
+      );
+    });
+
+    it('never() should delegate to Where.never', () => {
+      expect(w.never()).toEqual({ never: true });
+      expect(w.never()).toBe(Where.never());
+    });
+
     it('rel() should delegate to Where.rel', () => {
       const condition = w.eq('status', 'active');
       expect(w.rel('tasks', condition)).toEqual({
@@ -503,6 +560,10 @@ describe('Where', () => {
         );
         expect(isWhereCondition(compound)).toBe(false);
       });
+
+      it('should return false for the never node', () => {
+        expect(isWhereCondition(Where.never())).toBe(false);
+      });
     });
 
     describe('isWhereCompound()', () => {
@@ -522,10 +583,36 @@ describe('Where', () => {
         expect(isWhereCompound(compound)).toBe(true);
       });
 
+      it('should return false for the never node', () => {
+        // The load-bearing case: WhereNever must not be classified as a
+        // compound, or every `if (isWhereCondition) ... else <treat as
+        // compound>` site in the codebase would try to read `.conditions`
+        // off it.
+        expect(isWhereCompound(Where.never())).toBe(false);
+      });
+
       it('should return false for a field condition', () => {
         expect(isWhereCompound(Where.eq<TestEntity>('name', 'Alice'))).toBe(
           false,
         );
+      });
+    });
+
+    describe('isWhereNever()', () => {
+      it('should return true for the never node', () => {
+        expect(isWhereNever(Where.never())).toBe(true);
+      });
+
+      it('should return false for a field condition', () => {
+        expect(isWhereNever(Where.eq<TestEntity>('name', 'Alice'))).toBe(false);
+      });
+
+      it('should return false for a compound clause', () => {
+        const compound = Where.and(
+          Where.eq<TestEntity>('name', 'Alice'),
+          Where.eq<TestEntity>('status', 'active'),
+        );
+        expect(isWhereNever(compound)).toBe(false);
       });
     });
 

@@ -10,12 +10,19 @@ import {
   type WhereConditionNullary,
   type WhereConditionPair,
   type WhereConditionScalar,
+  type WhereNever,
 } from './interfaces/where-clause.interface.js';
 import {
   type EntityColumn,
   WhereCompoundOperator,
   WhereOperator,
 } from './repository.types.js';
+
+// A single frozen instance, so the builder never allocates and the node
+// cannot be mutated in place. Consumers recognize it structurally
+// (`isWhereNever`), not by reference, so a hand-built `{ never: true }` is
+// treated identically.
+const NEVER: WhereNever = Object.freeze({ never: true });
 
 /**
  * Where clause builder with both static and instance APIs.
@@ -155,11 +162,44 @@ export class Where<Entity extends PlainLiteralObject = PlainLiteralObject> {
     return { field, operator: WhereOperator.BETWEEN, value: [from, to] };
   }
 
+  /**
+   * An always-false clause — matches zero rows, and cannot be narrowed away
+   * into "no constraint" the way an absent `where` would be. The canonical way
+   * to express "resolved to nothing" for a fail-closed guard clause (e.g. an
+   * empty tenant-id set). See `WhereNever` and `toDnf`.
+   */
+  static never(): WhereNever {
+    return NEVER;
+  }
+
+  /**
+   * `AND` requires at least one condition — an empty `AND` has no
+   * conditions to be false about, so silently accepting one would let
+   * `Where.and(...possiblyEmptyArray)` collapse to "no constraint" the
+   * moment the array happens to be empty. Callers must guard emptiness
+   * explicitly.
+   */
   static and(...conditions: WhereClause[]): WhereCompound {
+    if (conditions.length === 0) {
+      throw new RuntimeException({
+        message: 'Where.and() requires at least one condition',
+        fault: 'usage',
+      });
+    }
     return { operator: WhereCompoundOperator.AND, conditions };
   }
 
-  static or(...conditions: WhereClause[]): WhereCompound {
+  /**
+   * `OR`'s identity for zero conditions is "none of them matched" — unlike
+   * `and()`, this is safe to resolve automatically rather than requiring
+   * the caller to guard it, since the correct answer (match nothing) is
+   * unambiguous. Makes `Where.or(...tenantIds.map(...))` correct by
+   * construction when `tenantIds` happens to be empty.
+   */
+  static or(...conditions: WhereClause[]): WhereCompound | WhereNever {
+    if (conditions.length === 0) {
+      return Where.never();
+    }
     return { operator: WhereCompoundOperator.OR, conditions };
   }
 
@@ -334,11 +374,15 @@ export class Where<Entity extends PlainLiteralObject = PlainLiteralObject> {
     return Where.between(field, from, to);
   }
 
+  never(): WhereNever {
+    return Where.never();
+  }
+
   and(...conditions: WhereClause[]): WhereCompound {
     return Where.and(...conditions);
   }
 
-  or(...conditions: WhereClause[]): WhereCompound {
+  or(...conditions: WhereClause[]): WhereCompound | WhereNever {
     return Where.or(...conditions);
   }
 

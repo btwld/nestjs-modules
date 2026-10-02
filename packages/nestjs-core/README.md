@@ -274,6 +274,37 @@ call. It only removes an overlay defined directly on that host — one
 inherited from a parent context (e.g. via `with()`) is left untouched, and
 the call returns `false` rather than removing anything.
 
+### Immutable overlays
+
+An overlay carrying something a request must not be able to change — an
+authenticated principal, a tenant — can be defined `{ immutable: true }`:
+
+```ts
+ctx.defineOverlay(MyCtx, { tenantId }, { immutable: true });
+```
+
+That overlay then cannot be removed, redefined, or shadowed on a prototype
+child. Removal is refused quietly — `removeOverlay` returns `false` and leaves
+it in place — while redefining or shadowing throws
+`OverlayImmutableException`. Hardening an overlay that is already defined
+mutably throws `OverlayAlreadyDefinedException` rather than silently doing
+nothing, so a definer is never left believing it protected something it did
+not.
+
+It is opt-in because some overlays need the opposite — a transaction overlay
+is removed at teardown and deliberately re-declared on narrower children.
+
+The values are frozen **one level deep**: a frozen copy is stored, so
+reassigning a top-level key has no effect, but an object nested inside those
+values is still shared with whoever defined the overlay and stays mutable.
+Freezing that is the definer's call — the option protects the binding and the
+values it was handed, not the object graph underneath. Keeping overlay values
+flat sidesteps the question.
+
+Reading an overlay is already safe from tampering regardless: `with()` returns
+a fresh object each call, so mutating what you receive never affects a later
+read.
+
 **Defining a custom overlay:**
 
 ```ts
@@ -708,12 +739,15 @@ exercise correlation behavior directly.
 
 | Export | Description |
 | --- | --- |
-| `AppContextHost` | Per-request overlay container. Use `defineOverlay`, `removeOverlay`, `with`, `require`, `supports`, `optional`. Static `from(value?)` coerces `AppContextLike` to a host. |
+| `AppContextHost` | Per-request overlay container. Use `defineOverlay`, `removeOverlay`, `with`, `require`, `supports`, `optional`. Static `from(value?)` coerces `AppContextLike` to a host — it throws on a non-empty plain object, so pass a real host rather than `{ tenantId }`. |
+| `OverlayDefineOptionsInterface` | Third argument to `defineOverlay`. `{ immutable: true }` protects the overlay from removal, redefinition, and shadowing. |
 | `getAppContext(request)` | Returns the `AppContextHost` for a request, creating one on first access. |
 | `Ctx` | Parameter decorator. Without args: injects the raw `AppContextHost`. With an `OverlayRef`: unwraps the overlay via `appCtx.with(ref)`. |
 | `OverlayRef` | Typed token for a named overlay. Construct with `new OverlayRef<Name, Props>('withName')`. |
 | `ContextOverlayInterceptor` | Abstract base for custom overlays. Subclasses implement `ref` and `attach()`. |
 | `OverlayNotDefinedException` | Thrown when `with(ref)` is called for an overlay that was not defined on the context. |
+| `OverlayImmutableException` | Thrown when an overlay defined `{ immutable: true }` is redefined or shadowed on a child. |
+| `OverlayAlreadyDefinedException` | Thrown when `{ immutable: true }` is requested but a mutable overlay of that name already exists. |
 | `AppContextInterface` | Interface implemented by `AppContextHost`. |
 | `AppContextLike` | Type accepted by `AppContextHost.from()` — either an `AppContextHost` or a nullish/empty plain object. |
 | `CorrelationCtx` | `OverlayRef` token for the correlation overlay. Use with `ctx.with(CorrelationCtx)` or `@Ctx(CorrelationCtx)`. |

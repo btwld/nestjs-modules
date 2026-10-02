@@ -2,15 +2,29 @@ import { type PlainLiteralObject } from '@nestjs/common';
 
 import { type AppContextLike } from '../../domain/context/app-context-like.type.js';
 import { type AppContextInterface } from '../../domain/context/interfaces/app-context.interface.js';
+import { type OverlayDefineOptionsInterface } from '../../domain/context/interfaces/overlay-define-options.interface.js';
 import { type OverlayRef } from '../../domain/context/overlay-ref.js';
 import { type RefsToMethods } from '../../domain/context/refs-to-methods.type.js';
 
+import { OverlayAlreadyDefinedException } from './exceptions/overlay-already-defined.exception.js';
+import { OverlayImmutableException } from './exceptions/overlay-immutable.exception.js';
 import { OverlayNotDefinedException } from './exceptions/overlay-not-defined.exception.js';
 
 /**
  * Symbol key used to store the context on the request object.
  */
 export const APP_CONTEXT_KEY = Symbol('APP_CONTEXT_KEY');
+
+/**
+ * Marks an installed overlay method as immutable. Kept on the method itself
+ * rather than in a side table so it travels the prototype chain for free —
+ * which is what lets a child detect a parent's immutable overlay.
+ */
+const IMMUTABLE_OVERLAY = Symbol('IMMUTABLE_OVERLAY');
+
+function isImmutableOverlay(value: unknown): boolean {
+  return typeof value === 'function' && IMMUTABLE_OVERLAY in value;
+}
 
 // ---------------------------------------------------------------------------
 // Proxy handler — intercepts undefined `with*` calls
@@ -59,21 +73,56 @@ export class AppContextHost implements AppContextInterface {
    * in a prototype-chain child of this context.
    *
    * Idempotent — if the overlay name already exists on `this`, this is a no-op.
+   *
+   * Pass `{ immutable: true }` for an overlay that must not change once set,
+   * such as one carrying authorization input. See
+   * {@link OverlayDefineOptionsInterface}.
    */
   defineOverlay<Name extends string, Props extends PlainLiteralObject>(
     ref: OverlayRef<Name, Props, unknown[]>,
     values: Props,
+    options?: OverlayDefineOptionsInterface,
   ): void {
     const name = ref.name;
 
-    if (Object.prototype.hasOwnProperty.call(this, name)) return;
+    // `name in this` rather than a read: the proxy's get trap throws
+    // OverlayNotDefinedException for any undefined `with*` property, so
+    // reading first would throw on every overlay's first definition. The
+    // `has` trap is not overridden, so `in` is safe — and it walks the
+    // prototype chain, which is what catches shadowing.
+    if (name in this && isImmutableOverlay(Reflect.get(this, name))) {
+      throw new OverlayImmutableException(name);
+    }
+
+    const immutable = options?.immutable === true;
+
+    if (Object.prototype.hasOwnProperty.call(this, name)) {
+      // Definition is idempotent, but silently swallowing a request to harden
+      // would leave the caller believing an overlay is protected when it is
+      // still removable, shadowable, and holding someone else's values.
+      if (immutable) {
+        throw new OverlayAlreadyDefinedException(name);
+      }
+      return;
+    }
+    // A copy, so freezing does not reach back and freeze the caller's own
+    // object out from under them.
+    const resolved = immutable ? Object.freeze({ ...values }) : values;
+
+    const overlay = function (this: AppContextHost) {
+      return Object.assign(Object.create(this), resolved);
+    };
+
+    if (immutable) {
+      Object.defineProperty(overlay, IMMUTABLE_OVERLAY, { value: true });
+    }
 
     Object.defineProperty(this, name, {
-      value: function (this: AppContextHost) {
-        return Object.assign(Object.create(this), values);
-      },
+      value: overlay,
       enumerable: false,
-      configurable: true,
+      // Non-configurable when immutable, so removeOverlay() cannot clear it
+      // and open the way to a redefinition.
+      configurable: !immutable,
       writable: false,
     });
   }
@@ -84,6 +133,9 @@ export class AppContextHost implements AppContextInterface {
    * Only removes an overlay owned directly by this instance — an overlay
    * inherited from a parent (e.g. a `with()` child's prototype) is left
    * untouched. Returns whether an own overlay was removed.
+   *
+   * An overlay defined with `{ immutable: true }` is non-configurable, so this
+   * returns `false` and leaves it in place.
    */
   removeOverlay(
     ref: OverlayRef<string, PlainLiteralObject, unknown[]>,

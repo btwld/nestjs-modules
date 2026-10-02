@@ -159,10 +159,10 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
     throw new Error('not implemented');
   }
   merge(
-    _mergeIntoEntity: TestEntity,
-    ..._entityLikes: DeepPartial<TestEntity>[]
+    mergeIntoEntity: TestEntity,
+    ...entityLikes: DeepPartial<TestEntity>[]
   ): TestEntity {
-    throw new Error('not implemented');
+    return Object.assign(mergeIntoEntity, ...entityLikes);
   }
 
   exposedResolveJoinClauses(join?: JoinClause[]): JoinClause[] | undefined {

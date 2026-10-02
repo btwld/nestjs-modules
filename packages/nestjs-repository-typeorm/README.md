@@ -107,6 +107,13 @@ Each entity key creates a `TypeOrmRepository` instance injectable via
 export class AppModule {}
 ```
 
+**Do not declare `rowScope` on this path.** Only
+`RepositoryModule.forFeature()` binds a row scope resolver. An entity declared
+`{ access: 'scoped' }` here gets no resolver, so it fails closed — every
+operation throws `RowScopeUnboundException`, and startup fails outright if
+`RepositoryModule.forRoot()` is present. Register scoped entities through
+`RepositoryModule.forFeature({ module: TypeOrmRepositoryModule, ... })`.
+
 ### Provider Options
 
 ```ts
@@ -115,6 +122,8 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   entity: Type<Entity>;                                    // TypeORM entity class
   dataSource?: TypeOrmDataSourceToken;                     // Data source (default: 'default')
   factory?: (dataSource: DataSource) => Repository<Entity>; // Custom repository factory
+  relations?: Record<string, RelationActionConfig>;        // Per-relation onDelete/onUpdate and federation
+  rowScope?: RowScopeRegistration;                         // Row scope declaration (see above)
 }
 ```
 
@@ -124,6 +133,11 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   `DataSourceOptions`; defaults to `'default'`
 - **`factory`** -- optional factory for custom TypeORM repositories; receives
   `DataSource`, returns `Repository<Entity>`
+- **`relations`** -- per-relation `onDelete`/`onUpdate` behaviour and
+  federation settings, keyed by relation property name
+- **`rowScope`** -- declares the entity scoped or public. Passed straight
+  through to the adapter; the driver plays no part in enforcement, and the
+  resolver is bound by `RepositoryModule.forFeature()`
 
 ### Injecting Repositories
 
@@ -267,6 +281,23 @@ section](../nestjs-repository/README.md#soft-deleted-immutability) for the
 
 Entities without a version column are unaffected — `update`/`replace`
 behave exactly as before.
+
+### Relation Cascades and Row Scope
+
+`doCreate`/`doUpdate`/`doReplace` use `repository.save()`, which honours
+TypeORM's `cascade` option on a relation. A cascaded write reaches the related
+entity's table **without going through that entity's repository**, so any
+row-scope resolver registered for it never runs, and the adapter's own
+pre-write checks only ever saw the entity you called.
+
+Reproduced: with `@ManyToOne(() => Parent, { cascade: true })`, a scoped write
+on the child carrying `{ parent: { id: <other tenant's id>, ... } }` overwrote
+— and re-tenanted — that parent row, with no refusal.
+
+**Do not enable `cascade` on a relation of a row-scoped entity, or on a
+relation pointing at one.** Write each entity through its own repository so
+each resolver runs. This is a driver-level concern: the repository abstraction
+has no notion of cascading writes, so nothing above this layer can detect it.
 
 ### Transaction Awareness
 

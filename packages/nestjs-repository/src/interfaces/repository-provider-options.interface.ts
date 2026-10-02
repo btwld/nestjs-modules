@@ -2,6 +2,7 @@ import { type Type, type PlainLiteralObject } from '@nestjs/common';
 
 import { type WhereCondition } from '../repository/interfaces/where-clause.interface.js';
 import { type RelationAction } from '../repository/repository.types.js';
+import { type RowScopeRegistration } from '../row-scope/interfaces/row-scope-registration.interface.js';
 
 /**
  * Per-relation configuration for forFeature() registration.
@@ -43,6 +44,14 @@ export interface RepositoryProviderOptions<
    * Keyed by relation property name on the entity.
    */
   relations?: Record<string, RelationActionConfig>;
+
+  /**
+   * Row scope declaration for this entity.
+   *
+   * Either names the resolver that scopes its rows, or records that the
+   * entity is deliberately public along with the reason.
+   */
+  rowScope?: RowScopeRegistration;
 
   /**
    * Additional driver-specific options.

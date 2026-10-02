@@ -1,5 +1,7 @@
 import { OverlayRef } from '../../../domain/context/overlay-ref.js';
 import { AppContextHost } from '../app-context.host.js';
+import { OverlayAlreadyDefinedException } from '../exceptions/overlay-already-defined.exception.js';
+import { OverlayImmutableException } from '../exceptions/overlay-immutable.exception.js';
 
 interface FeatureProps {
   value: string;
@@ -53,6 +55,107 @@ describe(AppContextHost.name, () => {
 
       expect(removed).toBe(false);
       expect(ctx.supports(FeatureRef)).toBe(false);
+    });
+  });
+
+  describe('immutable overlays', () => {
+    const define = (ctx: AppContextHost, value: string) =>
+      ctx.defineOverlay(FeatureRef, { value }, { immutable: true });
+
+    it('reads back like any other overlay', () => {
+      const ctx = new AppContextHost();
+      define(ctx, 'first');
+
+      expect(ctx.supports(FeatureRef)).toBe(true);
+      expect(ctx.with(FeatureRef).value).toEqual('first');
+    });
+
+    it('refuses a second definition instead of silently ignoring it', () => {
+      const ctx = new AppContextHost();
+      define(ctx, 'first');
+
+      expect(() => define(ctx, 'second')).toThrow(OverlayImmutableException);
+      expect(ctx.with(FeatureRef).value).toEqual('first');
+    });
+
+    it('refuses a mutable redefinition too', () => {
+      const ctx = new AppContextHost();
+      define(ctx, 'first');
+
+      expect(() => ctx.defineOverlay(FeatureRef, { value: 'second' })).toThrow(
+        OverlayImmutableException,
+      );
+    });
+
+    it('cannot be removed and redefined', () => {
+      const ctx = new AppContextHost();
+      define(ctx, 'first');
+
+      expect(ctx.removeOverlay(FeatureRef)).toBe(false);
+      expect(ctx.supports(FeatureRef)).toBe(true);
+      expect(() => define(ctx, 'second')).toThrow(OverlayImmutableException);
+    });
+
+    it('refuses to be shadowed on a prototype child', () => {
+      const parent = new AppContextHost();
+      define(parent, 'parent');
+      const child = AppContextHost.from(parent.with(FeatureRef));
+
+      expect(() => define(child, 'child')).toThrow(OverlayImmutableException);
+      expect(child.with(FeatureRef).value).toEqual('parent');
+    });
+
+    it('does not freeze the caller own values object', () => {
+      const ctx = new AppContextHost();
+      const values = { value: 'first' };
+
+      ctx.defineOverlay(FeatureRef, values, { immutable: true });
+
+      expect(Object.isFrozen(values)).toBe(false);
+    });
+
+    it('refuses to harden an overlay that is already defined mutably', () => {
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(FeatureRef, { value: 'first' });
+
+      // Silently ignoring this would leave the caller believing it hardened
+      // an overlay that is still removable and shadowable.
+      expect(() => define(ctx, 'second')).toThrow(
+        OverlayAlreadyDefinedException,
+      );
+      expect(ctx.removeOverlay(FeatureRef)).toBe(true);
+    });
+
+    it('ignores mutation of the values object after definition', () => {
+      const ctx = new AppContextHost();
+      const values = { value: 'first' };
+      ctx.defineOverlay(FeatureRef, values, { immutable: true });
+
+      values.value = 'tampered';
+
+      expect(ctx.with(FeatureRef).value).toEqual('first');
+    });
+  });
+
+  describe('mutable overlays keep their existing behavior', () => {
+    it('still shadows on a prototype child', () => {
+      const parent = new AppContextHost();
+      parent.defineOverlay(FeatureRef, { value: 'parent' });
+      const child = AppContextHost.from(parent.with(FeatureRef));
+
+      child.defineOverlay(FeatureRef, { value: 'child' });
+
+      expect(child.with(FeatureRef).value).toEqual('child');
+      expect(parent.with(FeatureRef).value).toEqual('parent');
+    });
+
+    it('is still an idempotent no-op on the same context', () => {
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(FeatureRef, { value: 'first' });
+
+      ctx.defineOverlay(FeatureRef, { value: 'second' });
+
+      expect(ctx.with(FeatureRef).value).toEqual('first');
     });
   });
 });

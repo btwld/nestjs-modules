@@ -3,10 +3,13 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type OverlayRef } from '../overlay-ref.js';
 import { type RefsToMethods } from '../refs-to-methods.type.js';
 
+import { type OverlayDefineOptionsInterface } from './overlay-define-options.interface.js';
+
 export interface AppContextInterface {
   defineOverlay<Name extends string, Props extends PlainLiteralObject>(
     ref: OverlayRef<Name, Props, unknown[]>,
     values: Props,
+    options?: OverlayDefineOptionsInterface,
   ): void;
 
   removeOverlay(

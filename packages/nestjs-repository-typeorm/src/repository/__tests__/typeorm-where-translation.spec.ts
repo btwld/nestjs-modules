@@ -2,6 +2,8 @@ import {
   And,
   Between,
   Equal,
+  type FindOperator,
+  type FindOptionsWhere,
   In,
   IsNull,
   LessThan,
@@ -13,6 +15,7 @@ import {
   type Repository,
 } from 'typeorm';
 
+import { RuntimeException } from '@concepta/nestjs-core';
 import {
   type JoinClause,
   Where,
@@ -56,6 +59,21 @@ class TestableTypeOrmRepository extends TypeOrmRepository<TestEntity> {
   public testTranslateJoin(join?: JoinClause[]) {
     return this.translateJoin(join);
   }
+
+  public testNeverWhere() {
+    return this.neverWhere();
+  }
+}
+
+// Raw()'s FindOperator carries the sql-generator closure itself, so two
+// separately-constructed never-where predicates are never `toEqual` —
+// assert shape instead of comparing against a second Raw() call.
+function expectNeverWhere(result: FindOptionsWhere<TestEntity>[] | undefined) {
+  expect(result).toHaveLength(1);
+  const branch = (result ?? [])[0] as Record<string, FindOperator<unknown>>;
+  expect(Object.keys(branch)).toEqual(['id']);
+  expect(branch.id.type).toBe('raw');
+  expect(branch.id.getSql?.('t')).toBe('1 = 0');
 }
 
 function createTestableRepo(): TestableTypeOrmRepository {
@@ -322,6 +340,22 @@ describe('TypeOrmRepository WHERE clause translation', () => {
       const result = repo.testBranchToFindOptionsWhere(leaves);
       expect(result).toEqual({});
     });
+
+    it('should throw for a never leaf — unreachable via translateWhere, a defensive guard against a broken toDnf invariant silently widening to "no constraint"', () => {
+      expect(() => repo.testBranchToFindOptionsWhere([Where.never()])).toThrow(
+        RuntimeException,
+      );
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // neverWhere
+  // ═════════════════════════════════════════════════════════════════════════════
+
+  describe('neverWhere', () => {
+    it('should anchor on the primary column and render a literal always-false predicate', () => {
+      expectNeverWhere([repo.testNeverWhere()]);
+    });
   });
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -410,6 +444,32 @@ describe('TypeOrmRepository WHERE clause translation', () => {
       expect(repo.testTranslateWhere(clause)).toEqual([
         { firstName: Equal('John'), posts: { id: Equal('abc') } },
       ]);
+    });
+
+    it('should render Where.never() as neverWhere(), not an empty/undefined where', () => {
+      expectNeverWhere(repo.testTranslateWhere(Where.never()));
+    });
+
+    it('should render AND(x, never) as neverWhere() — never short-circuits the whole clause', () => {
+      const clause = Where.and(
+        Where.eq<TestEntity>('firstName', 'John'),
+        Where.never(),
+      );
+      expectNeverWhere(repo.testTranslateWhere(clause));
+    });
+
+    it('should drop a never branch out of an OR, keeping the satisfiable branch', () => {
+      const clause = Where.or(
+        Where.never(),
+        Where.eq<TestEntity>('firstName', 'John'),
+      );
+      expect(repo.testTranslateWhere(clause)).toEqual([
+        { firstName: Equal('John') },
+      ]);
+    });
+
+    it('should render an empty Where.or() as neverWhere()', () => {
+      expectNeverWhere(repo.testTranslateWhere(Where.or()));
     });
   });
 

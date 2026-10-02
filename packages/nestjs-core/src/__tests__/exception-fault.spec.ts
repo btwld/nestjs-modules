@@ -2,6 +2,8 @@ import { fileURLToPath } from 'url';
 
 import { type RuntimeExceptionFault } from '../domain/exceptions/exception.types.js';
 import { RuntimeException } from '../domain/exceptions/runtime.exception.js';
+import { OverlayAlreadyDefinedException } from '../infrastructure/context/exceptions/overlay-already-defined.exception.js';
+import { OverlayImmutableException } from '../infrastructure/context/exceptions/overlay-immutable.exception.js';
 import { OverlayNotDefinedException } from '../infrastructure/context/exceptions/overlay-not-defined.exception.js';
 import { HookNotDecoratedException } from '../infrastructure/hook/exceptions/hook-not-decorated.exception.js';
 import { HookProviderNotFoundException } from '../infrastructure/hook/exceptions/hook-provider-not-found.exception.js';
@@ -28,6 +30,16 @@ const CASES: {
   {
     name: 'OverlayNotDefinedException',
     build: () => new OverlayNotDefinedException('SomeOverlay'),
+    fault: 'usage',
+  },
+  {
+    name: 'OverlayImmutableException',
+    build: () => new OverlayImmutableException('SomeOverlay'),
+    fault: 'usage',
+  },
+  {
+    name: 'OverlayAlreadyDefinedException',
+    build: () => new OverlayAlreadyDefinedException('SomeOverlay'),
     fault: 'usage',
   },
   {

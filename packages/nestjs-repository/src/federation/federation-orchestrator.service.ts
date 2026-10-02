@@ -1,6 +1,8 @@
 import { Inject, Injectable, PlainLiteralObject } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 
+import { RuntimeException } from '@concepta/nestjs-core';
+
 import { JoinClause } from '../repository/interfaces/join-clause.interface.js';
 import { RepositoryFindOptions } from '../repository/interfaces/repository-options.interface.js';
 import { RepositoryRelationMetadataInterface } from '../repository/interfaces/repository-relation-metadata.interface.js';
@@ -404,6 +406,12 @@ export class FederationOrchestrator {
         const [data, total] = await peerRepo.findAndCount(peerOptions);
         return { relation, data, total };
       } catch (error) {
+        // A peer repository is scoped by its own resolver, so a refusal can
+        // surface here. Rewrapping it would turn a deliberate 403/404 into an
+        // internal error and discard the httpStatus hint — the same reason
+        // RepoPermeatorFactory's onError lets a RuntimeException through.
+        if (error instanceof RuntimeException) throw error;
+
         throw new FederationException({
           message: 'Failed to fetch relation "%s" from entity "%s"',
           messageParams: [relation.name, relation.targetEntity],

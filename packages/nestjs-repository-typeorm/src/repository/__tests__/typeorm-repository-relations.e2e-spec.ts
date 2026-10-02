@@ -268,12 +268,10 @@ describe('TypeOrmRepository (relations)', () => {
       tag1 = await tagFactory.create({ label: 'TypeScript' });
       tag2 = await tagFactory.create({ label: 'NestJS' });
 
-      // Associate tags with posts via owning side (Tag)
-      tag1.posts = [post1, post2];
-      await tagRepo.create(tag1);
-
-      tag2.posts = [post1];
-      await tagRepo.create(tag2);
+      // Associate tags with posts via owning side (Tag). `update`, not
+      // `create` — these rows already exist, and create inserts.
+      await tagRepo.update(tag1, { posts: [post1, post2] });
+      await tagRepo.update(tag2, { posts: [post1] });
     });
 
     it('should return tag with posts populated via M2M join (owning side)', async () => {
@@ -376,11 +374,9 @@ describe('TypeOrmRepository (relations)', () => {
       tag1 = await tagFactory.create({ label: 'TypeScript' });
       tag2 = await tagFactory.create({ label: 'NestJS' });
 
-      tag1.posts = [post1, post2];
-      await tagRepo.create(tag1);
-
-      tag2.posts = [post1];
-      await tagRepo.create(tag2);
+      // `update`, not `create` — these rows already exist, and create inserts.
+      await tagRepo.update(tag1, { posts: [post1, post2] });
+      await tagRepo.update(tag2, { posts: [post1] });
     });
 
     it('should populate both author and tags via two joins on find', async () => {

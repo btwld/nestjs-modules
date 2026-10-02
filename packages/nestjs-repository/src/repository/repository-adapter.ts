@@ -11,11 +11,26 @@ import {
 } from '@concepta/nestjs-core';
 
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
+import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
+import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { type FederationOrchestrator } from '../federation/federation-orchestrator.service.js';
 import { RepoPermeatorFactory } from '../hooks/repo-permeator-factory.js';
 import { RepoHook } from '../hooks/repository-hook.decorators.js';
+import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
+import { RowScopeUnboundException } from '../row-scope/exceptions/row-scope-unbound.exception.js';
+import { RowScopeCtx } from '../row-scope/interfaces/row-scope-context.interface.js';
+import {
+  isRowScopeScoped,
+  type RowScopeRegistration,
+} from '../row-scope/interfaces/row-scope-registration.interface.js';
+import { type RowScopeInterface } from '../row-scope/interfaces/row-scope.interface.js';
+import {
+  RowScopeOperation,
+  type RowScopeQueryOperation,
+  type RowScopeWriteOperation,
+} from '../row-scope/row-scope.types.js';
 
 import { type JoinClause } from './interfaces/join-clause.interface.js';
 import { type RepositoryMetadataInterface } from './interfaces/repository-metadata.interface.js';
@@ -35,6 +50,7 @@ import {
   type WhereClause,
   isWhereCondition,
   isWhereCompound,
+  isWhereNever,
 } from './interfaces/where-clause.interface.js';
 import { WhereCompoundOperator } from './repository.types.js';
 import { Where } from './where.helpers.js';
@@ -71,10 +87,13 @@ export abstract class RepositoryAdapter<
 
   private _permeator?: RepoPermeatorFactory<Entity>;
   private _federationOrchestrator?: FederationOrchestrator;
+  private _rowScope?: RowScopeInterface;
 
   constructor(
     entityKey: string,
     protected readonly hookResolver?: HookResolverService,
+    /** Held here so the unbound state fails closed. */
+    readonly rowScopeDeclaration?: RowScopeRegistration,
   ) {
     this.entityKey = entityKey;
 
@@ -97,6 +116,49 @@ export abstract class RepositoryAdapter<
    */
   setFederationOrchestrator(orchestrator: FederationOrchestrator): void {
     this._federationOrchestrator = orchestrator;
+  }
+
+  /**
+   * Bind this entity's resolver instance.
+   *
+   * The declaration arrives by constructor, but the instance can only come
+   * from DI — so it is bound by `RepositoryModule.forFeature()` rather than by
+   * each driver's provider factory, where a driver that forgot would fail open
+   * silently.
+   *
+   * Binds once: enforcement that can be swapped at runtime is not enforcement.
+   */
+  setRowScope(rowScope: RowScopeInterface): void {
+    if (this._rowScope) {
+      throw new RowScopeBootException([
+        `"${this.entityKey}" already has a row scope resolver bound. ` +
+          'Resolvers are bound once, at startup, and cannot be replaced.',
+      ]);
+    }
+    this._rowScope = rowScope;
+  }
+
+  /**
+   * Whether a resolver is bound. Read by the boot checks.
+   */
+  get hasRowScopeResolver(): boolean {
+    return this._rowScope !== undefined;
+  }
+
+  /**
+   * Resolve the bound resolver, refusing to serve a declared-but-unbound
+   * entity. Reached before every operation, so the window between construction
+   * and binding — and a declaration that nothing ever bound — both fail closed
+   * rather than silently running unscoped.
+   */
+  private requireRowScope(): RowScopeInterface | undefined {
+    if (this._rowScope) return this._rowScope;
+
+    if (isRowScopeScoped(this.rowScopeDeclaration)) {
+      throw new RowScopeUnboundException(this.entityKey);
+    }
+
+    return undefined;
   }
 
   protected get permeator(): RepoPermeatorFactory<Entity> {
@@ -139,12 +201,119 @@ export abstract class RepositoryAdapter<
       .withTrx();
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Row scope invocation
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Invoke the bound scope resolver for a read, and hand the driver what it
+   * returns.
+   *
+   * Called from inside each operation's permeate callback, so scoping lands
+   * after hooks and immediately before `do*` — a hook cannot run after scope
+   * has been applied. Whatever the resolver returns goes to the driver
+   * untouched.
+   *
+   * `scope` is resolved from the caller's context *before* hooks ran, which is
+   * what stops a hook returning `{ ...options, ctx: other }` from choosing
+   * which principal is enforced. `options.ctx` stays exactly as hooks left it,
+   * since that is what the driver will run under.
+   */
+  private async applyQueryScope<
+    Options extends { where?: WhereClause; ctx?: PlainLiteralObject },
+  >(
+    operation: RowScopeQueryOperation,
+    options: Options,
+    scope: PlainLiteralObject | undefined,
+  ): Promise<Options> {
+    const rowScope = this.requireRowScope();
+    if (!rowScope) return options;
+
+    return rowScope.scopeQuery({ operation, options, ctx: options.ctx, scope });
+  }
+
+  /**
+   * Resolve the row scope overlay from the caller's context.
+   *
+   * Read at the public entry point, before hooks run, so what a resolver
+   * enforces against cannot be influenced by anything downstream. An absent
+   * overlay yields `undefined` and leaves the resolver to fail closed.
+   */
+  private resolveRowScopeContext(
+    ctx?: PlainLiteralObject,
+  ): PlainLiteralObject | undefined {
+    if (!ctx) return undefined;
+
+    const appCtx = AppContextHost.from(ctx);
+    return appCtx.supports(RowScopeCtx) ? appCtx.with(RowScopeCtx) : undefined;
+  }
+
+  /**
+   * Invoke the bound scope resolver for a write, and hand the driver what it
+   * returns. A resolver refuses by throwing.
+   *
+   * `target` is the existing row the call is aimed at, where there is one —
+   * the pre-hook argument, not the post-hook payload.
+   *
+   * The row is pinned before this runs — see `withoutRelations` and, for
+   * `update`/`replace`, `assertKeyUnchanged`.
+   *
+   * The delete/lifecycle operations act on the returned `value` rather than on
+   * `target`, so that is the one to check. See `RowScopeWriteParams`.
+   */
+  private async applyWriteScope<Value extends PlainLiteralObject>(
+    operation: RowScopeWriteOperation,
+    value: Value,
+    target: PlainLiteralObject | undefined,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<Value> {
+    const rowScope = this.requireRowScope();
+    if (!rowScope) return value;
+
+    return rowScope.scopeWrite({
+      operation,
+      value,
+      target,
+      ctx,
+      scope: this.resolveRowScopeContext(ctx),
+    });
+  }
+
+  /**
+   * Batch form: the callback is invoked once per element, and a refusal of any
+   * one element rejects the whole call. All-or-nothing is the only safe
+   * default — a partially applied batch would leave the caller unable to tell
+   * which rows were written without re-reading them.
+   */
+  private async applyWriteScopeMany<Value extends PlainLiteralObject>(
+    operation: RowScopeWriteOperation,
+    values: Value[],
+    targets: (PlainLiteralObject | undefined)[],
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<Value[]> {
+    if (!this.requireRowScope()) return values;
+
+    const scoped: Value[] = [];
+    for (const [index, value] of values.entries()) {
+      scoped.push(
+        await this.applyWriteScope(operation, value, targets[index], ctx),
+      );
+    }
+
+    return scoped;
+  }
+
   // Query operations
 
   async find(options: RepositoryFindOptions<Entity> = {}): Promise<Entity[]> {
+    const scope = this.resolveRowScopeContext(options.ctx);
+
     return this.permeator.find.permeate(
       options,
-      (scoped) => this.doFind(scoped),
+      async (scoped) =>
+        this.doFind(
+          await this.applyQueryScope(RowScopeOperation.FIND, scoped, scope),
+        ),
       this.entityCtx(options.ctx),
     );
   }
@@ -156,9 +325,14 @@ export abstract class RepositoryAdapter<
   async findOne(
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
+    const scope = this.resolveRowScopeContext(options.ctx);
+
     return this.permeator.findOne.permeate(
       options,
-      (scoped) => this.doFindOne(scoped),
+      async (scoped) =>
+        this.doFindOne(
+          await this.applyQueryScope(RowScopeOperation.FIND_ONE, scoped, scope),
+        ),
       this.entityCtx(options.ctx),
     );
   }
@@ -168,9 +342,14 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity | null>;
 
   async count(options: RepositoryFindOptions<Entity> = {}): Promise<number> {
+    const scope = this.resolveRowScopeContext(options.ctx);
+
     return this.permeator.count.permeate(
       options,
-      (scoped) => this.doCount(scoped),
+      async (scoped) =>
+        this.doCount(
+          await this.applyQueryScope(RowScopeOperation.COUNT, scoped, scope),
+        ),
       this.entityCtx(options.ctx),
     );
   }
@@ -192,9 +371,19 @@ export abstract class RepositoryAdapter<
     if (this._federationOrchestrator && this.hasFederatedJoins(options?.join)) {
       return this._federationOrchestrator.findAndCount(this, options);
     }
+
+    const scope = this.resolveRowScopeContext(options.ctx);
+
     return this.permeator.findAndCount.permeate(
       options,
-      (scoped) => this.doFindAndCount(scoped),
+      async (scoped) =>
+        this.doFindAndCount(
+          await this.applyQueryScope(
+            RowScopeOperation.FIND_AND_COUNT,
+            scoped,
+            scope,
+          ),
+        ),
       this.entityCtx(options.ctx),
     );
   }
@@ -211,7 +400,16 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     return this.permeator.create.permeate(
       entity,
-      (scoped) => this.doCreate(scoped, options),
+      async (scoped) => {
+        const value = await this.applyWriteScope(
+          RowScopeOperation.CREATE,
+          scoped,
+          undefined,
+          options?.ctx,
+        );
+        await this.assertNotExisting(value, options?.ctx);
+        return this.doCreate(value, options);
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -227,7 +425,18 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity[]> {
     return this.permeator.createMany.permeate(
       entities,
-      (scoped) => this.doCreateMany(scoped, options),
+      async (scoped) => {
+        const values = await this.applyWriteScopeMany(
+          RowScopeOperation.CREATE_MANY,
+          scoped,
+          [],
+          options?.ctx,
+        );
+        for (const value of values) {
+          await this.assertNotExisting(value, options?.ctx);
+        }
+        return this.doCreateMany(values, options);
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -248,7 +457,24 @@ export abstract class RepositoryAdapter<
     this.assertMutable(entity, options);
     return this.permeator.update.permeate(
       data,
-      (scoped) => this.doUpdate(entity, scoped, { ...options, versionGuard }),
+      async (scoped) => {
+        // Before row scope: moving the write is a repository-level error
+        // whatever the scope, and reporting it as such is clearer than the
+        // scope refusal it would otherwise surface as. Still after hooks, so
+        // a hook cannot redirect the write either.
+        this.assertKeyUnchanged(entity, scoped);
+        const stored = this.withoutRelations(entity);
+        return this.doUpdate(
+          stored,
+          await this.applyWriteScope(
+            RowScopeOperation.UPDATE,
+            scoped,
+            stored,
+            options?.ctx,
+          ),
+          { ...options, versionGuard },
+        );
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -266,7 +492,20 @@ export abstract class RepositoryAdapter<
     await this.assertUpsertMutable(entity, options);
     return this.permeator.upsert.permeate(
       entity,
-      (scoped) => this.doUpsert(scoped, options),
+      async (scoped) =>
+        this.doUpsert(
+          await this.applyWriteScope(
+            RowScopeOperation.UPSERT,
+            scoped,
+            // Upsert names its row by the key in its own payload, so the row
+            // it aims at has to be looked up rather than passed in. Absent
+            // means the conflict clause cannot fire, which is the difference
+            // between an insert and an update a resolver has to police.
+            await this.findByKey(scoped, options?.ctx),
+            options?.ctx,
+          ),
+          options,
+        ),
       this.entityCtx(options?.ctx),
     );
   }
@@ -285,7 +524,20 @@ export abstract class RepositoryAdapter<
     this.assertMutable(entity, options);
     return this.permeator.replace.permeate(
       data,
-      (scoped) => this.doReplace(entity, scoped, { ...options, versionGuard }),
+      async (scoped) => {
+        this.assertKeyUnchanged(entity, scoped);
+        const stored = this.withoutRelations(entity);
+        return this.doReplace(
+          stored,
+          await this.applyWriteScope(
+            RowScopeOperation.REPLACE,
+            scoped,
+            stored,
+            options?.ctx,
+          ),
+          { ...options, versionGuard },
+        );
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -305,7 +557,18 @@ export abstract class RepositoryAdapter<
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
       entity,
-      (scoped) => this.doDelete(scoped, { ...options, versionGuard }),
+      async (scoped) => {
+        const stored = this.withoutRelations(scoped);
+        return this.doDelete(
+          await this.applyWriteScope(
+            RowScopeOperation.DELETE,
+            stored,
+            stored,
+            options?.ctx,
+          ),
+          { ...options, versionGuard },
+        );
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -321,7 +584,18 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity[]> {
     return this.permeator.deleteMany.permeate(
       entities,
-      (scoped) => this.doDeleteMany(scoped, options),
+      async (scoped) => {
+        const stored = scoped.map((entity) => this.withoutRelations(entity));
+        return this.doDeleteMany(
+          await this.applyWriteScopeMany(
+            RowScopeOperation.DELETE_MANY,
+            stored,
+            stored,
+            options?.ctx,
+          ),
+          options,
+        );
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -342,13 +616,37 @@ export abstract class RepositoryAdapter<
 
     const deleteDateColumn = this.getDeleteDateColumn();
     if (deleteDateColumn && this.isSoftDeleted(entity, deleteDateColumn)) {
+      // The no-op below returns without reaching the permeator, so scope is
+      // consulted here or not at all — and "already deleted" must not become a
+      // way to soft-delete a row the caller was never allowed to touch. The
+      // returned value is discarded rather than returned: nothing is written,
+      // so only the resolver's refusal is meaningful.
+      const stored = this.withoutRelations(entity);
+      await this.applyWriteScope(
+        RowScopeOperation.SOFT_DELETE,
+        stored,
+        stored,
+        options?.ctx,
+      );
+
       // Idempotent rather than rejected: a retried delete must not fail.
       return entity;
     }
 
     return this.permeator.softDelete.permeate(
       entity,
-      (scoped) => this.doSoftDelete(scoped, { ...options, versionGuard }),
+      async (scoped) => {
+        const stored = this.withoutRelations(scoped);
+        return this.doSoftDelete(
+          await this.applyWriteScope(
+            RowScopeOperation.SOFT_DELETE,
+            stored,
+            stored,
+            options?.ctx,
+          ),
+          { ...options, versionGuard },
+        );
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -365,7 +663,18 @@ export abstract class RepositoryAdapter<
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,
-      (scoped) => this.doRestore(scoped, { ...options, versionGuard }),
+      async (scoped) => {
+        const stored = this.withoutRelations(scoped);
+        return this.doRestore(
+          await this.applyWriteScope(
+            RowScopeOperation.RESTORE,
+            stored,
+            stored,
+            options?.ctx,
+          ),
+          { ...options, versionGuard },
+        );
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -462,11 +771,19 @@ export abstract class RepositoryAdapter<
    * Same guard as `assertMutable`, but for `upsert()` — the caller only
    * supplies a partial entity, not an existing row, so whether the target is
    * soft-deleted has to be read first. `prepare()` materializes a typed
-   * `Entity` so the primary key columns can be read without a cast. Reads
-   * via the protected `doFindOne` rather than the public `findOne`,
-   * deliberately bypassing the find permeator so a tenant-scoping
-   * `beforeFindOne` hook can't decide this guard. Uses `withDeleted: true`
-   * since the row being checked is expected to be soft-deleted.
+   * `Entity` so the primary key columns can be read without a cast. Uses
+   * `withDeleted: true` since the row being checked is expected to be
+   * soft-deleted.
+   *
+   * Reads via the protected `doFindOne` rather than the public `findOne`, so
+   * the find permeator is bypassed and a `beforeFindOne` hook cannot decide
+   * this guard — but row scope is applied explicitly, because it must. An
+   * unscoped read here would answer "is there a soft-deleted row with this
+   * key" across every scope at once, letting the immutability exception
+   * report the existence of a row the caller cannot see.
+   *
+   * Nothing is lost by bypassing the permeator: the scope this read enforces
+   * comes from the context overlay, not from anything hooks produce.
    */
   private async assertUpsertMutable(
     entity: DeepPartial<Entity>,
@@ -495,14 +812,168 @@ export abstract class RepositoryAdapter<
     const where =
       conditions.length === 1 ? conditions[0] : Where.and(...conditions);
 
-    const existing = await this.doFindOne({
-      where,
-      withDeleted: true,
-      ctx: options?.ctx,
-    });
+    const existing = await this.doFindOne(
+      await this.applyQueryScope(
+        RowScopeOperation.FIND_ONE,
+        { where, withDeleted: true, ctx: options?.ctx },
+        this.resolveRowScopeContext(options?.ctx),
+      ),
+    );
 
     if (existing && this.isSoftDeleted(existing, deleteDateColumn)) {
       throw new SoftDeletedImmutableException(this.metadata.name);
+    }
+  }
+
+  /**
+   * Enforce that a create inserts rather than updates.
+   *
+   * A driver is free to implement create with a save-by-primary-key primitive,
+   * which would silently overwrite the row a supplied key names. That is
+   * invisible to every permission check above this layer, because on the way in
+   * it looks like an insert — so the guard lives here, once, rather than in
+   * each driver.
+   *
+   * Reads via the protected `doFindOne` so it bypasses both the hook permeator
+   * and row scope. Bypassing scope is the point: the question is whether the
+   * key is taken, not whether the caller may see the row that took it. The
+   * alternative — a scoped read — cannot tell "does not exist yet" from
+   * "belongs to another scope", and guessing wrong either refuses every
+   * caller-supplied key or permits a cross-scope overwrite.
+   *
+   * A key is only checkable when every primary column is present; a partial one
+   * cannot identify a row, so it is left to the database. `withDeleted` because
+   * a soft-deleted row still occupies its primary key.
+   *
+   * **This is a check-then-write with a real race**, unreachable for generated
+   * keys and narrow for caller-supplied ones. See "Create Inserts, It Never
+   * Updates" in the README.
+   */
+  private async assertNotExisting(
+    entity: DeepPartial<Entity>,
+    ctx?: PlainLiteralObject,
+  ): Promise<void> {
+    const where = this.keyClause(entity);
+    if (!where) return;
+
+    const existing = await this.doFindOne({ where, withDeleted: true, ctx });
+
+    if (existing) {
+      throw new EntityAlreadyExistsException(this.metadata.name);
+    }
+  }
+
+  /**
+   * An equality clause on every primary key column, or `undefined` when the
+   * key is incomplete — nothing to identify a row with.
+   *
+   * Read off `transform` rather than the raw value: it settles a relation
+   * object into the scalar column it backs, and does not fill database
+   * defaults, so a partial key stays partial.
+   */
+  private keyClause(entity: DeepPartial<Entity>): WhereClause | undefined {
+    const primaryColumns = this.getPrimaryColumns();
+    if (primaryColumns.length === 0) return undefined;
+
+    if (!isObject(entity)) return undefined;
+
+    const prepared = this.transform(entity);
+
+    const conditions: WhereClause[] = [];
+    for (const col of primaryColumns) {
+      const value = prepared[col];
+      if (value === undefined) return undefined;
+      conditions.push(Where.eq(col, value));
+    }
+
+    return conditions.length === 1 ? conditions[0] : Where.and(...conditions);
+  }
+
+  /**
+   * The stored row a write names, found by primary key alone.
+   *
+   * Deliberately unscoped — a resolver's own reads carry its scope predicate
+   * and so cannot tell "no such row" from "not yours". Handed over as `target`
+   * for the resolver to check, never as something to trust. Only read when a
+   * resolver is bound, so an unscoped repository pays nothing.
+   */
+  private async findByKey(
+    entity: DeepPartial<Entity>,
+    ctx?: PlainLiteralObject,
+  ): Promise<Entity | undefined> {
+    if (!this.requireRowScope()) return undefined;
+
+    const where = this.keyClause(entity);
+    if (!where) return undefined;
+
+    return (
+      (await this.doFindOne({ where, withDeleted: true, ctx })) ?? undefined
+    );
+  }
+
+  /**
+   * `entity` with its relation properties removed, for any write that names an
+   * existing row.
+   *
+   * A driver resolving a column prefers a relation object over the column's
+   * own scalar — so a relation on the caller's entity decides which row is
+   * written, whatever the scalar says. Planting one redirects the write to a
+   * row the caller never named, invisibly to every check above the repository.
+   *
+   * It also lets two checks disagree: a resolver reads the key through
+   * `transform` (relation-first) while a driver's identifying read may take the
+   * scalar, so the pre-check clears one row and the statement hits another.
+   *
+   * Removing them leaves the scalars to decide, which is what the rest of the
+   * write path already reads. On `update`/`replace` this is the merge base, so
+   * `data`'s own relations are applied afterwards and are unaffected; a
+   * relation absent from a merge base means "unchanged" to a driver, not
+   * "cleared".
+   */
+  private withoutRelations(entity: Entity): Entity {
+    const relations = this.metadata.relations;
+    if (!relations?.length) return entity;
+
+    const stripped = { ...entity };
+    for (const relation of relations) {
+      delete stripped[relation.name];
+    }
+
+    return this.prepare(stripped) ?? entity;
+  }
+
+  /**
+   * Refuse an `update` or `replace` whose data would change the primary key.
+   *
+   * Both name the row to write in their entity argument; `data` carries field
+   * values, not a target. A primary key arriving through `data` decides the row
+   * instead — the write lands on a row the caller never named, and the row they
+   * passed is left untouched. Nothing above the repository can see that happen,
+   * because on the way in it looks like an ordinary update of the entity.
+   *
+   * Compares after a merge rather than reading `data` directly: a column can be
+   * supplied as its own scalar or through a relation object that resolves to
+   * it, and merging settles both into the scalar column a driver will write.
+   * The merge runs against a copy, so the caller's entity is not touched.
+   *
+   * `upsert` is deliberately not guarded — its key comes from the payload by
+   * contract, and it has no entity argument to contradict.
+   */
+  private assertKeyUnchanged(entity: Entity, data: DeepPartial<Entity>): void {
+    const primaryColumns = this.getPrimaryColumns();
+    if (primaryColumns.length === 0) return;
+
+    const base = this.prepare({ ...entity });
+    if (!base) return;
+
+    const probe = this.merge(base, data);
+
+    const changed = primaryColumns.filter(
+      (column) => probe[column] !== entity[column],
+    );
+
+    if (changed.length > 0) {
+      throw new PrimaryKeyImmutableException(this.metadata.name, changed);
     }
   }
 
@@ -624,29 +1095,80 @@ export abstract class RepositoryAdapter<
    *
    * Leaves are either WhereConditions or not(...) compounds
    * preserved for ORM-specific translation.
+   *
+   * `[]` is never returned — it would be ambiguous between "no constraint"
+   * and "nothing matches," and a where-clause compiler resolving that
+   * ambiguity fail-open is exactly how an unsatisfiable scope (an empty
+   * `AND`/`OR`, or `Where.never()` itself) can silently evaporate into
+   * "match everything." `[[NEVER]]` — a single branch containing exactly
+   * one `WhereNever` leaf — is the sole encoding of FALSE; every other
+   * result represents at least one satisfiable branch. Every case below is
+   * responsible for preserving that invariant, not just the leaves.
    */
   protected toDnf(clause: WhereClause): WhereClause[][] {
+    if (isWhereNever(clause)) {
+      return [[clause]];
+    }
+
     if (isWhereCondition(clause)) {
       return [[clause]];
     }
 
-    if (!isWhereCompound(clause)) return [];
+    if (!isWhereCompound(clause)) {
+      throw new RuntimeException({
+        message: 'Unrecognized where clause node',
+        fault: 'internal',
+      });
+    }
 
-    switch (clause.operator) {
-      case WhereCompoundOperator.OR:
-        return clause.conditions.flatMap((c) => this.toDnf(c));
+    // Switch on a local, not clause.operator directly — otherwise TS
+    // narrows `clause` to `never` in `default:`, breaking the property read.
+    const operator = clause.operator;
+    switch (operator) {
+      case WhereCompoundOperator.OR: {
+        // OR's identity for zero conditions, and for every branch turning
+        // out FALSE, is "none of them matched" — never "no constraint".
+        if (clause.conditions.length === 0) return [[Where.never()]];
+        const branches = clause.conditions
+          .flatMap((c) => this.toDnf(c))
+          .filter((branch) => !this.isNeverBranch(branch));
+        return branches.length === 0 ? [[Where.never()]] : branches;
+      }
 
       case WhereCompoundOperator.AND: {
+        // Empty AND is a deliberate deviation from AND's logical identity
+        // (true): this is a security-relevant AST, and unreachable through
+        // the public builder API (`Where.and()` throws on empty args) — the
+        // only way to construct one is a hand-built clause, where refusing
+        // to match is the safe direction.
+        if (clause.conditions.length === 0) return [[Where.never()]];
         const groups = clause.conditions.map((c) => this.toDnf(c));
-        const nonEmpty = groups.filter((g) => g.length > 0);
-        if (nonEmpty.length === 0) return [];
-        if (nonEmpty.length === 1) return nonEmpty[0];
-        return this.cartesianProduct(nonEmpty);
+        if (groups.some((g) => this.isNeverDnf(g))) return [[Where.never()]];
+        if (groups.length === 1) return groups[0];
+        return this.cartesianProduct(groups);
       }
 
       default:
-        return [];
+        throw new RuntimeException({
+          message: 'Unrecognized where compound operator "%s"',
+          messageParams: [operator],
+          fault: 'internal',
+        });
     }
+  }
+
+  /**
+   * A DNF branch is the canonical FALSE encoding iff it's the singleton
+   * `[Where.never()]` — see `toDnf`'s invariant. A never leaf is never
+   * merged into a longer branch (AND short-circuits to `[[NEVER]]` the
+   * moment any sub-group is FALSE, before `cartesianProduct` ever runs).
+   */
+  private isNeverBranch(branch: WhereClause[]): boolean {
+    return branch.length === 1 && isWhereNever(branch[0]);
+  }
+
+  private isNeverDnf(dnf: WhereClause[][]): boolean {
+    return dnf.length === 1 && this.isNeverBranch(dnf[0]);
   }
 
   protected static readonly MAX_DNF_BRANCHES = 50;

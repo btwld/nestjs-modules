@@ -116,6 +116,11 @@ import { UserModule } from '@concepta/nestjs-user';
 export class AppModule {}
 ```
 
+Credential rows carry a `userId`, so in a deployment where they are
+owner-scoped they are rows you will want scoped. That is declared on the same
+`RepositoryModule.forFeature()` registration above via `rowScope` — see the Row
+Scope section of `@concepta/nestjs-repository`.
+
 ### register / registerAsync
 
 Non-global variants of `forRoot`. Identical options, scoped to the importing

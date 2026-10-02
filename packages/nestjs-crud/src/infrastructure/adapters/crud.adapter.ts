@@ -9,6 +9,7 @@ import { type DeepPartial, isObject, isUndefined } from '@concepta/nestjs-core';
 import {
   type EntityColumn,
   isWhereCondition,
+  isWhereNever,
   type RepositoryFindOneOptions,
   type RepositoryFindOptions,
   type RepositoryInterface,
@@ -571,6 +572,10 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
    */
   protected validateWhereFields(clause: WhereClause | undefined): void {
     if (!clause) return;
+
+    // An always-false node has no field to validate — nothing to skip past,
+    // nothing to recurse into.
+    if (isWhereNever(clause)) return;
 
     if (isWhereCondition(clause)) {
       // Skip relation-tagged conditions — they target joined entities

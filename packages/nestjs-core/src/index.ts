@@ -112,6 +112,9 @@ export { Ctx } from './infrastructure/context/ctx.decorator.js';
 export { OverlayRef } from './domain/context/overlay-ref.js';
 export type { AppContextLike } from './domain/context/app-context-like.type.js';
 export { OverlayNotDefinedException } from './infrastructure/context/exceptions/overlay-not-defined.exception.js';
+export { OverlayImmutableException } from './infrastructure/context/exceptions/overlay-immutable.exception.js';
+export { OverlayAlreadyDefinedException } from './infrastructure/context/exceptions/overlay-already-defined.exception.js';
+export { OverlayDefineOptionsInterface } from './domain/context/interfaces/overlay-define-options.interface.js';
 
 // Context overlay utilities
 export { ContextOverlayInterceptor } from './infrastructure/context/context-overlay.interceptor.js';

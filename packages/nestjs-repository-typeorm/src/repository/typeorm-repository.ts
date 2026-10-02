@@ -12,6 +12,7 @@ import {
   MoreThan,
   MoreThanOrEqual,
   Not,
+  Raw,
   type Repository,
   type EntityManager,
   type FindOptionsRelations,
@@ -30,6 +31,7 @@ import {
 } from '@concepta/nestjs-core';
 import {
   isWhereCondition,
+  isWhereNever,
   type JoinClause,
   OptimisticLockException,
   type RelationActionConfig,
@@ -44,6 +46,7 @@ import {
   type RepositoryRestoreOptions,
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
+  type RowScopeRegistration,
   type RepositoryVersionGuardInterface,
   type TransactionScope,
   type WhereClause,
@@ -69,6 +72,8 @@ export interface TypeOrmRepositoryOptions {
   hookResolver?: HookResolverService;
   relationsConfig?: Record<string, RelationActionConfig>;
   transactionScope?: TransactionScope;
+  /** Declaration only — the resolver is bound by RepositoryModule. */
+  rowScope?: RowScopeRegistration;
 }
 
 /**
@@ -84,7 +89,7 @@ export class TypeOrmRepository<
     private readonly repo: Repository<Entity>,
     private readonly options: TypeOrmRepositoryOptions,
   ) {
-    super(options.entityKey, options.hookResolver);
+    super(options.entityKey, options.hookResolver, options.rowScope);
 
     const entityName = repo.metadata?.name || repo.metadata?.targetName;
 
@@ -142,8 +147,34 @@ export class TypeOrmRepository<
   ): FindOptionsWhere<Entity>[] | undefined {
     if (!clause) return undefined;
     const dnf = this.toDnf(clause);
-    if (dnf.length === 0) return undefined;
+    // `[[NEVER]]` is toDnf's sole FALSE encoding, so it is the only shape
+    // needing special handling here.
+    if (dnf.length === 1 && dnf[0].length === 1 && isWhereNever(dnf[0][0])) {
+      return [this.neverWhere()];
+    }
     return dnf.map((branch) => this.branchToFindOptionsWhere(branch));
+  }
+
+  /**
+   * An unconditionally-false `FindOptionsWhere` — `WHERE 1 = 0`, not an empty
+   * `IN ()` a driver upgrade could stop folding to constant-false. Anchored on
+   * an arbitrary column, since the raw expression ignores its value.
+   */
+  protected neverWhere(): FindOptionsWhere<Entity> {
+    const anchor =
+      this.getPrimaryColumns()[0] ?? this.metadata.columns[0]?.name;
+    if (!anchor) {
+      throw new RuntimeException({
+        message:
+          'Cannot render an always-false where clause for "%s": entity has no columns',
+        messageParams: [this.metadata.name],
+        fault: 'internal',
+      });
+    }
+    return Object.assign<
+      FindOptionsWhere<Entity>,
+      Record<string, FindOperator<unknown>>
+    >({}, { [anchor]: Raw(() => '1 = 0') });
   }
 
   /**
@@ -159,6 +190,20 @@ export class TypeOrmRepository<
     const relations: Record<string, Record<string, FindOperator<unknown>>> = {};
 
     for (const leaf of leaves) {
+      if (isWhereNever(leaf)) {
+        // Unreachable by construction: translateWhere's dnf.length === 1
+        // check above catches the only shape toDnf ever produces a never
+        // leaf in (see repository-adapter.ts's toDnf invariant). Throwing
+        // rather than skipping means a future change that breaks that
+        // invariant fails loudly instead of silently widening a scope
+        // check to "no constraint".
+        throw new RuntimeException({
+          message:
+            "Unexpected WhereNever leaf outside translateWhere's single-branch case",
+          fault: 'internal',
+        });
+      }
+
       if (!isWhereCondition(leaf)) continue;
 
       const op = this.toFindOperator(leaf);

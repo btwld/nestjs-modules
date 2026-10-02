@@ -1,3 +1,4 @@
+import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import {
   WhereCompoundOperator,
   WhereOperator,
@@ -136,6 +137,45 @@ describe('FilterAnalyzer', () => {
 
       expect(analyzer.getRootWhere()).toBeUndefined();
       expect(analyzer.getRelationConditions(posts)).toEqual([]);
+    });
+
+    // filterClause matches neither isWhereCondition nor isWhereCompound for
+    // a never node, so it falls into the same "pass through unchanged"
+    // branch an unrecognized node would — this is what keeps a row-scope
+    // guard clause (e.g. an empty tenant set resolving to Where.never())
+    // intact through federation's relation-extraction pass, rather than
+    // letting it be silently dropped.
+    it('should pass a root-only never clause through unchanged', () => {
+      const where: WhereClause = { never: true };
+      const analyzer = new FilterAnalyzer(where, [posts], new Set());
+
+      expect(analyzer.getRootWhere()).toEqual({ never: true });
+    });
+
+    it('should preserve a never node nested inside an AND alongside relation-tagged conditions', () => {
+      const where: WhereClause = {
+        operator: WhereCompoundOperator.AND,
+        conditions: [
+          { never: true },
+          {
+            field: 'title',
+            operator: WhereOperator.EQ,
+            value: 'hello',
+            relation: 'posts',
+          },
+        ],
+      };
+      const analyzer = new FilterAnalyzer(where, [posts], new Set());
+
+      expect(analyzer.getRootWhere()).toEqual({ never: true });
+      expect(analyzer.getRelationConditions(posts)).toEqual([
+        {
+          field: 'title',
+          operator: WhereOperator.EQ,
+          value: 'hello',
+          relation: 'posts',
+        },
+      ]);
     });
   });
 

@@ -83,26 +83,44 @@ export interface WhereCompound {
 }
 
 /**
+ * An always-false clause — matches zero rows, unconditionally and
+ * unambiguously. Deliberately has no `field`: requiring one would invite a
+ * misspelled or relation-tagged column into what's meant to be a
+ * driver-agnostic, unmistakable "nothing matches" node. Distinct from an
+ * _absent_ where clause (no constraint at all) — see `Where.never()`.
+ */
+export interface WhereNever {
+  readonly never: true;
+}
+
+/**
  * A single node in the where clause AST.
  */
-export type WhereClause = WhereCondition | WhereCompound;
+export type WhereClause = WhereCondition | WhereCompound | WhereNever;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Type guards
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Type guard to distinguish field conditions from compounds.
+ * Type guard to distinguish field conditions from compounds/never.
  */
 export function isWhereCondition(c: WhereClause): c is WhereCondition {
   return 'field' in c && 'operator' in c;
 }
 
 /**
- * Type guard to distinguish compound clauses from field conditions.
+ * Type guard to distinguish compound clauses from field conditions/never.
  */
 export function isWhereCompound(c: WhereClause): c is WhereCompound {
   return 'conditions' in c && 'operator' in c;
+}
+
+/**
+ * Type guard for the always-false node — see `WhereNever`.
+ */
+export function isWhereNever(c: WhereClause): c is WhereNever {
+  return 'never' in c && c.never === true;
 }
 
 /**

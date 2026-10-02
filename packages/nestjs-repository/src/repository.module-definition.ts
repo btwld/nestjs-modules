@@ -3,6 +3,7 @@ import {
   type DynamicModule,
   type Provider,
 } from '@nestjs/common';
+import { DiscoveryModule } from '@nestjs/core';
 
 import {
   FEDERATION_ORCHESTRATOR,
@@ -11,6 +12,7 @@ import {
 import { TransactionInterceptor } from './interceptors/transaction.interceptor.js';
 import { type RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
 import { REPOSITORY_MODULE_OPTIONS } from './repository.constants.js';
+import { RowScopeBootService } from './row-scope/row-scope-boot.service.js';
 import {
   RepositoryRegistryService,
   REPOSITORY_REGISTRY,
@@ -33,11 +35,14 @@ export const {
   optionsInjectionToken: RAW_OPTIONS_TOKEN,
 })
   .setExtras({}, (definition: DynamicModule) => {
-    const { providers = [] } = definition;
+    const { providers = [], imports = [] } = definition;
 
     return {
       ...definition,
       global: true,
+      // Row scope's boot checks discover adapters across every registration
+      // path, including driver modules the repository registry never sees.
+      imports: [...imports, DiscoveryModule],
       providers: createRepositoryProviders({ providers }),
       exports: createRepositoryExports(),
     };
@@ -69,6 +74,7 @@ export function createRepositoryProviders(options: {
       provide: FEDERATION_ORCHESTRATOR,
       useClass: FederationOrchestrator,
     },
+    RowScopeBootService,
     TransactionScope,
     TransactionalRunner,
     TransactionInterceptor,

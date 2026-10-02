@@ -8,6 +8,8 @@ import { RepositoryFeatureOptions } from './interfaces/repository-feature-option
 import { DynamicRepositoryModule } from './interfaces/repository-module.interface.js';
 import { RepositoryAdapter } from './repository/repository-adapter.js';
 import { RepositoryModuleClass } from './repository.module-definition.js';
+import { isRowScopeScoped } from './row-scope/interfaces/row-scope-registration.interface.js';
+import { type RowScopeInterface } from './row-scope/interfaces/row-scope.interface.js';
 import {
   RepositoryRegistryService,
   REPOSITORY_REGISTRY,
@@ -59,7 +61,7 @@ export class RepositoryModule extends RepositoryModuleClass {
    * ```
    */
   static forFeature(options: RepositoryFeatureOptions): DynamicModule {
-    const { module, entities } = options;
+    const { module, entities, imports = [] } = options;
     const dynamicModule: DynamicRepositoryModule = module.forFeature(entities);
     const moduleName = module.name;
 
@@ -96,6 +98,27 @@ export class RepositoryModule extends RepositoryModuleClass {
       },
     });
 
+    // Row scope binding — one provider per scoped entity, depending on both
+    // the repository and its resolver, so Nest constructs both before binding
+    // and the whole graph is bound before any onModuleInit can run a seeder.
+    // Deliberately not delegated to the driver's provider factory: a driver
+    // that forgot would fail open, and no driver can forget what it never does.
+    for (const entity of entities) {
+      const registration = entity.rowScope;
+      if (!isRowScopeScoped(registration)) continue;
+
+      providers.push({
+        provide: Symbol(`ROW_SCOPE_BINDING_${entity.key}_${Date.now()}`),
+        inject: [getDynamicRepositoryToken(entity.key), registration.resolver],
+        useFactory: (repo: unknown, resolver: RowScopeInterface) => {
+          if (repo instanceof RepositoryAdapter) {
+            repo.setRowScope(resolver);
+          }
+          return true;
+        },
+      });
+    }
+
     // Transaction factory registration
     if (dynamicModule.transactionFactories) {
       for (const descriptor of dynamicModule.transactionFactories) {
@@ -127,6 +150,7 @@ export class RepositoryModule extends RepositoryModuleClass {
 
     return {
       ...dynamicModule,
+      imports: [...(dynamicModule.imports ?? []), ...imports],
       providers,
       exports,
     };

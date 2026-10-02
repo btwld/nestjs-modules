@@ -425,6 +425,11 @@ the default resolver), `CoreModule.forRoot()` (context overlays), and a
 `RepositoryModule.forFeature()` mapping the entity key to your cache entity
 class.
 
+Cache rows carry an `assigneeId`, so in a multi-tenant deployment they are
+rows you will want scoped. That is declared on this same
+`RepositoryModule.forFeature()` registration via `rowScope` — see the Row Scope
+section of `@concepta/nestjs-repository`.
+
 ```ts
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
