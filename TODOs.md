@@ -30,18 +30,33 @@ git history for what shipped.
       alternatively the adapter could reduce nested relation objects to their identifying
       columns before saving. Decide which.
 
-  3. **`Join.inner()` is refused on the TypeORM driver rather than implemented** (M) —
+  3. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+      — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`. Every
+      one passes in isolation and on a re-run of the same suite, so it is a shared-resource
+      condition under concurrency rather than four unrelated bad tests. Seen as a
+      `SQLITE_CONSTRAINT: UNIQUE` on a fixture row and as
+      `TransactionScopeFailedException` after a timeout. The cost of leaving it is that a
+      red suite goes green on retry, which trains everyone to re-run rather than look —
+      so a genuine regression in a transactional path would be dismissed as this.
+      Suspect per-worker database isolation or fixture seeding shared across workers;
+      confirm by pinning the failing spec to a single worker.
+
+  4. **`Join.inner()` is refused on the TypeORM driver rather than implemented** (M) —
       TypeORM's `relations` find option always renders a LEFT JOIN, so the driver cannot
       honour an `INNER` clause. It now throws (`fault: 'usage'`) rather than silently
       returning the rows the caller asked to exclude, which was a wrong answer with no
       signal. Federation is unaffected: it implements `INNER` itself by requiring the
       related row to exist, and strips federated joins from the root options before the
-      driver sees them. Implementing it properly means routing joined reads through
-      TypeORM's QueryBuilder instead of `relations` — a real change to the driver's read
-      path, affecting every joined query. Do it if a consumer needs INNER on a
-      non-federated relation; until then the refusal is the honest behaviour.
+      driver sees them. Do it if a consumer needs INNER on a non-federated relation; until
+      then the refusal is the honest behaviour. Two routes if it is ever wanted: inject a
+      `NOT_NULL` predicate on the related entity's key into every AND-branch of the
+      `WHERE`, since a LEFT join plus a predicate on the joined column already excludes
+      non-matching roots — cheaper, but it has to respect the `never` and empty-compound
+      invariants in `toDnf`; or route joined reads through TypeORM's QueryBuilder instead
+      of `relations`, which is correct for every join shape but changes the driver's whole
+      read path. The first was not explored when this was deferred.
 
-  4. **A relation from an unscoped entity into a scoped one defeats row scope on reads**
+  5. **A relation from an unscoped entity into a scoped one defeats row scope on reads**
       — a `join` (or a `Where.rel()` filter) is resolved by the driver in one statement, so
       the joined entity's resolver never runs. That is safe where every scoped entity carries
       its own scope column and each resolver checks the foreign keys it owns on write, because
@@ -57,10 +72,32 @@ git history for what shipped.
       the joined entity's predicate as relation-tagged conditions (no driver change needed,
       but a LEFT join then drops roots whose related row is invisible).
 
-  5. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
+  6. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
 
-  6. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  7. **A scope value typed unlike its column is a silent trap, and nothing documents it**
+      (S) — resolve `'42'` against an integer `tenantId` and the database compares the two
+      equal while row scope's post-read check does not, so every read succeeds and every
+      write 404s. It fails closed and it is loud on first run, which is why a diagnostic
+      was deliberately rejected: it would have put a `String()`-based loose compare next to
+      the strict compare that is the actual security decider. A sentence in the row-scope
+      README naming the symptom is the whole fix.
+
+  8. **Nothing stops a row-scope resolver regressing to `RowScopeBase<PlainLiteralObject>`**
+      (S) — naming the entity in both type parameters is what makes `column` checked
+      against the entity's real columns, turning a misspelling into a compile error instead
+      of a boot failure. The fixtures were the worked examples and had all drifted to the
+      weaker form, which also produced a wrong review finding when they were read as the
+      reference instead of the README. A lint rule or a type-level nudge would hold the
+      line; until then it relies on review.
+
+  9. **`console.log` in the crud README's hook examples** (S) — against the project's own
+      rule, and README examples get copied verbatim into consumer code where the shipped
+      ESLint config then rejects them. The hook section now injects a `Logger`; the rest of
+      the file was left alone because fixing it properly is a sweep across every package's
+      README rather than one example.
+
+  10. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
          `packages` list (or collapse both blocks to a single `packages/*` glob when all
