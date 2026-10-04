@@ -14,7 +14,7 @@ import { type HookOption } from '../hook.types.js';
  *
  * Method-level decorators are merged with class-level decorators.
  *
- * @param hooks - Hook configurations (class or `{ hook, spec }` objects)
+ * @param hooks - Hook classes
  *
  * @example
  * ```typescript
@@ -45,16 +45,9 @@ import { type HookOption } from '../hook.types.js';
  * }
  * ```
  *
- * @example
- * ```typescript
- * // With specification objects
- * @UseHooks(
- *   { hook: TenantHook, spec: Spec.isQuery() },
- *   { hook: AuditHook, spec: Spec.isMutation() },
- * )
- * @Controller('orders')
- * class OrderController { ... }
- * ```
+ * Gating is a property of the hook, not of the registration: pass a
+ * specification to the hook-method decorator, to a method-level
+ * `@Specification`, or to the class-level `@Hook`/`@RepoHook`.
  */
 export function UseHooks(
   ...hooks: HookOption[]

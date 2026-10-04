@@ -168,7 +168,10 @@ export const BeforeRead = createHookMethodDecorator(
 );
 
 /**
- * Runs after any read operation (find, findOne, count, findAndCount).
+ * Runs after `find` and `findOne`.
+ *
+ * Not after `count` or `findAndCount` — those carry their own after-keys,
+ * because their payloads are a number and a tuple rather than entities.
  */
 export const AfterRead = createHookMethodDecorator(
   RepoHookMethodKey.AFTER_READ,

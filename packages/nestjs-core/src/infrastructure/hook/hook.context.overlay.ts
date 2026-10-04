@@ -42,17 +42,12 @@ export class HookContextOverlay extends ContextOverlayInterceptor {
 
   private normalizeOption(option: HookOption): HookWithSpec {
     const hook = typeof option === 'function' ? option : option.hook;
-    const specOverride = typeof option === 'function' ? undefined : option.spec;
 
     const metadata = this.reflector.get<HookMetadataInterface>(
       HOOK_METADATA_KEY,
       hook,
     );
 
-    return {
-      hook,
-      type: metadata?.type,
-      spec: specOverride,
-    };
+    return { hook, type: metadata?.type };
   }
 }

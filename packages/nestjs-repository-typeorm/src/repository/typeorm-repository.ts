@@ -291,6 +291,24 @@ export class TypeOrmRepository<
     if (!join?.length) return undefined;
     const relations: Record<string, boolean> = {};
     for (const j of join) {
+      // TypeORM's `relations` find option always renders a LEFT JOIN, so an
+      // INNER clause cannot be honoured here. Refusing is the only safe
+      // answer: silently widening it to LEFT returns rows the caller asked to
+      // exclude. Federated relations never reach this method — the
+      // orchestrator implements INNER itself and strips those joins from the
+      // root options.
+      if (j.joinType === 'INNER') {
+        throw new RuntimeException({
+          message:
+            'INNER joins are not supported on relation "%s": this driver ' +
+            "renders joins through TypeORM's `relations` option, which is " +
+            'always a LEFT JOIN. Filter on the related column instead, or ' +
+            'declare the relation federated.',
+          messageParams: [j.relation],
+          fault: 'usage',
+        });
+      }
+
       relations[j.relation] = true;
     }
     return Object.assign<FindOptionsRelations<Entity>, Record<string, boolean>>(

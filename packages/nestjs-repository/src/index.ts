@@ -52,6 +52,7 @@ export {
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
 export { EntityAlreadyExistsException } from './exceptions/entity-already-exists.exception.js';
+export { PartialPrimaryKeyException } from './exceptions/partial-primary-key.exception.js';
 export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
 export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';

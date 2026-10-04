@@ -13,6 +13,7 @@ import {
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
+import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { type FederationOrchestrator } from '../federation/federation-orchestrator.service.js';
@@ -63,17 +64,22 @@ let warnedHooksNotWired = false;
 /**
  * Abstract repository adapter that implements entity hydration.
  *
- * Concrete repository implementations should extend this class.
+ * Concrete repository implementations should extend this class and implement
+ * the protected `do*` methods. **Never override a public operation method**
+ * (`find`, `create`, `update`, …): those are where hooks, row scope and the
+ * soft-delete guards are invoked, so an override bypasses all of them for
+ * every entity the driver serves.
  *
  * @example
  * ```typescript
- * class TypeOrmRepository<Entity> extends RepositoryAdapter<Entity> {
- *   async find(options?) {
- *     return await this.repo.find(options);
+ * class MyDriverRepository<Entity extends PlainLiteralObject>
+ *   extends RepositoryAdapter<Entity> {
+ *   protected async doFind(options?: RepositoryFindOptions<Entity>) {
+ *     return this.repo.find(translate(options));
  *   }
  *
- *   async create(entity, options?) {
- *     return await this.repo.save(entity);
+ *   protected async doCreate(entity: DeepPartial<Entity>) {
+ *     return this.repo.save(entity);
  *   }
  * }
  * ```
@@ -407,6 +413,7 @@ export abstract class RepositoryAdapter<
           undefined,
           options?.ctx,
         );
+        this.assertKeyNotPartial(value);
         await this.assertNotExisting(value, options?.ctx);
         return this.doCreate(value, options);
       },
@@ -433,6 +440,7 @@ export abstract class RepositoryAdapter<
           options?.ctx,
         );
         for (const value of values) {
+          this.assertKeyNotPartial(value);
           await this.assertNotExisting(value, options?.ctx);
         }
         return this.doCreateMany(values, options);
@@ -871,6 +879,33 @@ export abstract class RepositoryAdapter<
    * object into the scalar column it backs, and does not fill database
    * defaults, so a partial key stays partial.
    */
+  /**
+   * Refuse a create that supplies only part of a composite primary key.
+   *
+   * A partial key cannot be looked up, so `assertNotExisting` cannot tell
+   * whether it is taken, and the driver then fails with a message about
+   * updating a row — for a call to `create`, naming no column. Refusing here
+   * reports which columns are missing.
+   *
+   * Supplying none of them is the ordinary generated-key create and is left
+   * alone, as is a single-column key.
+   */
+  private assertKeyNotPartial(entity: DeepPartial<Entity>): void {
+    const primaryColumns = this.getPrimaryColumns();
+    if (primaryColumns.length < 2) return;
+
+    if (!isObject(entity)) return;
+
+    const prepared = this.transform(entity);
+    const missing = primaryColumns.filter((col) => prepared[col] === undefined);
+
+    if (missing.length === 0 || missing.length === primaryColumns.length) {
+      return;
+    }
+
+    throw new PartialPrimaryKeyException(this.metadata.name, missing);
+  }
+
   private keyClause(entity: DeepPartial<Entity>): WhereClause | undefined {
     const primaryColumns = this.getPrimaryColumns();
     if (primaryColumns.length === 0) return undefined;

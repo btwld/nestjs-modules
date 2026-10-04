@@ -167,6 +167,6 @@ export class HookResolverService {
       throw new HookNotDecoratedException(config.hook.name);
     }
 
-    return { hook, spec: config.spec, methods };
+    return { hook, methods };
   }
 }

@@ -143,6 +143,14 @@ export { CrudSoftDeleteCommand } from './application/commands/impl/crud-soft-del
 export { CrudRestoreCommand } from './application/commands/impl/crud-restore.command.js';
 export { CrudWithBodyCommand } from './application/commands/impl/crud-with-body.command.js';
 
+// Wiring a hand-written controller: these build the per-entity adapter provider
+// and operation handlers that `CrudModule.forFeature` otherwise generates.
+export { createCrudAdapterProvider } from './infrastructure/utils/create-crud-adapter-provider.js';
+export {
+  createQueryHandler,
+  createCommandHandler,
+} from './application/utils/create-operation-handlers.js';
+
 // operations (handlers)
 export { CrudListHandler } from './application/queries/handlers/crud-list.handler.js';
 export { CrudReadHandler } from './application/queries/handlers/crud-read.handler.js';

@@ -1,22 +1,19 @@
-import { type PlainLiteralObject, type Type } from '@nestjs/common';
-
-import { type SpecificationInterface } from './interfaces/specification.interface.js';
+import { type Type } from '@nestjs/common';
 
 /**
- * Normalized hook configuration with hook class and optional specification.
- * Stored on context and in registry.
+ * Normalized hook configuration. Stored on context and in the registry.
+ *
+ * Gating a hook is a property of the hook, not of where it was registered:
+ * pass a specification to the hook-method decorator, to a method-level
+ * `@Specification`, or to the class-level `@Hook`/`@RepoHook`.
  */
-export interface HookWithSpec<
-  Ctx extends PlainLiteralObject = PlainLiteralObject,
-> {
+export interface HookWithSpec {
   hook: Type;
   type?: string;
-  spec?: SpecificationInterface<Ctx>;
 }
 
 /**
- * Configuration for a hook registration.
- * Can be a hook class directly or a HookWithSpec object with spec override.
+ * Configuration for a hook registration: a hook class, or that class wrapped
+ * with the subsystem `type` it belongs to.
  */
-export type HookOption<Ctx extends PlainLiteralObject = PlainLiteralObject> =
-  Type | HookWithSpec<Ctx>;
+export type HookOption = Type | HookWithSpec;

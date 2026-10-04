@@ -5,6 +5,7 @@ import { type PlainLiteralObject, type Type } from '@nestjs/common';
 import { type DeepPartial, isObject } from '@concepta/nestjs-core';
 
 import { EntityAlreadyExistsException } from '../../exceptions/entity-already-exists.exception.js';
+import { PartialPrimaryKeyException } from '../../exceptions/partial-primary-key.exception.js';
 import { type RepositoryMetadataInterface } from '../interfaces/repository-metadata.interface.js';
 import {
   type RepositoryCreateOptions,
@@ -256,13 +257,41 @@ describe('create guard', () => {
       ).resolves.toBeDefined();
     });
 
-    it('leaves a partial key to the database', async () => {
+    it('refuses a partial key, naming the missing column', async () => {
+      // Left to the database this is a 500 reporting that it cannot *update* a
+      // row — for a call to `create`, naming no column. A partial key also
+      // cannot be looked up, so the existence check never runs: refusing is
+      // the only answer that tells the caller what is wrong.
       const adapter = new TestAdapter([EXISTING], ['id', 'accountId']);
 
       await expect(
         adapter.create({ id: EXISTING.id, name: 'Partial' }),
+      ).rejects.toThrow(PartialPrimaryKeyException);
+
+      await expect(
+        adapter.create({ id: EXISTING.id, name: 'Partial' }),
+      ).rejects.toMatchObject({ context: { missing: ['accountId'] } });
+
+      expect(adapter.reads).toEqual([]);
+    });
+
+    it('allows every key column absent, which is a generated key', async () => {
+      const adapter = new TestAdapter([EXISTING], ['id', 'accountId']);
+
+      await expect(
+        adapter.create({ name: 'Generated' }),
       ).resolves.toBeDefined();
       expect(adapter.reads).toEqual([]);
+    });
+
+    it('does not refuse a partial key on a single-column key', async () => {
+      // One column means there is no such thing as partial: absent is the
+      // generated-key case.
+      const adapter = new TestAdapter([EXISTING], ['id']);
+
+      await expect(
+        adapter.create({ name: 'Generated' }),
+      ).resolves.toBeDefined();
     });
   });
 });

@@ -66,12 +66,11 @@ export interface HookMethodMapInterface {
 }
 
 /**
- * A resolved hook instance with pre-computed method mappings.
- * The spec here is from the hook config; per-method specs are in HookMethodMapInterface.
+ * A resolved hook instance with pre-computed method mappings. The specification
+ * that gates each method lives on `HookMethodMapInterface.resolvedSpec`.
  */
 export interface ResolvedHook {
   hook: object;
-  spec?: SpecificationInterface;
   methods?: Map<HookMethodKeyType, HookMethodMapInterface[]>;
 }
 

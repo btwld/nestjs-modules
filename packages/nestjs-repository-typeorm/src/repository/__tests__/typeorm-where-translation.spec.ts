@@ -491,6 +491,23 @@ describe('TypeOrmRepository WHERE clause translation', () => {
       expect(repo.testTranslateJoin(joins)).toEqual({ posts: true });
     });
 
+    it('should translate an explicit LEFT join', () => {
+      const joins: JoinClause[] = [{ relation: 'posts', joinType: 'LEFT' }];
+      expect(repo.testTranslateJoin(joins)).toEqual({ posts: true });
+    });
+
+    it('should refuse an INNER join rather than silently widening it', () => {
+      // TypeORM's `relations` option is always a LEFT JOIN, so honouring this
+      // is impossible here. Returning LEFT anyway would hand back rows the
+      // caller asked to exclude — a wrong answer is worse than an error.
+      const joins: JoinClause[] = [{ relation: 'company', joinType: 'INNER' }];
+
+      expect(() => repo.testTranslateJoin(joins)).toThrow(/company/);
+      expect(() => repo.testTranslateJoin(joins)).toThrow(
+        /INNER joins are not supported/,
+      );
+    });
+
     it('should translate multiple joins', () => {
       const joins: JoinClause[] = [
         { relation: 'posts' },

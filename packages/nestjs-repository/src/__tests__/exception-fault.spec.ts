@@ -8,6 +8,7 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
+import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
 import { RepositoryDuplicateKeyException } from '../exceptions/repository-duplicate-key.exception.js';
 import { RepositoryQueryException } from '../exceptions/repository-query.exception.js';
@@ -51,6 +52,11 @@ const CASES: {
   {
     name: 'EntityAlreadyExistsException',
     build: () => new EntityAlreadyExistsException('SomeEntity'),
+    fault: 'client',
+  },
+  {
+    name: 'PartialPrimaryKeyException',
+    build: () => new PartialPrimaryKeyException('SomeEntity', ['locale']),
     fault: 'client',
   },
   {
