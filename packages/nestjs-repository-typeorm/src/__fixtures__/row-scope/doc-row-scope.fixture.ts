@@ -6,6 +6,7 @@ import {
   RowScopeBase,
 } from '@concepta/nestjs-repository';
 
+import { type DocEntityFixture } from './doc.entity.fixture.js';
 import { ROW_SCOPE_DOC_TOKEN } from './row-scope.constants.fixture.js';
 
 /**
@@ -17,12 +18,12 @@ import { ROW_SCOPE_DOC_TOKEN } from './row-scope.constants.fixture.js';
  */
 @Injectable()
 export class DocRowScopeFixture extends RowScopeBase<
-  PlainLiteralObject,
+  DocEntityFixture,
   PlainLiteralObject
 > {
   constructor(
     @InjectDynamicRepository(ROW_SCOPE_DOC_TOKEN)
-    docs: RepositoryInterface<PlainLiteralObject>,
+    docs: RepositoryInterface<DocEntityFixture>,
   ) {
     super(docs, { scopeKey: 'tenantId', column: 'tenantId', label: 'Doc' });
   }

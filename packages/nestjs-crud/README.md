@@ -750,6 +750,9 @@ options object:
   overrides for response serialization.
 - `methodName` targets (or names) a specific controller method in
   hybrid/generated mode, allowing multiple operations of the same type.
+- `transactional` is also accepted in `controller`, where it covers every
+  write operation at once; read operations are opted out. An operation's own
+  setting overrides it either way.
 
 ### Delete/Restore Response Behavior
 
@@ -1196,40 +1199,71 @@ repository hook. Decorate methods with lifecycle decorators (`@BeforeCreate`,
 `@AfterFind`, etc.) and optionally pass a `CrudSpec` to restrict when the
 method runs:
 
+A hook's `ctx` is the app context. The CRUD request lives on it as the
+`CrudCtx` overlay, so reach `operation`, `params` and `query` through that —
+they are not properties of `ctx` itself.
+
 ```ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { AppContextInterface } from '@concepta/nestjs-core';
 import {
   RepoHook,
   BeforeFind,
   AfterCreate,
   AfterUpdate,
+  RepositoryFindOptions,
+  Where,
 } from '@concepta/nestjs-repository';
-import { CrudSpec } from '@concepta/nestjs-crud';
+import { CrudCtx, CrudSpec } from '@concepta/nestjs-crud';
 
 @Injectable()
 @RepoHook()
 export class AuditHook {
+  private readonly logger = new Logger(AuditHook.name);
+
+  // `with()` throws when the overlay is absent, and the same repository is
+  // reachable from services that never went through a CRUD route.
+  private operationOf(ctx?: AppContextInterface): string {
+    return ctx?.supports(CrudCtx) ? ctx.with(CrudCtx).operation : 'repository';
+  }
+
   // Runs on ALL find operations (no spec restriction)
   @BeforeFind()
-  async addTenantFilter(options, ctx) {
-    const tenantId = ctx.params?.tenantId;
-    if (tenantId) {
-      // add tenant filter to query options
-    }
-    return options;
+  async addTenantFilter(
+    options: RepositoryFindOptions<PhotoEntity>,
+    ctx?: AppContextInterface,
+  ): Promise<RepositoryFindOptions<PhotoEntity>> {
+    const tenantId = ctx?.supports(CrudCtx)
+      ? ctx.with(CrudCtx).params.tenantId
+      : undefined;
+
+    if (typeof tenantId !== 'string') return options;
+
+    const condition = Where.eq('tenantId', tenantId);
+
+    return {
+      ...options,
+      where: options.where ? Where.and(options.where, condition) : condition,
+    };
   }
 
   // Runs ONLY when the CRUD operation is a Create
   @AfterCreate(CrudSpec.isCreate())
-  async logCreation(entity, ctx) {
-    console.log(`Created ${ctx.operation}:`, entity.id);
+  async logCreation(
+    entity: PhotoEntity,
+    ctx?: AppContextInterface,
+  ): Promise<PhotoEntity> {
+    this.logger.log(`Created ${this.operationOf(ctx)}: ${entity.id}`);
     return entity;
   }
 
   // Runs ONLY on write operations (Create, Update, Replace)
   @AfterUpdate(CrudSpec.isWrite())
-  async logModification(entity, ctx) {
-    console.log(`Modified via ${ctx.operation}:`, entity.id);
+  async logModification(
+    entity: PhotoEntity,
+    ctx?: AppContextInterface,
+  ): Promise<PhotoEntity> {
+    this.logger.log(`Modified via ${this.operationOf(ctx)}: ${entity.id}`);
     return entity;
   }
 }

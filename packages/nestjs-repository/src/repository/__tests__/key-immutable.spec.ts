@@ -237,6 +237,44 @@ describe('primary key immutability on update and replace', () => {
     });
   });
 
+  describe('a hook that rewrites the primary key', () => {
+    // The guard runs inside the permeator's callback, so it sees the payload
+    // hooks produced rather than the one the caller passed. A hook is trusted
+    // code, but redirecting a write onto another row is a repository-level
+    // error whatever wrote it — and on a scoped entity it would be the scope
+    // refusal that surfaced instead, blaming the caller for the hook's edit.
+    // Overriding `runHooks` is what the permeator calls, so this produces the
+    // same post-hook payload a real `@BeforeUpdate` would.
+    class HookRewritingAdapter extends TestAdapter {
+      protected async runHooks<T>(
+        _methodKey: Parameters<TestAdapter['runHooks']>[0],
+        payload: T,
+      ): Promise<T> {
+        if (payload && typeof payload === 'object') {
+          return { ...payload, id: 'row-2' };
+        }
+        return payload;
+      }
+    }
+
+    it.each([
+      [
+        'update',
+        (a: HookRewritingAdapter) => a.update(EXISTING, { name: 'X' }),
+      ],
+      [
+        'replace',
+        (a: HookRewritingAdapter) => a.replace(EXISTING, { name: 'X' }),
+      ],
+    ])('is refused on %s, though the caller named no key', async (_n, run) => {
+      const adapter = new HookRewritingAdapter();
+
+      await expect(run(adapter)).rejects.toThrow(PrimaryKeyImmutableException);
+      expect(adapter.updated).toEqual([]);
+      expect(adapter.replaced).toEqual([]);
+    });
+  });
+
   it('leaves an entity with no primary key columns alone', async () => {
     const adapter = new TestAdapter([]);
 

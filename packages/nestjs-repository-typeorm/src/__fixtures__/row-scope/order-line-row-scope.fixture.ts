@@ -14,6 +14,8 @@ import {
   type WhereClause,
 } from '@concepta/nestjs-repository';
 
+import { type OrderLineEntityFixture } from './order-line.entity.fixture.js';
+import { type OrderEntityFixture } from './order.entity.fixture.js';
 import {
   ROW_SCOPE_ORDER_LINE_TOKEN,
   ROW_SCOPE_ORDER_TOKEN,
@@ -33,14 +35,14 @@ import { type TenantScopeFixture } from './tenant-row-scope.fixture.js';
  */
 @Injectable()
 export class OrderLineRowScopeFixture extends RowScopeBase<
-  PlainLiteralObject,
+  OrderLineEntityFixture,
   TenantScopeFixture
 > {
   constructor(
     @InjectDynamicRepository(ROW_SCOPE_ORDER_LINE_TOKEN)
-    private readonly orderLines: RepositoryInterface<PlainLiteralObject>,
+    private readonly orderLines: RepositoryInterface<OrderLineEntityFixture>,
     @InjectDynamicRepository(ROW_SCOPE_ORDER_TOKEN)
-    private readonly orders: RepositoryInterface<PlainLiteralObject>,
+    private readonly orders: RepositoryInterface<OrderEntityFixture>,
   ) {
     super(orderLines, {
       scopeKey: 'tenantId',
@@ -64,8 +66,8 @@ export class OrderLineRowScopeFixture extends RowScopeBase<
 
     // `transform` settles an `order` relation *object* into the `orderId`
     // column it backs, so one read covers both the scalar and the object. A
-    // bare id (`order: '…'`) is not settled and reads as undefined — the
-    // driver rejects that form on a declared join column.
+    // bare id (`order: '…'`) reads as undefined, so the driver fails the
+    // write.
     const orderId = this.orderLines.transform(scoped).orderId;
     if (orderId === undefined) return scoped;
 

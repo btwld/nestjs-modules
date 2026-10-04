@@ -8,6 +8,7 @@ import {
   type WhereClause,
 } from '@concepta/nestjs-repository';
 
+import { type OrderEntityFixture } from './order.entity.fixture.js';
 import { ROW_SCOPE_ORDER_TOKEN } from './row-scope.constants.fixture.js';
 
 /** The scope shape this deployment puts on `RowScopeCtx`. */
@@ -26,12 +27,12 @@ export interface TenantScopeFixture extends PlainLiteralObject {
  */
 @Injectable()
 export class TenantRowScopeFixture extends RowScopeBase<
-  PlainLiteralObject,
+  OrderEntityFixture,
   TenantScopeFixture
 > {
   constructor(
     @InjectDynamicRepository(ROW_SCOPE_ORDER_TOKEN)
-    orders: RepositoryInterface<PlainLiteralObject>,
+    orders: RepositoryInterface<OrderEntityFixture>,
   ) {
     super(orders, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
   }

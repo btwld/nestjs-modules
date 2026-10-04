@@ -1583,8 +1583,8 @@ export class OrderLinesRowScope extends RowScopeBase<OrderLine, TenantScope> {
 
     // `transform` settles an `order` relation *object* into the `orderId`
     // column it backs, so one read covers both the scalar and the object. A
-    // bare id (`order: '…'`) is not settled and reads as undefined — the
-    // driver rejects that form on a declared join column.
+    // bare id (`order: '…'`) reads as undefined, so the driver fails the
+    // write.
     const orderId = this.orderLines.transform(scoped).orderId;
     if (orderId === undefined) return scoped;
 
