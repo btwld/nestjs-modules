@@ -72,10 +72,23 @@ git history for what shipped.
       the joined entity's predicate as relation-tagged conditions (no driver change needed,
       but a LEFT join then drops roots whose related row is invisible).
 
-  6. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
+  6. **`HookContextOverlay` crashes on a non-HTTP execution context** (S) —
+      `attach()` calls `context.switchToHttp().getRequest()` unguarded and hands the
+      result to `getAppContext`, which indexes it. On a microservice, websocket or
+      scheduled handler that request is `undefined`, so the property access is a
+      `TypeError` — thrown from an interceptor registered globally via
+      `APP_INTERCEPTOR`, so it takes down the handler rather than degrading. Latent
+      only because nothing in the repo drives hooks over a non-HTTP transport; any
+      consumer with a queue consumer plus `CoreModule` hits it. The fix is a guard
+      returning early when there is no request, which is also the honest behaviour:
+      there is no request-scoped hook list to attach. Worth pairing with a decision on
+      whether a non-HTTP entry point should get a context at all, since entity-level
+      hook registration now means those calls run hooks without needing one.
+
+  7. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
 
-  7. **A scope value typed unlike its column is a silent trap, and nothing documents it**
+  8. **A scope value typed unlike its column is a silent trap, and nothing documents it**
       (S) — resolve `'42'` against an integer `tenantId` and the database compares the two
       equal while row scope's post-read check does not, so every read succeeds and every
       write 404s. It fails closed and it is loud on first run, which is why a diagnostic
@@ -83,7 +96,7 @@ git history for what shipped.
       the strict compare that is the actual security decider. A sentence in the row-scope
       README naming the symptom is the whole fix.
 
-  8. **Nothing stops a row-scope resolver regressing to `RowScopeBase<PlainLiteralObject>`**
+  9. **Nothing stops a row-scope resolver regressing to `RowScopeBase<PlainLiteralObject>`**
       (S) — naming the entity in both type parameters is what makes `column` checked
       against the entity's real columns, turning a misspelling into a compile error instead
       of a boot failure. The fixtures were the worked examples and had all drifted to the
@@ -91,13 +104,13 @@ git history for what shipped.
       reference instead of the README. A lint rule or a type-level nudge would hold the
       line; until then it relies on review.
 
-  9. **`console.log` in the crud README's hook examples** (S) — against the project's own
+  10. **`console.log` in the crud README's hook examples** (S) — against the project's own
       rule, and README examples get copied verbatim into consumer code where the shipped
       ESLint config then rejects them. The hook section now injects a `Logger`; the rest of
       the file was left alone because fixing it properly is a sweep across every package's
       README rather than one example.
 
-  10. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  11. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
          `packages` list (or collapse both blocks to a single `packages/*` glob when all
