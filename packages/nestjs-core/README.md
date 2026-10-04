@@ -157,20 +157,24 @@ Forgetting `@Hook()` is a hard failure, not a silent no-op: a class registered
 via `@UseHooks()` without the class-level `@Hook()` decorator throws
 `HookNotDecoratedException` at resolution time, and a hook that can't be
 resolved from the module's providers throws `HookProviderNotFoundException`.
-There is no equivalent hard failure for the two steps below — omitting
-either one leaves the hook silently inert, no error, no warning:
+Two more things have to be true:
 
 1. **`CoreModule.forRoot()`** must be imported — it provides
    `HookResolverService` and the interceptor that populates hook state on
-   the request context.
+   the request context. A subsystem that registers hooks against a declared
+   target fails outright without it — `@concepta/nestjs-repository` refuses at
+   startup and on the call, and emits a `ROCKETS_HOOKS_NOT_WIRED` warning once
+   per process.
 2. **The hook class must be listed in `providers`** for DI to resolve it.
+
+A hook attached with `@UseHooks()` alone, in an app with no repository module,
+is the case with the weakest signal: nothing warns, and the hook is simply
+inert.
 
 ### Attaching Hooks to Controllers
 
 `@UseHooks(...hooks)` is applied to a controller class or a specific method.
-Method-level decorators are merged with class-level decorators. This is the
-third required step — see `@concepta/nestjs-repository`'s README, "Wiring
-Hooks", for the full three-step checklist with a non-HTTP alternative.
+Method-level decorators are merged with class-level decorators.
 
 ```ts
 import { UseHooks } from '@concepta/nestjs-core';
@@ -189,17 +193,26 @@ export class UserController {
 }
 ```
 
-`@UseHooks` also accepts `{ hook, spec }` objects to add a per-registration
-specification guard:
+#### What a hook reaches
 
-```ts
-@UseHooks(
-  { hook: TenantScopeHook, spec: Spec.always() },
-  { hook: AuditHook, spec: Spec.and(adminSpec, mutationSpec) },
-)
-@Controller('orders')
-export class OrderController { ... }
-```
+`@UseHooks` stores the hook list on the request's `ctx`, not on anything the
+hook is *about*. Every call that receives that `ctx` reads the same list, so a
+hook declared here runs for every operation of its subsystem the request
+touches — including other entities written later in the request, and ones
+reached through a hook that forwards its `ctx`. The subsystem `type` is the
+only bound: a `RepoHook` never runs on cache operations.
+
+That is right for a cross-cutting hook and wrong for one that belongs to a
+single thing, so choose by where you register it rather than by adding a guard:
+
+| Intent | Where to register | Specification |
+| --- | --- | --- |
+| Cross-cutting — logging, metrics, audit | `@UseHooks` on the controller | Not needed |
+| Specific to one entity — stamp, scope, validation | `hooks:` in the subsystem's own registration, e.g. `RepositoryModule.forFeature` | Not needed |
+| A subset of either | Either | Required |
+
+A cross-cutting hook should *not* enumerate entities with a specification: a forgotten
+one loses coverage silently, which is the failure the hook existed to prevent.
 
 ### Specification Guards
 
@@ -231,13 +244,16 @@ export class IsAdminSpec implements SpecificationInterface {
 ### Consuming Hooks
 
 `HookResolverService` is exported by `CoreModule` and available for
-injection. It resolves and executes the matching hook methods from the request
-context, passing the payload through each applicable hook in sequence.
+injection. It resolves and executes the matching hook methods from the list it
+is given, passing the payload through each applicable hook in sequence.
 
 ```ts
+import { Injectable } from '@nestjs/common';
+
 import {
-  HookResolverService,
   getAppContext,
+  HookResolverService,
+  HooksCtx,
 } from '@concepta/nestjs-core';
 import { RepoHook } from '@concepta/nestjs-repository';
 
@@ -247,15 +263,28 @@ export class SomeService {
 
   async findAll(req: Request, options: FindOptions): Promise<FindOptions> {
     const ctx = getAppContext(req);
-    // hookType is the decorator object (has KEY property); payload is what flows
-    // through hooks; ctx is the full app context (resolver reads ctx.hooks internally).
-    return this.hookResolver.execute(RepoHook, 'beforeFind', options, ctx);
+    // hookType is the decorator object (has KEY property); payload is what
+    // flows through hooks; hooks is the list that applies to this call; ctx is
+    // the full app context, passed to each hook and to its specification.
+    const hooks = ctx.supports(HooksCtx) ? ctx.with(HooksCtx).hooks : [];
+    return this.hookResolver.execute(
+      RepoHook,
+      'beforeFind',
+      options,
+      hooks,
+      ctx,
+    );
   }
 }
 ```
 
-`execute<T>(hookType, methodKey, payload, ctx)` returns the payload after all
-applicable hooks have processed it.
+`execute<T>(hookType, methodKey, payload, hooks, ctx, filter?)` returns the
+payload after all applicable hooks have processed it.
+
+The hook list is a parameter rather than something read off `ctx`. A context
+is forwarded between entities and subsystems, so resolving from it made a
+nested call inherit the *caller's* hooks and run none of its own, silently.
+The caller owns which hooks apply; `ctx` is only what they run against.
 
 ## Context System
 
@@ -698,7 +727,7 @@ exercise correlation behavior directly.
 
 | Export | Description |
 | --- | --- |
-| `@UseHooks(...hooks)` | Controller/method decorator. Attaches hook classes (or `{ hook, spec }` objects) to the handler. |
+| `@UseHooks(...hooks)` | Controller/method decorator. Attaches hook classes to the handler. |
 | `@Hook(options)` | Class decorator. Marks a class as a hook, applies `@Injectable()`, and pre-computes method mappings. |
 | `@Specification(spec)` | Class/method decorator. Attaches a default specification to a hook class or method. |
 | `createHookMethodDecorator(key)` | Factory for creating subsystem-specific hook method decorators (e.g. `@BeforeFind`). |

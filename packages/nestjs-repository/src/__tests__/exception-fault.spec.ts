@@ -7,6 +7,7 @@ import {
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
+import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
 import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
@@ -98,6 +99,11 @@ const CASES: {
     name: 'FederationException',
     build: () => new FederationException(),
     fault: 'internal',
+  },
+  {
+    name: 'HookBootException',
+    build: () => new HookBootException(['some failure']),
+    fault: 'usage',
   },
   {
     name: 'RowScopeBootException',

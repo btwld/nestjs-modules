@@ -12,7 +12,7 @@ import {
   TypeOrmModule,
 } from '@nestjs/typeorm';
 
-import { HookResolverService } from '@concepta/nestjs-core';
+import { type HookOption, HookResolverService } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
   type RelationActionConfig,
@@ -77,6 +77,7 @@ export function createTypeOrmRepository<E extends PlainLiteralObject>(
   relationsConfig?: Record<string, RelationActionConfig>,
   transactionScope?: TransactionScope,
   rowScope?: RowScopeRegistration,
+  hooks?: HookOption[],
 ): TypeOrmRepository<E> {
   return new TypeOrmRepository(repo, {
     entityKey,
@@ -85,6 +86,7 @@ export function createTypeOrmRepository<E extends PlainLiteralObject>(
     relationsConfig,
     transactionScope,
     rowScope,
+    hooks,
   });
 }
 
@@ -114,7 +116,8 @@ export const OPTIONAL_TRANSACTION_SCOPE_INJECT = {
 export function createTypeOrmProvider<E extends PlainLiteralObject>(
   options: TypeOrmProviderOptionsInterface<E>,
 ): Provider {
-  const { key, entity, dataSource, factory, relations, rowScope } = options;
+  const { key, entity, dataSource, factory, relations, rowScope, hooks } =
+    options;
   const dsName = resolveDataSourceName(dataSource);
   const dsToken = resolveTokenName(dsName);
 
@@ -139,6 +142,7 @@ export function createTypeOrmProvider<E extends PlainLiteralObject>(
           relations,
           transactionScope,
           rowScope,
+          hooks,
         );
       },
     };
@@ -163,6 +167,7 @@ export function createTypeOrmProvider<E extends PlainLiteralObject>(
           relations,
           transactionScope,
           rowScope,
+          hooks,
         );
       },
     };

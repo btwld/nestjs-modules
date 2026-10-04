@@ -1,4 +1,4 @@
-import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
+import { HttpStatus, type PlainLiteralObject, type Type } from '@nestjs/common';
 
 import {
   AppContextHost,
@@ -7,11 +7,16 @@ import {
   RuntimeException,
   type HookMethodFilter,
   type HookMethodKeyType,
+  type HookOption,
   type HookResolverService,
+  type HookWithSpec,
+  HooksCtx,
+  normalizeHookOption,
 } from '@concepta/nestjs-core';
 
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
+import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
 import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
@@ -94,12 +99,16 @@ export abstract class RepositoryAdapter<
   private _permeator?: RepoPermeatorFactory<Entity>;
   private _federationOrchestrator?: FederationOrchestrator;
   private _rowScope?: RowScopeInterface;
+  private _hooks?: HookWithSpec[];
+  private readonly _warnedDuplicates = new Set<Type>();
 
   constructor(
     entityKey: string,
     protected readonly hookResolver?: HookResolverService,
     /** Held here so the unbound state fails closed. */
     readonly rowScopeDeclaration?: RowScopeRegistration,
+    /** Held for the same reason. */
+    readonly hooksDeclaration?: HookOption[],
   ) {
     this.entityKey = entityKey;
 
@@ -107,9 +116,9 @@ export abstract class RepositoryAdapter<
       warnedHooksNotWired = true;
       process.emitWarning(
         `Repository "${entityKey}" was constructed without a HookResolverService — ` +
-          'hooks registered via @UseHooks() will never run for this repository ' +
-          '(or any other, until CoreModule is imported), silently. Import ' +
-          'CoreModule (e.g. CoreModule.forRoot()) to enable them.',
+          'no hook will ever run for this repository (or any other, until ' +
+          'CoreModule is imported), silently. Import CoreModule (e.g. ' +
+          'CoreModule.forRoot()) to enable them.',
         { code: 'ROCKETS_HOOKS_NOT_WIRED' },
       );
     }
@@ -152,6 +161,87 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * Bind this entity's registered hooks.
+   *
+   * Bound once, by `RepositoryModule.forFeature()`, for the same reason as
+   * `setRowScope`.
+   */
+  setHooks(hooks: HookOption[]): void {
+    if (this._hooks) {
+      throw new HookBootException([
+        `"${this.entityKey}" already has hooks bound. Hooks are bound once, ` +
+          'at startup, and cannot be replaced.',
+      ]);
+    }
+
+    const normalized = hooks.map(normalizeHookOption);
+
+    // Refused rather than deduplicated: listing a class twice for one entity
+    // has no reading that differs from listing it once, so it is a typo, and
+    // running it twice would be silent — a doubled stamp looks identical.
+    const duplicate = normalized.find(
+      (config, i) => normalized.findIndex((c) => c.hook === config.hook) !== i,
+    );
+    if (duplicate) {
+      throw new HookBootException([
+        `Hook "${duplicate.hook.name}" is registered more than once for ` +
+          `"${this.entityKey}". Remove the duplicate.`,
+      ]);
+    }
+
+    this._hooks = normalized;
+  }
+
+  /**
+   * Whether a resolver is available to run hooks. Read by the boot checks.
+   */
+  get hasHookResolver(): boolean {
+    return this.hookResolver !== undefined;
+  }
+
+  /**
+   * Whether hooks are bound. Read by the boot checks.
+   */
+  get hasBoundHooks(): boolean {
+    return this._hooks !== undefined;
+  }
+
+  /**
+   * The bound hooks, for the boot checks to validate.
+   */
+  get boundHooks(): readonly HookWithSpec[] {
+    return this._hooks ?? [];
+  }
+
+  /**
+   * Refuse an entity whose declared hooks could never run. Without this, a
+   * declaration that was missed is indistinguishable from an entity with no
+   * hooks — the silent failure this registration exists to remove.
+   *
+   * Called from every path that would otherwise proceed hookless, including
+   * the ones that return before reaching the permeator.
+   */
+  protected assertHooksRunnable(): void {
+    if (!this.hooksDeclaration?.length) return;
+
+    if (!this.hookResolver) {
+      throw new HookBootException([
+        `"${this.entityKey}" declares hooks but no HookResolverService is ` +
+          'available to run them. Import CoreModule (e.g. ' +
+          'CoreModule.forRoot()).',
+      ]);
+    }
+
+    if (!this._hooks) {
+      throw new HookBootException([
+        `"${this.entityKey}" declares hooks but none were bound to it. The ` +
+          'entity was registered by calling the driver module directly ' +
+          'rather than through RepositoryModule.forFeature().',
+      ]);
+    }
+  }
+
+  /**
    * Resolve the bound resolver, refusing to serve a declared-but-unbound
    * entity. Reached before every operation, so the window between construction
    * and binding — and a declaration that nothing ever bound — both fail closed
@@ -188,11 +278,13 @@ export abstract class RepositoryAdapter<
    * it differs per repository per call, so it can't use `defineOverlay`'s
    * idempotent "declare once" semantics without pinning to whichever
    * repository happened to touch `ctx` first.
+   *
+   * A call with no `ctx` still gets a host, so `RepoCtx` is present and an
+   * entity-scoped specification can be evaluated. Row scope is unaffected: it
+   * reads the caller's own `options.ctx`, never this, which is what stops a
+   * hook deciding which principal is enforced.
    */
-  protected entityCtx(
-    ctx?: PlainLiteralObject,
-  ): PlainLiteralObject | undefined {
-    if (!ctx) return undefined;
+  protected entityCtx(ctx?: PlainLiteralObject): PlainLiteralObject {
     const appCtx = AppContextHost.from(ctx);
 
     const repoScoped = AppContextHost.from(Object.create(appCtx));
@@ -636,6 +728,10 @@ export abstract class RepositoryAdapter<
         stored,
         options?.ctx,
       );
+
+      // Same reasoning for hooks: this path skips the permeator, so a
+      // declaration that could never run would go unrefused here alone.
+      this.assertHooksRunnable();
 
       // Idempotent rather than rejected: a retried delete must not fail.
       return entity;
@@ -1256,10 +1352,84 @@ export abstract class RepositoryAdapter<
     ctx: PlainLiteralObject | undefined,
     filter?: HookMethodFilter,
   ): Promise<T> {
+    this.assertHooksRunnable();
+
     if (!this.hookResolver) {
       return payload;
     }
 
-    return this.hookResolver.execute(RepoHook, methodKey, payload, ctx, filter);
+    return this.hookResolver.execute(
+      RepoHook,
+      methodKey,
+      payload,
+      this.applicableHooks(ctx),
+      ctx,
+      filter,
+    );
+  }
+
+  /**
+   * The hooks that apply to this call: those registered for this entity, plus
+   * any the context carries from a `@UseHooks()` route.
+   *
+   * Registered hooks come first and win the dedupe, because they hold whatever
+   * guarantee the entity was registered for. A context-carried hook may have
+   * been declared on a route for a different entity entirely and reached here
+   * by a forwarded `ctx`, so a duplicate is reported against the route rather
+   * than the registration.
+   */
+  private applicableHooks(ctx: PlainLiteralObject | undefined): HookWithSpec[] {
+    const registered = this._hooks ?? [];
+    const carried = this.contextHooks(ctx);
+    if (!carried.length) return registered;
+
+    const registeredClasses = new Set(registered.map((config) => config.hook));
+    const seen = new Set(registeredClasses);
+    const merged = [...registered];
+
+    for (const config of carried) {
+      if (seen.has(config.hook)) {
+        this.warnDuplicateHook(config.hook, registeredClasses.has(config.hook));
+        continue;
+      }
+      seen.add(config.hook);
+      merged.push(config);
+    }
+
+    return merged;
+  }
+
+  /**
+   * Read the route-declared hooks off the context, if the overlay is there.
+   */
+  private contextHooks(ctx: PlainLiteralObject | undefined): HookWithSpec[] {
+    if (!ctx) return [];
+
+    const appCtx = AppContextHost.from(ctx);
+    if (!appCtx.supports(HooksCtx)) return [];
+
+    return appCtx.with(HooksCtx).hooks ?? [];
+  }
+
+  /**
+   * Warn once per hook class per entity. The dedupe already made it run once;
+   * this is so the redundant registration gets removed rather than lived with.
+   */
+  private warnDuplicateHook(hook: Type, alsoRegistered: boolean): void {
+    if (this._warnedDuplicates.has(hook)) return;
+    this._warnedDuplicates.add(hook);
+
+    const hookName = hook.name;
+
+    process.emitWarning(
+      alsoRegistered
+        ? `Hook "${hookName}" is registered for "${this.entityKey}" and also ` +
+            'arrived on the context from a @UseHooks() route. It runs once. ' +
+            'If that route exists only to reach this entity the @UseHooks() ' +
+            'entry is redundant — but it may be covering other entities too.'
+        : `Hook "${hookName}" reached "${this.entityKey}" twice on the same ` +
+            'context. It runs once. Remove the duplicate @UseHooks() entry.',
+      { code: 'ROCKETS_HOOKS_DUPLICATE' },
+    );
   }
 }

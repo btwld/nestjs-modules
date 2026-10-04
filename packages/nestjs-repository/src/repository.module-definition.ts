@@ -9,6 +9,7 @@ import {
   FEDERATION_ORCHESTRATOR,
   FederationOrchestrator,
 } from './federation/federation-orchestrator.service.js';
+import { HookBootService } from './hooks/hook-boot.service.js';
 import { TransactionInterceptor } from './interceptors/transaction.interceptor.js';
 import { type RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
 import { REPOSITORY_MODULE_OPTIONS } from './repository.constants.js';
@@ -75,6 +76,7 @@ export function createRepositoryProviders(options: {
       useClass: FederationOrchestrator,
     },
     RowScopeBootService,
+    HookBootService,
     TransactionScope,
     TransactionalRunner,
     TransactionInterceptor,

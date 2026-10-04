@@ -56,6 +56,8 @@ export { PartialPrimaryKeyException } from './exceptions/partial-primary-key.exc
 export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
 export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
+export { HookBootException } from './exceptions/hook-boot.exception.js';
+export { HookBootTargetInterface } from './hooks/hook-boot-checks.js';
 export { RepositoryQueryException } from './exceptions/repository-query.exception.js';
 export { OptimisticLockException } from './exceptions/optimistic-lock.exception.js';
 export { SoftDeletedImmutableException } from './exceptions/soft-deleted-immutable.exception.js';

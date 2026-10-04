@@ -1211,62 +1211,91 @@ export class TenantScopeHook {
 
 ### Wiring Hooks
 
-Defining a hook class is not enough on its own — three things all have to be
-true for it to run, and skipping any one of them means the hook silently
-never fires (no error, no warning beyond `ROCKETS_HOOKS_NOT_WIRED` — see
-below — if *no* repository anywhere has hooks wired):
+Register the hook on the entity it belongs to, in `forFeature`. Two things
+have to be true for it to run:
 
 1. **`CoreModule.forRoot()`** (or `.register()`) is imported. It provides
-   `HookResolverService` and the interceptor that reads `@UseHooks()`
-   metadata into the request context.
-2. **`@UseHooks(TheHook)`** is applied to the controller or method — for a
-   plain controller, directly; for a CRUD-generated one, via
-   `extraDecorators: [UseHooks(TheHook)]` on the `crud.controller` options.
-3. **The hook class is listed in `providers`** so Nest's DI can resolve it.
+   `HookResolverService`.
+2. **The hook class is listed in `providers`** of some module, so Nest's DI
+   can resolve it. Any module will do — it is resolved with
+   `moduleRef.get(hook, { strict: false })`, so no extra `imports` entry is
+   needed.
 
 ```ts
 import { Module } from '@nestjs/common';
-import { CoreModule, UseHooks } from '@concepta/nestjs-core';
+import { CoreModule } from '@concepta/nestjs-core';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
 @Module({
   imports: [
     CoreModule.forRoot(), // 1. required for any hook to run
-    // ...RepositoryModule, TypeOrmModule, etc.
+    RepositoryModule.forFeature({
+      module: TypeOrmRepositoryModule,
+      entities: [
+        { key: 'orders', entity: Order, hooks: [TenantScopeHook] },
+      ],
+    }),
   ],
-  controllers: [], // if wiring @UseHooks directly on a controller (2)
-  providers: [TenantScopeHook], // 3. required so DI can resolve it
+  providers: [TenantScopeHook], // 2. required so DI can resolve it
 })
 export class OrderModule {}
+```
 
-@UseHooks(TenantScopeHook) // 2. required — the actual attachment point
+A hook registered this way runs on **every** call that reaches the entity —
+an HTTP route, another entity's hook calling this repository, a queue
+consumer, a seeder, a test. Nothing further is needed outside HTTP.
+
+A declared hook that could never run is a startup failure
+(`HookBootException`), not a silent no-op. Caught at boot: a missing
+`CoreModule`, a declaration nothing bound, a class listed twice for one
+entity, a hook missing its `@RepoHook()`, one decorated for another
+subsystem, and one the container cannot resolve. The first two are also
+refused on the call itself, which is what covers an app that never reaches the
+startup checks.
+
+#### Request-scoped hooks
+
+`@UseHooks(TheHook)` on a controller or method attaches a hook to a
+*request* instead — directly on a plain controller, or via
+`extraDecorators: [UseHooks(TheHook)]` on a CRUD controller's options.
+
+```ts
+import { Controller } from '@nestjs/common';
+import { UseHooks } from '@concepta/nestjs-core';
+
+@UseHooks(AdminAuditHook)
 @Controller('orders')
 export class OrderController {}
 ```
 
-Outside HTTP (a queue worker, a CLI script, a test), there's no controller
-for `@UseHooks()` to attach to, so build the hook list directly and set it
-on the ambient `ctx` yourself:
+Both paths work and are unioned per call, deduplicated by class — a hook
+reaching the same entity twice runs once, and warns
+(`ROCKETS_HOOKS_DUPLICATE`). Registered hooks run before route-declared ones.
 
-```ts
-import { AppContextHost, HooksCtx } from '@concepta/nestjs-core';
-import { RepoHook } from '@concepta/nestjs-repository';
+The hook list lives on the request's `ctx`, which cuts both ways: it is absent
+outside HTTP, so the hook does not run for a queue consumer, a seeder or a
+test; and it is read by every repository call that receives that `ctx`, so an
+ungated hook also runs for other entities written during the request. See
+[what a hook reaches](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#what-a-hook-reaches).
 
-const ctx = new AppContextHost();
-ctx.defineOverlay(HooksCtx, {
-  hooks: [{ hook: TenantScopeHook, type: RepoHook.KEY }],
-});
+Prefer registration unless the hook is genuinely cross-cutting or specific to
+one route.
 
-await orderRepo.create(dto, { ctx });
-```
-
-`TenantScopeHook` still needs to be resolvable from the module container
-(`HookResolverService` resolves it via `moduleRef.get(hook, { strict: false
-})`, so any module works, not specifically `CoreModule`'s own) — this only
-replaces the `@UseHooks()`/controller attachment step, not step 1 above.
+> A hook that reads an overlay — `ctx.with(AuthUserCtx)` — now runs on calls
+> that have no such overlay, where previously it did not run at all. Guard
+> with `ctx?.supports(ref)` before reading. `with()` throws when the overlay
+> is absent.
 
 ### Scoped Hooks
 
-Use specifications to restrict a hook to specific entities:
+To target one entity, register the hook on it — `hooks:` in `forFeature`
+reaches that entity and nothing else.
+
+Specifications are for the cuts registration cannot express: a subset of
+operations, or a condition on the context. `RepoSpec.isEntity` narrows a hook
+that already reaches several entities — a cross-cutting `@UseHooks` one, or a
+class registered on more than one entity:
 
 ```ts
 import { RepoHook, RepoSpec, AfterCreate } from '@concepta/nestjs-repository';

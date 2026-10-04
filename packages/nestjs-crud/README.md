@@ -1271,8 +1271,29 @@ export class AuditHook {
 
 ### Registering Hooks
 
-Attach hooks to a controller with `@UseHooks()` from `@concepta/nestjs-core`,
-which takes hook classes:
+Prefer registering a repository hook on its entity, in
+`RepositoryModule.forFeature`:
+
+```ts
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+
+RepositoryModule.forFeature({
+  module: TypeOrmRepositoryModule,
+  entities: [{ key: 'photo', entity: Photo, hooks: [AuditHook] }],
+});
+```
+
+That hook then runs on every call reaching the entity, including ones no CRUD
+route started — another entity's hook writing through this repository, a queue
+consumer, a seeder. See the
+[nestjs-repository hooks section](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-repository#wiring-hooks).
+
+Attach a hook to a *request* instead with `@UseHooks()` from
+`@concepta/nestjs-core`, which takes hook classes. Its list lives on the
+request's `ctx`, so the hook runs for every entity that `ctx` reaches — not
+just this controller's — and does not run at all outside HTTP. Use it for a
+hook that is genuinely cross-cutting or specific to a route:
 
 ```ts
 import { UseHooks } from '@concepta/nestjs-core';

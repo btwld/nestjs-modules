@@ -165,5 +165,6 @@ export { Hook } from './infrastructure/hook/decorators/hook.decorator.js';
 export { Specification } from './infrastructure/hook/decorators/specification.decorator.js';
 export { createHookMethodDecorator } from './infrastructure/hook/decorators/hook-method.decorator.js';
 export { HooksCtx } from './infrastructure/hook/hook.context.overlay.js';
+export { normalizeHookOption } from './infrastructure/hook/utils/normalize-hook-option.js';
 export { HookNotDecoratedException } from './infrastructure/hook/exceptions/hook-not-decorated.exception.js';
 export { HookProviderNotFoundException } from './infrastructure/hook/exceptions/hook-provider-not-found.exception.js';

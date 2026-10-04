@@ -1,6 +1,5 @@
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
-import { type PlainLiteralObject } from '@nestjs/common';
 import { type ModuleRef, type Reflector } from '@nestjs/core';
 
 import { HookNotDecoratedException } from '../exceptions/hook-not-decorated.exception.js';
@@ -12,9 +11,7 @@ const TYPE_KEY = 'testHook';
 
 class TestHook {}
 
-function ctxWith(config: HookWithSpec): PlainLiteralObject {
-  return { hooks: [config] };
-}
+const hooksOf = (config: HookWithSpec): HookWithSpec[] => [config];
 
 describe(HookResolverService.name, () => {
   let moduleRef: DeepMockProxy<ModuleRef>;
@@ -37,7 +34,8 @@ describe(HookResolverService.name, () => {
         { KEY: TYPE_KEY },
         'beforeFind',
         {},
-        ctxWith({ hook: TestHook, type: TYPE_KEY }),
+        hooksOf({ hook: TestHook, type: TYPE_KEY }),
+        {},
       ),
     ).rejects.toThrow(HookProviderNotFoundException);
   });
@@ -51,7 +49,8 @@ describe(HookResolverService.name, () => {
         { KEY: TYPE_KEY },
         'beforeFind',
         {},
-        ctxWith({ hook: TestHook, type: TYPE_KEY }),
+        hooksOf({ hook: TestHook, type: TYPE_KEY }),
+        {},
       ),
     ).rejects.toThrow(HookNotDecoratedException);
   });
@@ -66,7 +65,8 @@ describe(HookResolverService.name, () => {
       { KEY: TYPE_KEY },
       'beforeFind',
       payload,
-      ctxWith({ hook: TestHook, type: TYPE_KEY }),
+      hooksOf({ hook: TestHook, type: TYPE_KEY }),
+      {},
     );
 
     expect(result).toBe(payload);

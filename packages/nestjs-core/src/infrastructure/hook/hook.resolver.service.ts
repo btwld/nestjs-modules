@@ -39,10 +39,17 @@ export class HookResolverService {
    * Filters by hook type, resolves instances, evaluates specs,
    * and calls hook methods in sequence.
    *
+   * The hook list is a parameter rather than something read off `ctx`. That is
+   * deliberate: a context is forwarded between entities and subsystems, so
+   * resolving from it made a nested call inherit the *caller's* hooks and run
+   * none of its own, silently. The caller owns which hooks apply; `ctx` is only
+   * what they run against.
+   *
    * @param hookType - Hook type decorator with KEY property
    * @param methodKey - The method key (e.g., 'beforeFind')
    * @param payload - The payload to pass through hooks
-   * @param ctx - The hook context
+   * @param hooks - The hooks that apply to this call
+   * @param ctx - The hook context, passed to each hook and to its specification
    * @param filter - Optional predicate over each method's metadata, letting a
    *   subsystem split a single method key into disjoint execution groups (e.g.
    *   by subsystem-defined `options`). Omitted = every registered method runs,
@@ -53,15 +60,16 @@ export class HookResolverService {
     hookType: { readonly KEY: string },
     methodKey: HookMethodKeyType,
     payload: T,
+    hooks: HookWithSpec[],
     ctx: PlainLiteralObject | undefined,
     filter?: HookMethodFilter,
   ): Promise<T> {
-    if (!ctx?.hooks?.length) {
+    if (!hooks.length) {
       return payload;
     }
 
     // Filter hooks by type
-    const typeHooks = ctx.hooks.filter(
+    const typeHooks = hooks.filter(
       (config: HookWithSpec) => config.type === hookType.KEY,
     );
 
@@ -73,11 +81,16 @@ export class HookResolverService {
     const resolved = this.resolveHooks(typeHooks);
     let result = payload;
 
+    // An absent context reads as an empty one: `always()` still matches,
+    // anything looking for a value does not. The hook method still receives
+    // `ctx` as it came.
+    const specCtx = ctx ?? {};
+
     for (const resolvedHook of resolved) {
       const methods = this.getMethods<T>(resolvedHook, methodKey, filter);
 
       for (const { method, spec } of methods) {
-        if (!spec.isSatisfiedBy(ctx)) {
+        if (!spec.isSatisfiedBy(specCtx)) {
           continue;
         }
 

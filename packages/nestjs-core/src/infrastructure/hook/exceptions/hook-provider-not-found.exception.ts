@@ -4,7 +4,7 @@ import { RuntimeException } from '../../../domain/exceptions/runtime.exception.j
 export class HookProviderNotFoundException extends RuntimeException {
   constructor(hookName: string, options?: RuntimeExceptionOptions) {
     super({
-      message: `Hook class "%s" is registered via @UseHooks() but could not be resolved. Ensure it is registered in the module's providers.`,
+      message: `Hook class "%s" is registered but could not be resolved. Ensure it is registered in the module's providers.`,
       messageParams: [hookName],
       fault: 'usage',
       ...options,

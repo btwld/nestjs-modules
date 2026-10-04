@@ -27,6 +27,7 @@ import {
   type AppContextLike,
   type DeepPartial,
   RuntimeException,
+  type HookOption,
   type HookResolverService,
 } from '@concepta/nestjs-core';
 import {
@@ -74,6 +75,8 @@ export interface TypeOrmRepositoryOptions {
   transactionScope?: TransactionScope;
   /** Declaration only — the resolver is bound by RepositoryModule. */
   rowScope?: RowScopeRegistration;
+  /** Declaration only — the hooks are bound by RepositoryModule. */
+  hooks?: HookOption[];
 }
 
 /**
@@ -89,7 +92,12 @@ export class TypeOrmRepository<
     private readonly repo: Repository<Entity>,
     private readonly options: TypeOrmRepositoryOptions,
   ) {
-    super(options.entityKey, options.hookResolver, options.rowScope);
+    super(
+      options.entityKey,
+      options.hookResolver,
+      options.rowScope,
+      options.hooks,
+    );
 
     const entityName = repo.metadata?.name || repo.metadata?.targetName;
 

@@ -6,9 +6,9 @@ import { ContextOverlayInterceptor } from '../context/context-overlay.intercepto
 import { getAppContext } from '../context/get-app-context.util.js';
 import { HookContextInterface } from '../context/interfaces/hook-context.interface.js';
 
-import { HOOK_METADATA_KEY, HOOKS_METADATA_KEY } from './hook.constants.js';
-import { HookMetadataInterface } from './hook.interfaces.js';
-import { HookOption, HookWithSpec } from './hook.types.js';
+import { HOOKS_METADATA_KEY } from './hook.constants.js';
+import { HookOption } from './hook.types.js';
+import { normalizeHookOption } from './utils/normalize-hook-option.js';
 
 export const HooksCtx = new OverlayRef<'withHooks', HookContextInterface>(
   'withHooks',
@@ -34,20 +34,6 @@ export class HookContextOverlay extends ContextOverlayInterceptor {
       HOOKS_METADATA_KEY,
       [context.getHandler(), context.getClass()],
     );
-    const hooks = (decoratorHooks ?? []).map((option) =>
-      this.normalizeOption(option),
-    );
-    return { hooks };
-  }
-
-  private normalizeOption(option: HookOption): HookWithSpec {
-    const hook = typeof option === 'function' ? option : option.hook;
-
-    const metadata = this.reflector.get<HookMetadataInterface>(
-      HOOK_METADATA_KEY,
-      hook,
-    );
-
-    return { hook, type: metadata?.type };
+    return { hooks: (decoratorHooks ?? []).map(normalizeHookOption) };
   }
 }

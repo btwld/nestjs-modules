@@ -404,6 +404,46 @@ describe('row scope ordering guarantees', () => {
 
       expect(rowScope.queries[0]?.scope).toBeUndefined();
     });
+
+    // `find({})` above still hands the adapter an options object, and
+    // `AppContextHost.from({})` mints a host from it. These pin the case where
+    // `options.ctx` is genuinely `undefined`, which takes a different branch
+    // inside the adapter's ambient-context construction. Covered for every
+    // operation family, because the scope input is read per method and a guard
+    // verified on one has twice turned out not to hold for its siblings.
+    // Asserting the resolver ran is the load-bearing half: `queries[0]?.scope`
+    // is `undefined` both when the scope is absent and when the resolver was
+    // never consulted, so these would pass against an adapter that skipped
+    // scoping entirely on a ctx-less call.
+    describe('with no options object at all', () => {
+      it('leaves a read unscoped rather than inventing a scope', async () => {
+        await repo.find();
+
+        expect(rowScope.queries).toHaveLength(1);
+        expect(rowScope.queries[0]?.scope).toBeUndefined();
+      });
+
+      it('leaves count unscoped', async () => {
+        await repo.count();
+
+        expect(rowScope.queries).toHaveLength(1);
+        expect(rowScope.queries[0]?.scope).toBeUndefined();
+      });
+
+      it('leaves a write unscoped', async () => {
+        await repo.create(row());
+
+        expect(rowScope.writes).toHaveLength(1);
+        expect(rowScope.writes[0]?.scope).toBeUndefined();
+      });
+
+      it('leaves a delete unscoped', async () => {
+        await repo.delete(row());
+
+        expect(rowScope.writes).toHaveLength(1);
+        expect(rowScope.writes[0]?.scope).toBeUndefined();
+      });
+    });
   });
 
   describe('declared but unbound', () => {
@@ -541,6 +581,36 @@ describe('row scope ordering guarantees', () => {
       // one after the fact.
       await late.find({ ctx: new AppContextHost() });
 
+      expect(rowScope.queries[0]?.scope).toBeUndefined();
+    });
+
+    it('cannot establish a scope on a call that had no ctx at all', async () => {
+      // The sibling above hands in an empty host; this one hands in nothing,
+      // which reaches the adapter's ambient-context construction by a
+      // different branch. The `log` assertion is here because the rewrite is
+      // the whole premise: a test that never confirmed the hook ran would pass
+      // on an adapter that silently stopped calling hooks.
+      const log: string[] = [];
+
+      class LateScopeNoCtxAdapter extends TestAdapter {
+        protected async runHooks<T>(
+          methodKey: Parameters<TestAdapter['runHooks']>[0],
+          payload: T,
+        ): Promise<T> {
+          if (methodKey === RepoHookMethodKey.BEFORE_READ && payload) {
+            log.push(methodKey);
+            return { ...payload, ctx: callerCtx('smuggled') };
+          }
+          return payload;
+        }
+      }
+      const late = new LateScopeNoCtxAdapter('rows');
+      late.setRowScope(rowScope);
+
+      await late.find();
+
+      expect(log).toEqual([RepoHookMethodKey.BEFORE_READ]);
+      expect(rowScope.queries).toHaveLength(1);
       expect(rowScope.queries[0]?.scope).toBeUndefined();
     });
   });

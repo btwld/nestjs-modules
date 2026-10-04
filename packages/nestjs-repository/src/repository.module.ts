@@ -119,6 +119,31 @@ export class RepositoryModule extends RepositoryModuleClass {
       });
     }
 
+    // Hook binding — one provider per entity that registered hooks. Same
+    // reasoning as the row scope binding above: a driver that forgot would
+    // leave the hooks unbound, and the adapter then refuses rather than
+    // running as though the entity had none.
+    //
+    // The hook classes are deliberately not injected here. Resolution stays
+    // `moduleRef.get(hook, { strict: false })` at call time, as it has always
+    // been for `@UseHooks`, so a hook provided in two modules cannot yield one
+    // instance at boot and a different one at runtime — and registering a hook
+    // needs no `imports` entry. The startup checks cover resolvability.
+    for (const entity of entities) {
+      if (!entity.hooks?.length) continue;
+
+      providers.push({
+        provide: Symbol(`HOOK_BINDING_${entity.key}_${Date.now()}`),
+        inject: [getDynamicRepositoryToken(entity.key)],
+        useFactory: (repo: unknown) => {
+          if (repo instanceof RepositoryAdapter) {
+            repo.setHooks(entity.hooks ?? []);
+          }
+          return true;
+        },
+      });
+    }
+
     // Transaction factory registration
     if (dynamicModule.transactionFactories) {
       for (const descriptor of dynamicModule.transactionFactories) {
