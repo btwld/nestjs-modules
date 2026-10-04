@@ -379,12 +379,14 @@ persistence form via `toPersistence()`.
 ### Repository Resolution
 
 ```ts
-const cacheRepo = this.repositoryResolver.resolve(ctx.entity);
+const cacheRepo = this.repositoryResolver.resolve(namespace);
 const cache = await cacheRepo.get(ctx, id);
 ```
 
 `CacheRepositoryResolver` looks up the repository by entity key. Entity keys
-are registered via `CacheModule.forFeature()`.
+are registered via `CacheModule.forFeature()`. The key comes from the
+operation's own `namespace` — every command and query carries one, and that is
+what the handlers resolve by. It is not on `ctx`.
 
 ## Schemas
 
@@ -435,6 +437,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { CoreModule, Operation } from '@concepta/nestjs-core';
 import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
+import { CacheSqliteEntity } from '@concepta/nestjs-cache/optional/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
 import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 import {
@@ -471,7 +474,7 @@ import {
     CoreModule.forRoot(),
     RepositoryModule.forFeature({
       module: TypeOrmRepositoryModule,
-      entities: [{ key: 'userCache', entity: UserCacheEntity }],
+      entities: [{ key: 'userCache', entity: CacheSqliteEntity }],
     }),
     CacheModule.forFeature(['userCache']),
     CrudModule.forFeature<CacheInterface>({

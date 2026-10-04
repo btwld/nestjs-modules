@@ -77,6 +77,10 @@ import {
   ValidatePasswordHistoryCommand,
 } from '@concepta/nestjs-password';
 import { UserModule } from '@concepta/nestjs-user';
+import {
+  UserCredentialSqliteEntity,
+  UserSqliteEntity,
+} from '@concepta/nestjs-user/optional/typeorm';
 
 @Module({
   imports: [
@@ -87,8 +91,8 @@ import { UserModule } from '@concepta/nestjs-user';
     RepositoryModule.forFeature({
       module: TypeOrmRepositoryModule,
       entities: [
-        { key: 'user', entity: UserEntity },
-        { key: 'user-credentials', entity: UserCredentialEntity },
+        { key: 'user', entity: UserSqliteEntity },
+        { key: 'user-credentials', entity: UserCredentialSqliteEntity },
       ],
     }),
 

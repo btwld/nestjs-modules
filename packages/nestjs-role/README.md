@@ -62,34 +62,39 @@ Register the module, define your entities, and wire up repositories.
 
 ### Entities
 
-Define TypeORM entities that implement the domain interfaces:
+Define TypeORM entities that implement the domain interfaces. Extend
+`CommonSqliteEntity`/`CommonPostgresEntity`, which carry the audit
+columns with the decorators the repository looks for:
 
 ```ts
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm';
 import { RoleEntityInterface, RoleAssignmentEntityInterface } from '@concepta/nestjs-role';
 
 @Entity()
-export class RoleEntity implements RoleEntityInterface {
-  @PrimaryGeneratedColumn('uuid') id!: string;
+export class RoleEntity extends CommonSqliteEntity implements RoleEntityInterface {
   @Column() name!: string;
-  @Column() description!: string;
-  @Column() dateCreated!: Date;
-  @Column() dateUpdated!: Date;
-  @Column({ nullable: true }) dateDeleted!: Date | null;
-  @Column({ default: 1 }) version!: number;
+  @Column({ nullable: true }) description!: string;
 }
 
 @Entity()
-export class UserRoleEntity implements RoleAssignmentEntityInterface {
-  @PrimaryGeneratedColumn('uuid') id!: string;
+export class UserRoleEntity
+  extends CommonSqliteEntity
+  implements RoleAssignmentEntityInterface {
   @Column() roleId!: string;
   @Column() assigneeId!: string;
-  @Column() dateCreated!: Date;
-  @Column() dateUpdated!: Date;
-  @Column({ nullable: true }) dateDeleted!: Date | null;
-  @Column({ default: 1 }) version!: number;
 }
 ```
+
+**Declaring the audit columns by hand with plain `@Column()` silently costs you
+two guarantees.** The repository finds the version column through TypeORM's
+`isVersion` flag and the delete-date column through `isDeleteDate`, and only
+`@VersionColumn` and `@DeleteDateColumn` set those. A `@Column({ default: 1 })
+version` compiles and boots, but `expectedVersion` then throws and
+`SoftDeletedImmutableException` can never fire — so optimistic locking and
+soft-delete immutability are both off, with nothing to indicate it. If you do
+define them yourself, use `@CreateDateColumn`, `@UpdateDateColumn`,
+`@DeleteDateColumn` and `@VersionColumn`.
 
 ### App Module
 

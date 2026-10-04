@@ -355,6 +355,11 @@ export class SomeService {
 | SoftDelete | `softDelete()` | `softDelete()` |
 | Restore | `restore()` | `restore()` |
 
+Update, Replace, Delete, SoftDelete and Restore each call `findOne()` first to
+resolve the row (Restore with `withDeleted`), then pass it to the repository
+operation. That is why they return `404` for a row the caller cannot see, and
+why `@BeforeFindOne`/`@BeforeRead` hooks fire on a `PATCH`.
+
 **Row-scoped entities are scoped on every route, with nothing to add here.**
 Because enforcement lives in the repository this table maps onto, a CRUD
 controller over an entity declared `rowScope` is scoped without any filter,
@@ -393,7 +398,9 @@ PATCH /users/1  If-Match: "3"   -> 200  ETag: "4"     (wins)
 PATCH /users/1  If-Match: "3"   -> 409                (stale, rejected)
 ```
 
-- **`ETag`** is emitted on Read and on any successful write, derived from
+- **`ETag`** is emitted on Read and on any write that returns the entity
+  body — not on a `204`, so Delete/SoftDelete/Restore carry one only with
+  `returnDeleted`/`returnRestored` set. It is derived from
   the entity's version column — never from a `version` key in the response
   body, so an unrelated field of that name never produces a bogus
   validator. Narrowing with `?select=` suppresses it defensively, since the
@@ -424,8 +431,9 @@ PATCH /users/1  If-Match: "3"   -> 409                (stale, rejected)
   route never evaluates it — a stale or malformed `If-Match` on a `GET`
   is simply not checked, since a lost-update precondition has no meaning
   on a read.
-- **`If-Match` targeting an entity with no version column returns `400`**
-  — the resource can't honor a precondition it has no way to check.
+- **`If-Match` carrying a version, on an entity with no version column,
+  returns `400`** — the resource can't honor a precondition it has no way to
+  check. `If-Match: *` carries no version and passes through.
 
 If a resource should *require* a precondition rather than merely accept
 one, annotate it with `@CrudRequireVersion()` — at the controller level
@@ -841,9 +849,12 @@ via `CrudQueryParser`.
 | `includeDeleted` | `1` or `0` | `?includeDeleted=1` |
 | `s` | JSON search object | `?s={"name":{"$contains":"sunset"}}` |
 
-`includeDeleted` only affects reads (list, read). A write (update, replace,
-upsert) targeting a soft-deleted row always returns 409 Conflict — soft-deleted
-rows are immutable at the repository level regardless of this parameter. See
+`includeDeleted=1` lets any single-row operation *locate* a soft-deleted row,
+writes included — every one of them re-reads through `getOneOrFail` first.
+Without it, an update, replace, delete or soft-delete aimed at a soft-deleted
+row returns **404**, because the row is never found. With it, update and
+replace return **409**, because the repository refuses to mutate a
+soft-deleted row. See
 [nestjs-repository's Soft-Deleted Immutability
 section](../nestjs-repository/README.md#soft-deleted-immutability).
 
@@ -1146,7 +1157,7 @@ Or with the decorator:
 
 ```ts
 @CrudCreate()
-@CrudCommandHandler(CustomCreateHandler)
+@CrudCommandHandler({ handler: CustomCreateHandler })
 async create(
   @Ctx(CrudCtx) ctx: CrudContextInterface<PhotoEntity>,
   @CrudBody({ schema: photoCreateSchema }) dto: PhotoCreatable,
@@ -1201,7 +1212,7 @@ export class AuditHook {
   // Runs on ALL find operations (no spec restriction)
   @BeforeFind()
   async addTenantFilter(options, ctx) {
-    const tenantId = ctx.locals?.tenantId;
+    const tenantId = ctx.params?.tenantId;
     if (tenantId) {
       // add tenant filter to query options
     }
@@ -1226,20 +1237,15 @@ export class AuditHook {
 
 ### Registering Hooks
 
-Attach hooks to a controller with `@UseHooks()` from `@concepta/nestjs-core`.
-Hooks can be plain classes or `{ hook, spec }` objects:
+Attach hooks to a controller with `@UseHooks()` from `@concepta/nestjs-core`,
+which takes hook classes:
 
 ```ts
 import { UseHooks } from '@concepta/nestjs-core';
 import { CrudSpec } from '@concepta/nestjs-crud';
 
-// Simple: hook runs for all operations on this controller
+// Hook runs for every operation on this controller
 @UseHooks(AuditHook)
-@CrudController({ ... })
-export class PhotoController { ... }
-
-// With spec: hook only runs for mutations
-@UseHooks({ hook: AuditHook, spec: CrudSpec.isMutation() })
 @CrudController({ ... })
 export class PhotoController { ... }
 
@@ -1248,8 +1254,21 @@ export class PhotoController { ... }
 @CrudController({ ... })
 export class PhotoController {
   @CrudDelete()
-  @UseHooks({ hook: AdminAuditHook, spec: CrudSpec.isDelete() })
+  @UseHooks(AdminAuditHook)
   async delete(@Ctx(CrudCtx) ctx) { ... }
+}
+```
+
+**Gating is a property of the hook, not of where it is registered.** To run a
+hook only for some operations, put the specification on the hook itself — on
+the hook-method decorator, on a method-level `@Specification`, or on the
+class-level `@RepoHook`:
+
+```ts
+@RepoHook({ type: RepoHookType, spec: CrudSpec.isMutation() })
+export class AuditHook {
+  @BeforeWrite()
+  async stamp(data, ctx) { ... }
 }
 ```
 
@@ -1258,8 +1277,8 @@ export class PhotoController {
 When multiple specs are defined, the most specific wins:
 
 1. Hook method parameter: `@BeforeCreate(spec)` — highest
-2. Class-level: `@RepoHook(spec)`
-3. `@UseHooks({ hook, spec })` registration
+2. Method-level: `@Specification(spec)`
+3. Class-level: `@RepoHook(spec)`
 4. Default: `CrudSpec.always()` — lowest
 
 ### Composing Specifications
@@ -1285,7 +1304,7 @@ Hook method decorators from `@concepta/nestjs-repository`:
 | Decorator | Fires on |
 | --- | --- |
 | `@BeforeRead` / `@AfterRead` | Any read (find, findOne, count, findAndCount) |
-| `@BeforeWrite` / `@AfterWrite` | Any write (create, update, replace) |
+| `@BeforeWrite` / `@AfterWrite` | Any write (create, createMany, update, upsert, replace) — note `CreateBatch` maps to `createMany`, so these fire for it |
 | `@BeforeTransition` / `@AfterTransition` | Lifecycle changes (softDelete, restore) |
 | `@BeforeDestroy` / `@AfterDestroy` | Hard delete |
 | `@BeforeFind` / `@AfterFind` | `find()` |
@@ -1307,6 +1326,7 @@ Hook method decorators from `@concepta/nestjs-repository`:
 | `CrudContextException` | Error during context building (interceptor) |
 | `CrudDecoratorException` | Invalid decorator configuration |
 | `CrudQueryException` | Error executing a query or command |
+| `CrudPreconditionRequiredException` | A route requires `If-Match` and the request did not send one (HTTP 428) |
 
 ## Entry Points
 

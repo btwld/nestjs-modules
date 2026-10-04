@@ -236,8 +236,12 @@ see the row that took it. A scoped read cannot tell "does not exist yet" from
 caller-supplied key, the other permits a cross-scope overwrite.
 
 Caller-supplied primary keys are otherwise fine. A key is only checked when
-every primary column is present; a partial one cannot identify a row, so it is
-left to the database.
+every primary column is present. A *partial* composite key is refused with
+`PartialPrimaryKeyException` (HTTP 400) naming the missing columns: it cannot
+identify a row, so nothing can tell whether it is taken, and a driver
+implementing create as a save-by-key would otherwise fail reporting that it
+cannot *update* a row. Supplying none of the key columns is the ordinary
+generated-key create and is untouched.
 
 **This is a check-then-write with a real race.** A row inserted between the
 check and the write is *overwritten* rather than rejected, because a driver
@@ -265,15 +269,16 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any — backs both the in-request lock and `expectedVersion` (subclass-author API) |
 | `getDeleteDateColumn()` | protected | Get the soft-remove date column name from metadata, if any (subclass-author API) |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
-| `runHooks(methodKey, payload, ctx)` | protected | Execute repository hooks for a lifecycle event (subclass-author API) |
-| `resolveJoinClauses(join?)` | protected | Resolve structural join properties from relation metadata (subclass-author API) |
+| `runHooks(methodKey, payload, ctx, filter?)` | protected | Execute repository hooks for a lifecycle event; `filter` selects by hook metadata, which is how `{ replace: true }` routing works (subclass-author API) |
+| `resolveJoinClauses(join?)` | protected | Validate join relation names against entity metadata (subclass-author API) |
 
 ### Implementing a Repository
 
 ```ts
 import { RepositoryAdapter } from '@concepta/nestjs-repository';
 
-class MyDriverRepository<Entity> extends RepositoryAdapter<Entity> {
+class MyDriverRepository<Entity extends PlainLiteralObject>
+  extends RepositoryAdapter<Entity> {
   readonly metadata = { /* ... */ };
 
   protected async doFind(options?) {
@@ -380,9 +385,18 @@ interface JoinClause {
 }
 ```
 
-Structural properties (`on`, `through`, `cardinality`) are resolved
-automatically from entity relation metadata by the adapter (via the
-protected `resolveJoinClauses()`).
+`joinType` is honoured by federation, which implements `INNER` by requiring the
+related row to exist. The TypeORM driver renders joins through TypeORM's
+`relations` find option, which is always a LEFT JOIN, so it **refuses** an
+`INNER` clause on a non-federated relation rather than silently returning the
+rows you asked to exclude. Filter on the related column instead, or declare the
+relation federated.
+
+`resolveJoinClauses()` validates each clause's relation name against
+`metadata.relations` and refuses an unknown one with a `400`; it does not alter
+the clauses. Structural relation data (`on`, `through`, `cardinality`) lives on
+`metadata.relations`, where the driver and federation read it — it is never
+attached to a join clause.
 
 ### Join Helper
 
@@ -416,7 +430,7 @@ const [users, total] = await userRepo.findAndCount({
 | Method | Description |
 | --- | --- |
 | `left(relation)` | LEFT JOIN (default — includes rows with no match) |
-| `inner(relation)` | INNER JOIN (excludes rows with no match) |
+| `inner(relation)` | INNER JOIN (excludes rows with no match) — federated relations only; see above |
 | `join(...clauses)` | Wrap join clauses into `{ join: clauses }` for passing to `find()` |
 
 ### Filtering by Relations
@@ -877,6 +891,12 @@ export class CreateOrderHandler implements ICommandHandler<CreateOrderCommand> {
 }
 ```
 
+`orderRepo` here is a DDD aggregate repository of your own — note the
+`save(ctx, aggregate)` shape, which `RepositoryInterface` does not have. It
+would be resolved through a resolver you write and would call a
+`RepositoryInterface` underneath. The point of the example is the transaction
+scope and the commit/rollback callbacks, not the repository shape.
+
 ```ts
 // Read-only transaction (always rolls back). onRollback callbacks run
 // (the scope did roll back); onCommit callbacks never run.
@@ -1273,7 +1293,8 @@ match broad categories, and fine-grained decorators for specific operations.
 
 | Decorator | Matches |
 | --- | --- |
-| `@BeforeRead` / `@AfterRead` | find, findOne, count, findAndCount |
+| `@BeforeRead` | find, findOne, count, findAndCount |
+| `@AfterRead` | find, findOne (count and findAndCount have their own after-keys) |
 | `@BeforeWrite` / `@AfterWrite` | create, createMany, update, upsert, replace |
 | `@BeforeTransition` / `@AfterTransition` | softDelete, restore |
 | `@BeforeDestroy` / `@AfterDestroy` | delete, deleteMany (hard delete) |
@@ -1869,9 +1890,10 @@ also exported for manual provider wiring.
 | Exception | Description |
 | --- | --- |
 | `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
-| `OptimisticLockException` | An `update`/`replace` targeted a stale version — the row was modified by another request since it was read |
+| `OptimisticLockException` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — the row was modified by another request since it was read |
 | `RepositoryDuplicateKeyException` | Duplicate repository keys detected at bootstrap |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
+| `PartialPrimaryKeyException` | A `create`/`createMany` supplied only part of a composite primary key. A partial key cannot be looked up, so nothing can tell whether it is taken. Supply every key column, or none for a generated key |
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |
 | `TransactionClosedException` | A settled scope was used again — `getOrStart`, `enter`, `onCommit`, or `onRollback` after close |
 | `TransactionHeuristicCommitException` | A multi-datasource commit failed after at least one datasource had already committed |

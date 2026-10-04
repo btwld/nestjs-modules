@@ -261,14 +261,16 @@ relies on `affected` reflecting rows *matched*, not rows *changed* — true
 by default for Postgres and sqlite, but on MySQL only with
 `CLIENT_FOUND_ROWS` enabled, so an entity with no other auto-updating
 column (e.g. no `@UpdateDateColumn`) can see a false conflict without it.
-And supplying `expectedVersion` to `softDelete` on an already-soft-deleted
-row *voids* the idempotency guarantee below by design: a stale entity
-whose caller honestly restates its own (also stale) version passes the
-in-memory check trivially, so the no-op is skipped and the driver's CAS
-conflicts instead — the discriminating case is exactly what makes
-`expectedVersion` on delete paths meaningful. (Unreachable over HTTP:
-`nestjs-crud`'s `getOneOrFail` always re-reads with `withDeleted: false`
-before a soft-delete, so an already-soft-deleted row 404s first.)
+Note how `expectedVersion` interacts with the idempotent `softDelete` of an
+already-soft-deleted row: the guard is resolved *before* the no-op, so a
+**stale** version conflicts with `OptimisticLockException` instead of quietly
+succeeding, while a **matching** version still no-ops — the driver is never
+reached either way, so its CAS does not run on that path. The idempotency
+guarantee is preserved; what `expectedVersion` adds is that a stale
+precondition against a row someone else already deleted is reported rather
+than swallowed. (Unreachable over HTTP anyway: `nestjs-crud`'s `getOneOrFail`
+re-reads with `withDeleted: false` before a soft-delete, so an
+already-soft-deleted row 404s first.)
 
 ### Soft-Deleted Immutability
 
@@ -279,8 +281,8 @@ maintain. See [nestjs-repository's Soft-Deleted Immutability
 section](../nestjs-repository/README.md#soft-deleted-immutability) for the
 `{ force: true }` escape hatch and the `softDelete()` no-op behavior.
 
-Entities without a version column are unaffected — `update`/`replace`
-behave exactly as before.
+This guard depends only on the delete-date column, so it applies to entities
+with no version column too.
 
 ### Relation Cascades and Row Scope
 
@@ -533,7 +535,11 @@ This gives `OrderEntity` the `id`, `dateCreated`, `dateUpdated`,
 | Exception | Package | Description |
 | --- | --- | --- |
 | `RepositoryQueryException` | `@concepta/nestjs-repository` | Repository query error (wraps original error) |
-| `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`/`replace` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
+| `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
+| `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
+| `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |
+| `PartialPrimaryKeyException` | `@concepta/nestjs-repository` | A `create` supplied only part of a composite primary key |
+| `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
 
 ## Entry Points
 

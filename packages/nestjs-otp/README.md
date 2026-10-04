@@ -400,13 +400,13 @@ persistence form via `toPersistence()`.
 
 | Method | Signature |
 | --- | --- |
-| `get` | `(ctx, id) => Promise<Otp>` |
+| `get` | `(ctx, id) => Promise<Otp \| null>` |
 | `findActiveByPasscode` | `(ctx, { category, passcode }) => Promise<Otp \| null>` |
 | `findByPasscode` | `(ctx, { category, passcode }) => Promise<Otp \| null>` |
 | `findActiveByAssignee` | `(ctx, { assigneeId, category }) => Promise<Otp \| null>` |
 | `findAllByAssigneeAndCategory` | `(ctx, { assigneeId, category }) => Promise<Otp[]>` |
-| `countCreatedSince` | `(ctx, { assigneeId, category, since }) => Promise<number>` |
-| `findOlderThan` | `(ctx, { assigneeId, category, cutoff }) => Promise<Otp[]>` |
+| `countCreatedSince` | `(ctx, { assigneeId, category, cutoffDate }) => Promise<number>` |
+| `findOlderThan` | `(ctx, { assigneeId, category, cutoffDate }) => Promise<Otp[]>` |
 | `save` | `(ctx, otp) => Promise<void>` |
 | `remove` | `(ctx, otp) => Promise<void>` |
 | `removeAll` | `(ctx, otps) => Promise<void>` |
@@ -553,10 +553,21 @@ import { OtpInterface, OtpModule, otpCreateSchema } from '@concepta/nestjs-otp';
 
 import { CreateOtpRequest } from './create-otp.request';
 import { CreateOtpRequestHandler } from './create-otp-request.handler';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { OtpSqliteEntity } from '@concepta/nestjs-otp/optional/typeorm';
+
 import { otpResponseSchema } from './otp-response.schema';
 
 @Module({
   imports: [
+    // The OTP repository provider injects the dynamic repository for this
+    // entity key, so the key has to be registered with RepositoryModule —
+    // without this, Nest cannot resolve OTP_REPOSITORY_USEROTP at startup.
+    RepositoryModule.forFeature({
+      module: TypeOrmRepositoryModule,
+      entities: [{ key: 'userOtp', entity: OtpSqliteEntity }],
+    }),
     OtpModule.forFeature(['userOtp']),
     CrudModule.forFeature<OtpInterface>({
       crud: {
@@ -596,7 +607,13 @@ pairs following the same pattern. See the `@concepta/nestjs-crud` documentation
 for the full API.
 
 `OtpModule.forRoot()` (or `forRootAsync()`) must be registered globally
-in a parent module for `forFeature()` to resolve its dependencies.
+in a parent module for `forFeature()` to resolve its dependencies, and
+`RepositoryModule.forRoot({})` must be registered for the repository layer.
+
+OTP rows carry an `assigneeId`, so in a multi-tenant deployment they are rows
+you will want scoped. That is declared on the same
+`RepositoryModule.forFeature()` registration via `rowScope` — see the Row Scope
+section of `@concepta/nestjs-repository`.
 
 ## Entry Points
 
