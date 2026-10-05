@@ -20,15 +20,9 @@ export class UserScopeHookFixture {
   @BeforeFindOne(RepoSpec.isEntity('user'))
   async scopeUserLookup(
     options: RepositoryFindOneOptions<UserEntityInterface>,
-    ctx?: AppContextInterface,
+    ctx: AppContextInterface,
   ): Promise<RepositoryFindOneOptions<UserEntityInterface>> {
-    const authorizedUser = ctx?.supports(AuthorizedUserRef)
-      ? ctx.with(AuthorizedUserRef)
-      : undefined;
-
-    if (!authorizedUser?.id) {
-      return options;
-    }
+    const authorizedUser = ctx.require(AuthorizedUserRef).withAuthorizedUser();
 
     const condition = Where.eq('id', authorizedUser.id);
 
@@ -41,15 +35,9 @@ export class UserScopeHookFixture {
   @BeforeFindOne(RepoSpec.isEntity('user-credentials'))
   async scopeCredentialsLookup(
     options: RepositoryFindOneOptions<UserCredentialEntityInterface>,
-    ctx?: AppContextInterface,
+    ctx: AppContextInterface,
   ): Promise<RepositoryFindOneOptions<UserCredentialEntityInterface>> {
-    const authorizedUser = ctx?.supports(AuthorizedUserRef)
-      ? ctx.with(AuthorizedUserRef)
-      : undefined;
-
-    if (!authorizedUser?.id) {
-      return options;
-    }
+    const authorizedUser = ctx.require(AuthorizedUserRef).withAuthorizedUser();
 
     const userCondition = Where.eq('userId', authorizedUser.id);
 

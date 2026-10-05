@@ -1062,12 +1062,9 @@ describe('TypeOrmRepository Hooks', () => {
       @BeforeFind()
       async addTenantFilter(
         options: RepositoryFindOptions<TestEntityFixture>,
-        ctx?: AppContextInterface,
+        ctx: AppContextInterface,
       ): Promise<RepositoryFindOptions<TestEntityFixture>> {
-        const tenant = ctx?.supports(TenantCtx)
-          ? ctx.with(TenantCtx)
-          : undefined;
-        if (!tenant) return options;
+        const tenant = ctx.require(TenantCtx).withTenant();
 
         const condition = Where.eq('lastName', tenant.tenantId);
         return {
@@ -1081,12 +1078,9 @@ describe('TypeOrmRepository Hooks', () => {
       @BeforeCreate({ replace: true })
       async stampTenant(
         data: DeepPartial<TestEntityFixture>,
-        ctx?: AppContextInterface,
+        ctx: AppContextInterface,
       ): Promise<DeepPartial<TestEntityFixture>> {
-        const tenant = ctx?.supports(TenantCtx)
-          ? ctx.with(TenantCtx)
-          : undefined;
-        if (!tenant) return data;
+        const tenant = ctx.require(TenantCtx).withTenant();
 
         return { ...data, lastName: tenant.tenantId };
       }

@@ -139,10 +139,11 @@ export class TenantScopeHook {
   @BeforeFind()
   async addTenantFilter(
     options: RepositoryFindOptions<OrderEntity>,
-    ctx?: AppContextInterface,
+    ctx: AppContextInterface,
   ): Promise<RepositoryFindOptions<OrderEntity>> {
-    const tenant = ctx?.supports(TenantCtx) ? ctx.with(TenantCtx) : undefined;
-    if (!tenant) return options;
+    // Refuses a call that cannot identify a tenant, rather than reading
+    // across all of them.
+    const tenant = ctx.require(TenantCtx).withTenant();
 
     const condition = Where.eq('tenantId', tenant.tenantId);
     return {
@@ -266,6 +267,8 @@ export class SomeService {
     // hookType is the decorator object (has KEY property); payload is what
     // flows through hooks; hooks is the list that applies to this call; ctx is
     // the full app context, passed to each hook and to its specification.
+    // `supports()` rather than `require()`: a route that declared no hooks
+    // has no overlay, and an empty list is the right answer for it.
     const hooks = ctx.supports(HooksCtx) ? ctx.with(HooksCtx).hooks : [];
     return this.hookResolver.execute(
       RepoHook,

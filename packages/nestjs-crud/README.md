@@ -1204,8 +1204,8 @@ A hook's `ctx` is the app context. The CRUD request lives on it as the
 they are not properties of `ctx` itself.
 
 ```ts
-import { Injectable, Logger } from '@nestjs/common';
-import { AppContextInterface } from '@concepta/nestjs-core';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { AppContextInterface, RuntimeException } from '@concepta/nestjs-core';
 import {
   RepoHook,
   BeforeFind,
@@ -1231,13 +1231,20 @@ export class AuditHook {
   @BeforeFind()
   async addTenantFilter(
     options: RepositoryFindOptions<PhotoEntity>,
-    ctx?: AppContextInterface,
+    ctx: AppContextInterface,
   ): Promise<RepositoryFindOptions<PhotoEntity>> {
-    const tenantId = ctx?.supports(CrudCtx)
-      ? ctx.with(CrudCtx).params.tenantId
-      : undefined;
+    // Both absences are refused rather than returning `options` unchanged,
+    // which would read across every tenant.
+    const { params } = ctx.require(CrudCtx).withCrud();
+    const tenantId = params.tenantId;
 
-    if (typeof tenantId !== 'string') return options;
+    if (typeof tenantId !== 'string') {
+      throw new RuntimeException({
+        message: 'No tenant on the request',
+        httpStatus: HttpStatus.FORBIDDEN,
+        fault: 'usage',
+      });
+    }
 
     const condition = Where.eq('tenantId', tenantId);
 

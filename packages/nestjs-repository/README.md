@@ -1178,10 +1178,11 @@ export class TenantScopeHook {
   @BeforeFind()
   async addTenantFilter(
     options: RepositoryFindOptions<OrderEntity>,
-    ctx?: AppContextInterface,
+    ctx: AppContextInterface,
   ): Promise<RepositoryFindOptions<OrderEntity>> {
-    const tenant = ctx?.supports(TenantCtx) ? ctx.with(TenantCtx) : undefined;
-    if (!tenant) return options;
+    // `require()` throws when the overlay is absent, so a call that cannot
+    // identify a tenant is refused rather than reading across all of them.
+    const tenant = ctx.require(TenantCtx).withTenant();
 
     const condition = Where.eq('tenantId', tenant.tenantId);
     return {
@@ -1199,10 +1200,9 @@ export class TenantScopeHook {
   @BeforeCreate({ replace: true })
   async stampTenant(
     data: DeepPartial<OrderEntity>,
-    ctx?: AppContextInterface,
+    ctx: AppContextInterface,
   ): Promise<DeepPartial<OrderEntity>> {
-    const tenant = ctx?.supports(TenantCtx) ? ctx.with(TenantCtx) : undefined;
-    if (!tenant) return data;
+    const tenant = ctx.require(TenantCtx).withTenant();
 
     return { ...data, tenantId: tenant.tenantId };
   }
@@ -1282,10 +1282,13 @@ ungated hook also runs for other entities written during the request. See
 Prefer registration unless the hook is genuinely cross-cutting or specific to
 one route.
 
-> A hook that reads an overlay — `ctx.with(AuthUserCtx)` — now runs on calls
-> that have no such overlay, where previously it did not run at all. Guard
-> with `ctx?.supports(ref)` before reading. `with()` throws when the overlay
-> is absent.
+> A hook runs on calls that carry no particular overlay — a nested write, a
+> queue consumer, a seeder. To read one, `ctx.require(ref).withRef()` refuses
+> such a call; `ctx.supports(ref)` branches on it instead.
+>
+> A refusal from an `after*` hook comes too late to undo the row that hook ran
+> for, and a hook writing to a second entity leaves the first one written.
+> Wrap the operation in a `TransactionScope` if that matters.
 
 ### Scoped Hooks
 
