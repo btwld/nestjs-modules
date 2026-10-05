@@ -2,12 +2,18 @@ import { OverlayRef } from '../../../domain/context/overlay-ref.js';
 import { AppContextHost } from '../app-context.host.js';
 import { OverlayAlreadyDefinedException } from '../exceptions/overlay-already-defined.exception.js';
 import { OverlayImmutableException } from '../exceptions/overlay-immutable.exception.js';
+import { OverlayNotDefinedException } from '../exceptions/overlay-not-defined.exception.js';
 
 interface FeatureProps {
   value: string;
 }
 
+interface OtherProps {
+  label: string;
+}
+
 const FeatureRef = new OverlayRef<'withFeature', FeatureProps>('withFeature');
+const OtherRef = new OverlayRef<'withOther', OtherProps>('withOther');
 
 describe(AppContextHost.name, () => {
   describe('removeOverlay', () => {
@@ -156,6 +162,91 @@ describe(AppContextHost.name, () => {
       ctx.defineOverlay(FeatureRef, { value: 'second' });
 
       expect(ctx.with(FeatureRef).value).toEqual('first');
+    });
+  });
+
+  describe('require', () => {
+    it('refuses an overlay that is not defined', () => {
+      const ctx = new AppContextHost();
+
+      expect(() => ctx.require(FeatureRef)).toThrow(OverlayNotDefinedException);
+    });
+
+    it('names the first absent overlay when several are given', () => {
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(FeatureRef, { value: 'present' });
+
+      expect(() => ctx.require(FeatureRef, OtherRef)).toThrow(/"withOther"/);
+    });
+
+    it('reads the overlay when it is defined', () => {
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(FeatureRef, { value: 'present' });
+
+      expect(ctx.require(FeatureRef).withFeature().value).toEqual('present');
+    });
+
+    // `RepositoryAdapter.entityCtx` builds its context as a prototype child of
+    // the caller's, so an overlay the caller supplied is never an own property
+    // by the time a hook reads it. A presence check on own properties only
+    // would refuse every real request.
+    it('accepts an overlay inherited from a parent context', () => {
+      const parent = new AppContextHost();
+      parent.defineOverlay(FeatureRef, { value: 'from-parent' });
+      const child = AppContextHost.from(parent.with(FeatureRef));
+
+      expect(child.require(FeatureRef).withFeature().value).toEqual(
+        'from-parent',
+      );
+    });
+  });
+
+  describe('optional', () => {
+    it('resolves the overlay when it is defined', () => {
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(FeatureRef, { value: 'present' });
+
+      const resolved = ctx.optional().withFeature();
+
+      expect(AppContextHost.from(resolved).with(FeatureRef).value).toEqual(
+        'present',
+      );
+    });
+
+    it('returns the context unchanged for an overlay that is absent', () => {
+      const ctx = new AppContextHost();
+
+      expect(ctx.optional().withFeature()).toBe(ctx);
+    });
+
+    // A proxy that answers every property with a callable reports a callable
+    // `then`, which makes it a thenable — so awaiting it hands the runtime a
+    // `then` that resolves nothing and the await never settles.
+    it('is not a thenable', async () => {
+      const ctx = new AppContextHost();
+
+      await expect(
+        Promise.race([
+          Promise.resolve(ctx.optional()),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('await never settled')), 100),
+          ),
+        ]),
+      ).resolves.toBeDefined();
+    });
+
+    // Chaining past two absent overlays is the shape `entityCtx` uses, and the
+    // reason `optional()` returns the host rather than the overlay's props.
+    it('keeps chaining when an earlier overlay in the chain is absent', () => {
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(OtherRef, { label: 'reached' });
+
+      const chained = ctx.optional().withFeature();
+      const reached = AppContextHost.from(chained).optional().withOther();
+
+      expect(AppContextHost.from(reached).with(OtherRef).label).toEqual(
+        'reached',
+      );
     });
   });
 });

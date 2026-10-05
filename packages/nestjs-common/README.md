@@ -348,10 +348,10 @@ expect(ctx.supports(FooCtx)).toBe(true);
 | Method | Description |
 | --- | --- |
 | `defineOverlay(ref, values)` | Register an overlay by `OverlayRef` and pre-resolved values. Installs a `with*()` method. Idempotent -- subsequent calls with the same name are no-ops. |
-| `require(...refs)` | Type-level narrowing. Returns `this` cast to include the typed `with*()` methods for the given refs. No runtime validation. |
+| `require(...refs)` | Asserts every ref is present, throwing `OverlayNotDefinedException` on the first absent one, and returns `this` narrowed to their typed `with*()` methods. |
 | `with(ref)` | Direct lookup by ref. Returns the resolved overlay props, or throws `OverlayNotDefinedException`. |
 | `supports(ref)` | Returns `true` if the overlay is defined on this context. |
-| `optional()` | Returns a proxy where any `with*()` call returns the resolved overlay if defined, or `this` unchanged if not. |
+| `optional()` | Returns a proxy for chaining past a possibly-absent overlay: any `with*()` call returns the resolved overlay if defined, or `this` unchanged if not. Not an accessor -- to read an overlay use `require()` or `supports()`. |
 | `static from(value?)` | Normalizes an `AppContextLike` value to a guaranteed `AppContextHost`. Passes through existing instances; creates a new one for `undefined`, `null`, or `{}`. |
 
 ### Proxy Guard

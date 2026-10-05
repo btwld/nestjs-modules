@@ -145,14 +145,23 @@ export class AppContextHost implements AppContextInterface {
   }
 
   /**
-   * Type-level narrowing gate.
+   * Assert that each overlay is present, and narrow to its typed `with*()`
+   * methods.
    *
-   * Returns `this` cast to include the typed `with*()` methods for the
-   * given refs. No runtime validation — the proxy handles undefined overlays.
+   * Throws `OverlayNotDefinedException` on the first absent ref — the same
+   * exception `with()` throws, so an absent overlay fails one way whichever
+   * accessor found it. Use this to read an overlay a caller must supply;
+   * `supports()` to branch on one that is genuinely optional.
    */
   require<R extends OverlayRef<string, PlainLiteralObject, unknown[]>[]>(
-    ..._refs: R
+    ...refs: R
   ): this & RefsToMethods<R[number]> {
+    for (const ref of refs) {
+      if (!(ref.name in this)) {
+        throw new OverlayNotDefinedException(ref.name);
+      }
+    }
+
     return this as this & RefsToMethods<R[number]>;
   }
 
@@ -185,6 +194,19 @@ export class AppContextHost implements AppContextInterface {
   /**
    * Returns a proxy where calling any overlay method returns the
    * resolved overlay if defined, or `this` unchanged if not.
+   *
+   * For chaining past an overlay that may be absent — the return type is
+   * `this`, not the overlay's props, so a chain continues either way. To read
+   * an overlay, use `require()` or `supports()`.
+   *
+   * Absence is decided by looking the method up, not by catching: an error
+   * thrown by the overlay itself propagates rather than being reported as an
+   * absent overlay.
+   *
+   * Only `with*` properties resolve to a callable. Anything else reads as
+   * `undefined`, which keeps the proxy from answering for members it has no
+   * overlay for — `then` in particular, since a proxy that reports a callable
+   * `then` is a thenable, and awaiting one that never calls back hangs.
    */
   optional(): Record<string, () => this> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -193,16 +215,20 @@ export class AppContextHost implements AppContextInterface {
       {},
       {
         get(_target, prop: string) {
+          if (typeof prop !== 'string' || !prop.startsWith('with')) {
+            return undefined;
+          }
+
           return (...args: unknown[]) => {
-            try {
-              const fn = Reflect.get(self, prop);
-              if (typeof fn === 'function') {
-                return Reflect.apply(fn, self, args);
-              }
-            } catch {
-              // proxy guard threw — overlay not defined, fall through
+            if (!(prop in self)) {
+              return self;
             }
-            return self;
+
+            const fn = Reflect.get(self, prop);
+
+            return typeof fn === 'function'
+              ? Reflect.apply(fn, self, args)
+              : self;
           };
         },
       },
