@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-federated",
   "version": "8.0.0-alpha.12",
+  "description": "Rockets NestJS Federated",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +16,15 @@
     }
   },
   "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btwld/nestjs-modules.git",
+    "directory": "packages/nestjs-federated"
+  },
+  "bugs": {
+    "url": "https://github.com/btwld/nestjs-modules/issues"
+  },
+  "homepage": "https://github.com/btwld/nestjs-modules#readme",
   "publishConfig": {
     "access": "public"
   },

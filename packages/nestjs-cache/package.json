@@ -24,6 +24,15 @@
     }
   },
   "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btwld/nestjs-modules.git",
+    "directory": "packages/nestjs-cache"
+  },
+  "bugs": {
+    "url": "https://github.com/btwld/nestjs-modules/issues"
+  },
+  "homepage": "https://github.com/btwld/nestjs-modules#readme",
   "publishConfig": {
     "access": "public"
   },

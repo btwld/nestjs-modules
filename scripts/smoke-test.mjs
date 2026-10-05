@@ -6,6 +6,8 @@
  *
  * Checks:
  *  1. package.json has {"type":"module"}
+ *  1b. package.json declares repository, bugs and homepage, and
+ *     repository.directory points at the package's own directory
  *  2. exports map: all default (.js) and types (.d.ts) files exist on disk
  *  3. exports map: same files also exist in a `pnpm pack` tarball — this is
  *     the check that actually validates the package's `files` allowlist, since
@@ -92,6 +94,33 @@ for (const { dir, export: exportName } of PACKAGES) {
     process.stdout.write(`  FAIL  ${dir} — package.json has type "${pkg.type}", expected "module"\n`);
     failed++;
     continue;
+  }
+
+  // 1b. Registry metadata. Without these a consumer reading node_modules has no
+  // route back to this repository, and `npm repo`/`npm bugs` both fail. Numbered
+  // 1b rather than 2 to keep the cross-references in the checks below accurate.
+  //
+  // No `continue` on failure: metadata is independent of the build checks that
+  // follow, and skipping them would hide a second problem behind this one.
+  const missing = [
+    ['repository.url', pkg.repository?.url],
+    ['bugs.url', pkg.bugs?.url],
+    ['homepage', pkg.homepage],
+  ].flatMap(([field, value]) => (value ? [] : [field]));
+
+  // The one value that differs per package, so the one a 13-file hand-edit can
+  // mis-paste — and a wrong directory is invisible until someone follows the npm
+  // link and lands on a sibling package.
+  const expectedDir = `packages/${dir}`;
+  if (missing.length > 0) {
+    process.stdout.write(`  FAIL  ${dir} — package.json is missing ${missing.join(', ')}\n`);
+    failed++;
+  } else if (pkg.repository.directory !== expectedDir) {
+    process.stdout.write(`  FAIL  ${dir} — repository.directory is "${pkg.repository.directory}", expected "${expectedDir}"\n`);
+    failed++;
+  } else {
+    process.stdout.write(`  pass  ${dir} declares repository, bugs and homepage\n`);
+    passed++;
   }
 
   // 2. Walk exports map: verify all default (.js) and types (.d.ts) files exist on disk

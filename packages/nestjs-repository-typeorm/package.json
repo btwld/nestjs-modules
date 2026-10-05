@@ -6,6 +6,15 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btwld/nestjs-modules.git",
+    "directory": "packages/nestjs-repository-typeorm"
+  },
+  "bugs": {
+    "url": "https://github.com/btwld/nestjs-modules/issues"
+  },
+  "homepage": "https://github.com/btwld/nestjs-modules#readme",
   "publishConfig": {
     "access": "public"
   },
