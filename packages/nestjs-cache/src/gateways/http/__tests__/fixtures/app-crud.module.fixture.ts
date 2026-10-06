@@ -33,7 +33,7 @@ import { ReadCacheRequest } from '../../queries/impl/read-cache.request.js';
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [UserEntityFixture, UserCacheEntityFixture],

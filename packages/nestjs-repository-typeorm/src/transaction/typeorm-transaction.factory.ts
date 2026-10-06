@@ -9,32 +9,29 @@ import {
 
 import { TypeOrmTransaction } from './typeorm-transaction.js';
 
-// TypeORM 0.3.31 drivers whose createQueryRunner() returns one shared
-// QueryRunner per DataSource, rather than a fresh one per call — confirmed
-// by grepping node_modules/typeorm/driver/*/[A-Z]*Driver.js for the
-// `if (!this.queryRunner) this.queryRunner = new ...` caching pattern. A
-// second BEGIN on that shared connection while the first transaction is
-// still open fails at the driver level (concepta/nestjs-modules#476), so
-// these are the drivers that need TransactionManager to serialize
-// transactions rather than let them race. `postgres` (and everything else
-// not listed) hands out a fresh connection/QueryRunner per transaction and
-// is unaffected.
+// Drivers whose createQueryRunner() returns one shared QueryRunner per
+// DataSource rather than a fresh one per call. A second BEGIN on that shared
+// connection while the first transaction is still open fails at the driver
+// level (#476), so these need TransactionManager to serialize transactions.
+// `postgres`, and everything else not listed, is unaffected.
 //
-// `mongodb` also caches a single shared QueryRunner (assigned in its own
-// connect(), not the grepped pattern above) but is deliberately excluded:
-// its startTransaction()/commitTransaction() are documented no-ops ("not
-// supported by mongodb driver"), so there's no BEGIN for a second caller to
-// collide with.
-const SHARED_QUERY_RUNNER_DRIVER_TYPES = new Set<DatabaseType>([
-  'sqlite',
-  'better-sqlite3',
-  'sqljs',
-  'expo',
-  'capacitor',
-  'cordova',
-  'nativescript',
-  'react-native',
-]);
+// `mongodb` caches one too, but is excluded: its startTransaction() and
+// commitTransaction() are no-ops, so there's no BEGIN to collide with.
+//
+// `sqlite` is the legacy sqlite3-backed driver, present in TypeORM 0.3 and
+// removed from `DatabaseType` in 1.x. It stays in the element type so one
+// build serves either line.
+const SHARED_QUERY_RUNNER_DRIVER_TYPES: ReadonlySet<DatabaseType | 'sqlite'> =
+  new Set<DatabaseType | 'sqlite'>([
+    'sqlite',
+    'better-sqlite3',
+    'sqljs',
+    'expo',
+    'capacitor',
+    'cordova',
+    'nativescript',
+    'react-native',
+  ]);
 
 /**
  * Factory for creating TypeORM transactions.

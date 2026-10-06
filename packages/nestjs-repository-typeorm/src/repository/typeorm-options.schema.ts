@@ -1,4 +1,8 @@
-import { type EntityTarget, type FindOptionsOrder } from 'typeorm';
+import {
+  type EntityTarget,
+  type FindOptionsOrder,
+  type FindOptionsSelect,
+} from 'typeorm';
 
 import { type Type, type PlainLiteralObject } from '@nestjs/common';
 
@@ -311,4 +315,32 @@ export function buildOrder<Entity extends PlainLiteralObject>(
   if (!hasEntries) return undefined;
 
   return Object.assign<FindOptionsOrder<Entity>, typeof result>({}, result);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Column list → TypeORM FindOptionsSelect
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Build TypeORM FindOptionsSelect from a column list.
+ *
+ * The object form is the only shape TypeORM 1.x accepts; 0.3 also took a
+ * string array and converted it to this object internally, so translating
+ * here changes nothing on either line. Keys are top-level columns, so no
+ * dotted-path nesting is attempted.
+ *
+ * An empty list yields `undefined`, which TypeORM reads as "all columns".
+ */
+export function buildSelect<Entity extends PlainLiteralObject>(
+  keys: readonly (keyof Entity)[],
+): FindOptionsSelect<Entity> | undefined {
+  if (keys.length === 0) return undefined;
+
+  const result: Record<string, boolean> = {};
+
+  for (const key of keys) {
+    result[String(key)] = true;
+  }
+
+  return Object.assign<FindOptionsSelect<Entity>, typeof result>({}, result);
 }

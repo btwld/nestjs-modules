@@ -61,7 +61,7 @@ const USER_OTP_ENTITY_KEY = 'user-otp';
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [

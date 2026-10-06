@@ -48,7 +48,7 @@ const USER_ROLE_ENTITY_KEY = 'userRole';
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [RoleEntityFixture, UserRoleEntityFixture, UserEntityFixture],

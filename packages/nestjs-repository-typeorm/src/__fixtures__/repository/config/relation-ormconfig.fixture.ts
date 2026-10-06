@@ -5,7 +5,7 @@ import { PostEntityFixture } from '../entity/post.entity.fixture.js';
 import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
 
 export const relationOrmConfig: DataSourceOptions = {
-  type: 'sqlite',
+  type: 'better-sqlite3',
   database: ':memory:',
   synchronize: true,
   entities: [AuthorEntityFixture, PostEntityFixture, TagEntityFixture],

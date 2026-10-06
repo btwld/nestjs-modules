@@ -12,7 +12,7 @@ import { UserEntityFixture } from './entities/user-entity.fixture.js';
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [UserEntityFixture, UserCacheEntityFixture],

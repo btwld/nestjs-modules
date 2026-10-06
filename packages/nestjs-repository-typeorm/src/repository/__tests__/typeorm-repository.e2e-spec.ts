@@ -93,6 +93,22 @@ describe(TypeOrmRepository, () => {
       expect(firstNames).toEqual(['Alice', 'Bob']);
     });
 
+    // Guards the column-list translation. TypeORM 1.x removed the string-array
+    // form of `select` and throws on it, so this pins that we hand it the
+    // object form. Asserts the whole entity, not just the selected fields,
+    // since the failure to catch is extra columns coming back.
+    it('should return only the selected columns', async () => {
+      await testFactory.create({ firstName: 'Alice', lastName: 'Anderson' });
+
+      const result = await testRepository.find({ select: ['id', 'firstName'] });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        id: expect.any(String),
+        firstName: 'Alice',
+      });
+    });
+
     it('should apply where conditions', async () => {
       await testFactory.create({ firstName: 'Alice' });
       await testFactory.create({ firstName: 'Bob' });

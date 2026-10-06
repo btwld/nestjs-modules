@@ -8,7 +8,7 @@ import { UserProfileEntity } from './user-profile/user-profile.entity.js';
 import { UserEntity } from './users/user.entity.js';
 
 export const ormSqliteConfig: TypeOrmModuleOptions = {
-  type: 'sqlite',
+  type: 'better-sqlite3',
   database: ':memory:',
   entities: [
     CompanyEntity,

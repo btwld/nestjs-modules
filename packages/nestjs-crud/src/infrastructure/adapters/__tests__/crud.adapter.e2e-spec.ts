@@ -74,7 +74,7 @@ describe('CrudAdapter (e2e)', () => {
     moduleFixture = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
-          type: 'sqlite',
+          type: 'better-sqlite3',
           database: ':memory:',
           synchronize: true,
           entities: [TestEntityFixture],
@@ -1153,7 +1153,7 @@ describe('CrudAdapter relations (e2e)', () => {
     moduleFixture = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
-          type: 'sqlite',
+          type: 'better-sqlite3',
           database: ':memory:',
           synchronize: true,
           entities: [CompanyEntity, UserEntity, ProjectEntity],

@@ -46,7 +46,7 @@
     "@nestjs/typeorm": "^12.0.1",
     "@types/qs": "^6.15.1",
     "supertest": "^6.3.4",
-    "typeorm": "^0.3.28",
+    "typeorm": "~1.0.0",
     "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {

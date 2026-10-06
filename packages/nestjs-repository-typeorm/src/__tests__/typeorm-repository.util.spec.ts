@@ -1,4 +1,8 @@
-import { type DataSource, type Repository } from 'typeorm';
+import {
+  type DataSource,
+  type DataSourceOptions,
+  type Repository,
+} from 'typeorm';
 import { mockDeep } from 'vitest-mock-extended';
 
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -27,6 +31,16 @@ class TestEntity {
   name!: string;
 }
 
+// TypeORM 1.x removed `name` from DataSourceOptions, so a literal carrying it
+// fails the excess-property check. Built by assignment rather than cast, since
+// resolveDataSourceName reads `name` at runtime on whichever line is installed.
+function namedDataSourceOptions(name: string): DataSourceOptions {
+  return Object.assign<DataSourceOptions, { name: string }>(
+    { type: 'postgres' },
+    { name },
+  );
+}
+
 describe('typeorm-repository.util', () => {
   describe('resolveDataSourceName', () => {
     it('should return default name when no dataSource provided', () => {
@@ -45,14 +59,12 @@ describe('typeorm-repository.util', () => {
     });
 
     it('should return DataSource name when DataSource object provided', () => {
-      const mockDataSource = { name: 'custom-ds' } as DataSource;
-      const result = resolveDataSourceName(mockDataSource);
+      const result = resolveDataSourceName(namedDataSourceOptions('custom-ds'));
       expect(result).toBe('custom-ds');
     });
 
     it('should return default name when DataSource has no name', () => {
-      const mockDataSource = {} as DataSource;
-      const result = resolveDataSourceName(mockDataSource);
+      const result = resolveDataSourceName({ type: 'postgres' });
       expect(result).toBe(TYPEORM_DEFAULT_DATA_SOURCE_NAME);
     });
   });
@@ -69,8 +81,7 @@ describe('typeorm-repository.util', () => {
     });
 
     it('should handle DataSource object', () => {
-      const mockDataSource = { name: 'custom-ds' } as DataSource;
-      const result = resolveTransactionKey(mockDataSource);
+      const result = resolveTransactionKey(namedDataSourceOptions('custom-ds'));
       expect(result).toBe('typeorm:custom-ds');
     });
   });

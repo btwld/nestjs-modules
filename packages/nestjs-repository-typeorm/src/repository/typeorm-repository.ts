@@ -62,6 +62,7 @@ import {
   buildColumns,
   buildOrder,
   buildRelations,
+  buildSelect,
 } from './typeorm-options.schema.js';
 
 /**
@@ -358,8 +359,9 @@ export class TypeOrmRepository<
     const where = this.translateWhere(options.where);
     const relations = this.translateJoin(resolvedJoin);
     const order = buildOrder<Entity>(options.order ?? []);
+    const select = buildSelect<Entity>(options.select ?? []);
     return {
-      select: options.select,
+      select,
       where,
       relations,
       order,

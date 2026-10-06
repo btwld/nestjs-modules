@@ -13,8 +13,12 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [22.x]
+        # See ci-pr-test.yml: one TypeORM instance can be installed at a time,
+        # so each supported line gets its own leg. `lockfile` is 1.0.x.
+        typeorm: [lockfile, '0.3.28']
     steps:
       - uses: actions/checkout@v4
       - name: Install pnpm
@@ -26,7 +30,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install
+        if: matrix.typeorm == 'lockfile'
         run: pnpm install --frozen-lockfile
+      - name: Install on TypeORM ${{ matrix.typeorm }}
+        if: matrix.typeorm != 'lockfile'
+        run: |
+          perl -pi -e 's/^(\s*typeorm:) .+$/$1 ^${{ matrix.typeorm }}/ if $. < 100' pnpm-workspace.yaml
+          pnpm install --no-frozen-lockfile
       - name: Build
         run: pnpm build
       - name: Linting
@@ -39,12 +49,14 @@ jobs:
         run: pnpm smoke
       - name: Process Test Results
         uses: dorny/test-reporter@v3
+        if: matrix.typeorm == 'lockfile'
         with:
           name: Unit Tests
           path: "junit.xml"
           reporter: java-junit
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
+        if: matrix.typeorm == 'lockfile'
         with:
           files: ./coverage/coverage-final.json
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -52,6 +64,7 @@ jobs:
           verbose: true
       - name: Upload coverage to Codacy
         uses: codacy/codacy-coverage-reporter-action@v1.3.0
+        if: matrix.typeorm == 'lockfile'
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
           coverage-reports: ./coverage/lcov.info

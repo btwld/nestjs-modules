@@ -1,6 +1,6 @@
 import {
+  type DatabaseType,
   type DataSource,
-  type DataSourceOptions,
   type EntityManager,
   type QueryRunner,
 } from 'typeorm';
@@ -205,9 +205,16 @@ describe(TypeOrmTransaction.name, () => {
 // DataSource.options is declared readonly; mockDeep<DataSource>() preserves
 // that in its type, but each test needs to swap in a different driver type,
 // so it's set via defineProperty rather than direct assignment.
+//
+// Typed on `type` alone rather than DataSourceOptions: the factory reads only
+// that field, and `sqlite` is absent from 1.x's DatabaseType while still
+// needing coverage for 0.3 consumers.
 function setDataSourceOptions(
   dataSource: DataSource,
-  options: DataSourceOptions,
+  options: {
+    readonly type: DatabaseType | 'sqlite';
+    readonly database?: string;
+  },
 ): void {
   Object.defineProperty(dataSource, 'options', {
     value: options,

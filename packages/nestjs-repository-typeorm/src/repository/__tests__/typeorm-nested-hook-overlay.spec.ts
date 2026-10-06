@@ -101,7 +101,7 @@ class PetNoteHook {
 }
 
 const ormConfig: DataSourceOptions = {
-  type: 'sqlite',
+  type: 'better-sqlite3',
   database: ':memory:',
   synchronize: true,
   entities: [PetEntityFixture, NoteEntityFixture],

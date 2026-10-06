@@ -4,7 +4,7 @@
   "license": "BSD-3-Clause",
   "private": true,
   "engines": {
-    "node": ">=22.12.0",
+    "node": "^22.13.0 || >=24.11.0",
     "pnpm": ">=12.0.0"
   },
   "devDependencies": {
@@ -43,7 +43,7 @@
     "supertest": "^6.3.4",
     "typedoc": "^0.25.13",
     "typedoc-plugin-coverage": "^3.3.0",
-    "typeorm": "^0.3.28",
+    "typeorm": "~1.0.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.46.4",
     "vitest": "^4.1.9",

@@ -33,7 +33,7 @@ export {
 };
 
 export const rowScopeOrmConfig: DataSourceOptions = {
-  type: 'sqlite',
+  type: 'better-sqlite3',
   database: ':memory:',
   synchronize: true,
   entities: [

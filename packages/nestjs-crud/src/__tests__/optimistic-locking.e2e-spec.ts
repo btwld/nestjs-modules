@@ -20,7 +20,7 @@ describe('optimistic locking (If-Match / ETag)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
-          type: 'sqlite',
+          type: 'better-sqlite3',
           database: ':memory:',
           synchronize: true,
           entities: [VersionedFixture],

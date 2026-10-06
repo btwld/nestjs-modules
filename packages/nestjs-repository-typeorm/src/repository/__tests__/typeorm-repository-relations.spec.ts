@@ -1,6 +1,6 @@
 import { mockRelationMetadata } from '../../__fixtures__/repository/mock/relation-metadata.mock.js';
 import { mockTypeOrmRepository } from '../../__fixtures__/repository/mock/typeorm-repository.mock.js';
-import { buildRelations } from '../typeorm-options.schema.js';
+import { buildRelations, buildSelect } from '../typeorm-options.schema.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // buildRelations — pure function, mocked RelationMetadata
@@ -451,5 +451,27 @@ describe('translateJoin', () => {
 
   it('should return undefined for undefined input', () => {
     expect(typeormRepo['translateJoin'](undefined)).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// buildSelect — pure function
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('buildSelect', () => {
+  interface SelectableEntity {
+    id: string;
+    name: string;
+  }
+
+  it('should map a column list to the object form TypeORM 1.x requires', () => {
+    expect(buildSelect<SelectableEntity>(['id', 'name'])).toEqual({
+      id: true,
+      name: true,
+    });
+  });
+
+  it('should return undefined for an empty list, meaning all columns', () => {
+    expect(buildSelect<SelectableEntity>([])).toBeUndefined();
   });
 });

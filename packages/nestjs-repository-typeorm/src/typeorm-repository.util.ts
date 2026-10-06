@@ -1,4 +1,9 @@
-import { type DataSource, type EntitySchema, type Repository } from 'typeorm';
+import {
+  type DataSource,
+  type DataSourceOptions,
+  type EntitySchema,
+  type Repository,
+} from 'typeorm';
 
 import {
   type DynamicModule,
@@ -37,6 +42,22 @@ import { type TypeOrmDataSourceToken } from './typeorm-repository.types.js';
 type EntityClassOrSchema = Type<unknown> | EntitySchema;
 
 /**
+ * Read the data source name off a DataSource or its options.
+ *
+ * TypeORM 1.x dropped `name` from both, along with the named-connection
+ * concept; 0.3 still declares and populates it. Read at runtime for the same
+ * reason `@nestjs/typeorm` does, so the name agrees with the token Nest
+ * registered.
+ */
+function readDataSourceName(
+  dataSource: DataSource | DataSourceOptions,
+): string | undefined {
+  return 'name' in dataSource && typeof dataSource.name === 'string'
+    ? dataSource.name
+    : undefined;
+}
+
+/**
  * Resolve data source name from token.
  */
 export function resolveDataSourceName(
@@ -47,7 +68,7 @@ export function resolveDataSourceName(
   }
   return typeof dataSource === 'string'
     ? dataSource
-    : (dataSource.name ?? TYPEORM_DEFAULT_DATA_SOURCE_NAME);
+    : (readDataSourceName(dataSource) ?? TYPEORM_DEFAULT_DATA_SOURCE_NAME);
 }
 
 /**
