@@ -23,8 +23,9 @@ jobs:
         # The driver's peer range admits both supported TypeORM lines, and only
         # one can be installed at a time — the workspace pins a single instance
         # so decorator metadata cannot split. `lockfile` is 1.0.x; the second
-        # leg rewrites the pin to keep 0.3 covered.
-        typeorm: [lockfile, '0.3.28']
+        # leg rewrites the pin to keep 0.3 covered, to the exact version named
+        # here so the matrix value is what actually gets installed.
+        typeorm: [lockfile, '0.3.31']
 
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +43,7 @@ jobs:
       - name: Install on TypeORM ${{ matrix.typeorm }}
         if: matrix.typeorm != 'lockfile'
         run: |
-          perl -pi -e 's/^(\s*typeorm:) .+$/$1 ^${{ matrix.typeorm }}/ if $. < 100' pnpm-workspace.yaml
+          perl -pi -e 's/^(\s*typeorm:) .+$/$1 ${{ matrix.typeorm }}/ if $. < 100' pnpm-workspace.yaml
           pnpm install --no-frozen-lockfile
       - name: Build
         run: pnpm build

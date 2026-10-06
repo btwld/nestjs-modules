@@ -50,7 +50,7 @@ NestJS 12.
 | Package | Required | Notes |
 | --- | --- | --- |
 | `@nestjs/common` | Yes | NestJS core — install explicitly, no longer bundled |
-| `typeorm` | Yes | TypeORM `^0.3.0 \|\| ~1.0.0`. 1.1+ is not yet supported: it counts distinct values of the selected columns when find options carry a `select`, which changes what a projected paginated query reports as its total |
+| `typeorm` | Yes | TypeORM `^0.3.31 \|\| ~1.0.0`. 1.1+ is not yet supported: it counts distinct values of the selected columns when find options carry a `select`, which changes what a projected paginated query reports as its total |
 
 ## Module Registration
 

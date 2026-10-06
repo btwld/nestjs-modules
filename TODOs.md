@@ -20,7 +20,7 @@ git history for what shipped.
       updating, then widen the range back.
 
   2. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
-      driver's peer range is `^0.3.0 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
+      driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
       tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
       deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
       count DISTINCT values of the *selected* columns whenever find options carry a `select`
@@ -36,6 +36,13 @@ git history for what shipped.
       already gets a wrong total on 1.1+. Re-check on each TypeORM release whether
       `findAndCount`'s documented entity-count contract is restored, which would make this
       a range widening rather than a code change.
+
+      The `~1.0.0` pin also accepts a known advisory: GHSA-2rp8-mm9q-fp49 /
+      CVE-2026-73651 (medium) affects `>= 1.0.0, < 1.1.0`, and 1.1.0 is the only patched
+      1.x. Accepted deliberately — the vector is template-literal injection in
+      `migration:generate`, a dev-time codegen command that nothing in this repo invokes,
+      so the exposure is a consumer who runs it against an untrusted schema. Landing the
+      count fix above is what clears it.
 
   3. **Cascaded writes bypass row scope** — `repository.save()` honours TypeORM's `cascade`
       on a relation, so a write reaches the related table without entering that entity's

@@ -18,7 +18,7 @@ jobs:
         node-version: [22.x]
         # See ci-pr-test.yml: one TypeORM instance can be installed at a time,
         # so each supported line gets its own leg. `lockfile` is 1.0.x.
-        typeorm: [lockfile, '0.3.28']
+        typeorm: [lockfile, '0.3.31']
     steps:
       - uses: actions/checkout@v4
       - name: Install pnpm
@@ -35,7 +35,7 @@ jobs:
       - name: Install on TypeORM ${{ matrix.typeorm }}
         if: matrix.typeorm != 'lockfile'
         run: |
-          perl -pi -e 's/^(\s*typeorm:) .+$/$1 ^${{ matrix.typeorm }}/ if $. < 100' pnpm-workspace.yaml
+          perl -pi -e 's/^(\s*typeorm:) .+$/$1 ${{ matrix.typeorm }}/ if $. < 100' pnpm-workspace.yaml
           pnpm install --no-frozen-lockfile
       - name: Build
         run: pnpm build
