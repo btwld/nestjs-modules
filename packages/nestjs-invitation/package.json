@@ -1,6 +1,6 @@
 {
   "name": "@concepta/nestjs-invitation",
-  "version": "8.0.0-alpha.12",
+  "version": "8.0.0-alpha.13",
   "description": "Rockets NestJS Invitation",
   "type": "module",
   "main": "./dist/index.js",
@@ -66,8 +66,8 @@
     "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "@concepta/nestjs-crud": "8.0.0-alpha.12",
-    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.12",
+    "@concepta/nestjs-crud": "8.0.0-alpha.13",
+    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.13",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
     "@nestjs/common": "^12.0.1",

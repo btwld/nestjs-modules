@@ -1,6 +1,6 @@
 {
   "name": "@concepta/nestjs-federated",
-  "version": "8.0.0-alpha.12",
+  "version": "8.0.0-alpha.13",
   "description": "Rockets NestJS Federated",
   "type": "module",
   "main": "./dist/index.js",
@@ -49,7 +49,7 @@
     "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.12",
+    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.13",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1",
