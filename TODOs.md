@@ -19,7 +19,25 @@ git history for what shipped.
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  2. **Cascaded writes bypass row scope** — `repository.save()` honours TypeORM's `cascade`
+  2. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
+      driver's peer range is `^0.3.0 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
+      tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
+      deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
+      count DISTINCT values of the *selected* columns whenever find options carry a `select`
+      (typeorm PR #11965, "feat: support distinct count"), so a projected paginated query
+      reports a distinct count where it used to report a total — measured on better-sqlite3,
+      100 rows with `select: { isActive }` counted as 2. Unblocking needs the projection kept
+      out of the count query, in two halves: `RepositoryAdapter.count()` stripping `select`
+      before `doCount` (the invariant belongs in the abstraction — no driver should see a
+      projection on a count), and the driver's `doFindAndCount` splitting into `find` +
+      `count`, since one options object cannot serve both halves, while recovering TypeORM's
+      `lazyCount` shortcut so a short page does not pay for an extra query. Worth doing
+      independently of the version range: a direct caller doing `findAndCount({ select })`
+      already gets a wrong total on 1.1+. Re-check on each TypeORM release whether
+      `findAndCount`'s documented entity-count contract is restored, which would make this
+      a range widening rather than a code change.
+
+  3. **Cascaded writes bypass row scope** — `repository.save()` honours TypeORM's `cascade`
       on a relation, so a write reaches the related table without entering that entity's
       repository. Its row-scope resolver never runs, and the adapter's own pre-write checks
       only ever saw the entity that was called. Reproduced: a scoped write on a child
@@ -30,7 +48,7 @@ git history for what shipped.
       alternatively the adapter could reduce nested relation objects to their identifying
       columns before saving. Decide which.
 
-  3. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+  4. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
       — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`. Every
       one passes in isolation and on a re-run of the same suite, so it is a shared-resource
       condition under concurrency rather than four unrelated bad tests. Seen as a
@@ -41,7 +59,17 @@ git history for what shipped.
       Suspect per-worker database isolation or fixture seeding shared across workers;
       confirm by pinning the failing spec to a single worker.
 
-  4. **`Join.inner()` is refused on the TypeORM driver rather than implemented** (M) —
+  5. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
+      (S) — `UserCacheFactoryFixture` sets `key = faker.person.jobArea()`, drawn from roughly
+      25 values, with constant `type` and `assigneeId`, and the spec calls `createMany(2)`
+      against `@Unique(['key', 'type', 'assigneeId'])`. Two draws therefore collide about
+      1 time in 25, independently of TypeORM version or worker concurrency — confirmed by
+      8 consecutive passes after one failure, with no other change. Make `key` unique per
+      iteration. This is a **different cause** from the parallel-load item above and may
+      account for some of its nestjs-cache `SQLITE_CONSTRAINT: UNIQUE` sightings, so fixing
+      it first narrows that investigation.
+
+  6. **`Join.inner()` is refused on the TypeORM driver rather than implemented** (M) —
       TypeORM's `relations` find option always renders a LEFT JOIN, so the driver cannot
       honour an `INNER` clause. It now throws (`fault: 'usage'`) rather than silently
       returning the rows the caller asked to exclude, which was a wrong answer with no
@@ -56,7 +84,7 @@ git history for what shipped.
       of `relations`, which is correct for every join shape but changes the driver's whole
       read path. The first was not explored when this was deferred.
 
-  5. **A relation from an unscoped entity into a scoped one defeats row scope on reads**
+  7. **A relation from an unscoped entity into a scoped one defeats row scope on reads**
       — a `join` (or a `Where.rel()` filter) is resolved by the driver in one statement, so
       the joined entity's resolver never runs. That is safe where every scoped entity carries
       its own scope column and each resolver checks the foreign keys it owns on write, because
@@ -72,7 +100,7 @@ git history for what shipped.
       the joined entity's predicate as relation-tagged conditions (no driver change needed,
       but a LEFT join then drops roots whose related row is invisible).
 
-  6. **`HookContextOverlay` crashes on a non-HTTP execution context** (S) —
+  8. **`HookContextOverlay` crashes on a non-HTTP execution context** (S) —
       `attach()` calls `context.switchToHttp().getRequest()` unguarded and hands the
       result to `getAppContext`, which indexes it. On a microservice, websocket or
       scheduled handler that request is `undefined`, so the property access is a
@@ -85,10 +113,10 @@ git history for what shipped.
       whether a non-HTTP entry point should get a context at all, since entity-level
       hook registration now means those calls run hooks without needing one.
 
-  7. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
+  9. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
 
-  8. **A scope value typed unlike its column is a silent trap, and nothing documents it**
+  10. **A scope value typed unlike its column is a silent trap, and nothing documents it**
       (S) — resolve `'42'` against an integer `tenantId` and the database compares the two
       equal while row scope's post-read check does not, so every read succeeds and every
       write 404s. It fails closed and it is loud on first run, which is why a diagnostic
@@ -96,7 +124,7 @@ git history for what shipped.
       the strict compare that is the actual security decider. A sentence in the row-scope
       README naming the symptom is the whole fix.
 
-  9. **Nothing stops a row-scope resolver regressing to `RowScopeBase<PlainLiteralObject>`**
+  11. **Nothing stops a row-scope resolver regressing to `RowScopeBase<PlainLiteralObject>`**
       (S) — naming the entity in both type parameters is what makes `column` checked
       against the entity's real columns, turning a misspelling into a compile error instead
       of a boot failure. The fixtures were the worked examples and had all drifted to the
@@ -104,13 +132,13 @@ git history for what shipped.
       reference instead of the README. A lint rule or a type-level nudge would hold the
       line; until then it relies on review.
 
-  10. **`console.log` in the crud README's hook examples** (S) — against the project's own
+  12. **`console.log` in the crud README's hook examples** (S) — against the project's own
       rule, and README examples get copied verbatim into consumer code where the shipped
       ESLint config then rejects them. The hook section now injects a `Logger`; the rest of
       the file was left alone because fixing it properly is a sweep across every package's
       README rather than one example.
 
-  11. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  13. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
          `packages` list (or collapse both blocks to a single `packages/*` glob when all
