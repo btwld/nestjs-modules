@@ -1,12 +1,11 @@
-import { INestApplication } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type INestApplication } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
 import {
-  INVITATION_MODULE_CATEGORY_ORG_KEY,
-  InvitationEntityInterface,
-  UserEntityInterface,
-  OrgEntityInterface,
+  type InvitationEntityInterface,
+  type UserEntityInterface,
+  type OrgEntityInterface,
 } from '@concepta/nestjs-common';
 import { CrudModule } from '@concepta/nestjs-crud';
 import { EventModule } from '@concepta/nestjs-event';
@@ -35,7 +34,7 @@ import { OwnerModuleFixture } from '../__fixtures__/owner.module.fixture';
 import { UserEntityFixture } from '../__fixtures__/user-entity.fixture';
 
 describe(InvitationAcceptedListener, () => {
-  const category = INVITATION_MODULE_CATEGORY_ORG_KEY;
+  const category = 'org';
   let app: INestApplication;
   let seedingSource: SeedingSource;
   let testUser: UserEntityInterface;

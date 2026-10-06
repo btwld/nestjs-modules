@@ -1,3 +1,3 @@
-import { ReportInterface } from './report.interface';
+import { type ReportInterface } from './report.interface';
 
 export interface ReportEntityInterface extends ReportInterface {}

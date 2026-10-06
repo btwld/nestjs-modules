@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "strict": true,
-    "module": "commonjs",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "target": "es2017",
     "sourceMap": true,
     "incremental": true,
@@ -13,105 +14,24 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": [
+      "./node_modules/@types"
+    ]
   },
   "files": [],
   "references": [
-    {
-      "path": "packages/nestjs-common"
-    },
-    {
-      "path": "packages/nestjs-access-control"
-    },
-    {
-      "path": "packages/nestjs-email"
-    },
-    {
-      "path": "packages/nestjs-event"
-    },
-    {
-      "path": "packages/nestjs-jwt"
-    },
-    {
-      "path": "packages/nestjs-logger"
-    },
-    {
-      "path": "packages/nestjs-authentication"
-    },
-    {
-      "path": "packages/nestjs-password"
-    },
-    {
-      "path": "packages/nestjs-auth-local"
-    },
-    {
-      "path": "packages/nestjs-auth-jwt"
-    },
-    {
-      "path": "packages/nestjs-auth-github"
-    },
-    {
-      "path": "packages/nestjs-typeorm-ext"
-    },
-    {
-      "path": "packages/nestjs-role"
-    },
-    {
-      "path": "packages/nestjs-user"
-    },
-    {
-      "path": "packages/nestjs-org"
-    },
-    {
-      "path": "packages/nestjs-auth-refresh"
-    },
-    {
-      "path": "packages/nestjs-swagger-ui"
-    },
-    {
-      "path": "packages/nestjs-federated"
-    },
-    {
-      "path": "packages/typeorm-common"
-    },
-    {
-      "path": "packages/nestjs-otp"
-    },
-    {
-      "path": "packages/nestjs-auth-recovery"
-    },
-    {
-      "path": "packages/nestjs-invitation"
-    },
-    {
-      "path": "packages/nestjs-cache"
-    },
-    {
-      "path": "packages/nestjs-auth-google"
-    },
-    {
-      "path": "packages/nestjs-logger-coralogix"
-    },
-    {
-      "path": "packages/nestjs-logger-sentry"
-    },
-    {
-      "path": "packages/nestjs-file"
-    },
-    {
-      "path": "packages/nestjs-auth-apple"
-    },
-    {
-      "path": "packages/nestjs-report"
-    },
-    {
-      "path": "packages/nestjs-auth-verify"
-    },
-    {
-      "path": "packages/nestjs-samples"
-    },
-    {
-      "path": "packages/nestjs-auth-router"
-    }
+    { "path": "packages/nestjs-core" },
+    { "path": "packages/nestjs-repository" },
+    { "path": "packages/nestjs-repository-typeorm" },
+    { "path": "packages/nestjs-crud" },
+    { "path": "packages/nestjs-cache" },
+    { "path": "packages/nestjs-otp" },
+    { "path": "packages/nestjs-role" },
+    { "path": "packages/nestjs-password" },
+    { "path": "packages/nestjs-user" },
+    { "path": "packages/nestjs-invitation" },
+    { "path": "packages/nestjs-federated" },
+    { "path": "packages/nestjs-authentication" },
+    { "path": "packages/nestjs-access-control" }
   ]
 }

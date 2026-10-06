@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker';
 
 import { Factory } from '@concepta/typeorm-seeding';
 
-import { PhotoFixture } from './photo.entity.fixture';
+import { PhotoFixture } from './photo.entity.fixture.js';
 
 export class PhotoFactoryFixture extends Factory<PhotoFixture> {
   protected options = { entity: PhotoFixture };

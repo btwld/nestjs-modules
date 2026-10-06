@@ -1,5 +1,9 @@
 export { FileModule } from './file.module';
 
+// entities
+export { FileSqliteEntity } from './entities/file-sqlite.entity';
+export { FilePostgresEntity } from './entities/file-postgres.entity';
+
 export { FileServiceInterface } from './interfaces/file-service.interface';
 export { FileStorageServiceInterface } from './interfaces/file-storage-service.interface';
 

@@ -2,10 +2,10 @@ import EventEmitter2 from 'eventemitter2';
 
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
+  type DynamicModule,
   Logger,
-  ModuleMetadata,
-  Provider,
+  type ModuleMetadata,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -17,9 +17,9 @@ import {
   EVENT_MODULE_SETTINGS_TOKEN,
 } from './event-constants';
 import { EventManager } from './event-manager';
-import { EventOptionsExtrasInterface } from './interfaces/event-options-extras.interface';
-import { EventOptionsInterface } from './interfaces/event-options.interface';
-import { EventSettingsInterface } from './interfaces/event-settings.interface';
+import { type EventOptionsExtrasInterface } from './interfaces/event-options-extras.interface';
+import { type EventOptionsInterface } from './interfaces/event-options.interface';
+import { type EventSettingsInterface } from './interfaces/event-settings.interface';
 import { EventDispatchService } from './services/event-dispatch.service';
 import { EventListenService } from './services/event-listen.service';
 

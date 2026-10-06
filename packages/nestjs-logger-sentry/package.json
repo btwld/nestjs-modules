@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-logger-sentry",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "description": "Rockets NestJS Logger",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

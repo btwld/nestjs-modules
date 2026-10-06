@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 import { AUTH_APPLE_MODULE_DEFAULT_SETTINGS_TOKEN } from '../auth-apple.constants';
 import { AuthAppleLoginDto } from '../dto/auth-apple-login.dto';
-import { AuthAppleSettingsInterface } from '../interfaces/auth-apple-settings.interface';
+import { type AuthAppleSettingsInterface } from '../interfaces/auth-apple-settings.interface';
 import { mapProfile } from '../utils/auth-apple-map-profile';
 import { authAppleScopeParser } from '../utils/auth-apple-scope-parser.util';
 

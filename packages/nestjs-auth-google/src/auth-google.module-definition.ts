@@ -1,13 +1,13 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import {
   IssueTokenService,
-  IssueTokenServiceInterface,
+  type IssueTokenServiceInterface,
 } from '@concepta/nestjs-authentication';
 import { createSettingsProvider } from '@concepta/nestjs-common';
 import { FederatedOAuthService } from '@concepta/nestjs-federated';
@@ -18,9 +18,9 @@ import {
 } from './auth-google.constants';
 import { AuthGoogleStrategy } from './auth-google.strategy';
 import { authGoogleDefaultConfig } from './config/auth-google-default.config';
-import { AuthGoogleOptionsExtrasInterface } from './interfaces/auth-google-options-extras.interface';
-import { AuthGoogleOptionsInterface } from './interfaces/auth-google-options.interface';
-import { AuthGoogleSettingsInterface } from './interfaces/auth-google-settings.interface';
+import { type AuthGoogleOptionsExtrasInterface } from './interfaces/auth-google-options-extras.interface';
+import { type AuthGoogleOptionsInterface } from './interfaces/auth-google-options.interface';
+import { type AuthGoogleSettingsInterface } from './interfaces/auth-google-settings.interface';
 
 const RAW_OPTIONS_TOKEN = Symbol('__AUTH_GOOGLE_MODULE_RAW_OPTIONS_TOKEN__');
 

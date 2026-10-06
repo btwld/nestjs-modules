@@ -7,7 +7,7 @@ import {
   createAccessControlExports,
   createAccessControlImports,
   createAccessControlProviders,
-} from './access-control.module-definition';
+} from './access-control.module-definition.js';
 
 @Module({})
 export class AccessControlModule extends AccessControlModuleClass {

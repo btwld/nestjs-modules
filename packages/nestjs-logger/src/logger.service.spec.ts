@@ -2,13 +2,13 @@ import supertest from 'supertest';
 
 import {
   ConsoleLogger,
-  INestApplication,
+  type INestApplication,
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { AppModuleFixture } from './__fixture__/app.module.fixture';
-import { LoggerTransportInterface } from './interfaces/logger-transport.interface';
+import { type LoggerTransportInterface } from './interfaces/logger-transport.interface';
 import { LoggerTransportService } from './logger-transport.service';
 import { LoggerService } from './logger.service';
 

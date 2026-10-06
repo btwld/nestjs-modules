@@ -1,6 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
-import { SwaggerUiSettingsInterface } from './interfaces/swagger-ui-settings.interface';
+import { type SwaggerUiSettingsInterface } from './interfaces/swagger-ui-settings.interface';
 import { SWAGGER_UI_MODULE_SETTINGS_TOKEN } from './swagger-ui.constants';
 import { SwaggerUiModule } from './swagger-ui.module';
 import { SwaggerUiService } from './swagger-ui.service';

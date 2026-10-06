@@ -1,4 +1,4 @@
-import { LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
 
 /**
  * Interface for 3dr party transport.

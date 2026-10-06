@@ -1,6 +1,6 @@
-import { Listener as EmitterListener } from 'eventemitter2';
+import { type Listener as EmitterListener } from 'eventemitter2';
 
-import { EventInstance, EventReturnType } from '../../event-types';
+import { type EventInstance, type EventReturnType } from '../../event-types';
 
 /**
  * The interface that defines Event Listener signature.

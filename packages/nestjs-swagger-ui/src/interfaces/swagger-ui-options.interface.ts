@@ -1,6 +1,6 @@
-import { DocumentBuilder } from '@nestjs/swagger';
+import { type DocumentBuilder } from '@nestjs/swagger';
 
-import { SwaggerUiSettingsInterface } from './swagger-ui-settings.interface';
+import { type SwaggerUiSettingsInterface } from './swagger-ui-settings.interface';
 
 export interface SwaggerUiOptionsInterface {
   settings?: SwaggerUiSettingsInterface;

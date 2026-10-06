@@ -1,11 +1,11 @@
-import { LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
 import {
-  ConfigFactory,
-  ConfigFactoryKeyHost,
+  type ConfigFactory,
+  type ConfigFactoryKeyHost,
   registerAs,
 } from '@nestjs/config';
 
-import { LoggerSettingsInterface } from '../interfaces/logger-settings.interface';
+import { type LoggerSettingsInterface } from '../interfaces/logger-settings.interface';
 import { splitLogLevel } from '../utils/config-parser.util';
 
 /**

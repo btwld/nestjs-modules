@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 
 import { EventException } from './exceptions/event.exception';
-import { EventDispatchService } from './services/event-dispatch.service';
-import { EventListenService } from './services/event-listen.service';
+import { type EventDispatchService } from './services/event-dispatch.service';
+import { type EventListenService } from './services/event-listen.service';
 
 interface EventManagerOptions {
   allowManualShutdown: boolean;

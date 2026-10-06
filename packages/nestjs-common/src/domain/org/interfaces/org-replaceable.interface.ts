@@ -1,6 +1,5 @@
-import { OrgCreatableInterface } from './org-creatable.interface';
-import { OrgInterface } from './org.interface';
+import { type OrgCreatableInterface } from './org-creatable.interface';
+import { type OrgInterface } from './org.interface';
 
 export interface OrgReplaceableInterface
-  extends Pick<OrgInterface, 'id'>,
-    OrgCreatableInterface {}
+  extends Pick<OrgInterface, 'id'>, OrgCreatableInterface {}

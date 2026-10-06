@@ -1,29 +1,32 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
-import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
-import { CrudModule } from '../../crud.module';
-import { CRUD_TEST_PHOTO_ENTITY_KEY } from '../crud-test.constants';
+import { CrudModule } from '../../crud.module.js';
+import { CRUD_TEST_PHOTO_ENTITY_NAME } from '../crud-test.constants.js';
 
-import { PhotoTypeOrmCrudAdapterFixture } from './photo-typeorm-crud.adapter.fixture';
-import { PhotoControllerFixture } from './photo.controller.fixture';
-import { PhotoFixture } from './photo.entity.fixture';
-import { PhotoServiceFixture } from './photo.service.fixture';
+import { PhotoEntityInterfaceFixture } from './interfaces/photo-entity.interface.fixture.js';
+import { PhotoControllerFixture } from './photo.controller.fixture.js';
+import { PhotoFixture } from './photo.entity.fixture.js';
 
-@Module({
-  providers: [PhotoTypeOrmCrudAdapterFixture, PhotoServiceFixture],
-  controllers: [PhotoControllerFixture],
-})
+@Module({})
 export class PhotoModuleFixture {
   static register(): DynamicModule {
     return {
       module: PhotoModuleFixture,
       imports: [
         CrudModule.forRoot({}),
-        TypeOrmExtModule.forFeature({
-          [CRUD_TEST_PHOTO_ENTITY_KEY]: {
-            entity: PhotoFixture,
+        CrudModule.forFeature<PhotoEntityInterfaceFixture>({
+          crud: {
+            controller: { class: PhotoControllerFixture },
           },
+        }),
+        RepositoryModule.forFeature({
+          module: TypeOrmRepositoryModule,
+          entities: [
+            { key: CRUD_TEST_PHOTO_ENTITY_NAME, entity: PhotoFixture },
+          ],
         }),
       ],
     };

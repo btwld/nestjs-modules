@@ -1,0 +1,52 @@
+{
+  "name": "@concepta/nestjs-repository-typeorm",
+  "version": "8.0.0-alpha.13",
+  "description": "Rockets NestJS TypeORM Repository Module",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btwld/nestjs-modules.git",
+    "directory": "packages/nestjs-repository-typeorm"
+  },
+  "bugs": {
+    "url": "https://github.com/btwld/nestjs-modules/issues"
+  },
+  "homepage": "https://github.com/btwld/nestjs-modules#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
+  ],
+  "dependencies": {
+    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-repository": "workspace:*",
+    "@nestjs/typeorm": "^12.0.1",
+    "@tsyche/membrane": "^0.8.1"
+  },
+  "devDependencies": {
+    "@concepta/typeorm-seeding": "^4.0.0",
+    "@faker-js/faker": "^8.4.1",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/testing": "^12.0.1",
+    "better-sqlite3": "^12.0.0",
+    "typeorm": "~1.0.0",
+    "vitest-mock-extended": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^12.0.1",
+    "typeorm": "^0.3.31 || ~1.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}

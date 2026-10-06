@@ -1,12 +1,13 @@
-import { FactoryProvider, ModuleMetadata } from '@nestjs/common';
+import { type FactoryProvider, type ModuleMetadata } from '@nestjs/common';
 
-import { LoggerSentryOptionsInterface } from './logger-sentry-options.interface';
+import { type LoggerSentryOptionsInterface } from './logger-sentry-options.interface';
 
 /**
  * LoggerSentry async options.
  */
 export interface LoggerSentryAsyncOptionsInterface
-  extends Pick<ModuleMetadata, 'imports'>,
+  extends
+    Pick<ModuleMetadata, 'imports'>,
     Pick<
       FactoryProvider<
         LoggerSentryOptionsInterface | Promise<LoggerSentryOptionsInterface>

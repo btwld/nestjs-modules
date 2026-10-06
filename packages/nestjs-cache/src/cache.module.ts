@@ -1,29 +1,60 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
 import {
-  CacheAsyncOptions,
-  CacheModuleClass,
-  CacheOptions,
-} from './cache.module-definition';
+  CacheCoreAsyncOptions,
+  CacheCoreModuleClass,
+  CacheCoreOptions,
+} from './cache-core.module-definition.js';
+import { createCacheRepositoryProvider } from './infrastructure/utils/create-cache-repository-provider.js';
+type CacheOptions = Omit<CacheCoreOptions, 'global'>;
+type CacheAsyncOptions = Omit<CacheCoreAsyncOptions, 'global'>;
 
 /**
  * Cache Module
  */
 @Module({})
-export class CacheModule extends CacheModuleClass {
+export class CacheModule {
   static register(options: CacheOptions): DynamicModule {
-    return super.register(options);
+    return {
+      module: CacheModule,
+      imports: [CacheCoreModuleClass.register({ ...options, global: false })],
+    };
   }
 
   static registerAsync(options: CacheAsyncOptions): DynamicModule {
-    return super.registerAsync(options);
+    return {
+      module: CacheModule,
+      imports: [
+        CacheCoreModuleClass.registerAsync({ ...options, global: false }),
+      ],
+    };
   }
 
   static forRoot(options: CacheOptions): DynamicModule {
-    return super.register({ ...options, global: true });
+    return {
+      module: CacheModule,
+      imports: [CacheCoreModuleClass.register({ ...options, global: true })],
+    };
   }
 
   static forRootAsync(options: CacheAsyncOptions): DynamicModule {
-    return super.registerAsync({ ...options, global: true });
+    return {
+      module: CacheModule,
+      imports: [
+        CacheCoreModuleClass.registerAsync({ ...options, global: true }),
+      ],
+    };
+  }
+
+  static forFeature(entityKeys: string[]): DynamicModule {
+    const providers = entityKeys.map((entityKey) =>
+      createCacheRepositoryProvider(entityKey),
+    );
+
+    return {
+      module: CacheModule,
+      providers,
+      exports: providers,
+    };
   }
 }

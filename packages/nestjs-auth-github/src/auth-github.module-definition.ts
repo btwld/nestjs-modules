@@ -1,13 +1,13 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import {
   IssueTokenService,
-  IssueTokenServiceInterface,
+  type IssueTokenServiceInterface,
 } from '@concepta/nestjs-authentication';
 import { createSettingsProvider } from '@concepta/nestjs-common';
 import { FederatedOAuthService } from '@concepta/nestjs-federated';
@@ -18,9 +18,9 @@ import {
 } from './auth-github.constants';
 import { AuthGithubStrategy } from './auth-github.strategy';
 import { authGithubDefaultConfig } from './config/auth-github-default.config';
-import { AuthGithubOptionsExtrasInterface } from './interfaces/auth-github-options-extras.interface';
-import { AuthGithubOptionsInterface } from './interfaces/auth-github-options.interface';
-import { AuthGithubSettingsInterface } from './interfaces/auth-github-settings.interface';
+import { type AuthGithubOptionsExtrasInterface } from './interfaces/auth-github-options-extras.interface';
+import { type AuthGithubOptionsInterface } from './interfaces/auth-github-options.interface';
+import { type AuthGithubSettingsInterface } from './interfaces/auth-github-settings.interface';
 
 const RAW_OPTIONS_TOKEN = Symbol('__AUTH_GITHUB_MODULE_RAW_OPTIONS_TOKEN__');
 

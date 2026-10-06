@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 
-import { RuntimeExceptionOptions } from '@concepta/nestjs-common';
+import { type RuntimeExceptionOptions } from '@concepta/nestjs-common';
 
 import { ReportException } from './report.exception';
 

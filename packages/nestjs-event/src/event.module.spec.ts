@@ -1,6 +1,6 @@
 import EventEmitter2 from 'eventemitter2';
 
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { EVENT_MODULE_EMITTER_SERVICE_TOKEN } from './event-constants';
 import { EventManager } from './event-manager';

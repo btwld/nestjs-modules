@@ -1,5 +1,7 @@
 import ms from 'ms';
 
+import { HttpStatus } from '@nestjs/common';
+
 import { RuntimeException } from '../exceptions/runtime.exception';
 
 /**
@@ -16,13 +18,14 @@ export function toMilliseconds(
   value: unknown,
   fallback?: ms.StringValue | number,
 ): number {
-  const result = ms((value as ms.StringValue) ?? fallback);
+  const input = typeof value === 'string' ? value : fallback;
+  const result = ms(input as ms.StringValue);
   if (typeof result === 'number') {
     return result;
   } else {
     throw new RuntimeException({
       message: 'Invalid ms string value',
-      httpStatus: 400,
+      httpStatus: HttpStatus.BAD_REQUEST,
     });
   }
 }

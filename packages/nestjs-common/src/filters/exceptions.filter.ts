@@ -1,4 +1,9 @@
-import { Catch, ArgumentsHost, HttpException } from '@nestjs/common';
+import {
+  Catch,
+  ArgumentsHost,
+  ExceptionFilter,
+  HttpException,
+} from '@nestjs/common';
 import { isObject } from '@nestjs/common/utils/shared.utils';
 import { HttpAdapterHost } from '@nestjs/core';
 
@@ -11,7 +16,7 @@ import { RuntimeException } from '../exceptions/runtime.exception';
 import { mapHttpStatus } from '../utils/map-http-status.util';
 
 @Catch()
-export class ExceptionsFilter implements ExceptionsFilter {
+export class ExceptionsFilter implements ExceptionFilter {
   constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
 
   catch(exception: ExceptionInterface, host: ArgumentsHost): void {
@@ -45,20 +50,20 @@ export class ExceptionsFilter implements ExceptionsFilter {
       // its a runtime exception, set error code
       errorCode = exception.errorCode;
       // did they provide a status hint?
-      if (exception?.httpStatus) {
+      if (exception.httpStatus) {
         statusCode = exception.httpStatus;
       }
       // set the message
       if (statusCode >= 500) {
         // use safe message or internal sever error
-        message = exception?.safeMessage ?? ERROR_MESSAGE_FALLBACK;
-      } else if (exception?.safeMessage) {
+        message = exception.safeMessage ?? ERROR_MESSAGE_FALLBACK;
+      } else if (exception.safeMessage) {
         // use the safe message
         message = exception.safeMessage;
       } else {
         // use the error message with safe message as fallback
         message =
-          exception.message ?? exception?.safeMessage ?? ERROR_MESSAGE_FALLBACK;
+          exception.message ?? exception.safeMessage ?? ERROR_MESSAGE_FALLBACK;
       }
     }
 

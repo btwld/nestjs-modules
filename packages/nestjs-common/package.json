@@ -1,30 +1,49 @@
 {
   "name": "@concepta/nestjs-common",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "description": "Rockets NestJS Common",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
   "license": "BSD-3-Clause",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "dist/**/!(*.spec|*.e2e-spec|*.fixture).{js,d.ts}"
+    "dist/cjs/**/!(*.spec|*.e2e-spec|*.fixture|*.mock).{js,d.ts}",
+    "dist/esm/**/!(*.spec|*.e2e-spec|*.fixture|*.mock).{js,d.ts}",
+    "dist/cjs/package.json",
+    "dist/esm/package.json",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
     "@nestjs/common": "^11.1.9",
-    "@nestjs/swagger": "^11.2.2",
+    "@nestjs/core": "^11.1.9",
+    "@nestjs/swagger": "11.2.2",
     "ms": "^2.1.3"
   },
   "devDependencies": {
-    "@nestjs/core": "^11.1.9",
     "@nestjs/testing": "^11.1.9",
     "@types/supertest": "^6.0.3",
-    "jest-mock-extended": "^4.0.0",
     "supertest": "^6.3.4"
   },
   "peerDependencies": {
     "class-transformer": "*",
-    "class-validator": "*"
-  }
+    "class-validator": "*",
+    "rxjs": "^7.0.0"
+  },
+  "module": "./dist/esm/index.js"
 }

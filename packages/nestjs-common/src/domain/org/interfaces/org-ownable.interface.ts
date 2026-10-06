@@ -1,4 +1,4 @@
-import { ReferenceId } from '../../../reference/interfaces/reference.types';
+import { type ReferenceId } from '../../../reference/interfaces/reference.types';
 
 export interface OrgOwnableInterface {
   orgId: ReferenceId;

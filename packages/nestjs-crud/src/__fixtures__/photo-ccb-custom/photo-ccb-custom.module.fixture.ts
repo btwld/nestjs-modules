@@ -1,32 +1,26 @@
 import { Module } from '@nestjs/common';
 
-import { TypeOrmExtModule } from '@concepta/nestjs-typeorm-ext';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
-import { CRUD_TEST_PHOTO_ENTITY_KEY } from '../crud-test.constants';
-import { PhotoTypeOrmCrudAdapterFixture } from '../photo/photo-typeorm-crud.adapter.fixture';
-import { PhotoFixture } from '../photo/photo.entity.fixture';
+import { CRUD_TEST_PHOTO_CCB_CUSTOM_ENTITY_NAME } from '../crud-test.constants.js';
+import { PhotoFixture } from '../photo/photo.entity.fixture.js';
 
 import {
   PhotoCcbCustomControllerFixture,
-  PhotoCcbCustomCrudServiceFixture,
-  PHOTO_CRUD_SERVICE_TOKEN,
-} from './photo-ccb-custom.controller.fixture';
+  PhotoCcbCustomProviders,
+} from './photo-ccb-custom.controller.fixture.js';
 
 @Module({
   imports: [
-    TypeOrmExtModule.forFeature({
-      [CRUD_TEST_PHOTO_ENTITY_KEY]: {
-        entity: PhotoFixture,
-      },
+    RepositoryModule.forFeature({
+      module: TypeOrmRepositoryModule,
+      entities: [
+        { key: CRUD_TEST_PHOTO_CCB_CUSTOM_ENTITY_NAME, entity: PhotoFixture },
+      ],
     }),
   ],
-  providers: [
-    PhotoTypeOrmCrudAdapterFixture,
-    {
-      provide: PHOTO_CRUD_SERVICE_TOKEN,
-      useClass: PhotoCcbCustomCrudServiceFixture,
-    },
-  ],
+  providers: PhotoCcbCustomProviders,
   controllers: [PhotoCcbCustomControllerFixture],
 })
 export class PhotoCcbCustomModuleFixture {}
