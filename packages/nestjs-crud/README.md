@@ -8,8 +8,8 @@ build modes: fully generated, pre-decorated, and hybrid.
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-crud)](https://www.npmjs.com/package/@concepta/nestjs-crud)
 [![NPM Downloads](https://img.shields.io/npm/dw/@concepta/nestjs-crud)](https://www.npmjs.com/package/@concepta/nestjs-crud)
-[![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
-[![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
+[![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
+[![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
 [![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-crud%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
