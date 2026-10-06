@@ -8,9 +8,9 @@ nesting, and a two-level repository hook system.
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-repository)](https://www.npmjs.com/package/@concepta/nestjs-repository)
 [![NPM Downloads](https://img.shields.io/npm/dw/@concepta/nestjs-repository)](https://www.npmjs.com/package/@concepta/nestjs-repository)
-[![GH Last Commit](https://img.shields.io/github/last-commit/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets)
-[![GH Contrib](https://img.shields.io/github/contributors/conceptadev/rockets?logo=github)](https://github.com/conceptadev/rockets/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/conceptadev/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-repository%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
+[![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-repository%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
 
@@ -1141,8 +1141,8 @@ to specific entities using specifications. This section covers the
 repository-specific decorators and merge semantics; for the underlying
 mechanism (how a class becomes a hook, how it's attached to a controller,
 and how values get into `ctx`) see `@concepta/nestjs-core`'s
-[Hook Feature](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-core#hook-feature)
-and [Context System](https://github.com/conceptadev/rockets/tree/main/packages/nestjs-core#context-system)
+[Hook Feature](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#hook-feature)
+and [Context System](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#context-system)
 sections.
 
 ### Defining a Hook
