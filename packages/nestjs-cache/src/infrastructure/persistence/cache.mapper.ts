@@ -20,4 +20,8 @@ export class CacheMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(cache: Cache) {
+    return cache.toPlain();
+  }
 }

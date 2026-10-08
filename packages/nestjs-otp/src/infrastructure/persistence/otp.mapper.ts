@@ -20,4 +20,8 @@ export class OtpMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(otp: Otp) {
+    return otp.toPlain();
+  }
 }

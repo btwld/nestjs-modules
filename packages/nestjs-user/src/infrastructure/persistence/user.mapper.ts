@@ -18,4 +18,8 @@ export class UserMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(user: User) {
+    return user.toPlain();
+  }
 }

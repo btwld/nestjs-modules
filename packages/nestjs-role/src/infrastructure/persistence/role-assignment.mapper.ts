@@ -18,4 +18,8 @@ export class RoleAssignmentMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(roleAssignment: RoleAssignment) {
+    return roleAssignment.toPlain();
+  }
 }

@@ -30,7 +30,7 @@ export class InvitationMapper extends DomainMapper<
 
   toPersistence(aggregate: Invitation) {
     return {
-      ...super.toPersistence(aggregate),
+      ...aggregate.toPlain(),
       active: aggregate.active,
     };
   }

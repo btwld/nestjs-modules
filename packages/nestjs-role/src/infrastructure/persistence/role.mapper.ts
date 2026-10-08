@@ -19,4 +19,8 @@ export class RoleMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(role: Role) {
+    return role.toPlain();
+  }
 }

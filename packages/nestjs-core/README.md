@@ -661,8 +661,8 @@ Inherited members:
 ### DomainMapper
 
 Abstract mapper that converts persistence entities to domain aggregates and
-back. Implement `createAggregate(entity)` — `toDomain` and `toPersistence`
-are inherited.
+back. Implement both directions — `createAggregate(entity)` and
+`toPersistence(aggregate)`; `toDomain` is inherited.
 
 ```ts
 export class MyMapper extends DomainMapper<MyEntityInterface, MyInterface, MyAggregate> {
@@ -670,8 +670,17 @@ export class MyMapper extends DomainMapper<MyEntityInterface, MyInterface, MyAgg
     const { id, version, dateCreated, dateUpdated, dateDeleted, ...props } = entity;
     return new MyAggregate(id, props, version, { dateCreated, dateUpdated, dateDeleted });
   }
+
+  toPersistence(aggregate: MyAggregate) {
+    return aggregate.toPlain();
+  }
 }
 ```
+
+When the stored row matches the props, `toPersistence` returns
+`aggregate.toPlain()`. When it doesn't — a value object in props stored as
+several columns — translate here; the return type is checked against the
+entity, so a props-shaped object that doesn't fit fails to compile.
 
 The `nestjs-cache` package is the reference implementation for the full
 aggregate + mapper + repository pattern.
@@ -887,7 +896,7 @@ exercise correlation behavior directly.
 | Export | Description |
 | --- | --- |
 | `DomainAggregate<T>` | Abstract aggregate base extending `@nestjs/cqrs` `AggregateRoot`. |
-| `DomainMapper<Entity, Props, Agg>` | Abstract mapper base. Implement `createAggregate(entity)`. |
+| `DomainMapper<Entity, Props, Agg>` | Abstract mapper base. Implement `createAggregate(entity)` and `toPersistence(aggregate)`. |
 | `domainAggregateSchema` | Zod schema exposing `id`, `version`, and audit fields. Composed into entity schemas via `.extend()`. |
 | `AggregateMetaInterface` | Interface for aggregate audit timestamps: `dateCreated`, `dateUpdated`, `dateDeleted`. |
 

@@ -27,7 +27,21 @@ export abstract class DomainMapper<
     return this.createAggregate(entity);
   }
 
-  toPersistence(aggregate: A) {
-    return aggregate.toPlain();
-  }
+  /**
+   * Convert an aggregate to the row its repository stores.
+   *
+   * Required because the stored row may differ from the aggregate's props —
+   * a value object held in props may be stored as several columns. When the
+   * shapes match, return `aggregate.toPlain()`.
+   *
+   * Translate here rather than relying on the repository to notice: `upsert`
+   * accepts a partial row, so a props-shaped object with an untranslated
+   * value compiles there.
+   */
+  abstract toPersistence(
+    aggregate: A,
+  ): Entity &
+    ReferenceIdInterface &
+    ReferenceVersionInterface &
+    AggregateMetaInterface;
 }

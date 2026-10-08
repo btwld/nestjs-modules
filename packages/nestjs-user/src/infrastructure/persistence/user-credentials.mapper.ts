@@ -18,4 +18,8 @@ export class UserCredentialsMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(credentials: UserCredentials) {
+    return credentials.toPlain();
+  }
 }

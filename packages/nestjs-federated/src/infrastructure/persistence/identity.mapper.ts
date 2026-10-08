@@ -20,4 +20,8 @@ export class IdentityMapper extends DomainMapper<
       dateDeleted,
     });
   }
+
+  toPersistence(identity: Identity) {
+    return identity.toPlain();
+  }
 }
