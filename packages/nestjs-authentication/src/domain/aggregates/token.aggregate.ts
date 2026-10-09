@@ -6,7 +6,7 @@ import {
 } from '@concepta/nestjs-core';
 import {
   type AggregateMetaInterface,
-  DomainAggregate,
+  MutableAggregate,
 } from '@concepta/nestjs-core/aggregate';
 
 import { TokenIssuedEvent } from '../events/token-issued.event.js';
@@ -15,7 +15,7 @@ import { TokenAlreadyRevokedException } from '../exceptions/token-already-revoke
 import { type TokenCreatableInterface } from '../interfaces/token-creatable.interface.js';
 import { type TokenInterface } from '../interfaces/token.interface.js';
 
-export class Token extends DomainAggregate<TokenInterface> {
+export class Token extends MutableAggregate<TokenInterface> {
   constructor(
     id: string,
     props: TokenInterface,

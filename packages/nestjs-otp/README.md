@@ -191,7 +191,7 @@ Domain (Otp aggregate, Events, Services)
 Infrastructure (Repository, Mapper, Schemas, Config)
 ```
 
-- **Domain** -- `Otp` aggregate extending `DomainAggregate<OtpInterface>`,
+- **Domain** -- `Otp` aggregate extending `MutableAggregate<OtpInterface>`,
   3 domain events, history cleanup service, domain policy (`OtpPolicy`)
 - **Application** -- 6 commands and 4 queries dispatched via `@nestjs/cqrs`,
   1 built-in event listener
@@ -314,7 +314,7 @@ export class OtpCreatedListener implements IEventHandler<OtpCreatedEvent> {
 
 ## Otp Aggregate
 
-The `Otp` class extends `DomainAggregate<OtpInterface>` and encapsulates all
+The `Otp` class extends `MutableAggregate<OtpInterface>` and encapsulates all
 OTP domain logic.
 
 ### Factory Methods
@@ -348,7 +348,7 @@ otp.consume(eventContext);
 // Check if the OTP has expired
 otp.isExpired();
 
-// Convert to plain OtpInterface object (inherited from DomainAggregate)
+// Convert to plain OtpInterface object (inherited from MutableAggregate)
 const plain = otp.toPlain();
 ```
 

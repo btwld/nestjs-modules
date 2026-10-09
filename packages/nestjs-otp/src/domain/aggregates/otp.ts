@@ -4,7 +4,7 @@ import {
   type DomainFactory,
   type EventContextHost,
 } from '@concepta/nestjs-core';
-import { DomainAggregate } from '@concepta/nestjs-core/aggregate';
+import { MutableAggregate } from '@concepta/nestjs-core/aggregate';
 
 import { type OtpEventHeaderInterface } from '../events/interfaces/otp-event-header.interface.js';
 import { OtpConsumedEvent } from '../events/otp-consumed.event.js';
@@ -21,7 +21,7 @@ export interface OtpCreateProps {
   expiresIn: string;
 }
 
-export class Otp extends DomainAggregate<OtpInterface> {
+export class Otp extends MutableAggregate<OtpInterface> {
   get category() {
     return this.props.category;
   }

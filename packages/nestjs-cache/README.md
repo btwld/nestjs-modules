@@ -169,7 +169,7 @@ Domain (Cache aggregate, Events)
 Infrastructure (Repository, Mapper, Schemas, Config)
 ```
 
-- **Domain** -- `Cache` aggregate extending `DomainAggregate<CacheInterface>`,
+- **Domain** -- `Cache` aggregate extending `MutableAggregate<CacheInterface>`,
   domain events
 - **Application** -- 7 commands and 3 queries dispatched via `@nestjs/cqrs`
 - **Infrastructure** -- `CacheRepository` with ctx-first signatures,
@@ -302,7 +302,7 @@ export class CacheCreatedListener implements IEventHandler<CacheCreatedEvent> {
 
 ## Cache Aggregate
 
-The `Cache` class extends `DomainAggregate<CacheInterface>` and encapsulates
+The `Cache` class extends `MutableAggregate<CacheInterface>` and encapsulates
 all cache domain logic.
 
 ### Factory Methods
@@ -330,7 +330,7 @@ cache.updateData(eventContext, newData);
 // Extend expiration
 cache.extend(eventContext, expirationDate);
 
-// Convert to plain CacheInterface object (inherited from DomainAggregate)
+// Convert to plain CacheInterface object (inherited from MutableAggregate)
 const plain = cache.toPlain();
 ```
 

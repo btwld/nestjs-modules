@@ -1,3 +1,4 @@
+import { AppendOnlyAggregate } from '../append-only-aggregate.js';
 import { DomainAggregate } from '../domain-aggregate.js';
 import { DomainMapper } from '../domain-mapper.js';
 
@@ -21,7 +22,7 @@ interface NoteRow {
   text: string;
 }
 
-class NoteMapper extends DomainMapper<NoteRow, NoteProps, Note> {
+class NoteMapper extends DomainMapper<NoteRow, Note> {
   createAggregate(row: NoteRow): Note {
     return new Note(row.id, { text: row.text });
   }
@@ -31,7 +32,45 @@ class NoteMapper extends DomainMapper<NoteRow, NoteProps, Note> {
   }
 }
 
+interface EntryProps {
+  amount: string;
+}
+
+class Entry extends AppendOnlyAggregate<EntryProps> {}
+
+interface EntryRow {
+  id: string;
+  amount: string;
+  dateCreated: Date;
+}
+
+class EntryMapper extends DomainMapper<EntryRow, Entry> {
+  createAggregate(row: EntryRow): Entry {
+    const { id, dateCreated, ...props } = row;
+    return new Entry(id, props, dateCreated);
+  }
+
+  toPersistence(entry: Entry): EntryRow {
+    return entry.toPlain();
+  }
+}
+
 describe('DomainMapper', () => {
+  /**
+   * An append-only aggregate's `toPlain()` matches its row exactly, so the
+   * mapper can return it untranslated.
+   */
+  it('round-trips an append-only aggregate through toPlain()', () => {
+    const mapper = new EntryMapper();
+    const row: EntryRow = {
+      id: 'e1',
+      amount: '10.00',
+      dateCreated: new Date('2024-01-01'),
+    };
+
+    expect(mapper.toPersistence(mapper.toDomain(row))).toEqual(row);
+  });
+
   it('maps a row without version or audit columns both ways', () => {
     const mapper = new NoteMapper();
     const row: NoteRow = { id: 'n1', text: 'hello' };

@@ -37,6 +37,12 @@ import {
   type RowScopeQueryOperation,
   type RowScopeWriteOperation,
 } from '../row-scope/row-scope.types.js';
+import { AppendOnlyViolationException } from '../write-policy/exceptions/append-only-violation.exception.js';
+import { WritePolicyBootException } from '../write-policy/exceptions/write-policy-boot.exception.js';
+import {
+  isAppendOnly,
+  type WritePolicyRegistration,
+} from '../write-policy/interfaces/write-policy-registration.interface.js';
 
 import { type JoinClause } from './interfaces/join-clause.interface.js';
 import { type RepositoryMetadataInterface } from './interfaces/repository-metadata.interface.js';
@@ -100,6 +106,7 @@ export abstract class RepositoryAdapter<
   private _federationOrchestrator?: FederationOrchestrator;
   private _rowScope?: RowScopeInterface;
   private _hooks?: HookWithSpec[];
+  private _writePolicy?: WritePolicyRegistration;
   private readonly _warnedDuplicates = new Set<Type>();
 
   constructor(
@@ -158,6 +165,34 @@ export abstract class RepositoryAdapter<
    */
   get hasRowScopeResolver(): boolean {
     return this._rowScope !== undefined;
+  }
+
+  /**
+   * Bind this entity's write policy.
+   *
+   * Bound by `RepositoryModule.forFeature()` rather than passed by each
+   * driver, where a driver that forgot would leave an append-only entity
+   * silently mutable.
+   *
+   * Binds once: a policy that can be swapped at runtime is not a policy.
+   */
+  setWritePolicy(writePolicy: WritePolicyRegistration): void {
+    if (this._writePolicy) {
+      throw new WritePolicyBootException([
+        `"${this.entityKey}" already has a write policy bound. Write ` +
+          'policies are bound once, at startup, and cannot be replaced. ' +
+          `Is "${this.entityKey}" registered more than once in forFeature()?`,
+      ]);
+    }
+    this._writePolicy = writePolicy;
+  }
+
+  /**
+   * The bound write policy, or `undefined` if the entity declared none. Read
+   * by the guard and the boot checks.
+   */
+  get writePolicyDeclaration(): WritePolicyRegistration | undefined {
+    return this._writePolicy;
   }
 
   /**
@@ -553,6 +588,7 @@ export abstract class RepositoryAdapter<
     data: DeepPartial<Entity>,
     options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity> {
+    this.assertAppendable('update');
     const versionGuard = this.resolveVersionGuard(entity, options, 'guard');
     this.assertMutable(entity, options);
     return this.permeator.update.permeate(
@@ -589,6 +625,7 @@ export abstract class RepositoryAdapter<
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
+    this.assertAppendable('upsert');
     await this.assertUpsertMutable(entity, options);
     return this.permeator.upsert.permeate(
       entity,
@@ -620,6 +657,7 @@ export abstract class RepositoryAdapter<
     data: DeepPartial<Entity>,
     options?: RepositoryUpdateOptions<Entity>,
   ): Promise<Entity> {
+    this.assertAppendable('replace');
     const versionGuard = this.resolveVersionGuard(entity, options, 'guard');
     this.assertMutable(entity, options);
     return this.permeator.replace.permeate(
@@ -654,6 +692,7 @@ export abstract class RepositoryAdapter<
     entity: Entity,
     options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity> {
+    this.assertAppendable('delete');
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
       entity,
@@ -682,6 +721,7 @@ export abstract class RepositoryAdapter<
     entities: Entity[],
     options?: RepositoryDeleteOptions,
   ): Promise<Entity[]> {
+    this.assertAppendable('deleteMany');
     return this.permeator.deleteMany.permeate(
       entities,
       async (scoped) => {
@@ -709,6 +749,7 @@ export abstract class RepositoryAdapter<
     entity: Entity,
     options?: RepositoryDeleteOneOptions<Entity>,
   ): Promise<Entity> {
+    this.assertAppendable('softDelete');
     // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
     // below, so a stale precondition against a row someone else already
     // deleted conflicts instead of quietly succeeding.
@@ -764,6 +805,7 @@ export abstract class RepositoryAdapter<
     entity: Entity,
     options?: RepositoryRestoreOptions<Entity>,
   ): Promise<Entity> {
+    this.assertAppendable('restore');
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,
@@ -835,8 +877,11 @@ export abstract class RepositoryAdapter<
 
   /**
    * Get the soft-remove date column name from metadata, if any.
+   *
+   * Public so the startup checks, which run outside the adapter, can see
+   * whether soft delete is possible for an entity.
    */
-  protected getDeleteDateColumn(): (keyof Entity & string) | undefined {
+  getDeleteDateColumn(): (keyof Entity & string) | undefined {
     return this.metadata.columns.find((col) => col.isRemoveDate)?.name;
   }
 
@@ -854,6 +899,32 @@ export abstract class RepositoryAdapter<
     deleteDateColumn: keyof Entity & string,
   ): boolean {
     return entity[deleteDateColumn] != null;
+  }
+
+  /**
+   * Throw `AppendOnlyViolationException` if this entity is declared
+   * append-only.
+   *
+   * Called first in every operation that targets a stored row, ahead of the
+   * version guard and ahead of any early return. Ordering matters: were it to
+   * run after `resolveVersionGuard`, a stale version would surface as an
+   * `OptimisticLockException` and the caller would retry a write that can
+   * never succeed; were it to run after `softDelete`'s missing-column return,
+   * the refusal would depend on whether the entity happened to have a delete
+   * date column.
+   *
+   * Takes no `force` option, deliberately — see
+   * {@link AppendOnlyViolationException}.
+   *
+   * **Scope of this guarantee.** It covers the repository's own entry points.
+   * It does not cover a write that reaches the table without passing through
+   * one: a driver `cascade` on a relation, or a direct `@InjectRepository`
+   * handle. Neither is refused here, as for row scope.
+   */
+  private assertAppendable(operation: string): void {
+    if (isAppendOnly(this.writePolicyDeclaration)) {
+      throw new AppendOnlyViolationException(this.metadata.name, operation);
+    }
   }
 
   /**
@@ -963,7 +1034,19 @@ export abstract class RepositoryAdapter<
     const existing = await this.doFindOne({ where, withDeleted: true, ctx });
 
     if (existing) {
-      throw new EntityAlreadyExistsException(this.metadata.name);
+      // The default message points at `upsert`, which append-only refuses.
+      throw new EntityAlreadyExistsException(
+        this.metadata.name,
+        isAppendOnly(this.writePolicyDeclaration)
+          ? {
+              message:
+                'Cannot create %s: a record with that primary key already ' +
+                'exists — append-only records are never overwritten. Give a ' +
+                'new record an id the application generates, never one from ' +
+                'the request',
+            }
+          : undefined,
+      );
     }
   }
 

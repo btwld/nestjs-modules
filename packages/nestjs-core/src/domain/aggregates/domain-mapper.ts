@@ -4,8 +4,7 @@ import { type DomainAggregate } from './domain-aggregate.js';
 
 export abstract class DomainMapper<
   Entity,
-  Props extends PlainLiteralObject,
-  A extends DomainAggregate<Props>,
+  A extends DomainAggregate<PlainLiteralObject>,
 > {
   abstract createAggregate(entity: Entity): A;
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { conformsTo, withNamedComponent } from '@concepta/nestjs-core';
-import { domainAggregateSchema } from '@concepta/nestjs-core/aggregate';
+import { mutableAggregateSchema } from '@concepta/nestjs-core/aggregate';
 
 import { type UserInterface } from '../../domain/interfaces/user.interface.js';
 
@@ -17,7 +17,7 @@ import { type UserInterface } from '../../domain/interfaces/user.interface.js';
  */
 export const userSchema = withNamedComponent(
   conformsTo<UserInterface>()(
-    domainAggregateSchema.extend({
+    mutableAggregateSchema.extend({
       email: z.string().meta({ description: 'Email' }),
       username: z.string().meta({ description: 'Username' }),
       active: z.boolean().meta({ description: 'Active' }),

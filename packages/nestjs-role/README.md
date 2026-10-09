@@ -271,8 +271,8 @@ default repository implementations.
 ┌──────────────────────────────────────────┐
 │ Domain Aggregates                        │
 │                                          │
-│ Role (DomainAggregate<RoleInterface>)    │
-│ RoleAssignment (DomainAggregate<...>)    │
+│ Role (MutableAggregate<RoleInterface>)   │
+│ RoleAssignment (MutableAggregate<...>)   │
 └────────────────────┬─────────────────────┘
                      │
                      ▼
@@ -342,7 +342,7 @@ CrudModule.forFeature<RoleInterface>({
 
 ### Role
 
-Extends `DomainAggregate<RoleInterface>`.
+Extends `MutableAggregate<RoleInterface>`.
 
 | Property | Type |
 | --- | --- |
@@ -364,7 +364,7 @@ Reconstitution from a database entity is handled by `RoleMapper`.
 
 ### RoleAssignment
 
-Extends `DomainAggregate<RoleAssignmentInterface>`.
+Extends `MutableAggregate<RoleAssignmentInterface>`.
 
 | Property | Type |
 | --- | --- |

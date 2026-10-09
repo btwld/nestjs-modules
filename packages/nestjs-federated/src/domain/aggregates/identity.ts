@@ -7,14 +7,14 @@ import {
 } from '@concepta/nestjs-core';
 import {
   type AggregateMetaInterface,
-  DomainAggregate,
+  MutableAggregate,
 } from '@concepta/nestjs-core/aggregate';
 
 import { IdentityCreatedEvent } from '../events/identity-created.event.js';
 import { type IdentityCreatableInterface } from '../interfaces/identity-creatable.interface.js';
 import { type IdentityInterface } from '../interfaces/identity.interface.js';
 
-export class Identity extends DomainAggregate<IdentityInterface> {
+export class Identity extends MutableAggregate<IdentityInterface> {
   constructor(
     id: string,
     props: IdentityInterface,

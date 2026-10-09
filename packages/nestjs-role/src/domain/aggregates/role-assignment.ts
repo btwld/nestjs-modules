@@ -4,7 +4,7 @@ import {
   type DomainFactory,
   type EventContextHost,
 } from '@concepta/nestjs-core';
-import { DomainAggregate } from '@concepta/nestjs-core/aggregate';
+import { MutableAggregate } from '@concepta/nestjs-core/aggregate';
 
 import { type RoleEventHeaderInterface } from '../events/interfaces/role-event-header.interface.js';
 import { RoleAssignedEvent } from '../events/role-assigned.event.js';
@@ -16,7 +16,7 @@ export interface RoleAssignmentCreateProps {
   assigneeId: string;
 }
 
-export class RoleAssignment extends DomainAggregate<RoleAssignmentInterface> {
+export class RoleAssignment extends MutableAggregate<RoleAssignmentInterface> {
   get roleId() {
     return this.props.roleId;
   }

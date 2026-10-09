@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { conformsTo, withNamedComponent } from '@concepta/nestjs-core';
-import { domainAggregateSchema } from '@concepta/nestjs-core/aggregate';
+import { mutableAggregateSchema } from '@concepta/nestjs-core/aggregate';
 
 import { type InvitationInterface } from '../../domain/interfaces/invitation.interface.js';
 
@@ -19,7 +19,7 @@ import { type InvitationInterface } from '../../domain/interfaces/invitation.int
  */
 export const invitationSchema = withNamedComponent(
   conformsTo<InvitationInterface>()(
-    domainAggregateSchema.extend({
+    mutableAggregateSchema.extend({
       active: z
         .boolean()
         .default(true)

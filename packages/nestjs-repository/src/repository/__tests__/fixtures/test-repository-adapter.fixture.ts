@@ -184,10 +184,6 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   exposedGetVersionColumn(): (keyof TestEntity & string) | undefined {
     return this.getVersionColumn();
   }
-
-  exposedGetDeleteDateColumn(): (keyof TestEntity & string) | undefined {
-    return this.getDeleteDateColumn();
-  }
 }
 
 // ─── Version-less variant ─────────────────────────────────────────────────────

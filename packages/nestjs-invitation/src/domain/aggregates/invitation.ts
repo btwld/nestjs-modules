@@ -8,7 +8,7 @@ import {
 } from '@concepta/nestjs-core';
 import {
   type AggregateMetaInterface,
-  DomainAggregate,
+  MutableAggregate,
 } from '@concepta/nestjs-core/aggregate';
 
 import { type InvitationDispatchedMetadataInterface } from '../events/interfaces/invitation-dispatched-metadata.interface.js';
@@ -23,7 +23,7 @@ import { InvitationRevokedException } from '../exceptions/invitation-revoked.exc
 import { type InvitationCreatableInterface } from '../interfaces/invitation-creatable.interface.js';
 import { type InvitationInterface } from '../interfaces/invitation.interface.js';
 
-export class Invitation extends DomainAggregate<InvitationInterface> {
+export class Invitation extends MutableAggregate<InvitationInterface> {
   constructor(
     id: string,
     props: InvitationInterface,

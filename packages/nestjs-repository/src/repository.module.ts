@@ -144,6 +144,24 @@ export class RepositoryModule extends RepositoryModuleClass {
       });
     }
 
+    // Write policy binding — same reasoning again: a driver that forgot to pass
+    // the declaration would leave an append-only entity silently mutable.
+    for (const entity of entities) {
+      const registration = entity.writePolicy;
+      if (!registration) continue;
+
+      providers.push({
+        provide: Symbol(`WRITE_POLICY_BINDING_${entity.key}_${Date.now()}`),
+        inject: [getDynamicRepositoryToken(entity.key)],
+        useFactory: (repo: unknown) => {
+          if (repo instanceof RepositoryAdapter) {
+            repo.setWritePolicy(registration);
+          }
+          return true;
+        },
+      });
+    }
+
     // Transaction factory registration
     if (dynamicModule.transactionFactories) {
       for (const descriptor of dynamicModule.transactionFactories) {

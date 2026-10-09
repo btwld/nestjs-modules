@@ -10,6 +10,8 @@ export { TypeOrmTransaction } from './transaction/typeorm-transaction.js';
 export { TypeOrmTransactionFactory } from './transaction/typeorm-transaction.factory.js';
 
 // base entities
+export { AppendOnlyPostgresEntity } from './entities/append-only/append-only-postgres.entity.js';
+export { AppendOnlySqliteEntity } from './entities/append-only/append-only-sqlite.entity.js';
 export { AuditPostgresEntity } from './entities/audit/audit-postgres.entity.js';
 export { AuditSqliteEntity } from './entities/audit/audit-sqlite.entity.js';
 export { CommonPostgresEntity } from './entities/common/common-postgres.entity.js';

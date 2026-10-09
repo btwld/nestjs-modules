@@ -530,6 +530,30 @@ export class OrderEntity extends CommonPostgresEntity {
 This gives `OrderEntity` the `id`, `dateCreated`, `dateUpdated`,
 `dateDeleted`, and `version` fields automatically.
 
+### Append-Only Base Entities
+
+For an entity registered with an append-only `writePolicy` (see Write Policy
+in the `@concepta/nestjs-repository` README), extend `AppendOnlyPostgresEntity`
+or `AppendOnlySqliteEntity` instead. Each has a generated UUID `id` and
+`dateCreated`, and nothing that implies a row can change. The `Audit*` and
+`Common*` entities are refused at startup on an append-only entity, because
+their `dateDeleted` column could never be set.
+
+```ts
+import { Entity, Column } from 'typeorm';
+import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+
+@Entity()
+export class StatementItemEntity extends AppendOnlyPostgresEntity {
+  @Column()
+  amount!: string;
+}
+```
+
+Never take the `id` from the request; an id the application generates is
+fine. Two concurrent creates with the same request-supplied `id` can both
+pass `create`'s existence check, and the second can overwrite the first.
+
 ## Exceptions
 
 | Exception | Package | Description |
@@ -545,4 +569,4 @@ This gives `OrderEntity` the `id`, `dateCreated`, `dateUpdated`,
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity` |
+| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity` |

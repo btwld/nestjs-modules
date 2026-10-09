@@ -25,6 +25,7 @@ nesting, and a two-level repository hook system.
 - [Transactional Decorator](#transactional-decorator)
 - [Repository Hooks](#repository-hooks)
 - [Row Scope](#row-scope)
+- [Write Policy](#write-policy)
 - [Repository Registry](#repository-registry)
 - [Federation](#federation)
 - [Injecting Repositories](#injecting-repositories)
@@ -120,11 +121,12 @@ export class OrderModule {}
 Each entity registration creates a dynamic repository provider that can be
 injected by key using `@InjectDynamicRepository()`.
 
-Two further options matter when an entity is scoped:
+Further options for scoped or append-only entities:
 
 | Option | Description |
 | --- | --- |
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
+| `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `imports` | Modules exporting providers this registration must resolve. **Required** when any entity declares a resolver: the resolver is bound inside the module `forFeature()` returns, which cannot see providers declared alongside it |
 
 ```ts
@@ -146,7 +148,8 @@ RepositoryModule.forFeature({
 ```ts
 interface RepositoryModuleOptionsInterface {
   defaultTimeout?: number; // Transaction timeout in milliseconds (default: 30000)
-  requireRowScopeDeclaration?: boolean; // Fail startup on an undeclared entity (default: false)
+  requireRowScopeDeclaration?: boolean; // Fail startup on an entity with no rowScope (default: false)
+  requireWritePolicyDeclaration?: boolean; // Fail startup on an entity with no writePolicy (default: false)
 }
 ```
 
@@ -155,6 +158,8 @@ startup failure rather than a silent omission. Off by default because whether
 an undeclared entity is a mistake depends on the deployment: an application
 that scopes everything wants it on, one that scopes a handful of entities
 among many does not — see [Row Scope](#row-scope).
+`requireWritePolicyDeclaration` does the same for `writePolicy` — see
+[Write Policy](#write-policy).
 
 ## Architecture Overview
 
@@ -1803,6 +1808,132 @@ scope columns alone and match any row in scope), and a configured `column` must
 actually exist on the entity. A subclass overriding `resolveScope` configures no
 column, so only the first applies to it.
 
+## Write Policy
+
+Row scope restricts *which* rows a caller may touch. Write policy restricts
+*whether* a stored row may change at all.
+
+```ts
+RepositoryModule.forFeature({
+  module: TypeOrmRepositoryModule,
+  entities: [
+    {
+      key: 'statement-items',
+      entity: StatementItem,
+      writePolicy: { access: 'append-only', reason: 'financial lineage is retained' },
+    },
+  ],
+});
+```
+
+`create` and `createMany` stay open. Every operation that targets a stored row
+— `update`, `replace`, `upsert`, `delete`, `deleteMany`, `softDelete`,
+`restore` — is refused with `AppendOnlyViolationException` (`409`), even
+when the version is stale, so you never see a misleading optimistic-lock
+conflict.
+
+`reason` is required so the decision is written down; nothing reads it.
+Declare other entities `{ access: 'mutable' }`, which behaves like no
+declaration but satisfies `requireWritePolicyDeclaration`.
+
+### There is no escape hatch
+
+Unlike the soft-delete guard, there is no `{ force: true }`. Run migrations
+and backfills outside the repository.
+
+### Correcting an append-only record
+
+Append a new record that references the one it corrects, and resolve the chain
+on read:
+
+```ts
+await items.create({
+  correctedId: original.id,
+  reason: 'rate applied from the wrong agreement version',
+  amount: '27.00',
+  currency: 'USD',
+});
+```
+
+`resolveCorrectionChain` follows the corrections to the record currently in
+effect. It joins the caller's transaction, and under row scope it stops at
+the last record the caller can see:
+
+```ts
+const effective = await resolveCorrectionChain(items, original, { ctx });
+```
+
+Lineage points **forward only**: the original can't be updated, so it can't
+get a `supersededBy` column. Find out whether a record has been superseded
+by querying for one whose `correctedId` matches it.
+
+The policy does not keep the chain well formed: `create` is not checked, so
+two rows can share a `correctedId` or name a missing row. If each record may
+be corrected only once, add a unique index on `correctedId` and a
+self-referencing foreign key:
+
+```ts
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+
+@Entity()
+@Index(['correctedId'], { unique: true })
+export class StatementItem extends AppendOnlyPostgresEntity {
+  @Column({ type: 'uuid', nullable: true })
+  correctedId!: string | null;
+
+  @ManyToOne(() => StatementItem, { nullable: true })
+  @JoinColumn({ name: 'correctedId' })
+  corrected?: StatementItem | null;
+
+  @Column({ type: 'text', nullable: true })
+  reason!: string | null;
+
+  // amount, currency, …
+}
+```
+
+`NULL`s are distinct in a unique index on Postgres and SQLite, so originals
+coexist while a second correction of one record is refused. Leave `cascade`
+off the self-relation; see below.
+
+Both refusals reach you as `RepositoryQueryException` (`500`), with the
+database's constraint error as its `cause`; the top-level message does not
+name the constraint. Map it in your service if the caller should see a `409`.
+
+### Aggregates persist through `create`, not `upsert`
+
+If your aggregate repository persists with `upsert`, switch append-only
+aggregates to `create`: `upsert` is refused, because it updates the row when
+the key exists.
+
+**Never take the `id` from the request.** An id the application generates,
+such as `randomUUID()` in an aggregate's factory, is fine. An id from the
+request body lets two concurrent creates with the same `id` both pass
+`create`'s existence check
+([Create Inserts, It Never Updates](#create-inserts-it-never-updates)), and
+the second can overwrite the first.
+
+### What the guarantee covers
+
+The refusal only covers writes made through the repository. Three routes
+bypass it:
+
+- **Driver `cascade`.** Never enable `cascade` on a relation that reaches an
+  append-only entity; write the related record through its own repository.
+  Nothing refuses a cascaded write yet.
+- **Foreign-key actions.** `ON DELETE CASCADE` or `SET NULL` from an
+  append-only table lets a parent delete rewrite its rows. Declare those
+  foreign keys `RESTRICT` or `NO ACTION`.
+- **A direct `@InjectRepository` handle**, the same as for row scope.
+
+### Write-policy startup checks
+
+| Check | Always on | What it catches |
+| --- | --- | --- |
+| No soft-delete column on an append-only entity | yes | The entity has a soft-delete column, e.g. it extends an audited base entity. Use your driver's append-only base instead |
+| Every entity declares a policy | `requireWritePolicyDeclaration` | An entity nobody decided about, and a misspelled `writePolicy` key, which otherwise type-checks and is ignored |
+
 ## Repository Registry
 
 `RepositoryRegistryService` validates at application bootstrap that no
@@ -1934,6 +2065,9 @@ also exported for manual provider wiring.
 | `FederationException` | Unsupported federated query (e.g., OR across federated relations). A `RuntimeException` from a scoped peer repository passes through unwrapped, so a refusal keeps its own status hint |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before a resolver was bound to it — it refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
+| `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. No `force` option — append a correcting record instead |
+| `WritePolicyBootException` | One or more structural write-policy checks failed at startup; the message lists every failure |
+| `CorrectionChainDepthException` | `resolveCorrectionChain` found more corrections than `maxDepth` (default 100); raise `maxDepth` if the chain is genuinely that long |
 
 ## Entry Points
 

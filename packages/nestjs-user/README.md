@@ -200,9 +200,9 @@ Domain (User + UserCredentials aggregates, Events, Services, Policies)
 Infrastructure (Repositories, Mappers, Schemas, Config)
 ```
 
-- **Domain** -- `User` aggregate extending `DomainAggregate<UserInterface>`,
+- **Domain** -- `User` aggregate extending `MutableAggregate<UserInterface>`,
   `UserCredentials` aggregate extending
-  `DomainAggregate<UserCredentialInterface>`, domain events,
+  `MutableAggregate<UserCredentialInterface>`, domain events,
   `UserCredentialsService`, `UserPasswordPolicy`
 - **Application** -- 7 commands and 4 queries dispatched via `@nestjs/cqrs`
 - **Infrastructure** -- `UserRepository` and `UserCredentialsRepository` with
@@ -215,7 +215,7 @@ Infrastructure (Repositories, Mappers, Schemas, Config)
 
 ### User
 
-Extends `DomainAggregate<UserInterface>`.
+Extends `MutableAggregate<UserInterface>`.
 
 | Property | Type |
 | --- | --- |
@@ -238,7 +238,7 @@ Reconstitution from a database entity is handled by `UserMapper`.
 
 ### UserCredentials
 
-Extends `DomainAggregate<UserCredentialInterface>`.
+Extends `MutableAggregate<UserCredentialInterface>`.
 
 | Property | Type |
 | --- | --- |

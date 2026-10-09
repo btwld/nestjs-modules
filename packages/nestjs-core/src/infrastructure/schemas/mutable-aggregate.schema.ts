@@ -9,11 +9,11 @@ import { conformsTo } from './conforms-to.util.js';
 import { referenceIdSchema } from './reference-id.schema.js';
 
 /**
- * Base schema for concrete entity schemas — merges audit + reference-id +
- * version fields. Not wrapped with `withOpenApi`/`withNamedComponent`
- * itself; see `audit.schema.ts`.
+ * Base schema for a `MutableAggregate`'s entity schema — merges audit +
+ * reference-id + version fields. Not wrapped with
+ * `withOpenApi`/`withNamedComponent` itself; see `audit.schema.ts`.
  */
-export const domainAggregateSchema = conformsTo<
+export const mutableAggregateSchema = conformsTo<
   ReferenceIdInterface & ReferenceVersionInterface & AuditInterface
 >()(
   auditSchema.extend({

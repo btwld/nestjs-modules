@@ -4,14 +4,14 @@ import {
   type DomainFactory,
   type EventContextHost,
 } from '@concepta/nestjs-core';
-import { DomainAggregate } from '@concepta/nestjs-core/aggregate';
+import { MutableAggregate } from '@concepta/nestjs-core/aggregate';
 
 import { UserCredentialsCreatedEvent } from '../events/user-credentials-created.event.js';
 import { UserCredentialsDeactivatedEvent } from '../events/user-credentials-deactivated.event.js';
 import { type UserCredentialCreatableInterface } from '../interfaces/user-credential-creatable.interface.js';
 import { type UserCredentialInterface } from '../interfaces/user-credential.interface.js';
 
-export class UserCredentials extends DomainAggregate<UserCredentialInterface> {
+export class UserCredentials extends MutableAggregate<UserCredentialInterface> {
   get userId() {
     return this.props.userId;
   }

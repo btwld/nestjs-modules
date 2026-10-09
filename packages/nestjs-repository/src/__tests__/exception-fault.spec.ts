@@ -22,6 +22,9 @@ import { TransactionTimeoutException } from '../exceptions/transaction-timeout.e
 import { FederationException } from '../federation/exceptions/federation.exception.js';
 import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
 import { RowScopeUnboundException } from '../row-scope/exceptions/row-scope-unbound.exception.js';
+import { AppendOnlyViolationException } from '../write-policy/exceptions/append-only-violation.exception.js';
+import { CorrectionChainDepthException } from '../write-policy/exceptions/correction-chain-depth.exception.js';
+import { WritePolicyBootException } from '../write-policy/exceptions/write-policy-boot.exception.js';
 
 /**
  * Anti-drift check: every `RuntimeException` subclass in this package states
@@ -114,6 +117,25 @@ const CASES: {
     name: 'RowScopeUnboundException',
     build: () => new RowScopeUnboundException('orders'),
     fault: 'usage',
+  },
+  {
+    // The caller asked for an operation the entity's declaration forbids —
+    // a code error, not bad input.
+    name: 'AppendOnlyViolationException',
+    build: () => new AppendOnlyViolationException('SomeEntity', 'update'),
+    fault: 'usage',
+  },
+  {
+    name: 'WritePolicyBootException',
+    build: () => new WritePolicyBootException(['failure']),
+    fault: 'usage',
+  },
+  {
+    // Stored data is longer than the walk allows; no request caused it and
+    // no retry fixes it.
+    name: 'CorrectionChainDepthException',
+    build: () => new CorrectionChainDepthException('some-id', 100),
+    fault: 'internal',
   },
 ];
 

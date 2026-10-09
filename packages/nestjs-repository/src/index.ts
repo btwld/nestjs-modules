@@ -48,6 +48,20 @@ export {
 } from './row-scope/interfaces/row-scope-registration.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
+// Write Policy
+// ═══════════════════════════════════════════════════════════════════
+export {
+  resolveCorrectionChain,
+  CorrectionChainRecord,
+} from './write-policy/resolve-correction-chain.js';
+export {
+  WritePolicyRegistration,
+  WritePolicyAppendOnlyRegistration,
+  WritePolicyMutableRegistration,
+  isAppendOnly,
+} from './write-policy/interfaces/write-policy-registration.interface.js';
+
+// ═══════════════════════════════════════════════════════════════════
 // Exceptions
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
@@ -56,6 +70,9 @@ export { PartialPrimaryKeyException } from './exceptions/partial-primary-key.exc
 export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
 export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
+export { AppendOnlyViolationException } from './write-policy/exceptions/append-only-violation.exception.js';
+export { WritePolicyBootException } from './write-policy/exceptions/write-policy-boot.exception.js';
+export { CorrectionChainDepthException } from './write-policy/exceptions/correction-chain-depth.exception.js';
 export { HookBootException } from './exceptions/hook-boot.exception.js';
 export { HookBootTargetInterface } from './hooks/hook-boot-checks.js';
 export { RepositoryQueryException } from './exceptions/repository-query.exception.js';

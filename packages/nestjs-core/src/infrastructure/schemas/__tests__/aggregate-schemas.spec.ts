@@ -1,5 +1,6 @@
+import { appendOnlyAggregateSchema } from '../append-only-aggregate.schema.js';
 import { auditSchema } from '../audit.schema.js';
-import { domainAggregateSchema } from '../domain-aggregate.schema.js';
+import { mutableAggregateSchema } from '../mutable-aggregate.schema.js';
 import { referenceIdSchema } from '../reference-id.schema.js';
 
 describe('auditSchema', () => {
@@ -37,9 +38,9 @@ describe('referenceIdSchema', () => {
   });
 });
 
-describe('domainAggregateSchema', () => {
+describe('mutableAggregateSchema', () => {
   it('merges audit + reference-id + version fields', () => {
-    const result = domainAggregateSchema.parse({
+    const result = mutableAggregateSchema.parse({
       id: 'abc',
       version: 1,
       dateCreated: new Date('2024-01-01'),
@@ -57,7 +58,7 @@ describe('domainAggregateSchema', () => {
   });
 
   it('strips unknown keys (matching the legacy excludeAll/excludeExtraneousValues behavior)', () => {
-    const result = domainAggregateSchema.parse({
+    const result = mutableAggregateSchema.parse({
       id: 'abc',
       version: 1,
       dateCreated: new Date(),
@@ -67,5 +68,38 @@ describe('domainAggregateSchema', () => {
     });
 
     expect(result).not.toHaveProperty('_internal');
+  });
+});
+
+describe('appendOnlyAggregateSchema', () => {
+  it('accepts reference-id + dateCreated', () => {
+    const result = appendOnlyAggregateSchema.parse({
+      id: 'abc',
+      dateCreated: new Date('2024-01-01'),
+    });
+
+    expect(result).toEqual({ id: 'abc', dateCreated: new Date('2024-01-01') });
+  });
+
+  /**
+   * An append-only record never changes, so the mutable fields have no place
+   * in it.
+   */
+  it('strips version, dateUpdated and dateDeleted', () => {
+    const result = appendOnlyAggregateSchema.parse({
+      id: 'abc',
+      dateCreated: new Date('2024-01-01'),
+      version: 1,
+      dateUpdated: new Date(),
+      dateDeleted: null,
+    });
+
+    expect(result).toEqual({ id: 'abc', dateCreated: new Date('2024-01-01') });
+  });
+
+  it('rejects a missing dateCreated', () => {
+    expect(appendOnlyAggregateSchema.safeParse({ id: 'abc' }).success).toBe(
+      false,
+    );
   });
 });

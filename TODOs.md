@@ -44,16 +44,43 @@ git history for what shipped.
       so the exposure is a consumer who runs it against an untrusted schema. Landing the
       count fix above is what clears it.
 
-  3. **Cascaded writes bypass row scope** — `repository.save()` honours TypeORM's `cascade`
-      on a relation, so a write reaches the related table without entering that entity's
-      repository. Its row-scope resolver never runs, and the adapter's own pre-write checks
-      only ever saw the entity that was called. Reproduced: a scoped write on a child
-      carrying `{ parent: { id: <other tenant's> } }` overwrote and re-tenanted the parent,
-      with no refusal. Documented as a prohibition in the driver README, but nothing
-      enforces it. A boot check would need `cascade` on
-      `RepositoryRelationMetadataInterface` (not there today) plus driver support;
-      alternatively the adapter could reduce nested relation objects to their identifying
-      columns before saving. Decide which.
+  3. **Cascaded writes bypass row scope and write policy** (M) — `repository.save()` honours
+      TypeORM's `cascade` on a relation, so a write reaches the related table without entering
+      that entity's repository. None of the target's entry-point guarantees apply: not its
+      row-scope resolver, not its write policy, not its hooks, not `assertMutable`. Reproduced:
+      a scoped write on a child carrying `{ parent: { id: <other tenant's> } }` overwrote and
+      re-tenanted the parent, with no refusal.
+
+      Cascading writes are not a feature of this system — `RelationAction` governs
+      `onDelete`/`onUpdate` only, and `RepositoryProviderOptions` narrows both to
+      `Extract<RelationAction, 'delegate'>`, so nothing else can even be configured. This is a
+      driver behaviour leaking through a payload the abstraction passes along unexamined.
+
+      The specific holes:
+
+      * Nested relation objects in write payloads reach `save()` unexamined.
+      * `withoutRelations` protects the **row target only**, not the payload. `update` and
+        `replace` call it on `entity`; `data` passes through untouched, as its own TSDoc says.
+      * `create`, `createMany` and `upsert` strip nothing at all — and the reproduced bypass
+        was a `create`.
+      * Append-only entities are equally exposed: a cascade can rewrite a row the write
+        policy declares immutable. The README documents it as a prohibition; nothing
+        refuses it.
+      * `RelationAction`'s `'cascade' | 'restrict' | 'setNull'` are exported publicly with
+        TSDoc describing behaviour no code provides and no config accepts.
+      * Unverified: how a cascading M:N writes its junction table. A junction has no
+        repository to route through, so the fix has to refuse it rather than reduce it.
+
+      Most likely fix is to extend the blocking of cascade mutations rather than to detect
+      them per entity: reduce owning-side relation objects in every write payload to their
+      join-column scalar before the driver sees them (`{ author: { id: 'a' } }` →
+      `{ authorId: 'a' }`), and refuse the non-reducible ones — many-cardinality, M:N, inverse
+      one-to-one — since those can only have meant a cascade write. Two facts worth not
+      re-deriving: `on: { from, to }` on `RepositoryRelationMetadataInterface` already carries
+      the local FK property, so the reduction needs **no new driver metadata**; and no entity
+      in the repo sets `cascade: true`, so it is behaviour-preserving today. That closes row
+      scope and write policy together and uniformly across drivers, since no driver cascades
+      on a scalar FK.
 
   4. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
       — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`. Every
@@ -145,7 +172,15 @@ git history for what shipped.
       the file was left alone because fixing it properly is a sweep across every package's
       README rather than one example.
 
-  13. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  13. **`RepositoryProviderOptions`' index signature silently swallows misspelled options**
+      (M) — `[key: string]: unknown` lets `writePolcy` or `hook` type-check and then drops
+      it, so the entity behaves as if it declared nothing. Removing the signature turns a
+      misspelling into a compile error. It is a published type, so measure what breaks first
+      (driver-specific options passed through it) and land it as its own change. When it
+      lands, `checkWritePolicyCompleteness`'s TSDoc — "the only backstop against a
+      misspelled option name" — and the note on the signature itself both go stale.
+
+  14. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
          `packages` list (or collapse both blocks to a single `packages/*` glob when all

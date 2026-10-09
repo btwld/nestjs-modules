@@ -239,7 +239,7 @@ Infrastructure (Repository, Mapper, Schemas, Config)
 
 ## Aggregate
 
-The `Invitation` class extends `DomainAggregate<InvitationInterface>` and
+The `Invitation` class extends `MutableAggregate<InvitationInterface>` and
 encapsulates all invitation domain logic.
 
 ### Factory Methods

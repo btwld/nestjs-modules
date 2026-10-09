@@ -5,6 +5,7 @@ import { type HookOption } from '@concepta/nestjs-core';
 import { type WhereCondition } from '../repository/interfaces/where-clause.interface.js';
 import { type RelationAction } from '../repository/repository.types.js';
 import { type RowScopeRegistration } from '../row-scope/interfaces/row-scope-registration.interface.js';
+import { type WritePolicyRegistration } from '../write-policy/interfaces/write-policy-registration.interface.js';
 
 /**
  * Per-relation configuration for forFeature() registration.
@@ -54,6 +55,17 @@ export interface RepositoryProviderOptions<
    * entity is deliberately public along with the reason.
    */
   rowScope?: RowScopeRegistration;
+
+  /**
+   * Whether stored rows of this entity may change.
+   *
+   * `{ access: 'append-only', reason }` refuses every operation that targets
+   * a stored row — update, replace, upsert, delete, deleteMany, soft-delete,
+   * restore —
+   * while leaving `create` open. Correct such a record by appending a new one
+   * that references it.
+   */
+  writePolicy?: WritePolicyRegistration;
 
   /**
    * Repository hooks that apply to this entity, whatever reaches it.

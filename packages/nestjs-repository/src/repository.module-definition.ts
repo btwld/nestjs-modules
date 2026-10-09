@@ -24,6 +24,7 @@ import {
 } from './transaction/transaction-factory-registry.js';
 import { TransactionScope } from './transaction/transaction-scope.js';
 import { TransactionalRunner } from './transaction/transactional-runner.js';
+import { WritePolicyBootService } from './write-policy/write-policy-boot.service.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__REPOSITORY_MODULE_RAW_OPTIONS_TOKEN__');
 
@@ -76,6 +77,7 @@ export function createRepositoryProviders(options: {
       useClass: FederationOrchestrator,
     },
     RowScopeBootService,
+    WritePolicyBootService,
     HookBootService,
     TransactionScope,
     TransactionalRunner,

@@ -6,7 +6,7 @@ import {
 } from '@concepta/nestjs-core';
 import {
   type AggregateMetaInterface,
-  DomainAggregate,
+  MutableAggregate,
 } from '@concepta/nestjs-core/aggregate';
 
 import { CacheCreatedEvent } from '../events/cache-created.event.js';
@@ -17,7 +17,7 @@ import { type CacheEventHeaderInterface } from '../events/interfaces/cache-event
 import { type CacheCreatableInterface } from '../interfaces/cache-creatable.interface.js';
 import { type CacheInterface } from '../interfaces/cache.interface.js';
 
-export class Cache extends DomainAggregate<CacheInterface> {
+export class Cache extends MutableAggregate<CacheInterface> {
   constructor(
     id: string,
     props: CacheInterface,

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { conformsTo, withNamedComponent } from '@concepta/nestjs-core';
-import { domainAggregateSchema } from '@concepta/nestjs-core/aggregate';
+import { mutableAggregateSchema } from '@concepta/nestjs-core/aggregate';
 
 import { type CacheInterface } from '../../domain/interfaces/cache.interface.js';
 
@@ -18,7 +18,7 @@ import { type CacheInterface } from '../../domain/interfaces/cache.interface.js'
  */
 export const cacheSchema = withNamedComponent(
   conformsTo<CacheInterface>()(
-    domainAggregateSchema.extend({
+    mutableAggregateSchema.extend({
       key: z.string().meta({ description: 'key' }),
       type: z.string().meta({ description: 'type' }),
       data: z.string().nullable().meta({ description: 'data' }),

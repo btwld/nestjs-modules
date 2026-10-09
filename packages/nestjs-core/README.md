@@ -50,7 +50,7 @@ NestJS 12.
 | Import path | What it provides |
 | --- | --- |
 | `@concepta/nestjs-core` | Full public surface: hooks, context, exceptions, references, utilities, enums, schemas (`auditSchema`, `referenceIdSchema`, `conformsTo`, `withOpenApi`, `withNamedComponent`, `standardSchemaConverter`, `isStandardSchema`). |
-| `@concepta/nestjs-core/aggregate` | `DomainAggregate`, `DomainMapper`, `domainAggregateSchema`, `AggregateMetaInterface`. |
+| `@concepta/nestjs-core/aggregate` | `MutableAggregate`, `AppendOnlyAggregate`, `DomainAggregate`, `DomainMapper`, `mutableAggregateSchema`, `appendOnlyAggregateSchema`, `AggregateMetaInterface`, `CorrectableInterface`. |
 | `@concepta/nestjs-core/optional/money` | `Money`, `Rounding`, `RoundingMode`, `MoneyInterface`; `configureCurrencies`, `minorUnitsOf`, `isKnownCurrency`, `assertKnownCurrency`; `moneySchema`, `moneyAmountSchema`, `currencyCodeSchema`; `moneyAmountTransformer`; and the `Currency*`/`Money*` exceptions. Requires the optional peer `decimal.js`. |
 | `@concepta/nestjs-core/testing` | `createMockEventPublisher`, `createMockCommandBus`, `createMockQueryBus`, `collectRuntimeExceptionClassNames`, `createTestEventContext`, `resetCurrencies`. |
 
@@ -505,7 +505,8 @@ schemas are composed into concrete entity schemas via `.extend()`:
 | --- | --- |
 | `auditSchema` | `dateCreated`, `dateUpdated`, `dateDeleted` |
 | `referenceIdSchema` | `id` |
-| `domainAggregateSchema` (from `./aggregate`) | audit fields + `id` + `version` |
+| `mutableAggregateSchema` (from `./aggregate`) | audit fields + `id` + `version` |
+| `appendOnlyAggregateSchema` (from `./aggregate`) | `id` + `dateCreated` |
 
 ### Interface Conformance
 
@@ -516,11 +517,12 @@ allowed; missing fields, wrong types, or optional-vs-nullable mismatches
 fail to compile.
 
 ```ts
-import { conformsTo, domainAggregateSchema } from '@concepta/nestjs-core';
+import { conformsTo } from '@concepta/nestjs-core';
+import { mutableAggregateSchema } from '@concepta/nestjs-core/aggregate';
 import { z } from 'zod';
 
 export const cacheSchema = conformsTo<CacheInterface>()(
-  domainAggregateSchema.extend({
+  mutableAggregateSchema.extend({
     key: z.string(),
     data: z.string().nullable(),
   }),
@@ -610,20 +612,33 @@ fails to compile.
 
 ```ts
 import {
+  MutableAggregate,
+  AppendOnlyAggregate,
   DomainAggregate,
   DomainMapper,
-  domainAggregateSchema,
+  mutableAggregateSchema,
+  appendOnlyAggregateSchema,
   AggregateMetaInterface,
+  CorrectableInterface,
 } from '@concepta/nestjs-core/aggregate';
 ```
 
-### DomainAggregate
+Pick the aggregate that matches how the record is stored:
 
-Abstract base class for all v8 domain aggregates. Extends
-`@nestjs/cqrs` `AggregateRoot` (event sourcing support).
+| Extend | When the record | Carries | Pairs with |
+| --- | --- | --- | --- |
+| `MutableAggregate` | changes over time | `version`, `dateCreated`, `dateUpdated`, `dateDeleted` | `writePolicy: { access: 'mutable' }`, `mutableAggregateSchema` |
+| `AppendOnlyAggregate` | is written once, then only corrected by new records | `dateCreated` | `writePolicy: { access: 'append-only', reason }`, `appendOnlyAggregateSchema` |
+| `DomainAggregate` | fits neither | nothing beyond `id` and props | whatever you add |
+
+All three extend `@nestjs/cqrs` `AggregateRoot`, so every aggregate raises
+domain events with `apply()`. Each one owns its dates: what `toPlain()` emits
+is what gets stored.
+
+### MutableAggregate
 
 ```ts
-export class MyAggregate extends DomainAggregate<MyInterface> {
+export class MyAggregate extends MutableAggregate<MyInterface> {
   constructor(
     id: string,
     props: MyInterface,
@@ -661,6 +676,31 @@ Inherited members:
 | `incrementVersion()` | Bumps the version. Call inside mutation methods. |
 | `toPlain()` | Returns `{ id, version, ...props, ...meta }` — used as persistence payload. |
 
+### AppendOnlyAggregate
+
+```ts
+export class LedgerEntry extends AppendOnlyAggregate<LedgerEntryProps> {
+  static record(eventContext: EventContextHost, props: LedgerEntryProps): LedgerEntry {
+    const entry = new LedgerEntry(randomUUID(), props);
+    entry.apply(new LedgerEntryRecordedEvent(eventContext, entry.toPlain()));
+    return entry;
+  }
+}
+```
+
+`dateCreated` is stamped at construction; pass it as the third constructor
+argument when rebuilding from a row. `toPlain()` returns
+`{ id, ...props, dateCreated }`, the same columns as an append-only base
+entity, so a mapper can persist it as-is. There is no version, no updated or
+deleted date, and no method that changes the record. To correct one, create a
+new record that points at it (see `CorrectableInterface`).
+
+### DomainAggregate
+
+The base of both: `id`, protected `props`, domain events, and
+`toPlain()` returning `{ id, ...props }`. Extend it directly only when neither
+preset fits.
+
 ### DomainMapper
 
 Abstract mapper that converts persistence entities to domain aggregates and
@@ -668,7 +708,7 @@ back. Implement both directions — `createAggregate(entity)` and
 `toPersistence(aggregate)`; `toDomain` is inherited.
 
 ```ts
-export class MyMapper extends DomainMapper<MyEntityInterface, MyInterface, MyAggregate> {
+export class MyMapper extends DomainMapper<MyEntityInterface, MyAggregate> {
   createAggregate(entity: MyEntityInterface): MyAggregate {
     const { id, version, dateCreated, dateUpdated, dateDeleted, ...props } = entity;
     return new MyAggregate(id, props, version, { dateCreated, dateUpdated, dateDeleted });
@@ -685,18 +725,38 @@ When the stored row matches the props, `toPersistence` returns
 several columns — translate here; the return type is checked against the
 entity, so a props-shaped object that doesn't fit fails to compile.
 
-`Entity` is the stored row exactly as you declare it. A row without `version`
-or audit columns, such as an append-only record, maps as-is:
+`Entity` is the stored row exactly as you declare it, including one with no
+`version` or audit columns. An append-only row stores its lineage as two
+nullable columns, and `createAggregate` is where they narrow into
+`CorrectableInterface`, which allows only an original or a correction with a
+reason:
 
 ```ts
-export class NoteMapper extends DomainMapper<NoteRow, NoteProps, Note> {
-  createAggregate(row: NoteRow): Note {
-    return new Note(row.id, { text: row.text });
+type LedgerEntryProps = { amount: string } & CorrectableInterface;
+
+interface LedgerEntryRow {
+  id: string;
+  dateCreated: Date;
+  amount: string;
+  correctedId: string | null;
+  reason: string | null;
+}
+
+export class LedgerEntryMapper extends DomainMapper<LedgerEntryRow, LedgerEntry> {
+  createAggregate(row: LedgerEntryRow): LedgerEntry {
+    const { id, dateCreated, amount, correctedId, reason } = row;
+    return new LedgerEntry(id, { amount, ...toLineage(correctedId, reason) }, dateCreated);
   }
 
-  toPersistence(note: Note): NoteRow {
-    return { id: note.id, text: note.text };
+  toPersistence(entry: LedgerEntry): LedgerEntryRow {
+    return entry.toPlain();
   }
+}
+
+function toLineage(correctedId: string | null, reason: string | null): CorrectableInterface {
+  if (correctedId === null && reason === null) return { correctedId: null, reason: null };
+  if (correctedId !== null && reason !== null) return { correctedId, reason };
+  throw new RuntimeException({ message: 'Correction lineage is malformed' });
 }
 ```
 
@@ -1077,10 +1137,14 @@ exercise correlation behavior directly.
 
 | Export | Description |
 | --- | --- |
-| `DomainAggregate<T>` | Abstract aggregate base extending `@nestjs/cqrs` `AggregateRoot`. |
-| `DomainMapper<Entity, Props, Agg>` | Abstract mapper base. Implement `createAggregate(entity)` and `toPersistence(aggregate)`. |
-| `domainAggregateSchema` | Zod schema exposing `id`, `version`, and audit fields. Composed into entity schemas via `.extend()`. |
+| `MutableAggregate<T>` | Aggregate for a record that changes: `version`, audit dates, `stamp*()`, `incrementVersion()`. |
+| `AppendOnlyAggregate<T>` | Aggregate for a record written once: `dateCreated` only. |
+| `DomainAggregate<T>` | Base of both: `id`, `props`, domain events (`@nestjs/cqrs` `AggregateRoot`). |
+| `DomainMapper<Entity, Agg>` | Abstract mapper base. Implement `createAggregate(entity)` and `toPersistence(aggregate)`. |
+| `mutableAggregateSchema` | Zod schema exposing `id`, `version`, and audit fields. Composed into entity schemas via `.extend()`. |
+| `appendOnlyAggregateSchema` | Zod schema exposing `id` and `dateCreated`. Composed into entity schemas via `.extend()`. |
 | `AggregateMetaInterface` | Interface for aggregate audit timestamps: `dateCreated`, `dateUpdated`, `dateDeleted`. |
+| `CorrectableInterface` | Domain props for a record that is an original or a correction of one: `{ correctedId: null; reason: null }` or `{ correctedId: string; reason: string }`. Intersect it into an aggregate's props type. |
 
 ### Subpath: `./optional/money`
 
