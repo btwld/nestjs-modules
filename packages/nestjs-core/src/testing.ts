@@ -8,3 +8,6 @@ export { collectRuntimeExceptionClassNames } from './testing/collect-runtime-exc
 
 // Event context testing utilities
 export { createTestEventContext } from './testing/create-test-event-context.js';
+
+// Money testing utilities
+export { resetCurrencies } from './domain/value-objects/money/currency.js';

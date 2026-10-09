@@ -30,6 +30,7 @@ utilities**.
 - [Schemas & OpenAPI](#schemas--openapi)
 - [Event Context](#event-context)
 - [Aggregate](#aggregate-conceptanestjs-coreaggregate-subpath)
+- [Money](#money-conceptanestjs-coreoptionalmoney-subpath)
 - [Testing](#testing-conceptanestjs-coretesting-subpath)
 - [API Reference](#api-reference)
 
@@ -50,7 +51,8 @@ NestJS 12.
 | --- | --- |
 | `@concepta/nestjs-core` | Full public surface: hooks, context, exceptions, references, utilities, enums, schemas (`auditSchema`, `referenceIdSchema`, `conformsTo`, `withOpenApi`, `withNamedComponent`, `standardSchemaConverter`, `isStandardSchema`). |
 | `@concepta/nestjs-core/aggregate` | `DomainAggregate`, `DomainMapper`, `domainAggregateSchema`, `AggregateMetaInterface`. |
-| `@concepta/nestjs-core/testing` | `createMockEventPublisher`, `createMockCommandBus`, `createMockQueryBus`, `collectRuntimeExceptionClassNames`. |
+| `@concepta/nestjs-core/optional/money` | `Money`, `Rounding`, `RoundingMode`, `MoneyInterface`; `configureCurrencies`, `minorUnitsOf`, `isKnownCurrency`, `assertKnownCurrency`; `moneySchema`, `moneyAmountSchema`, `currencyCodeSchema`; `moneyAmountTransformer`; and the `Currency*`/`Money*` exceptions. Requires the optional peer `decimal.js`. |
+| `@concepta/nestjs-core/testing` | `createMockEventPublisher`, `createMockCommandBus`, `createMockQueryBus`, `collectRuntimeExceptionClassNames`, `createTestEventContext`, `resetCurrencies`. |
 
 ### Dependencies
 
@@ -65,6 +67,7 @@ Direct dependencies: `ms`, `rxjs`, `zod` (^4.4.3).
 | `@nestjs/swagger` | Yes | Required by the schema/OpenAPI bridge utilities — install explicitly |
 | `rxjs` | Yes | Observable support |
 | `@nestjs/cqrs` | No | Optional peer — only if using CQRS patterns |
+| `decimal.js` | No | Optional peer — only if importing `@concepta/nestjs-core/optional/money` |
 
 ## Module Registration
 
@@ -685,6 +688,170 @@ entity, so a props-shaped object that doesn't fit fails to compile.
 The `nestjs-cache` package is the reference implementation for the full
 aggregate + mapper + repository pattern.
 
+## Money (`@concepta/nestjs-core/optional/money` subpath)
+
+Exact monetary arithmetic. Install the optional peer `decimal.js` to use this
+subpath; no other entry point needs it.
+
+```ts
+import { Money, Rounding } from '@concepta/nestjs-core/optional/money';
+
+const fee = Money.of('1234.56', 'USD')
+  .multiply('0.27')             // exact; nothing is rounded
+  .round(Rounding.halfUp(2));   // 333.33 USD
+```
+
+### Building amounts
+
+```ts
+Money.of('1234.56', 'USD');        // ok
+Money.of(1234.56, 'USD');          // refused
+Money.fromNumber(1234.56, 'USD');  // explicit opt-in for a number you trust
+```
+
+Pass amounts as strings. A `number` carries no record of what has already
+happened to it — `0.1 + 0.2` arrives as `0.30000000000000004` — so use
+`fromNumber()` only when you have checked the value. Amounts are limited to
+38 significant digits, the widest portable SQL `numeric`.
+
+### Validating requests
+
+```ts
+const body = moneySchema.parse(request.body); // { amount: string; currency: string }
+const price = Money.fromJSON(body);
+```
+
+A client must send `"100.5"`, not `100.5`: a JSON number fails validation.
+When amount and currency arrive as separate fields, use `moneyAmountSchema`
+and `currencyCodeSchema`. The schema does not check the amount's scale
+against the currency — `{ amount: "1.005", currency: "USD" }` passes — so
+round in the handler if that matters.
+
+### Calculating
+
+Nothing is rounded unless you call `round()`. `add`, `subtract` and
+`multiply` keep full precision, and `divide()` requires a `Rounding`:
+
+```ts
+const total = price.multiply(3).add(shipping);  // quantity as a number
+const fee = total.multiply('0.0275');           // rate as a string
+const share = total.divide(4, Rounding.halfEven(2));
+```
+
+A rate is always a string: `multiply(0.0275)` compiles but throws, because a
+fractional `number` is refused.
+
+Rounding is always explicit — `Rounding.halfUp/halfDown/halfEven/up/down(scale)`,
+with `scale` from 0 to 20. `halfUp` rounds half away from zero, so `-2.675`
+becomes `-2.68`. Round to the currency's own minor unit with
+`Rounding.halfUp(minorUnitsOf(fee.currency))`; for a mode read from
+configuration, use `Rounding.of(scale, mode)`.
+
+The usual JavaScript idioms disagree with each other, and neither rounds
+half-up reliably:
+
+| Value | `toFixed(2)` | `Math.round(v * 100) / 100` | `Money` half-up |
+| --- | --- | --- | --- |
+| `2.675` | `2.67` | `2.68` | `2.68` |
+| `10.235` | `10.23` | `10.24` | `10.24` |
+| `1.105` | `1.10` | `1.11` | `1.11` |
+
+Arithmetic and ordering across currencies throw; `equals` across currencies
+returns `false`.
+
+### Splitting without losing a cent
+
+```ts
+Money.of('100.00', 'USD').allocate([1, 1, 1]);
+// [33.34, 33.33, 33.33] — sums exactly to 100.00
+```
+
+The same inputs always produce the same split, and a negative amount splits
+as the mirror of its positive. Any amount below the currency's minor unit is
+dropped first, towards zero, so round first if it has to land somewhere.
+
+### Persisting
+
+`moneyAmountTransformer` is a column transformer for the amount column. Keep
+the currency in its own column and build the `Money` in the entity's mapper.
+It works anywhere TypeORM accepts a `ValueTransformer`.
+
+```ts
+// Postgres
+@Column({ type: 'numeric', precision: 19, scale: 4, transformer: moneyAmountTransformer })
+amount!: string;
+
+// SQLite
+@Column({ type: 'text', transformer: moneyAmountTransformer })
+amount!: string;
+
+@Column({ type: 'varchar', length: 3 })
+currency!: string;
+```
+
+Declare the amount column `numeric` on Postgres and **`text`** on SQLite.
+Never use `real` or `float`. On SQLite, `decimal`/`numeric` also come back
+as JavaScript numbers with the precision already gone. If a column ever
+returns a number, the transformer throws `MoneyColumnTypeException`, even if
+a later migration changed the column type.
+
+To hold a `Money` in an aggregate, split it into those columns in the
+mapper, rounded to the column's scale:
+
+```ts
+toPersistence(invoice: Invoice) {
+  const { fee, ...rest } = invoice.toPlain();
+  return { ...rest, amount: fee.round(Rounding.halfUp(4)).toFixed(), currency: fee.currency };
+}
+```
+
+and rebuild it in `createAggregate` with `Money.of(amount, currency)`.
+Round to the column's scale so the value you store is the value you read
+back. A nullable amount column reads back as `null`; handle that before
+calling `Money.of`.
+
+### Returning and displaying
+
+```ts
+// API response — the exact value, without trailing zeros
+Money.of('12.50', 'USD').toJSON();  // { amount: "12.5", currency: "USD" }
+
+// Display — rounded and padded to the currency's scale
+const scale = minorUnitsOf(price.currency);
+price.round(Rounding.halfUp(scale)).toFixed(scale);  // "12.50"
+```
+
+`toFixed(scale)` pads but never rounds: an amount with more places than the
+scale is refused, so round first.
+
+### Currencies
+
+`minorUnitsOf` returns a currency's ISO 4217 minor unit — 2 for `USD`, 0 for
+`JPY`, 3 for `KWD`. About thirty widely used currencies are built in; any
+other code is refused rather than defaulted to two places. Add the ones you
+need at the top of `main.ts`, before `NestFactory.create`:
+
+```ts
+configureCurrencies({ ISK: 0, VND: 0 });
+```
+
+Pass `{ mode: 'replace' }` to accept only the table you give. Calling it
+again, or after any currency has been looked up, throws
+`CurrencyConfigurationException`. In tests, `resetCurrencies()` from
+`@concepta/nestjs-core/testing` restores the built-in set; that entry point
+also needs the optional peer `vitest-mock-extended` installed.
+
+### Errors
+
+| Exception | Status | When | What to do |
+| --- | --- | --- | --- |
+| `MoneyInvalidAmountException` | 400 | An unreadable amount, a `number` passed to `of()`, a fractional rate, division by zero, invalid weights, or `toFixed` that would round | Pass a decimal string; round before formatting |
+| `CurrencyUnknownException` | 400 | A currency that isn't configured | Validate request input with `moneySchema` first; add currencies you support with `configureCurrencies` |
+| `CurrencyMismatchException` | 400 | Arithmetic or ordering across two currencies | Convert first; compare like with like |
+| `CurrencyConfigurationException` | 500 | `configureCurrencies` called twice, late, or with a bad table | Call it once at the top of `main.ts` |
+| `MoneyColumnTypeException` | 500 | A column returned a number | Declare it `numeric` (Postgres) or `text` (SQLite) |
+| `RuntimeException` | 500 | A rounding or format scale outside 0–20, or text that is not a rounding mode | Fix the scale or mode in code or configuration |
+
 ## Testing (`@concepta/nestjs-core/testing` subpath)
 
 ```ts
@@ -900,6 +1067,28 @@ exercise correlation behavior directly.
 | `domainAggregateSchema` | Zod schema exposing `id`, `version`, and audit fields. Composed into entity schemas via `.extend()`. |
 | `AggregateMetaInterface` | Interface for aggregate audit timestamps: `dateCreated`, `dateUpdated`, `dateDeleted`. |
 
+### Subpath: `./optional/money`
+
+Requires the optional peer `decimal.js`.
+
+| Export | Description |
+| --- | --- |
+| `Money` | Immutable exact amount in one currency: `of`, `fromNumber`, `zero`, `fromJSON`; `add`, `subtract`, `multiply`, `divide`, `negate`, `abs`, `round`, `allocate`; comparison and sign checks; `toFixed`, `toJSON`. |
+| `Rounding` | Rounding mode plus scale (0–20): `halfUp`, `halfDown`, `halfEven`, `up`, `down`, or `of(scale, mode)` for a mode chosen at runtime. |
+| `RoundingMode` | String enum of the five modes. |
+| `MoneyInterface` | Transport shape `{ amount: string; currency: string }`. |
+| `configureCurrencies(table, options?)` | Set the accepted currencies once at startup; `mode: 'extend'` (default) or `'replace'`. |
+| `minorUnitsOf(code)` | ISO 4217 minor units of a configured currency. |
+| `isKnownCurrency(code)` / `assertKnownCurrency(code)` | Check whether a currency is configured, or refuse one that isn't. |
+| `CurrencyTable`, `ConfigureCurrenciesOptions` | Types for `configureCurrencies`. |
+| `moneySchema`, `moneyAmountSchema`, `currencyCodeSchema` | Zod schemas for the transport shape and its two fields. |
+| `moneyAmountTransformer`, `ColumnTransformerInterface` | Amount-column transformer, structurally compatible with TypeORM's `ValueTransformer`. |
+| `MoneyInvalidAmountException` | An amount, factor or weight that cannot be read exactly (400). |
+| `CurrencyUnknownException` | A currency code that is not configured (400). |
+| `CurrencyMismatchException` | Arithmetic or ordering across two currencies (400). |
+| `CurrencyConfigurationException` | `configureCurrencies` called twice, after first use, or with an invalid table (500). |
+| `MoneyColumnTypeException` | A column returned a number, so precision is already lost (500). |
+
 ### Subpath: `./testing`
 
 | Export | Description |
@@ -909,3 +1098,4 @@ exercise correlation behavior directly.
 | `createMockQueryBus()` | Returns a `DeepMockProxy<QueryBus>`. |
 | `collectRuntimeExceptionClassNames(srcDir, runtimeExceptionClass)` | Discovers every `RuntimeException` subclass under `srcDir` by dynamic import and prototype walk. |
 | `createTestEventContext(extraHeaders, metadata)` | Builds an `EventContextHost` with a fixed, deterministic correlation pair for tests that don't exercise correlation directly. |
+| `resetCurrencies()` | Restores the built-in currencies and allows `configureCurrencies` again. |

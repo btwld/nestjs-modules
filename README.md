@@ -62,13 +62,14 @@ to install the dependency.
 | `optional/typeorm` | `typeorm` |
 | `optional/seeding` | `@concepta/typeorm-seeding` + `@faker-js/faker` |
 | `optional/crud` | `@concepta/nestjs-crud` |
+| `optional/money` | `decimal.js` |
 
 Rules for maintaining this boundary:
 
 1. **The main entry is dependency-free.** Nothing reachable from
    `src/index.ts` may import an optional peer dependency.
-2. **One `optional/*` subpath per optional peer**, named after the dep it
-   gates. Source file is `src/optional-<name>.ts`, built to
+2. **One `optional/*` subpath per optional peer**, named after the dep or
+   capability it gates. Source file is `src/optional-<name>.ts`, built to
    `dist/optional-<name>.js`.
 3. **Every `optional/*` entry has a matching optional peer declaration** —
    the dep appears in `peerDependencies` *and* in `peerDependenciesMeta`
@@ -78,7 +79,8 @@ Rules for maintaining this boundary:
 5. **Canonical source locations:** typeorm entities in
    `src/infrastructure/persistence/typeorm/`, seed factories and seeders in
    `src/infrastructure/seeding/`, CRUD request/handler classes in
-   `src/gateways/http/{commands,queries}/{impl,handlers}/`.
+   `src/gateways/http/{commands,queries}/{impl,handlers}/`, money value
+   objects in `src/domain/value-objects/money/`.
 
 `@concepta/nestjs-core/aggregate`, `@concepta/nestjs-core/testing` and
 `@concepta/nestjs-repository/testing` are deliberate exceptions — they gate
