@@ -655,7 +655,7 @@ Inherited members:
 | `version` | Integer version counter. |
 | `meta` | `AggregateMetaInterface` — `dateCreated`, `dateUpdated`, `dateDeleted`. |
 | `props` | Protected domain properties object. |
-| `stampCreated()` | Sets `dateCreated` and `dateUpdated` to now. Called by the repository. |
+| `stampCreated()` | Sets `dateCreated` and `dateUpdated` to now. Called by `stampUpdated()` when `dateCreated` is unset. |
 | `stampUpdated()` | Updates `dateUpdated`. Called by the repository before save. |
 | `stampDeleted()` | Sets `dateDeleted`. Called by the repository before soft-delete. |
 | `incrementVersion()` | Bumps the version. Call inside mutation methods. |
@@ -684,6 +684,21 @@ When the stored row matches the props, `toPersistence` returns
 `aggregate.toPlain()`. When it doesn't — a value object in props stored as
 several columns — translate here; the return type is checked against the
 entity, so a props-shaped object that doesn't fit fails to compile.
+
+`Entity` is the stored row exactly as you declare it. A row without `version`
+or audit columns, such as an append-only record, maps as-is:
+
+```ts
+export class NoteMapper extends DomainMapper<NoteRow, NoteProps, Note> {
+  createAggregate(row: NoteRow): Note {
+    return new Note(row.id, { text: row.text });
+  }
+
+  toPersistence(note: Note): NoteRow {
+    return { id: note.id, text: note.text };
+  }
+}
+```
 
 The `nestjs-cache` package is the reference implementation for the full
 aggregate + mapper + repository pattern.
