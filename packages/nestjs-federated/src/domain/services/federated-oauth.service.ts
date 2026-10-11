@@ -42,17 +42,16 @@ export class FederatedOAuthService implements FederatedOAuthServiceInterface {
         return this.createUserWithIdentity(txCtx, provider, email, subject);
       }
 
-      if (!existing.user?.id) {
+      if (!existing.userId) {
         throw new IdentityUserRelationshipException(existing.id);
       }
 
-      const user = await this.userPort.getById(txCtx, existing.user.id);
+      const user = await this.userPort.getById(txCtx, existing.userId);
 
       if (!user) {
-        throw new IdentityFindUserException(
-          this.constructor.name,
-          existing.user,
-        );
+        throw new IdentityFindUserException(this.constructor.name, {
+          id: existing.userId,
+        });
       }
 
       return user;
@@ -70,7 +69,7 @@ export class FederatedOAuthService implements FederatedOAuthServiceInterface {
 
       const eventContext = createEventContext(txCtx, {}, {});
       const identity = this.eventPublisher.mergeObjectContext(
-        Identity.create(eventContext, { provider, subject, user }),
+        Identity.create(eventContext, { provider, subject, userId: user.id }),
       );
 
       await this.identityRepo.save(txCtx, identity);

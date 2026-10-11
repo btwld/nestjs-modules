@@ -39,7 +39,7 @@ export function createMockIdentityEntity(
     id: 'identity-id',
     provider: 'google',
     subject: 'subject-id',
-    user: { id: 'user-id' },
+    userId: 'user-id',
     dateCreated: new Date('2026-01-01'),
     dateUpdated: new Date('2026-01-01'),
     dateDeleted: null,

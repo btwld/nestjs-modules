@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import {
   type DomainFactory,
   type EventContextHost,
-  type ReferenceIdInterface,
+  type ReferenceId,
 } from '@concepta/nestjs-core';
 import {
   type AggregateMetaInterface,
@@ -30,8 +30,8 @@ export class Identity extends MutableAggregate<IdentityInterface> {
   get subject() {
     return this.props.subject;
   }
-  get user(): ReferenceIdInterface {
-    return this.props.user;
+  get userId(): ReferenceId {
+    return this.props.userId;
   }
 
   static create(
@@ -46,9 +46,9 @@ export class Identity extends MutableAggregate<IdentityInterface> {
     id: string,
     dto: IdentityCreatableInterface,
   ): Identity {
-    const { provider, subject, user } = dto;
+    const { provider, subject, userId } = dto;
 
-    const identity = new Identity(id, { provider, subject, user });
+    const identity = new Identity(id, { provider, subject, userId });
 
     identity.apply(new IdentityCreatedEvent(eventContext, identity.toPlain()));
 

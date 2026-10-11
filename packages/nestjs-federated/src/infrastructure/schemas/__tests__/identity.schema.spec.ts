@@ -9,7 +9,7 @@ const validIdentity = {
   dateDeleted: null,
   provider: 'google',
   subject: 'subject-123',
-  user: { id: 'user-abc' },
+  userId: 'user-abc',
 };
 
 describe('identitySchema', () => {
@@ -22,8 +22,8 @@ describe('identitySchema', () => {
     expect(result).not.toHaveProperty('_internal');
   });
 
-  it('rejects a missing user reference', () => {
-    const { user: _user, ...rest } = validIdentity;
+  it('rejects a missing user id', () => {
+    const { userId: _userId, ...rest } = validIdentity;
     expect(identitySchema.safeParse(rest).success).toBe(false);
   });
 });
@@ -32,7 +32,7 @@ describe('identityCreateSchema', () => {
   const validCreate = {
     provider: 'google',
     subject: 'subject-123',
-    user: { id: 'user-abc' },
+    userId: 'user-abc',
   };
 
   it('accepts a valid create payload', () => {
@@ -49,8 +49,8 @@ describe('identityCreateSchema', () => {
     expect(identityCreateSchema.safeParse(rest).success).toBe(false);
   });
 
-  it('rejects a missing user reference', () => {
-    const { user: _user, ...rest } = validCreate;
+  it('rejects a missing user id', () => {
+    const { userId: _userId, ...rest } = validCreate;
     expect(identityCreateSchema.safeParse(rest).success).toBe(false);
   });
 });

@@ -87,14 +87,15 @@ import { UserEntity } from '../user/user.entity';
 
 @Entity()
 export class IdentityEntity extends IdentitySqliteEntity {
-  @ManyToOne(() => UserEntity, { eager: true })
-  @JoinColumn()
-  user: UserEntity;
+  @ManyToOne(() => UserEntity)
+  @JoinColumn({ name: 'userId' })
+  user?: UserEntity;
 }
 ```
 
-The `user` property is declared `abstract` on the base class, so you must
-provide it with the appropriate TypeORM relationship decorator.
+The base class stores the user's id in a `userId` column. The relation is
+optional; declare it, joined on `userId`, to get a foreign key constraint to
+your users table.
 
 For PostgreSQL, extend `IdentityPostgresEntity` instead.
 

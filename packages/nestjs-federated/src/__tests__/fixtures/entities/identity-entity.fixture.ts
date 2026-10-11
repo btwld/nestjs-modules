@@ -1,4 +1,4 @@
-import { Entity, ManyToOne } from 'typeorm';
+import { Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 import { ReferenceIdInterface } from '@concepta/nestjs-core';
 
@@ -6,6 +6,7 @@ import { IdentitySqliteEntity } from '../../../infrastructure/persistence/typeor
 
 @Entity()
 export class IdentityEntityFixture extends IdentitySqliteEntity {
-  @ManyToOne('UserEntityFixture', { eager: true })
-  user!: ReferenceIdInterface;
+  @ManyToOne('UserEntityFixture')
+  @JoinColumn({ name: 'userId' })
+  user?: ReferenceIdInterface;
 }

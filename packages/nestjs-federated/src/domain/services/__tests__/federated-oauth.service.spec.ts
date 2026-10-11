@@ -104,7 +104,13 @@ describe(FederatedOAuthService, () => {
         email: 'test@example.com',
         username: 'test@example.com',
       });
-      expect(identityRepo.save).toHaveBeenCalled();
+      expect(identityRepo.save.mock.calls[0]?.[1].toPlain()).toEqual(
+        expect.objectContaining({
+          provider: 'google',
+          subject: 'subject-id',
+          userId: mockUser.id,
+        }),
+      );
     });
 
     it('should use existing user when email exists but identity does not', async () => {
@@ -136,7 +142,7 @@ describe(FederatedOAuthService, () => {
     it('should throw IdentityUserRelationshipException when identity exists but has no user', async () => {
       const identityWithoutUser = toIdentityDomain(
         createMockIdentityEntity({
-          user: { id: null },
+          userId: null,
         }),
       );
       identityRepo.findByProviderAndSubject.mockResolvedValue(
@@ -151,7 +157,7 @@ describe(FederatedOAuthService, () => {
     it('should classify a broken identity/user relation as internal/500, not client/404', async () => {
       const identityWithoutUser = toIdentityDomain(
         createMockIdentityEntity({
-          user: { id: null },
+          userId: null,
         }),
       );
       identityRepo.findByProviderAndSubject.mockResolvedValue(
