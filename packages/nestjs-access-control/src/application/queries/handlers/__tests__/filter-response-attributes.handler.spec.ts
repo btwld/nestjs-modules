@@ -75,6 +75,33 @@ describe(FilterResponseAttributesHandler.name, () => {
     expect(result).toEqual({ firstName: 'A', lastName: 'B' });
   });
 
+  it('filters by a later grant when an earlier one is not granted', async () => {
+    const rules = buildRules();
+    const { handler } = buildHandler(rules, ['viewer']);
+    const handlerFn = () => undefined;
+    Reflect.defineMetadata(
+      ACCESS_CONTROL_MODULE_GRANT_METADATA,
+      [
+        { resource: 'other_resource', action: ActionEnum.READ },
+        { resource, action: ActionEnum.READ },
+      ],
+      handlerFn,
+    );
+
+    const context = mock<ExecutionContext>();
+    context.getHandler.mockReturnValue(handlerFn);
+
+    const result = await handler.execute(
+      new FilterResponseAttributesQuery(context, {
+        firstName: 'A',
+        lastName: 'B',
+        phone: 'C',
+      }),
+    );
+
+    expect(result).toEqual({ firstName: 'A', lastName: 'B' });
+  });
+
   it('returns data unchanged when the role has no grant for the resource', async () => {
     const rules = new AccessControl();
     rules.grant('viewer').readAny('other_resource', ['firstName']);

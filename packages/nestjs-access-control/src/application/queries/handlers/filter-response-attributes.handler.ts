@@ -51,8 +51,6 @@ export class FilterResponseAttributesHandler implements IQueryHandler<
       permission = this.getPermission(userRoles, grant, PossessionEnum.OWN);
       if (permission.granted && permission.attributes)
         return permission.filter(data);
-
-      return data;
     }
 
     return data;
