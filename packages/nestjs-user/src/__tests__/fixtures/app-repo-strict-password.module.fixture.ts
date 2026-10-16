@@ -28,19 +28,22 @@ const USER_CREDENTIALS_ENTITY_KEY = 'user-credentials';
 @Module({
   imports: [
     TypeOrmModule.forRoot(ormConfig),
-    RepositoryModule.forRoot({}),
-    PasswordModule.forRoot({
-      settings: { minPasswordStrength: PasswordStrengthEnum.VeryStrong },
-    }),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: USER_ENTITY_KEY, entity: UserEntityFixture },
+    RepositoryModule.forRoot({
+      drivers: [
         {
-          key: USER_CREDENTIALS_ENTITY_KEY,
-          entity: UserCredentialEntityFixture,
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: USER_ENTITY_KEY, entity: UserEntityFixture },
+            {
+              key: USER_CREDENTIALS_ENTITY_KEY,
+              entity: UserCredentialEntityFixture,
+            },
+          ],
         },
       ],
+    }),
+    PasswordModule.forRoot({
+      settings: { minPasswordStrength: PasswordStrengthEnum.VeryStrong },
     }),
     UserModule.forRoot({
       entities: {

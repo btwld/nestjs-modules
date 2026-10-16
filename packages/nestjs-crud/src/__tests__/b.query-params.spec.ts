@@ -346,16 +346,25 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig }),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
-              { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
-              { key: CRUD_TEST_PROJECT_ENTITY_NAME, entity: ProjectEntity },
-              { key: CRUD_TEST_USER_ENTITY_NAME, entity: UserEntity },
-              { key: CRUD_TEST_NOTE_ENTITY_NAME, entity: NoteEntity },
+          RepositoryModule.forRoot({
+            drivers: [
+              {
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+                  { key: CRUD_TEST_PROJECT_ENTITY_NAME, entity: ProjectEntity },
+                  { key: CRUD_TEST_USER_ENTITY_NAME, entity: UserEntity },
+                  { key: CRUD_TEST_NOTE_ENTITY_NAME, entity: NoteEntity },
+                ],
+              },
             ],
           }),
+          RepositoryModule.forFeature([
+            CRUD_TEST_COMPANY_ENTITY_NAME,
+            CRUD_TEST_PROJECT_ENTITY_NAME,
+            CRUD_TEST_USER_ENTITY_NAME,
+            CRUD_TEST_NOTE_ENTITY_NAME,
+          ]),
           CrudModule.forRoot({}),
         ],
         controllers: [
@@ -447,7 +456,7 @@ describe('#crud-typeorm', () => {
           field: 'name',
           operator: 'nin',
           value: ['Name2', 'Name3'],
-        }).setOr({ field: 'domain', operator: 'contains', value: 5 });
+        }).setOr({ field: 'domain', operator: 'contains', value: '5' });
         const res = await request(server)
           .get('/companies')
           .query(qb.queryObject)

@@ -1,9 +1,6 @@
-import { Global, Module, Provider } from '@nestjs/common';
+import { Module, Provider } from '@nestjs/common';
 
-import {
-  getDynamicRepositoryToken,
-  DynamicRepositoryModule,
-} from '@concepta/nestjs-repository';
+import { DynamicRepositoryModule } from '@concepta/nestjs-repository';
 
 import { TypeOrmProviderOptionsInterface } from './repository/typeorm-provider-options.interface.js';
 import {
@@ -14,54 +11,40 @@ import {
 } from './typeorm-repository.util.js';
 
 /**
- * TypeORM Repository module providing data access with transaction support.
+ * TypeORM repository driver, registered through `RepositoryModule.forRoot()`.
  *
- * Can be used directly or wrapped by RepositoryModule. Direct usage does
- * NOT provide `TransactionScope` (only `RepositoryModule.forRoot()` does),
- * so optimistic locking on a versioned entity (see
- * `TypeOrmRepository`'s "Optimistic Locking" docs) throws immediately on
- * `update`/`replace` unless the caller is already inside their own active
- * transaction — it never silently runs unprotected.
- *
- * @example Direct usage
+ * @example
  * ```typescript
  * @Module({
  *   imports: [
  *     TypeOrmModule.forRoot({ ... }),
- *     TypeOrmRepositoryModule.forFeature([
- *       { key: 'orders', entity: Order },
- *       { key: 'customers', entity: Customer, dataSource: 'secondary' },
- *       { key: 'audit', entity: AuditLog, factory: createAuditRepository },
- *     ]),
- *   ],
- * })
- * export class AppModule {}
- * ```
- *
- * @example Via RepositoryModule wrapper
- * ```typescript
- * @Module({
- *   imports: [
- *     TypeOrmModule.forRoot({ ... }),
- *     RepositoryModule.forFeature({
- *       module: TypeOrmRepositoryModule,
- *       entities: [{ key: 'orders', entity: Order }],
+ *     RepositoryModule.forRoot({
+ *       drivers: [
+ *         {
+ *           driver: TypeOrmRepositoryModule,
+ *           entities: [
+ *             { key: 'orders', entity: Order },
+ *             { key: 'customers', entity: Customer, dataSource: 'secondary' },
+ *             { key: 'audit', entity: AuditLog, factory: createAuditRepository },
+ *           ],
+ *         },
+ *       ],
  *     }),
  *   ],
  * })
  * export class AppModule {}
  * ```
  */
-@Global()
 @Module({})
 export class TypeOrmRepositoryModule {
   /**
-   * Register repositories for TypeORM entities.
+   * Build the repository providers for TypeORM entities. Called by
+   * `RepositoryModule.forRoot()`, which binds and checks what it returns.
    *
    * @param entities - Entity options
    * @returns Dynamic module with repository providers and transaction factory descriptors
    */
-  static forFeature(
+  static register(
     entities: TypeOrmProviderOptionsInterface[],
   ): DynamicRepositoryModule {
     // Get imports
@@ -78,11 +61,6 @@ export class TypeOrmRepositoryModule {
       createTypeOrmProvider(entityOption),
     );
 
-    // Export tokens for injection
-    const exports = entities.map((entityOption) =>
-      getDynamicRepositoryToken(entityOption.key),
-    );
-
     // Create transaction factory descriptors for RepositoryModule to register
     const transactionFactories = Array.from(dataSourceNames).map((dsName) =>
       createTransactionFactoryDescriptor(dsName),
@@ -92,7 +70,6 @@ export class TypeOrmRepositoryModule {
       module: TypeOrmRepositoryModule,
       imports,
       providers,
-      exports,
       transactionFactories,
     };
   }

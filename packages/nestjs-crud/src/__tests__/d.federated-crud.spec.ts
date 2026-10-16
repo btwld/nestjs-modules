@@ -58,7 +58,7 @@ const UserListHandler = createQueryHandler({
  * E2E tests for federated CRUD queries through the controller layer.
  *
  * Company → Users is a one-to-many relationship. With `federated: true`
- * in forFeature(), the orchestrator issues separate queries and hydrates
+ * in forRoot(), the orchestrator issues separate queries and hydrates
  * the results — no DB-level JOIN.
  */
 describe('#federated-crud', () => {
@@ -90,20 +90,27 @@ describe('#federated-crud', () => {
     const fixture = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot(ormSqliteConfig),
-        RepositoryModule.forRoot({}),
-        RepositoryModule.forFeature({
-          module: TypeOrmRepositoryModule,
-          entities: [
+        RepositoryModule.forRoot({
+          drivers: [
             {
-              key: CRUD_TEST_COMPANY_ENTITY_NAME,
-              entity: CompanyEntity,
-              relations: {
-                users: { federated: true },
-              },
+              driver: TypeOrmRepositoryModule,
+              entities: [
+                {
+                  key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                  entity: CompanyEntity,
+                  relations: {
+                    users: { federated: true },
+                  },
+                },
+                { key: CRUD_TEST_USER_ENTITY_NAME, entity: UserEntity },
+              ],
             },
-            { key: CRUD_TEST_USER_ENTITY_NAME, entity: UserEntity },
           ],
         }),
+        RepositoryModule.forFeature([
+          CRUD_TEST_COMPANY_ENTITY_NAME,
+          CRUD_TEST_USER_ENTITY_NAME,
+        ]),
         CrudModule.forRoot({}),
       ],
       controllers: [CompaniesController],

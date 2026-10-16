@@ -1,5 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
+import { RepositoryModule } from '@concepta/nestjs-repository';
+
 import {
   CacheCoreAsyncOptions,
   CacheCoreModuleClass,
@@ -53,6 +55,7 @@ export class CacheModule {
 
     return {
       module: CacheModule,
+      imports: [RepositoryModule.forFeature(entityKeys)],
       providers,
       exports: providers,
     };

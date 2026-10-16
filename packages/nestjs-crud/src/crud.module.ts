@@ -1,5 +1,7 @@
 import { DynamicModule, Module, PlainLiteralObject } from '@nestjs/common';
 
+import { RepositoryModule } from '@concepta/nestjs-repository';
+
 import {
   CrudAsyncOptions,
   CrudModuleClass,
@@ -7,6 +9,7 @@ import {
 } from './crud.module-definition.js';
 import { CrudModuleForFeatureOptionsInterface } from './infrastructure/config/interfaces/crud-module-for-feature-options.interface.js';
 import { ConfigurableCrudBuilder } from './infrastructure/utils/configurable-crud.builder.js';
+import { getCrudRepositoryKey } from './infrastructure/utils/get-crud-repository-key.js';
 
 @Module({})
 export class CrudModule extends CrudModuleClass {
@@ -31,9 +34,13 @@ export class CrudModule extends CrudModuleClass {
   ): DynamicModule {
     const builder = new ConfigurableCrudBuilder<Entity>(options.crud);
     const { providers, controllers } = builder.build();
+    const repositoryKey = getCrudRepositoryKey(options.crud);
 
     return {
       module: CrudModule,
+      imports: repositoryKey
+        ? [RepositoryModule.forFeature([repositoryKey])]
+        : [],
       providers,
       exports: providers,
       controllers: Object.values(controllers),

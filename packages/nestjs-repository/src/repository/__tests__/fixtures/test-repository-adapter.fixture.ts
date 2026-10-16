@@ -2,9 +2,10 @@ import { type PlainLiteralObject, type Type } from '@nestjs/common';
 
 import { type DeepPartial } from '@concepta/nestjs-core';
 
-import { type JoinClause } from '../../interfaces/join-clause.interface.js';
+import { targetColumnsFixture } from '../../../__fixtures__/column-metadata.fixture.js';
 import { type RepositoryMetadataInterface } from '../../interfaces/repository-metadata.interface.js';
 import {
+  type RepositoryCountOptions,
   type RepositoryFindOptions,
   type RepositoryFindOneOptions,
   type RepositoryCreateOptions,
@@ -13,6 +14,7 @@ import {
   type RepositoryDeleteOptions,
   type RepositoryDeleteOneOptions,
   type RepositoryRestoreOptions,
+  type RepositoryVersionGuardOptions,
 } from '../../interfaces/repository-options.interface.js';
 import { type WhereClause } from '../../interfaces/where-clause.interface.js';
 import { RepositoryAdapter } from '../../repository-adapter.js';
@@ -42,6 +44,7 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   readonly metadata: RepositoryMetadataInterface<TestEntity> = {
     name: 'TestEntity',
     type: TestEntityClass as Type<TestEntity>,
+    urn: 'urn:memory:TestEntity',
     columns: [
       { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
       { name: 'name', isPrimary: false, isRemoveDate: false, isVersion: false },
@@ -62,16 +65,20 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
       {
         name: 'posts',
         targetEntity: 'PostEntity',
+        targetUrn: 'urn:memory:PostEntity',
+        targetColumns: targetColumnsFixture('id', 'authorId'),
         cardinality: 'many' as const,
         on: { from: 'id', to: 'authorId' },
       },
       {
         name: 'tags',
         targetEntity: 'TagEntity',
+        targetUrn: 'urn:memory:TagEntity',
+        targetColumns: targetColumnsFixture('id'),
         cardinality: 'many' as const,
         on: { from: 'id', to: 'id' },
         through: {
-          relation: 'entity_tags',
+          urn: 'urn:memory:entity_tags',
           fromKey: 'entityId',
           toKey: 'tagId',
         },
@@ -89,9 +96,7 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   ): Promise<TestEntity | null> {
     throw new Error('not implemented');
   }
-  protected doCount(
-    _options?: RepositoryFindOptions<TestEntity>,
-  ): Promise<number> {
+  protected doCount(_options?: RepositoryCountOptions): Promise<number> {
     throw new Error('not implemented');
   }
   protected doFindAndCount(
@@ -114,7 +119,7 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   protected doUpdate(
     _entity: TestEntity,
     _data: DeepPartial<TestEntity>,
-    _options?: RepositoryUpdateOptions<TestEntity>,
+    _options?: RepositoryUpdateOptions,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
@@ -127,13 +132,13 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   protected doReplace(
     _entity: TestEntity,
     _data: DeepPartial<TestEntity>,
-    _options?: RepositoryUpdateOptions<TestEntity>,
+    _options?: RepositoryUpdateOptions,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
   protected doDelete(
     _entity: TestEntity,
-    _options?: RepositoryDeleteOneOptions<TestEntity>,
+    _options?: RepositoryDeleteOneOptions,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
@@ -145,28 +150,18 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
   }
   protected doSoftDelete(
     _entity: TestEntity,
-    _options?: RepositoryDeleteOneOptions<TestEntity>,
+    _options?: RepositoryDeleteOneOptions,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
   protected doRestore(
     _entity: TestEntity,
-    _options?: RepositoryRestoreOptions<TestEntity>,
+    _options?: RepositoryRestoreOptions,
   ): Promise<TestEntity> {
     throw new Error('not implemented');
   }
-  transform(_entityLike: DeepPartial<TestEntity>): TestEntity {
+  toRow(_entityLike: DeepPartial<TestEntity>): TestEntity {
     throw new Error('not implemented');
-  }
-  merge(
-    mergeIntoEntity: TestEntity,
-    ...entityLikes: DeepPartial<TestEntity>[]
-  ): TestEntity {
-    return Object.assign(mergeIntoEntity, ...entityLikes);
-  }
-
-  exposedResolveJoinClauses(join?: JoinClause[]): JoinClause[] | undefined {
-    return this.resolveJoinClauses(join);
   }
 
   exposedToDnf(clause: WhereClause): WhereClause[][] {
@@ -204,9 +199,8 @@ export class TestRepositoryAdapterNoVersion extends TestRepositoryAdapter {
 // proves a guard fired before delegation (a different error than a guard
 // exception would surface). This subclass additionally makes them succeed,
 // tracking call counts and the options each call received, so the allowed
-// paths (`{ force: true }`, a matching `expectedVersion`, live entities, no
-// existing row) can assert a write actually went through with the right
-// options.
+// paths (a matching `expectedVersion`, live entities, no existing row) can
+// assert a write actually went through with the right options.
 export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
   doUpdateCalls = 0;
   doReplaceCalls = 0;
@@ -217,16 +211,22 @@ export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
   doFindOneCalls: RepositoryFindOneOptions<TestEntity>[] = [];
   findOneResult: TestEntity | null = null;
 
-  lastUpdateOptions?: RepositoryUpdateOptions<TestEntity>;
-  lastReplaceOptions?: RepositoryUpdateOptions<TestEntity>;
-  lastDeleteOptions?: RepositoryDeleteOneOptions<TestEntity>;
-  lastSoftDeleteOptions?: RepositoryDeleteOneOptions<TestEntity>;
-  lastRestoreOptions?: RepositoryRestoreOptions<TestEntity>;
+  lastUpdateOptions?: RepositoryUpdateOptions &
+    RepositoryVersionGuardOptions<TestEntity>;
+  lastReplaceOptions?: RepositoryUpdateOptions &
+    RepositoryVersionGuardOptions<TestEntity>;
+  lastDeleteOptions?: RepositoryDeleteOneOptions &
+    RepositoryVersionGuardOptions<TestEntity>;
+  lastSoftDeleteOptions?: RepositoryDeleteOneOptions &
+    RepositoryVersionGuardOptions<TestEntity>;
+  lastRestoreOptions?: RepositoryRestoreOptions &
+    RepositoryVersionGuardOptions<TestEntity>;
 
   protected override doUpdate(
     entity: TestEntity,
     data: DeepPartial<TestEntity>,
-    options?: RepositoryUpdateOptions<TestEntity>,
+    options?: RepositoryUpdateOptions &
+      RepositoryVersionGuardOptions<TestEntity>,
   ): Promise<TestEntity> {
     this.doUpdateCalls++;
     this.lastUpdateOptions = options;
@@ -236,7 +236,8 @@ export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
   protected override doReplace(
     entity: TestEntity,
     data: DeepPartial<TestEntity>,
-    options?: RepositoryUpdateOptions<TestEntity>,
+    options?: RepositoryUpdateOptions &
+      RepositoryVersionGuardOptions<TestEntity>,
   ): Promise<TestEntity> {
     this.doReplaceCalls++;
     this.lastReplaceOptions = options;
@@ -247,12 +248,13 @@ export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
     entity: DeepPartial<TestEntity>,
   ): Promise<TestEntity> {
     this.doUpsertCalls++;
-    return Promise.resolve(this.prepare(entity) ?? new TestEntityClass());
+    return Promise.resolve(Object.assign(new TestEntityClass(), entity));
   }
 
   protected override doDelete(
     entity: TestEntity,
-    options?: RepositoryDeleteOneOptions<TestEntity>,
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<TestEntity>,
   ): Promise<TestEntity> {
     this.doDeleteCalls++;
     this.lastDeleteOptions = options;
@@ -261,7 +263,8 @@ export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
 
   protected override doSoftDelete(
     entity: TestEntity,
-    options?: RepositoryDeleteOneOptions<TestEntity>,
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<TestEntity>,
   ): Promise<TestEntity> {
     this.doSoftDeleteCalls++;
     this.lastSoftDeleteOptions = options;
@@ -270,7 +273,8 @@ export class TrackingTestRepositoryAdapter extends TestRepositoryAdapter {
 
   protected override doRestore(
     entity: TestEntity,
-    options?: RepositoryRestoreOptions<TestEntity>,
+    options?: RepositoryRestoreOptions &
+      RepositoryVersionGuardOptions<TestEntity>,
   ): Promise<TestEntity> {
     this.doRestoreCalls++;
     this.lastRestoreOptions = options;

@@ -108,6 +108,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
 
       const result = createTypeOrmRepository(mockRepo, 'test-entity');
@@ -120,6 +123,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
 
       const result = createTypeOrmRepository(
@@ -135,6 +141,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
       const mockHookResolver = {} as HookResolverService;
 
@@ -246,6 +255,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
       const mockFactory = vi.fn().mockReturnValue(mockRepo);
 
@@ -286,6 +298,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
       const mockHookResolver = {} as HookResolverService;
 
@@ -313,6 +328,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
 
       const result = useFactory(mockRepo, undefined);
@@ -324,6 +342,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
       const mockFactory = vi.fn().mockReturnValue(mockRepo);
 
@@ -354,6 +375,9 @@ describe('typeorm-repository.util', () => {
       const mockRepo = {
         target: TestEntity,
         metadata: { name: 'TestEntity', targetName: 'TestEntity', columns: [] },
+        manager: {
+          dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+        },
       } as unknown as Repository<TestEntity>;
       const mockFactory = vi.fn().mockReturnValue(mockRepo);
 

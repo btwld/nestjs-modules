@@ -1,5 +1,6 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
+import { targetColumnsFixture } from '../../__fixtures__/column-metadata.fixture.js';
 import {
   type FederatedRelation,
   type RelationResult,
@@ -10,10 +11,11 @@ const makeRelation = (
   overrides: Partial<FederatedRelation> & { name: string },
 ): FederatedRelation => ({
   targetEntity: `${overrides.name}Entity`,
+  targetUrn: `urn:memory:${overrides.name}Entity`,
+  targetColumns: targetColumnsFixture('id', `${overrides.name}Id`),
   cardinality: 'many',
   on: { from: 'id', to: `${overrides.name}Id` },
   isOwning: false,
-  joinType: 'LEFT',
   ...overrides,
 });
 

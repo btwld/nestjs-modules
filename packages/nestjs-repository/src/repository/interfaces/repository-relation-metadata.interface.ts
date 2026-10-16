@@ -1,16 +1,11 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type RelationAction } from '../repository.types.js';
-
+import { type RepositoryColumnMetadataInterface } from './repository-column-metadata.interface.js';
 import { type WhereCondition } from './where-clause.interface.js';
 
 /**
- * ORM-agnostic relation metadata for repository introspection.
+ * A relation the driver reports for an entity.
  *
- * Based on the Tier 3 ORM common denominator — available in
- * TypeORM, MikroORM, Sequelize, Prisma, Objection, Drizzle Relational.
- *
- * Mirrors `JoinClause.on` and `JoinClause.through` for trivial mapping.
  * `on.from` is always "my column", `on.to` is always "their column".
  */
 export interface RepositoryRelationMetadataInterface {
@@ -18,23 +13,28 @@ export interface RepositoryRelationMetadataInterface {
   name: string;
   /** Target entity name (e.g., 'BlogEntity') */
   targetEntity: string;
+  /** URN of the rows the target reads, as the target reports its own `urn`. */
+  targetUrn: string;
+  /**
+   * The target entity's own columns, derived by the driver from the target's
+   * entity definition the same way it derives `columns` for the root.
+   */
+  targetColumns: RepositoryColumnMetadataInterface[];
   /** 'one' for 1:1/N:1, 'many' for 1:N/M:N */
   cardinality: 'one' | 'many';
   /** Column mapping: from = source entity column, to = target entity column */
   on: { from: string; to: string };
-  /** M:N junction info (mirrors JoinClause.through) */
+  /** Foreign key columns this entity holds; owning side of a to-one relation only. */
+  foreignKey?: { from: string; to: string }[];
+  /** M:N junction info */
   through?: {
-    /** Junction entity or table name. */
-    relation: string;
+    /** URN of the junction's rows, in the same form as an entity's `urn`. */
+    urn: string;
     /** Junction FK column pointing to the source entity. */
     fromKey: string;
     /** Junction FK column pointing to the target entity. */
     toKey: string;
   };
-  /** Action to take on related records when the source entity is deleted. */
-  onDelete?: RelationAction;
-  /** Action to take on related records when the source entity's PK is updated. */
-  onUpdate?: RelationAction;
   /** Use separate queries instead of DB joins for this relation (federation). */
   federated?: boolean;
   /**

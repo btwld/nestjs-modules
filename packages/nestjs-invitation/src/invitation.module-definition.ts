@@ -7,7 +7,10 @@ import { ConfigModule } from '@nestjs/config';
 import { CommandBus, CqrsModule, QueryBus } from '@nestjs/cqrs';
 
 import { createSettingsProvider } from '@concepta/nestjs-core';
-import { TransactionScope } from '@concepta/nestjs-repository';
+import {
+  RepositoryModule,
+  TransactionScope,
+} from '@concepta/nestjs-repository';
 
 import { AcceptInvitationHandler } from './application/commands/handlers/accept-invitation.handler.js';
 import { CreateInvitationByEmailHandler } from './application/commands/handlers/create-invitation-by-email.handler.js';
@@ -74,7 +77,11 @@ function definitionTransform(
   return {
     ...definition,
     global,
-    imports: createInvitationImports({ imports }),
+    imports: createInvitationImports({
+      imports,
+      // A custom repository replaces the one injected under the key.
+      repositoryKeys: repositories?.invitation ? [] : [entityKey],
+    }),
     providers: createInvitationProviders({
       providers,
       entityKey,
@@ -86,11 +93,13 @@ function definitionTransform(
 
 export function createInvitationImports(options: {
   imports: DynamicModule['imports'];
+  repositoryKeys: string[];
 }): DynamicModule['imports'] {
   return [
     ...(options.imports || []),
     ConfigModule.forFeature(invitationDefaultConfig),
     CqrsModule.forRoot(),
+    RepositoryModule.forFeature(options.repositoryKeys),
   ];
 }
 

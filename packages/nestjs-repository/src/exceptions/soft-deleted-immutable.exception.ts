@@ -8,9 +8,7 @@ import {
 /**
  * Exception thrown when an update, replace, or upsert targets a row that is
  * currently soft-deleted — soft-deleted rows are immutable everywhere except
- * through `restore()`. Pass `{ force: true }` to the write call to bypass
- * this guard for server-side carve-outs (e.g. pre-purge PII masking, admin
- * data-integrity corrections).
+ * through `restore()`.
  */
 export class SoftDeletedImmutableException extends RuntimeException {
   declare context: RuntimeException['context'] & { entityName: string };
@@ -18,8 +16,7 @@ export class SoftDeletedImmutableException extends RuntimeException {
   constructor(entityName: string, options?: RuntimeExceptionOptions) {
     super({
       message:
-        'Cannot mutate %s: the record is soft-deleted — restore it first, ' +
-        'or pass { force: true } to bypass this guard',
+        'Cannot mutate %s: the record is soft-deleted — restore it first',
       messageParams: [entityName],
       httpStatus: HttpStatus.CONFLICT,
       fault: 'client',

@@ -117,15 +117,29 @@ Each must have a registered handler in your application. For example, if you use
 
 ### Step 3: Configure the Module
 
+Register the identity entity in `RepositoryModule.forRoot()`, and give
+`entities.identity` the same key:
+
 ```ts
 import { Module } from '@nestjs/common';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 import { FederatedModule } from '@concepta/nestjs-federated';
+import { IdentityEntity } from './identity/identity.entity';
 import { GetUserQuery } from './user/queries/get-user.query';
 import { GetUserByEmailQuery } from './user/queries/get-user-by-email.query';
 import { CreateUserCommand } from './user/commands/create-user.command';
 
 @Module({
   imports: [
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'identity', entity: IdentityEntity }],
+        },
+      ],
+    }),
     FederatedModule.forRoot({
       entities: { identity: 'identity' },
       userPort: {

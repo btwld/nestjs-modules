@@ -1,5 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
+import { RepositoryModule } from '@concepta/nestjs-repository';
+
 import { createOtpRepositoryProvider } from './infrastructure/utils/create-otp-repository-provider.js';
 import {
   OtpCoreAsyncOptions,
@@ -52,6 +54,7 @@ export class OtpModule {
 
     return {
       module: OtpModule,
+      imports: [RepositoryModule.forFeature(entityKeys)],
       providers: [...repoProviders],
       exports: repoProviders,
     };

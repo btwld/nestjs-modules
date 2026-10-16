@@ -5,7 +5,7 @@ import { type RepositoryRelationMetadataInterface } from './repository-relation-
 
 /**
  * Repository metadata interface for entity introspection.
- * Provides schema information without exposing ORM internals.
+ * Provides schema information without exposing the driver's internals.
  */
 export interface RepositoryMetadataInterface<
   Entity extends PlainLiteralObject,
@@ -14,7 +14,13 @@ export interface RepositoryMetadataInterface<
   name: string;
   /** Entity class/constructor */
   type: Type<Entity>;
-  /** All columns in the entity */
+  /**
+   * Names the rows this entity reads. Two entities with the same URN read the
+   * same rows, whatever their names. The driver derives it from the entity's
+   * definition, as `urn:<driver>:…`; it is compared, never parsed.
+   */
+  urn: string;
+  /** The entity's own columns. A relation is never one, even when it holds a key. */
   columns: RepositoryColumnMetadataInterface<Entity>[];
   /** Relation metadata for join resolution */
   relations?: RepositoryRelationMetadataInterface[];

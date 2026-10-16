@@ -36,6 +36,9 @@ yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
+SQL databases only. A repository registered on a MongoDB data source fails at
+startup.
+
 ### Dependencies
 
 | Package | Notes |
@@ -54,11 +57,8 @@ NestJS 12.
 
 ## Module Registration
 
-### With RepositoryModule (recommended)
-
-Use `RepositoryModule.forFeature()` to register entities through the
-TypeORM driver. This provides transaction management, repository hooks,
-and duplicate key detection.
+List `TypeOrmRepositoryModule` as a driver in `RepositoryModule.forRoot()`,
+with the entities it serves:
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -73,12 +73,16 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
       url: 'postgres://user:pass@localhost:5432/mydb',
       entities: [OrderEntity, CustomerEntity],
     }),
-    RepositoryModule.forRoot({}),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: 'orders', entity: OrderEntity },
-        { key: 'customers', entity: CustomerEntity },
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: 'orders', entity: OrderEntity },
+            { key: 'customers', entity: CustomerEntity, dataSource: 'secondary' },
+            { key: 'audit', entity: AuditLog, factory: createAuditRepository },
+          ],
+        },
       ],
     }),
   ],
@@ -86,33 +90,9 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 export class AppModule {}
 ```
 
-Each entity key creates a `TypeOrmRepository` instance injectable via
-`@InjectDynamicRepository(key)`.
-
-### Direct Usage
-
-`TypeOrmRepositoryModule` can also be used directly without `RepositoryModule`:
-
-```ts
-@Module({
-  imports: [
-    TypeOrmModule.forRoot({ /* ... */ }),
-    TypeOrmRepositoryModule.forFeature([
-      { key: 'orders', entity: OrderEntity },
-      { key: 'customers', entity: CustomerEntity, dataSource: 'secondary' },
-      { key: 'audit', entity: AuditLog, factory: createAuditRepository },
-    ]),
-  ],
-})
-export class AppModule {}
-```
-
-**Do not declare `rowScope` on this path.** Only
-`RepositoryModule.forFeature()` binds a row scope resolver. An entity declared
-`{ access: 'scoped' }` here gets no resolver, so it fails closed — every
-operation throws `RowScopeUnboundException`, and startup fails outright if
-`RepositoryModule.forRoot()` is present. Register scoped entities through
-`RepositoryModule.forFeature({ module: TypeOrmRepositoryModule, ... })`.
+Each entity key creates a `TypeOrmRepository`. Import
+`RepositoryModule.forFeature(['orders'])` in a module to inject it there with
+`@InjectDynamicRepository('orders')`.
 
 ### Provider Options
 
@@ -122,8 +102,11 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   entity: Type<Entity>;                                    // TypeORM entity class
   dataSource?: TypeOrmDataSourceToken;                     // Data source (default: 'default')
   factory?: (dataSource: DataSource) => Repository<Entity>; // Custom repository factory
-  relations?: Record<string, RelationActionConfig>;        // Per-relation onDelete/onUpdate and federation
-  rowScope?: RowScopeRegistration;                         // Row scope declaration (see above)
+  relations?: Record<string, RelationConfig>;              // Per-relation federation settings
+  rowScope?: RowScopeRegistration;                         // Declarations, bound by forRoot()
+  writePolicy?: WritePolicyRegistration;
+  allowEagerRelations?: boolean;
+  hooks?: HookOption[];
 }
 ```
 
@@ -133,11 +116,11 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   `DataSourceOptions`; defaults to `'default'`
 - **`factory`** -- optional factory for custom TypeORM repositories; receives
   `DataSource`, returns `Repository<Entity>`
-- **`relations`** -- per-relation `onDelete`/`onUpdate` behaviour and
-  federation settings, keyed by relation property name
-- **`rowScope`** -- declares the entity scoped or public. Passed straight
-  through to the adapter; the driver plays no part in enforcement, and the
-  resolver is bound by `RepositoryModule.forFeature()`
+- **`relations`** -- per-relation federation settings, keyed by relation
+  property name
+- **`rowScope`**, **`writePolicy`**, **`allowEagerRelations`**, **`hooks`** --
+  the entity's declarations. Read and bound by `RepositoryModule.forRoot()`;
+  this driver ignores them
 
 ### Injecting Repositories
 
@@ -187,9 +170,6 @@ by type.
 | Delete | `deleteMany` | `(entities, options?) => Promise<Entity[]>` |
 | Delete | `softDelete` | `(entity, options?) => Promise<Entity>` |
 | Lifecycle | `restore` | `(entity, options?) => Promise<Entity>` |
-| Utility | `transform` | `(entityLike) => Entity` |
-| Utility | `merge` | `(mergeIntoEntity, ...entityLikes) => Entity` |
-| Utility | `prepare` | `(dto) => Entity \| undefined` |
 
 All query and mutation methods accept an `options` parameter that includes
 an optional `ctx` (repository context) for transaction and hook support.
@@ -221,15 +201,7 @@ first.
 The check runs inside a transaction, opening one scoped to just that call
 if the caller isn't already inside one (e.g. via `@Transactional()`), so a
 third writer can't interleave between the version check and the field
-write — **when `RepositoryModule.forRoot()` is imported**, since it's the
-one that provides `TransactionScope`. If `TypeOrmRepositoryModule` is used
-directly without it (see [Module Registration](#module-registration)) and
-the caller isn't already inside their own active transaction, `update`/
-`replace` on a versioned entity throws immediately — a `RuntimeException`
-whose message names the entity and points at `RepositoryModule.forRoot()` —
-rather than silently running the guard and the write as two separate,
-unprotected statements. This is a configuration error surfaced at call
-time, not a runtime conflict; it is not an `OptimisticLockException`.
+write.
 
 A version value supplied by the caller in `data` is always ignored — only
 the version read from the `entity` argument, and the row's own
@@ -279,27 +251,72 @@ already-soft-deleted row 404s first.)
 `RepositoryAdapter` itself, so this driver has no separate opt-out logic to
 maintain. See [nestjs-repository's Soft-Deleted Immutability
 section](../nestjs-repository/README.md#soft-deleted-immutability) for the
-`{ force: true }` escape hatch and the `softDelete()` no-op behavior.
+`softDelete()` no-op behavior.
 
 This guard depends only on the delete-date column, so it applies to entities
 with no version column too.
 
-### Relation Cascades and Row Scope
+### Eager Relations
 
-`doCreate`/`doUpdate`/`doReplace` use `repository.save()`, which honours
-TypeORM's `cascade` option on a relation. A cascaded write reaches the related
-entity's table **without going through that entity's repository**, so any
-row-scope resolver registered for it never runs, and the adapter's own
-pre-write checks only ever saw the entity you called.
+A relation declared with `eager: true` loads only for a repository registered
+with `allowEagerRelations: true` (see
+[What a result holds](../nestjs-repository/README.md#what-a-result-holds)).
+The rows its reads return then hold each eager relation, which may hold only its
+own columns: an eager relation nested inside another one throws. Without the
+opt-in, a row holds only the relations its read joined.
 
-Reproduced: with `@ManyToOne(() => Parent, { cascade: true })`, a scoped write
-on the child carrying `{ parent: { id: <other tenant's id>, ... } }` overwrote
-— and re-tenanted — that parent row, with no refusal.
+### TypeORM Features at Your Own Risk
 
-**Do not enable `cascade` on a relation of a row-scoped entity, or on a
-relation pointing at one.** Write each entity through its own repository so
-each resolver runs. This is a driver-level concern: the repository abstraction
-has no notion of cascading writes, so nothing above this layer can detect it.
+TypeORM behaviour you declare on an entity runs outside the repository's
+guarantees: row scope, write policy and hooks never see what it does.
+
+- **Entity listeners and subscribers** (`@BeforeInsert`, `@AfterLoad`,
+  `EntitySubscriberInterface`, …) run on every write and on every read that
+  returns rows. A value a listener sets reaches the database unchecked, and a
+  subscriber can write other tables without going through their repositories.
+  Don't add a property that is not a column: depending on the call, it is
+  dropped from the result or makes the call throw `RepositoryQueryException`.
+- **Write listeners** (`@BeforeInsert`, `@AfterUpdate`, …) receive an entity
+  the driver built without running its constructor, so they can't rely on
+  state the constructor sets, and reading an ES `#private` field throws.
+- **`cascade`** has nothing to act on. A write payload holds no relations (see
+  [Writing relations](../nestjs-repository/README.md#writing-relations)) and
+  only the entity's own columns reach TypeORM, so nothing cascades. `onDelete`
+  actions on a relation are the database's, and still apply.
+- **Closure-table, nested-set and materialized-path trees** (`@Tree`) are not
+  kept. The entity starts only with the `@TreeParent` key declared as a column
+  of its own, and a write sets that column. TypeORM finds a row's parent only
+  through the `@TreeParent` relation, though, which a repository write never
+  carries, so a new row is filed as a root (a nested set refuses a second
+  one) and a changed parent key leaves the tree as it was.
+
+### Joins and Foreign Key Constraints
+
+Joining a relation adds the related row to each result and never changes which
+rows come back or the total.
+
+The one exception is a required relation (`nullable: false`) declared with
+`createForeignKeyConstraints: false`: its key can point at a row that no longer
+exists, and joining it may then drop such rows from the result and the total.
+Keep the constraint, or treat the relation as your own risk.
+
+### Row Scope and Shared Tables
+
+A table can be registered once. Entities that read the same table, such as
+single-table inheritance children and their parent, can't both be registered,
+and a relation into any of them is checked like a relation into the registered
+one. A table is matched by its database and name, whichever data source reaches
+it and whatever schema it is in.
+
+That matching errs on the safe side: tables with the same name in two schemas,
+or in two databases with the same name on different servers, count as one.
+
+Two cases read a table without matching it, so give them a row scope yourself
+when the table is scoped:
+
+- a view entity over the table;
+- a SQLite file reached through two different paths (`./app.sqlite` and an
+  absolute path to the same file).
 
 ### Transaction Awareness
 
@@ -324,17 +341,30 @@ When a `PlainLiteralObject` context with an active `trx` is provided,
 | `gte` | `MoreThanOrEqual(value)` | Greater than or equal |
 | `lt` | `LessThan(value)` | Less than |
 | `lte` | `LessThanOrEqual(value)` | Less than or equal |
-| `contains` | `Like('%value%')` | Contains substring |
-| `ncontains` | `Not(Like('%value%'))` | Does not contain substring |
-| `starts` | `Like('value%')` | Starts with |
-| `nstarts` | `Not(Like('value%'))` | Does not start with |
-| `ends` | `Like('%value')` | Ends with |
-| `nends` | `Not(Like('%value'))` | Does not end with |
+| `contains` | `Raw(LIKE '%value%' ESCAPE '!')` | Contains substring |
+| `ncontains` | `Not(Raw(LIKE '%value%' ESCAPE '!'))` | Does not contain substring |
+| `starts` | `Raw(LIKE 'value%' ESCAPE '!')` | Starts with |
+| `nstarts` | `Not(Raw(LIKE 'value%' ESCAPE '!'))` | Does not start with |
+| `ends` | `Raw(LIKE '%value' ESCAPE '!')` | Ends with |
+| `nends` | `Not(Raw(LIKE '%value' ESCAPE '!'))` | Does not end with |
 | `in` | `In(values)` | In array |
 | `nin` | `Not(In(values))` | Not in array |
 | `null` | `IsNull()` | Is null |
 | `nnull` | `Not(IsNull())` | Is not null |
 | `between` | `Between(from, to)` | Between range |
+
+### Text Matching
+
+The text operators match your value as written: `Where.contains('code', '50%')`
+finds codes containing `50%`, and `_` matches only an underscore.
+
+Whether case matters is your database's decision:
+
+| Database | `Where.contains('name', 'ali')` matches `Alice` |
+| --- | --- |
+| PostgreSQL | No |
+| SQLite | Yes, for ASCII letters |
+| MySQL / MariaDB | Depends on the column's collation; yes with the default collations |
 
 ### Compound Operators
 
@@ -415,7 +445,7 @@ await tx.commit();
 ### TypeOrmTransactionFactory
 
 Factory for creating `TypeOrmTransaction` instances. Automatically registered
-with the `TransactionFactoryRegistry` when using `RepositoryModule.forFeature()`.
+with the `TransactionFactoryRegistry` by `RepositoryModule.forRoot()`.
 
 The transaction key follows the pattern `typeorm:<dataSourceName>` (e.g.,
 `typeorm:default`).
@@ -444,8 +474,8 @@ doesn't have.
 
 ### Automatic Transaction Integration
 
-When `TypeOrmRepositoryModule` is used via `RepositoryModule.forFeature()`,
-transaction factories are registered automatically. The `TypeOrmRepository`
+`RepositoryModule.forRoot()` registers a transaction factory for each data
+source your entities use. The `TypeOrmRepository`
 joins transactions from the context:
 
 ```ts
@@ -489,9 +519,6 @@ fine-grained hooks fire automatically.
 | `deleteMany` | `beforeDestroy` -> `beforeDeleteMany` | `afterDeleteMany` -> `afterDestroy` |
 | `softDelete` | `beforeTransition` -> `beforeSoftDelete` | `afterSoftDelete` -> `afterTransition` |
 | `restore` | `beforeTransition` -> `beforeRestore` | `afterRestore` -> `afterTransition` |
-
-Hooks are resolved via `HookResolverService` from `@concepta/nestjs-core`.
-The hook resolver is optional -- `TypeOrmRepository` works without it.
 
 ## Base Entities
 
@@ -554,11 +581,40 @@ Never take the `id` from the request; an id the application generates is
 fine. Two concurrent creates with the same request-supplied `id` can both
 pass `create`'s existence check, and the second can overwrite the first.
 
+To let each record be corrected only once (see
+[Correcting an append-only record](../nestjs-repository/README.md#correcting-an-append-only-record)),
+give `correctedId` a unique index and a self-referencing foreign key:
+
+```ts
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+
+@Entity()
+@Index(['correctedId'], { unique: true })
+export class StatementItem extends AppendOnlyPostgresEntity {
+  @Column({ type: 'uuid', nullable: true })
+  correctedId!: string | null;
+
+  @ManyToOne(() => StatementItem, { nullable: true })
+  @JoinColumn({ name: 'correctedId' })
+  corrected?: StatementItem | null;
+
+  @Column({ type: 'text', nullable: true })
+  reason!: string | null;
+
+  // amount, currency, …
+}
+```
+
+`NULL`s are distinct in a unique index on Postgres and SQLite, so originals
+coexist while a second correction of one record is refused.
+
 ## Exceptions
 
 | Exception | Package | Description |
 | --- | --- | --- |
 | `RepositoryQueryException` | `@concepta/nestjs-repository` | Repository query error (wraps original error) |
+| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` is the data source `type` (`postgres`, `better-sqlite3`); `context.code` is the database client's `code`, or its `errno` when it has no `code` |
 | `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
 | `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |

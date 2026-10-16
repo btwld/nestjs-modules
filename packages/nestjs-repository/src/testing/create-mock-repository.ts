@@ -21,6 +21,7 @@ export function createMockRepository<
     metadata: {
       name: 'MockEntity',
       type: class {} as never,
+      urn: 'urn:mock:MockEntity',
       columns: [],
       ...metadataOverrides,
     },
@@ -37,8 +38,5 @@ export function createMockRepository<
     deleteMany: vi.fn(),
     softDelete: vi.fn(),
     restore: vi.fn(),
-    transform: vi.fn(),
-    merge: vi.fn(),
-    prepare: vi.fn(),
   };
 }

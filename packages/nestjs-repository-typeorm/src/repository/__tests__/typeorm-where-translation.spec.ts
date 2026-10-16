@@ -8,7 +8,6 @@ import {
   IsNull,
   LessThan,
   LessThanOrEqual,
-  Like,
   MoreThan,
   MoreThanOrEqual,
   Not,
@@ -110,6 +109,9 @@ function createTestableRepo(): TestableTypeOrmRepository {
       relations: [],
     },
     target: TestEntityClass,
+    manager: {
+      dataSource: { options: { type: 'better-sqlite3' }, driver: {} },
+    },
   } as unknown as Repository<TestEntity>;
 
   return new TestableTypeOrmRepository(mockRepo, { entityKey: 'test-entity' });
@@ -123,7 +125,7 @@ describe('TypeOrmRepository WHERE clause translation', () => {
   });
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // toFindOperator — all 17 operator cases
+  // toFindOperator
   // ═════════════════════════════════════════════════════════════════════════════
 
   describe('toFindOperator', () => {
@@ -159,48 +161,6 @@ describe('TypeOrmRepository WHERE clause translation', () => {
     it('should translate LTE to LessThanOrEqual', () => {
       const result = repo.testToFindOperator(Where.lte<TestEntity>('age', 65));
       expect(result).toEqual(LessThanOrEqual(65));
-    });
-
-    it('should translate CONTAINS to Like(%value%)', () => {
-      const result = repo.testToFindOperator(
-        Where.contains<TestEntity>('firstName', 'oh'),
-      );
-      expect(result).toEqual(Like('%oh%'));
-    });
-
-    it('should translate NCONTAINS to Not(Like(%value%))', () => {
-      const result = repo.testToFindOperator(
-        Where.notContains<TestEntity>('firstName', 'oh'),
-      );
-      expect(result).toEqual(Not(Like('%oh%')));
-    });
-
-    it('should translate STARTS to Like(value%)', () => {
-      const result = repo.testToFindOperator(
-        Where.starts<TestEntity>('firstName', 'Jo'),
-      );
-      expect(result).toEqual(Like('Jo%'));
-    });
-
-    it('should translate NSTARTS to Not(Like(value%))', () => {
-      const result = repo.testToFindOperator(
-        Where.notStarts<TestEntity>('firstName', 'Jo'),
-      );
-      expect(result).toEqual(Not(Like('Jo%')));
-    });
-
-    it('should translate ENDS to Like(%value)', () => {
-      const result = repo.testToFindOperator(
-        Where.ends<TestEntity>('firstName', 'hn'),
-      );
-      expect(result).toEqual(Like('%hn'));
-    });
-
-    it('should translate NENDS to Not(Like(%value))', () => {
-      const result = repo.testToFindOperator(
-        Where.notEnds<TestEntity>('firstName', 'hn'),
-      );
-      expect(result).toEqual(Not(Like('%hn')));
     });
 
     it('should translate IN to In', () => {
@@ -333,12 +293,13 @@ describe('TypeOrmRepository WHERE clause translation', () => {
       expect(result).toEqual({});
     });
 
-    it('should skip compound nodes (non-conditions)', () => {
+    it('should throw for a compound node, rather than dropping its constraint', () => {
       const leaves: WhereClause[] = [
         Where.and(Where.eq<TestEntity>('firstName', 'John')),
       ];
-      const result = repo.testBranchToFindOptionsWhere(leaves);
-      expect(result).toEqual({});
+      expect(() => repo.testBranchToFindOptionsWhere(leaves)).toThrow(
+        RuntimeException,
+      );
     });
 
     it('should throw for a never leaf — unreachable via translateWhere, a defensive guard against a broken toDnf invariant silently widening to "no constraint"', () => {
@@ -449,28 +410,6 @@ describe('TypeOrmRepository WHERE clause translation', () => {
     it('should render Where.never() as neverWhere(), not an empty/undefined where', () => {
       expectNeverWhere(repo.testTranslateWhere(Where.never()));
     });
-
-    it('should render AND(x, never) as neverWhere() — never short-circuits the whole clause', () => {
-      const clause = Where.and(
-        Where.eq<TestEntity>('firstName', 'John'),
-        Where.never(),
-      );
-      expectNeverWhere(repo.testTranslateWhere(clause));
-    });
-
-    it('should drop a never branch out of an OR, keeping the satisfiable branch', () => {
-      const clause = Where.or(
-        Where.never(),
-        Where.eq<TestEntity>('firstName', 'John'),
-      );
-      expect(repo.testTranslateWhere(clause)).toEqual([
-        { firstName: Equal('John') },
-      ]);
-    });
-
-    it('should render an empty Where.or() as neverWhere()', () => {
-      expectNeverWhere(repo.testTranslateWhere(Where.or()));
-    });
   });
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -489,23 +428,6 @@ describe('TypeOrmRepository WHERE clause translation', () => {
     it('should translate a single join', () => {
       const joins: JoinClause[] = [{ relation: 'posts' }];
       expect(repo.testTranslateJoin(joins)).toEqual({ posts: true });
-    });
-
-    it('should translate an explicit LEFT join', () => {
-      const joins: JoinClause[] = [{ relation: 'posts', joinType: 'LEFT' }];
-      expect(repo.testTranslateJoin(joins)).toEqual({ posts: true });
-    });
-
-    it('should refuse an INNER join rather than silently widening it', () => {
-      // TypeORM's `relations` option is always a LEFT JOIN, so honouring this
-      // is impossible here. Returning LEFT anyway would hand back rows the
-      // caller asked to exclude — a wrong answer is worse than an error.
-      const joins: JoinClause[] = [{ relation: 'company', joinType: 'INNER' }];
-
-      expect(() => repo.testTranslateJoin(joins)).toThrow(/company/);
-      expect(() => repo.testTranslateJoin(joins)).toThrow(
-        /INNER joins are not supported/,
-      );
     });
 
     it('should translate multiple joins', () => {

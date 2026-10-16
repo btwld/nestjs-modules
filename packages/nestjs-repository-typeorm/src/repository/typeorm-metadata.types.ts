@@ -23,6 +23,16 @@ export interface TypeOrmColumnMetadata {
   readonly isPrimary: boolean;
   readonly isDeleteDate: boolean;
   readonly isVersion: boolean;
+  readonly relationMetadata?: { readonly propertyName: string };
+}
+
+/**
+ * Minimal shape of the table naming on TypeORM's EntityMetadata: `tableName`
+ * carries no schema, and `database` is set only where the entity names one.
+ */
+export interface TypeOrmTableMetadata {
+  readonly tableName: string;
+  readonly database?: string;
 }
 
 /**
@@ -33,7 +43,7 @@ export interface TypeOrmColumnMetadata {
 export interface TypeOrmInverseRelation {
   readonly joinColumns: readonly TypeOrmJoinColumnMetadata[];
   readonly inverseJoinColumns?: readonly TypeOrmJoinColumnMetadata[];
-  readonly junctionEntityMetadata?: { readonly name: string };
+  readonly junctionEntityMetadata?: TypeOrmTableMetadata;
 }
 
 /**
@@ -41,13 +51,16 @@ export interface TypeOrmInverseRelation {
  */
 export interface TypeOrmRelationMetadata {
   readonly propertyName: string;
-  readonly inverseEntityMetadata: { readonly name: string };
+  readonly inverseEntityMetadata: TypeOrmTableMetadata & {
+    readonly name: string;
+    readonly columns: readonly TypeOrmColumnMetadata[];
+  };
   readonly isOneToMany: boolean;
   readonly isManyToMany: boolean;
   readonly isManyToManyOwner: boolean;
   readonly isOwning: boolean;
   readonly joinColumns: readonly TypeOrmJoinColumnMetadata[];
   readonly inverseJoinColumns: readonly TypeOrmJoinColumnMetadata[];
-  readonly junctionEntityMetadata?: { readonly name: string };
+  readonly junctionEntityMetadata?: TypeOrmTableMetadata;
   readonly inverseRelation?: TypeOrmInverseRelation;
 }

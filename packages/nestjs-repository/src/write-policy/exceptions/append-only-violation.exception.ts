@@ -9,9 +9,8 @@ import {
  * Exception thrown when an operation would change a row on an entity declared
  * `append-only`.
  *
- * There is deliberately no `force` escape hatch, unlike the soft-delete
- * immutability guard. An escape hatch is the failure mode the declaration
- * exists to prevent: the value of "this row never changes" is that a reader
+ * There is deliberately no escape hatch. An escape hatch is the failure mode
+ * the declaration exists to prevent: the value of "this row never changes" is that a reader
  * can rely on it without auditing every call site. Data migration and
  * backfill run outside the repository layer, the same place direct
  * `@InjectRepository` writes do.

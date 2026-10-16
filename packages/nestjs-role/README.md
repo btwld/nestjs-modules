@@ -108,14 +108,17 @@ import { RoleModule } from '@concepta/nestjs-role';
 @Module({
   imports: [
     TypeOrmModule.forRoot({ /* ... */ }),
-    RepositoryModule.forRoot({}),
 
     // Register the repository entities
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: 'role', entity: RoleEntity },
-        { key: 'user-role', entity: UserRoleEntity },
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: 'role', entity: RoleEntity },
+            { key: 'user-role', entity: UserRoleEntity },
+          ],
+        },
       ],
     }),
 
@@ -134,8 +137,8 @@ export class AppModule {}
 
 Assignment rows carry an `assigneeId`, so in a multi-tenant deployment they are
 rows you will want scoped — while the role definitions themselves are usually
-shared. Both are declared on the same `RepositoryModule.forFeature()`
-registration above via `rowScope`: the assignment entity `scoped`, the role
+shared. Both are declared on the same `RepositoryModule.forRoot()`
+entries above via `rowScope`: the assignment entity `scoped`, the role
 entity `public` with a reason. See the Row Scope section of
 `@concepta/nestjs-repository`.
 

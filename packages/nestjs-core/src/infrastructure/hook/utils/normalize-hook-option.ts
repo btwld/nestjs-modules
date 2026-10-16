@@ -9,8 +9,8 @@ import { type HookOption, type HookWithSpec } from '../hook.types.js';
  * `type` from the class-level `@Hook()` metadata.
  *
  * Reads the metadata directly rather than through Nest's `Reflector`, because
- * the registration paths include a static `forFeature()` with no injector to
- * resolve one from.
+ * the registration paths include static module registration with no injector
+ * to resolve one from.
  *
  * An undecorated class yields `type: undefined`, which no subsystem matches —
  * callers that can fail at startup should reject it there rather than let the

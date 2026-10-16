@@ -1,6 +1,6 @@
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import { RepositoryDuplicateKeyException } from '../exceptions/repository-duplicate-key.exception.js';
+import { RepositoryDuplicateUrnException } from '../exceptions/repository-duplicate-urn.exception.js';
 import { RepositoryRegistryItem } from '../interfaces/repository-registry-item.interface.js';
 
 export { RepositoryRegistryItem };
@@ -8,33 +8,20 @@ export { RepositoryRegistryItem };
 export const REPOSITORY_REGISTRY = Symbol('RepositoryRegistry');
 
 /**
- * Registry for tracking repository registrations.
+ * Registry of every repository `RepositoryModule.forRoot()` registered.
  *
- * Validates for duplicate keys at application bootstrap.
+ * Filled once, when the module is compiled. Refuses two registrations reading
+ * the same rows (the same URN).
  */
 @Injectable()
-export class RepositoryRegistryService implements OnApplicationBootstrap {
-  private readonly registry = new Map<
-    string,
-    Readonly<RepositoryRegistryItem>
-  >();
+export class RepositoryRegistryService {
   private readonly entityIndex = new Map<
     string,
     Readonly<RepositoryRegistryItem>
   >();
-  private readonly pending: Readonly<RepositoryRegistryItem>[] = [];
-
-  /**
-   * Queue an item for validation at bootstrap.
-   */
-  register(item: RepositoryRegistryItem): void {
-    this.pending.push(Object.freeze({ ...item }));
-  }
 
   /**
    * Look up a registry item by entity name.
-   *
-   * Available after application bootstrap.
    */
   getByEntityName(
     entityName: string,
@@ -43,33 +30,35 @@ export class RepositoryRegistryService implements OnApplicationBootstrap {
   }
 
   /**
-   * Validate all pending items at application bootstrap.
-   * Throws if duplicate keys are found.
+   * Register every repository at once. Keys are already distinct.
+   *
+   * Throws if two registrations read the same rows.
    */
-  onApplicationBootstrap(): void {
-    const duplicates: { key: string; existing: string; attempted: string }[] =
-      [];
+  register(items: RepositoryRegistryItem[]): void {
+    const firstByUrn = new Map<string, Readonly<RepositoryRegistryItem>>();
+    const duplicateUrns: {
+      urn: string;
+      existing: string;
+      attempted: string;
+    }[] = [];
 
-    for (const item of this.pending) {
-      const existing = this.registry.get(item.key);
+    for (const item of items.map((entry) => Object.freeze({ ...entry }))) {
+      this.entityIndex.set(item.entityName, item);
 
-      if (existing) {
-        duplicates.push({
-          key: item.key,
-          existing: existing.entityName,
-          attempted: item.entityName,
+      const sameRows = firstByUrn.get(item.urn);
+      if (sameRows) {
+        duplicateUrns.push({
+          urn: item.urn,
+          existing: sameRows.key,
+          attempted: item.key,
         });
       } else {
-        this.registry.set(item.key, item);
-        this.entityIndex.set(item.entityName, item);
+        firstByUrn.set(item.urn, item);
       }
     }
 
-    // Clear pending after processing
-    this.pending.length = 0;
-
-    if (duplicates.length > 0) {
-      throw new RepositoryDuplicateKeyException(duplicates);
+    if (duplicateUrns.length > 0) {
+      throw new RepositoryDuplicateUrnException(duplicateUrns);
     }
   }
 }

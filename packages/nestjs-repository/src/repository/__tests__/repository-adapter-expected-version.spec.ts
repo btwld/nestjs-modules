@@ -30,6 +30,7 @@ describe('RepositoryAdapter expected version', () => {
 
   beforeEach(() => {
     adapter = new TrackingTestRepositoryAdapter('test-entity');
+    adapter.bind({});
   });
 
   describe('update', () => {
@@ -75,13 +76,12 @@ describe('RepositoryAdapter expected version', () => {
     });
 
     it('should overwrite a caller-supplied versionGuard rather than honor it', async () => {
-      await adapter.update(
-        entityWithVersion(3),
-        { name: 'x' },
-        {
-          versionGuard: { column: 'version', value: 999 },
-        },
-      );
+      // Not a caller option, but nothing stops a caller passing one.
+      const options = {
+        ctx: {},
+        versionGuard: { column: 'version', value: 999 },
+      };
+      await adapter.update(entityWithVersion(3), { name: 'x' }, options);
 
       expect(adapter.lastUpdateOptions?.versionGuard).toEqual({
         column: 'version',
@@ -244,6 +244,7 @@ describe('RepositoryAdapter expected version', () => {
 
     beforeEach(() => {
       noVersionAdapter = new TestRepositoryAdapterNoVersion('test-entity');
+      noVersionAdapter.bind({});
     });
 
     it('should throw a usage RuntimeException when expectedVersion is supplied', async () => {
@@ -265,6 +266,7 @@ describe('RepositoryAdapter expected version', () => {
       const trackingNoVersion = new TrackingTestRepositoryAdapterNoVersion(
         'test-entity',
       );
+      trackingNoVersion.bind({});
 
       await trackingNoVersion.update(entityWithVersion(1), { name: 'x' });
       await trackingNoVersion.replace(entityWithVersion(1), { name: 'x' });

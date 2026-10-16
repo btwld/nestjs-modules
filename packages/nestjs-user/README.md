@@ -85,16 +85,18 @@ import {
 @Module({
   imports: [
     TypeOrmModule.forRoot({ /* ... */ }),
-    RepositoryModule.forRoot({}),
-    PasswordModule.forRoot({}),
-
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: 'user', entity: UserSqliteEntity },
-        { key: 'user-credentials', entity: UserCredentialSqliteEntity },
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: 'user', entity: UserSqliteEntity },
+            { key: 'user-credentials', entity: UserCredentialSqliteEntity },
+          ],
+        },
       ],
     }),
+    PasswordModule.forRoot({}),
 
     UserModule.forRoot({
       entities: {
@@ -122,8 +124,8 @@ export class AppModule {}
 
 Credential rows carry a `userId`, so in a deployment where they are
 owner-scoped they are rows you will want scoped. That is declared on the same
-`RepositoryModule.forFeature()` registration above via `rowScope` — see the Row
-Scope section of `@concepta/nestjs-repository`.
+`RepositoryModule.forRoot()` entry above via `rowScope` — see the Row Scope
+section of `@concepta/nestjs-repository`.
 
 ### register / registerAsync
 

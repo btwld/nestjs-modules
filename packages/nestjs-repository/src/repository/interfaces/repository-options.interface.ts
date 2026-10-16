@@ -37,6 +37,17 @@ export interface RepositoryFindOptions<
 }
 
 /**
+ * What a driver counts by: which rows match. `RepositoryAdapter.count` takes
+ * find options and hands its driver only these, since how rows are selected,
+ * sorted or paged does not change how many match.
+ */
+export interface RepositoryCountOptions extends RepositoryBaseOptions {
+  where?: WhereClause;
+  join?: JoinClause[];
+  withDeleted?: boolean;
+}
+
+/**
  * Options for create operations.
  */
 export interface RepositoryCreateOptions extends RepositoryBaseOptions {}
@@ -44,43 +55,19 @@ export interface RepositoryCreateOptions extends RepositoryBaseOptions {}
 /**
  * Options for update operations.
  */
-export interface RepositoryUpdateOptions<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
-> extends RepositoryBaseOptions {
-  /**
-   * Bypass the soft-deleted immutability guard, letting this write reach a
-   * currently soft-deleted row. Not exposed over HTTP — for server-side
-   * carve-outs only (e.g. pre-purge PII masking, admin data-integrity
-   * corrections).
-   */
-  force?: boolean;
-
+export interface RepositoryUpdateOptions extends RepositoryBaseOptions {
   /**
    * The version the caller believes this row is currently at. A mismatch
    * throws `OptimisticLockException`, preventing a lost update against a
    * row the caller last read before someone else changed it.
    */
   expectedVersion?: number;
-
-  /**
-   * Resolved by `RepositoryAdapter` — drivers consume this, callers never
-   * set it. Any caller-supplied value is overwritten.
-   */
-  versionGuard?: RepositoryVersionGuardInterface<Entity>;
 }
 
 /**
  * Options for upsert operations.
  */
-export interface RepositoryUpsertOptions extends RepositoryBaseOptions {
-  /**
-   * Bypass the soft-deleted immutability guard, letting this write reach a
-   * currently soft-deleted row. Not exposed over HTTP — for server-side
-   * carve-outs only (e.g. pre-purge PII masking, admin data-integrity
-   * corrections).
-   */
-  force?: boolean;
-}
+export interface RepositoryUpsertOptions extends RepositoryBaseOptions {}
 
 /**
  * Options for delete operations (including `deleteMany`).
@@ -92,37 +79,32 @@ export interface RepositoryDeleteOptions extends RepositoryBaseOptions {}
  * Not used by `deleteMany` — there is no single caller-held row for an
  * expected version to describe.
  */
-export interface RepositoryDeleteOneOptions<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
-> extends RepositoryDeleteOptions {
+export interface RepositoryDeleteOneOptions extends RepositoryDeleteOptions {
   /**
    * The version the caller believes this row is currently at. A mismatch
    * throws `OptimisticLockException`.
    */
   expectedVersion?: number;
-
-  /**
-   * Resolved by `RepositoryAdapter` — drivers consume this, callers never
-   * set it. Any caller-supplied value is overwritten.
-   */
-  versionGuard?: RepositoryVersionGuardInterface<Entity>;
 }
 
 /**
  * Options for restore operations.
  */
-export interface RepositoryRestoreOptions<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
-> extends RepositoryBaseOptions {
+export interface RepositoryRestoreOptions extends RepositoryBaseOptions {
   /**
    * The version the caller believes this row is currently at. A mismatch
    * throws `OptimisticLockException`.
    */
   expectedVersion?: number;
+}
 
-  /**
-   * Resolved by `RepositoryAdapter` — drivers consume this, callers never
-   * set it. Any caller-supplied value is overwritten.
-   */
+/**
+ * Added by `RepositoryAdapter` to the options it hands a driver for a write
+ * against a stored row. Never part of a caller's options.
+ */
+export interface RepositoryVersionGuardOptions<
+  Entity extends PlainLiteralObject = PlainLiteralObject,
+> {
+  /** The compare-and-swap the driver must execute; absent when none applies. */
   versionGuard?: RepositoryVersionGuardInterface<Entity>;
 }

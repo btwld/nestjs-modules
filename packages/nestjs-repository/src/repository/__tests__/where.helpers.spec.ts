@@ -5,6 +5,7 @@ import {
   isNullaryCondition,
   isArrayCondition,
   isPairCondition,
+  type WhereCondition,
 } from '../interfaces/where-clause.interface.js';
 import { WhereOperator, WhereCompoundOperator } from '../repository.types.js';
 import { Where } from '../where.helpers.js';
@@ -153,6 +154,18 @@ describe('Where', () => {
         operator: WhereOperator.NENDS,
         value: 'xyz',
       });
+    });
+  });
+
+  describe('text conditions', () => {
+    it('take only a string value (checked by the compiler)', () => {
+      const text: WhereCondition<TestEntity> = {
+        field: 'name',
+        operator: WhereOperator.CONTAINS,
+        // @ts-expect-error a text operator matches text, not a number
+        value: 5,
+      };
+      expect(text.operator).toBe(WhereOperator.CONTAINS);
     });
   });
 

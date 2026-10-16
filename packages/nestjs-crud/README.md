@@ -154,16 +154,10 @@ export const photoPaginatedSchema = withNamedComponent(
 ```ts
 import { Module } from '@nestjs/common';
 import { Operation } from '@concepta/nestjs-core';
-import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 import { CrudModule } from '@concepta/nestjs-crud';
 
 @Module({
   imports: [
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [{ key: 'photo', entity: PhotoEntity }],
-    }),
     CrudModule.forFeature<PhotoEntity>({
       crud: {
         controller: {
@@ -189,24 +183,43 @@ import { CrudModule } from '@concepta/nestjs-crud';
 export class PhotoModule {}
 ```
 
+`entity: 'photo'` is the repository key. `CrudModule.forFeature()` imports
+that repository on its own, so the adapter can use it — the default
+`CrudAdapter`, your own adapter class, or a provider you write that injects
+`getDynamicRepositoryToken('photo')`.
+
 ### App Module
+
+Register the entity once, in `RepositoryModule.forRoot()`:
 
 ```ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 import { CrudModule } from '@concepta/nestjs-crud';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({ /* ... */ }),
-    RepositoryModule.forRoot({}),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'photo', entity: PhotoEntity }],
+        },
+      ],
+    }),
     CrudModule.forRoot({}),
     PhotoModule,
   ],
 })
 export class AppModule {}
 ```
+
+If you build controllers with `ConfigurableCrudBuilder` and host its
+`providers` in your own module, import the repository there yourself:
+`RepositoryModule.forFeature(['photo'])`.
 
 ### Generated Endpoints
 
@@ -896,12 +909,20 @@ section](../nestjs-repository/README.md#soft-deleted-immutability).
 GET /photos?filter[0]=status||$eq||active&filter[1]=views||$gt||100
 ```
 
-### Relation Filters
+### Relation Filters and Sorts
 
-Use dot notation to filter by related entity fields:
+Use dot notation to filter or sort by related entity fields:
 
 ```text
 GET /photos?filter=author.name||$eq||Alice
+GET /photos?sort=author.name,ASC
+```
+
+The route must join the relation with `@CrudJoin`; a filter or sort on a
+relation it doesn't join is refused with `400`:
+
+```ts
+@CrudJoin([{ relation: 'author' }])
 ```
 
 ## Paginated Response
@@ -1279,15 +1300,19 @@ export class AuditHook {
 ### Registering Hooks
 
 Prefer registering a repository hook on its entity, in
-`RepositoryModule.forFeature`:
+`RepositoryModule.forRoot`:
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
 import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
-RepositoryModule.forFeature({
-  module: TypeOrmRepositoryModule,
-  entities: [{ key: 'photo', entity: Photo, hooks: [AuditHook] }],
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [{ key: 'photo', entity: Photo, hooks: [AuditHook] }],
+    },
+  ],
 });
 ```
 

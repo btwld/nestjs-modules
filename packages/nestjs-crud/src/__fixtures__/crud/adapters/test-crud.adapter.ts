@@ -6,6 +6,7 @@ import { CrudAdapter } from '../../../infrastructure/adapters/crud.adapter.js';
 import { CrudContextOptionsInterface } from '../../../infrastructure/interceptors/interfaces/crud-context-options.interface.js';
 import { CrudContextInterface } from '../../../infrastructure/interceptors/interfaces/crud-context.interface.js';
 import { CrudParsedQueryInterface } from '../../../infrastructure/request/interfaces/crud-parsed-query.interface.js';
+import { CrudQueryOptionsInterface } from '../../../infrastructure/request/interfaces/crud-query-options.interface.js';
 
 @Injectable()
 export class TestCrudAdapter<
@@ -28,5 +29,12 @@ export class TestCrudAdapter<
 
   exposedValidateWhereFields(clause: WhereClause | undefined): void {
     return this.validateWhereFields(clause);
+  }
+
+  exposedGetSelectFields(
+    query: CrudParsedQueryInterface<T>,
+    options: CrudQueryOptionsInterface<T>,
+  ): (keyof T)[] {
+    return this.getSelectFields(query, options);
   }
 }

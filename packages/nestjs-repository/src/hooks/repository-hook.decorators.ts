@@ -198,14 +198,14 @@ export const AfterWrite = createHookMethodDecorator(
 );
 
 /**
- * Runs before any lifecycle transition (softRemove, restore).
+ * Runs before any lifecycle transition (softDelete, restore).
  */
 export const BeforeTransition = createHookMethodDecorator(
   RepoHookMethodKey.BEFORE_TRANSITION,
 );
 
 /**
- * Runs after any lifecycle transition (softRemove, restore).
+ * Runs after any lifecycle transition (softDelete, restore).
  */
 export const AfterTransition = createHookMethodDecorator(
   RepoHookMethodKey.AFTER_TRANSITION,

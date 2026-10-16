@@ -26,10 +26,11 @@ class RecordingAdapter extends RepositoryAdapter<Row> {
 
   constructor(writePolicy?: WritePolicyRegistration, versioned = false) {
     super('items');
-    if (writePolicy) this.setWritePolicy(writePolicy);
+    this.bind({ writePolicy });
     this.metadata = {
       name: 'Item',
       type: EntityClass as Type<Row>,
+      urn: 'urn:memory:Item',
       columns: [
         { name: 'id', isPrimary: true, isVersion: false, isRemoveDate: false },
         {
@@ -37,6 +38,12 @@ class RecordingAdapter extends RepositoryAdapter<Row> {
           isPrimary: false,
           isVersion: false,
           isRemoveDate: false,
+        },
+        {
+          name: 'dateDeleted',
+          isPrimary: false,
+          isVersion: false,
+          isRemoveDate: true,
         },
         ...(versioned
           ? [
@@ -71,11 +78,11 @@ class RecordingAdapter extends RepositoryAdapter<Row> {
   }
   protected async doCreate(entity: DeepPartial<Row>): Promise<Row> {
     this.reached.push('create');
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doCreateMany(entities: DeepPartial<Row>[]): Promise<Row[]> {
     this.reached.push('createMany');
-    return entities.map((entity) => this.transform(entity));
+    return entities.map((entity) => this.toRow(entity));
   }
   protected async doUpdate(entity: Row): Promise<Row> {
     this.reached.push('update');
@@ -83,7 +90,7 @@ class RecordingAdapter extends RepositoryAdapter<Row> {
   }
   protected async doUpsert(entity: DeepPartial<Row>): Promise<Row> {
     this.reached.push('upsert');
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doReplace(entity: Row): Promise<Row> {
     this.reached.push('replace');
@@ -105,11 +112,8 @@ class RecordingAdapter extends RepositoryAdapter<Row> {
     this.reached.push('restore');
     return entity;
   }
-  transform(entityLike: DeepPartial<Row>): Row {
+  toRow(entityLike: DeepPartial<Row>): Row {
     return { id: '', name: '', ...entityLike };
-  }
-  merge(mergeInto: Row): Row {
-    return mergeInto;
   }
 }
 
@@ -269,28 +273,6 @@ describe('append-only guard', () => {
       });
 
       expect(adapter.reached).toEqual(['find', 'findOne']);
-    });
-
-    /**
-     * There is deliberately no `force` option, unlike the soft-delete
-     * immutability guard — an escape hatch is the failure mode the
-     * declaration exists to prevent.
-     */
-    it('cannot be forced', async () => {
-      const adapter = new RecordingAdapter(appendOnly);
-
-      // `force` is the soft-delete guard's escape hatch; it has no effect on
-      // this one. (Only the operations that carry it are exercised here —
-      // `delete` does not accept it at all.)
-      await expect(
-        adapter.update(row, { name: 'changed' }, { force: true }),
-      ).rejects.toThrow(AppendOnlyViolationException);
-      await expect(
-        adapter.replace(row, { name: 'changed' }, { force: true }),
-      ).rejects.toThrow(AppendOnlyViolationException);
-      await expect(
-        adapter.upsert({ id: 'a', name: 'changed' }, { force: true }),
-      ).rejects.toThrow(AppendOnlyViolationException);
     });
   });
 

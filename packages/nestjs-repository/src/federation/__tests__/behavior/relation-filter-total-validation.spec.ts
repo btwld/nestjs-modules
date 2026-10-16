@@ -112,33 +112,6 @@ describe('FederationOrchestrator - relation filter total accuracy', () => {
     expect(total).toBe(1);
   });
 
-  it('should not throw for a plain INNER JOIN (no user filter) on a many-cardinality relation', async () => {
-    // The auto-injected NOT_NULL for INNER JOIN is structural, not a
-    // user-specified filter — it alone shouldn't demand distinctFilter.
-    const relation = mockOneToManyRelation('posts', 'TestRelation', {
-      on: { from: 'id', to: 'rootId' },
-    });
-    const rootRepo = mockTestRepo<TestRoot>('TestRoot', {
-      relations: [relation],
-    });
-    const peerRepo = mockTestRepo<TestRelation>('TestRelation');
-    const { orchestrator } = mockOrchestrator({ TestRelation: peerRepo });
-
-    peerRepo.findAndCount.mockResolvedValue([
-      [{ id: 1, rootId: 10 }] as TestRelation[],
-      1,
-    ]);
-    rootRepo.findAndCount.mockResolvedValue([[{ id: 10, name: 'Root 10' }], 1]);
-
-    await expect(
-      orchestrator.findAndCount(rootRepo, {
-        join: [{ relation: 'posts', joinType: 'INNER' }],
-        take: 10,
-        skip: 0,
-      }),
-    ).resolves.toBeDefined();
-  });
-
   it('should not throw when filtering a one-cardinality relation without distinctFilter', async () => {
     const relation = mockOneToOneRelation('profile', 'TestRelation', {
       on: { from: 'id', to: 'rootId' },

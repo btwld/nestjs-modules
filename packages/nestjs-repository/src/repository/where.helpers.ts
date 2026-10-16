@@ -10,6 +10,7 @@ import {
   type WhereConditionNullary,
   type WhereConditionPair,
   type WhereConditionScalar,
+  type WhereConditionText,
   type WhereNever,
 } from './interfaces/where-clause.interface.js';
 import {
@@ -86,45 +87,51 @@ export class Where<Entity extends PlainLiteralObject = PlainLiteralObject> {
     return { field, operator: WhereOperator.LTE, value };
   }
 
+  /** `field` contains `value`, matched literally. */
   static contains<E extends PlainLiteralObject = PlainLiteralObject>(
     field: EntityColumn<E>,
     value: string,
-  ): WhereConditionScalar<E> {
+  ): WhereConditionText<E> {
     return { field, operator: WhereOperator.CONTAINS, value };
   }
 
+  /** `field` does not contain `value`, matched literally. */
   static notContains<E extends PlainLiteralObject = PlainLiteralObject>(
     field: EntityColumn<E>,
     value: string,
-  ): WhereConditionScalar<E> {
+  ): WhereConditionText<E> {
     return { field, operator: WhereOperator.NCONTAINS, value };
   }
 
+  /** `field` starts with `value`, matched literally. */
   static starts<E extends PlainLiteralObject = PlainLiteralObject>(
     field: EntityColumn<E>,
     value: string,
-  ): WhereConditionScalar<E> {
+  ): WhereConditionText<E> {
     return { field, operator: WhereOperator.STARTS, value };
   }
 
+  /** `field` does not start with `value`, matched literally. */
   static notStarts<E extends PlainLiteralObject = PlainLiteralObject>(
     field: EntityColumn<E>,
     value: string,
-  ): WhereConditionScalar<E> {
+  ): WhereConditionText<E> {
     return { field, operator: WhereOperator.NSTARTS, value };
   }
 
+  /** `field` ends with `value`, matched literally. */
   static ends<E extends PlainLiteralObject = PlainLiteralObject>(
     field: EntityColumn<E>,
     value: string,
-  ): WhereConditionScalar<E> {
+  ): WhereConditionText<E> {
     return { field, operator: WhereOperator.ENDS, value };
   }
 
+  /** `field` does not end with `value`, matched literally. */
   static notEnds<E extends PlainLiteralObject = PlainLiteralObject>(
     field: EntityColumn<E>,
     value: string,
-  ): WhereConditionScalar<E> {
+  ): WhereConditionText<E> {
     return { field, operator: WhereOperator.NENDS, value };
   }
 
@@ -305,42 +312,39 @@ export class Where<Entity extends PlainLiteralObject = PlainLiteralObject> {
   contains(
     field: EntityColumn<Entity>,
     value: string,
-  ): WhereConditionScalar<Entity> {
+  ): WhereConditionText<Entity> {
     return Where.contains(field, value);
   }
 
   notContains(
     field: EntityColumn<Entity>,
     value: string,
-  ): WhereConditionScalar<Entity> {
+  ): WhereConditionText<Entity> {
     return Where.notContains(field, value);
   }
 
   starts(
     field: EntityColumn<Entity>,
     value: string,
-  ): WhereConditionScalar<Entity> {
+  ): WhereConditionText<Entity> {
     return Where.starts(field, value);
   }
 
   notStarts(
     field: EntityColumn<Entity>,
     value: string,
-  ): WhereConditionScalar<Entity> {
+  ): WhereConditionText<Entity> {
     return Where.notStarts(field, value);
   }
 
-  ends(
-    field: EntityColumn<Entity>,
-    value: string,
-  ): WhereConditionScalar<Entity> {
+  ends(field: EntityColumn<Entity>, value: string): WhereConditionText<Entity> {
     return Where.ends(field, value);
   }
 
   notEnds(
     field: EntityColumn<Entity>,
     value: string,
-  ): WhereConditionScalar<Entity> {
+  ): WhereConditionText<Entity> {
     return Where.notEnds(field, value);
   }
 

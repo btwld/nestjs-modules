@@ -3,18 +3,13 @@ import { type Type, type PlainLiteralObject } from '@nestjs/common';
 import { type HookOption } from '@concepta/nestjs-core';
 
 import { type WhereCondition } from '../repository/interfaces/where-clause.interface.js';
-import { type RelationAction } from '../repository/repository.types.js';
 import { type RowScopeRegistration } from '../row-scope/interfaces/row-scope-registration.interface.js';
 import { type WritePolicyRegistration } from '../write-policy/interfaces/write-policy-registration.interface.js';
 
 /**
- * Per-relation configuration for forFeature() registration.
- *
- * Supports onDelete/onUpdate behavior and federation settings.
+ * Per-relation federation settings for forRoot() registration.
  */
-export interface RelationActionConfig {
-  onDelete?: Extract<RelationAction, 'delegate'>;
-  onUpdate?: Extract<RelationAction, 'delegate'>;
+export interface RelationConfig {
   /** Use separate queries instead of DB joins for this relation. */
   federated?: boolean;
   /**
@@ -26,7 +21,8 @@ export interface RelationActionConfig {
 
 /**
  * Options for registering a repository provider.
- * Repository modules may extend this with driver-specific options.
+ * Drivers extend this with their own options; `RepositoryModule.forRoot()`
+ * checks each entity against its driver's.
  */
 export interface RepositoryProviderOptions<
   Entity extends PlainLiteralObject = PlainLiteralObject,
@@ -43,10 +39,10 @@ export interface RepositoryProviderOptions<
   entity: Type<Entity>;
 
   /**
-   * Per-relation action config (onDelete / onUpdate).
+   * Per-relation federation settings.
    * Keyed by relation property name on the entity.
    */
-  relations?: Record<string, RelationActionConfig>;
+  relations?: Record<string, RelationConfig>;
 
   /**
    * Row scope declaration for this entity.
@@ -68,6 +64,16 @@ export interface RepositoryProviderOptions<
   writePolicy?: WritePolicyRegistration;
 
   /**
+   * Accept results holding declared relations nobody joined.
+   *
+   * By default a result holds this entity's own columns and the relations its
+   * read joins, and anything else throws. Set this when the entity loads
+   * relations on its own — eagerly — and callers expect them on every row.
+   * Any other unexpected property still throws.
+   */
+  allowEagerRelations?: boolean;
+
+  /**
    * Repository hooks that apply to this entity, whatever reaches it.
    *
    * Registering here is what makes a hook run on a call this entity's own
@@ -86,14 +92,4 @@ export interface RepositoryProviderOptions<
    * checked at startup.
    */
   hooks?: HookOption[];
-
-  /**
-   * Additional driver-specific options.
-   *
-   * Note that this index signature means a misspelled option — `hook` for
-   * `hooks` — type-checks and is then silently ignored. Nothing catches it:
-   * the declaration never arrives, so the entity looks like one that wanted
-   * no hooks.
-   */
-  [key: string]: unknown;
 }

@@ -124,6 +124,7 @@ describe('#crud', () => {
               metadata: {
                 name: 'TestModel',
                 type: TestModel,
+                urn: 'urn:mock:TestModel',
                 columns: [
                   {
                     name: 'id',
@@ -158,9 +159,6 @@ describe('#crud', () => {
               deleteMany: vi.fn(),
               softDelete: vi.fn(),
               restore: vi.fn(),
-              transform: vi.fn(),
-              merge: vi.fn(),
-              prepare: vi.fn(),
             };
             return new TestCrudAdapter(mockRepo);
           },

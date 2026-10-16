@@ -72,24 +72,27 @@ const USER_OTP_ENTITY_KEY = 'user-otp';
       ],
     }),
     CqrsModule.forRoot(),
-    RepositoryModule.forRoot({}),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            {
+              key: INVITATION_MODULE_DEFAULT_ENTITY_KEY,
+              entity: InvitationEntityFixture,
+            },
+            { key: USER_ENTITY_KEY, entity: UserEntityFixture },
+            {
+              key: USER_CREDENTIALS_ENTITY_KEY,
+              entity: UserCredentialEntityFixture,
+            },
+            { key: USER_OTP_ENTITY_KEY, entity: UserOtpEntityFixture },
+          ],
+        },
+      ],
+    }),
     CrudModule.forRoot({
       defaultResolver: CrudCqrsResolver,
-    }),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        {
-          key: INVITATION_MODULE_DEFAULT_ENTITY_KEY,
-          entity: InvitationEntityFixture,
-        },
-        { key: USER_ENTITY_KEY, entity: UserEntityFixture },
-        {
-          key: USER_CREDENTIALS_ENTITY_KEY,
-          entity: UserCredentialEntityFixture,
-        },
-        { key: USER_OTP_ENTITY_KEY, entity: UserOtpEntityFixture },
-      ],
     }),
     PasswordModule.forRoot({}),
     OtpModule.forRoot({}),

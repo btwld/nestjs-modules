@@ -2,6 +2,7 @@ import { Column, Entity } from 'typeorm';
 
 import {
   BadRequestException,
+  HttpStatus,
   NotFoundException,
   PlainLiteralObject,
 } from '@nestjs/common';
@@ -11,10 +12,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActionEnum, AppContextHost, Operation } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
-  OptimisticLockException,
   RepoCtx,
   RepositoryModule,
-  SoftDeletedImmutableException,
   Where,
 } from '@concepta/nestjs-repository';
 import {
@@ -79,10 +78,13 @@ describe('CrudAdapter (e2e)', () => {
           synchronize: true,
           entities: [TestEntityFixture],
         }),
-        RepositoryModule.forRoot({}),
-        RepositoryModule.forFeature({
-          module: TypeOrmRepositoryModule,
-          entities: [{ key: ENTITY_TOKEN, entity: TestEntityFixture }],
+        RepositoryModule.forRoot({
+          drivers: [
+            {
+              driver: TypeOrmRepositoryModule,
+              entities: [{ key: ENTITY_TOKEN, entity: TestEntityFixture }],
+            },
+          ],
         }),
       ],
     }).compile();
@@ -880,7 +882,7 @@ describe('CrudAdapter (e2e)', () => {
           }),
           { firstName: 'Bob' },
         ),
-      ).rejects.toThrow(SoftDeletedImmutableException);
+      ).rejects.toMatchObject({ httpStatus: HttpStatus.CONFLICT });
     });
 
     it('should update when the precondition version matches', async () => {
@@ -901,7 +903,7 @@ describe('CrudAdapter (e2e)', () => {
       expect(result.firstName).toBe('Bob');
     });
 
-    it('should throw OptimisticLockException when the precondition version is stale', async () => {
+    it('should surface a conflict when the precondition version is stale', async () => {
       const entity = await seed({ firstName: 'Alice', lastName: 'Smith' });
 
       await expect(
@@ -916,7 +918,7 @@ describe('CrudAdapter (e2e)', () => {
           }),
           { firstName: 'Bob' },
         ),
-      ).rejects.toThrow(OptimisticLockException);
+      ).rejects.toMatchObject({ httpStatus: HttpStatus.CONFLICT });
     });
   });
 
@@ -1158,13 +1160,16 @@ describe('CrudAdapter relations (e2e)', () => {
           synchronize: true,
           entities: [CompanyEntity, UserEntity, ProjectEntity],
         }),
-        RepositoryModule.forRoot({}),
-        RepositoryModule.forFeature({
-          module: TypeOrmRepositoryModule,
-          entities: [
-            { key: COMPANY_TOKEN, entity: CompanyEntity },
-            { key: USER_TOKEN, entity: UserEntity },
-            { key: PROJECT_TOKEN, entity: ProjectEntity },
+        RepositoryModule.forRoot({
+          drivers: [
+            {
+              driver: TypeOrmRepositoryModule,
+              entities: [
+                { key: COMPANY_TOKEN, entity: CompanyEntity },
+                { key: USER_TOKEN, entity: UserEntity },
+                { key: PROJECT_TOKEN, entity: ProjectEntity },
+              ],
+            },
           ],
         }),
       ],
@@ -1222,7 +1227,7 @@ describe('CrudAdapter relations (e2e)', () => {
     return {
       options: {
         query: {
-          join: [{ relation: 'users', joinType: 'LEFT' }],
+          join: [{ relation: 'users' }],
         },
       },
     };
@@ -1232,7 +1237,7 @@ describe('CrudAdapter relations (e2e)', () => {
     return {
       options: {
         query: {
-          join: [{ relation: 'projects', joinType: 'LEFT' }],
+          join: [{ relation: 'projects' }],
         },
       },
     };
@@ -1242,10 +1247,7 @@ describe('CrudAdapter relations (e2e)', () => {
     return {
       options: {
         query: {
-          join: [
-            { relation: 'users', joinType: 'LEFT' },
-            { relation: 'projects', joinType: 'LEFT' },
-          ],
+          join: [{ relation: 'users' }, { relation: 'projects' }],
         },
       },
     };

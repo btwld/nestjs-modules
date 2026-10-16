@@ -141,11 +141,24 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 
 ### Synchronous
 
+Register your invitation entity in `RepositoryModule.forRoot()` under the key
+`invitation`. To use another key, pass it as `entities: { invitation: 'key' }`.
+
 ```ts
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 import { InvitationModule } from '@concepta/nestjs-invitation';
 
 @Module({
   imports: [
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'invitation', entity: InvitationEntity }],
+        },
+      ],
+    }),
     InvitationModule.register({
       settings: {
         otp: {

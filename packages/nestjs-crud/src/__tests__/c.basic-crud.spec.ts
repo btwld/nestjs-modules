@@ -157,13 +157,17 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
-              { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+          RepositoryModule.forRoot({
+            drivers: [
+              {
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+                ],
+              },
             ],
           }),
+          RepositoryModule.forFeature([CRUD_TEST_COMPANY_ENTITY_NAME]),
           CrudModule.forRoot({}),
         ],
         controllers: [CompaniesController0],
@@ -234,13 +238,17 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
-              { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+          RepositoryModule.forRoot({
+            drivers: [
+              {
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+                ],
+              },
             ],
           }),
+          RepositoryModule.forFeature([CRUD_TEST_COMPANY_ENTITY_NAME]),
           CrudModule.forRoot({}),
         ],
         controllers: [CompaniesController],
@@ -485,14 +493,21 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
           TypeOrmModule.forFeature([ProjectEntity, UserEntity]),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
-              { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
-              { key: CRUD_TEST_DEVICE_ENTITY_NAME, entity: DeviceEntity },
+          RepositoryModule.forRoot({
+            drivers: [
+              {
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+                  { key: CRUD_TEST_DEVICE_ENTITY_NAME, entity: DeviceEntity },
+                ],
+              },
             ],
           }),
+          RepositoryModule.forFeature([
+            CRUD_TEST_COMPANY_ENTITY_NAME,
+            CRUD_TEST_DEVICE_ENTITY_NAME,
+          ]),
           CrudModule.forRoot({}),
         ],
         controllers: [CompaniesController, DevicesController],
@@ -802,6 +817,7 @@ describe('#crud-typeorm', () => {
       });
       it('should permanently delete entity and return it', () => {
         return request(server).delete('/companies/8').expect(200).expect({
+          id: 8,
           name: 'Name8',
           domain: 'Domain8',
           description: null,
@@ -1014,13 +1030,17 @@ describe('#crud-typeorm', () => {
       const fixture = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
-              { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+          RepositoryModule.forRoot({
+            drivers: [
+              {
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
+                ],
+              },
             ],
           }),
+          RepositoryModule.forFeature([CRUD_TEST_COMPANY_ENTITY_NAME]),
           CrudModule.forRoot({}),
         ],
         controllers: [TxCompaniesController],

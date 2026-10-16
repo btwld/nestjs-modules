@@ -28,12 +28,23 @@ interface TenantScope extends PlainLiteralObject {
   role?: string;
 }
 
+/** Every column the specs use, optional so a row can carry any subset. */
+interface RowFixture {
+  id?: string | number;
+  tenantId?: string | number;
+  region?: string;
+  slug?: string;
+  locale?: string;
+  status?: string;
+  name?: string;
+}
+
 const MINE = { tenantId: 'acme' };
 
 const OWN_ROW = { id: 'row-1', tenantId: 'acme' };
 const FOREIGN_ROW = { id: 'row-2', tenantId: 'other' };
 
-const column = (name: string, isPrimary = false) => ({
+const column = (name: keyof RowFixture, isPrimary = false) => ({
   name,
   isPrimary,
   isRemoveDate: false,
@@ -47,30 +58,18 @@ const COMPOSITE_KEY = [
   column('tenantId'),
 ];
 
-const metadataOf = (
-  columns: ReturnType<typeof column>[],
-  relations?: { name: string; on: { from: string; to: string } }[],
-) => ({
+const metadataOf = (columns: ReturnType<typeof column>[]) => ({
   name: 'Order',
   type: class Order {},
+  urn: 'urn:memory:Order',
   columns,
-  relations: relations?.map((relation) => ({
-    ...relation,
-    targetEntity: 'Other',
-    cardinality: 'one' as const,
-  })),
 });
 
-/**
- * `transform` settles a relation object into the column it backs, as a driver
- * does. An identity mock would make every rule-4 case pass vacuously.
- */
 const repoWith = (
   columns: ReturnType<typeof column>[],
-  rows: PlainLiteralObject[] = [],
-  relations?: { name: string; on: { from: string; to: string } }[],
+  rows: RowFixture[] = [],
 ) => {
-  const metadata = metadataOf(columns, relations);
+  const metadata = metadataOf(columns);
 
   const findOne = vi.fn(async (options: PlainLiteralObject) => {
     const where = Reflect.get(options, 'where') ?? {};
@@ -79,58 +78,44 @@ const repoWith = (
       rows.find((row) =>
         conditions.every(
           (condition: PlainLiteralObject) =>
-            row[condition.field] === condition.value,
+            Reflect.get(row, condition.field) === condition.value,
         ),
       ) ?? null
     );
   });
 
-  const transform = vi.fn((entityLike: PlainLiteralObject) => {
-    const materialized: PlainLiteralObject = { ...entityLike };
-    for (const relation of metadata.relations ?? []) {
-      const related = materialized[relation.name];
-      if (typeof related === 'object' && related !== null) {
-        materialized[relation.on.from] = Reflect.get(related, relation.on.to);
-      }
-    }
-    return materialized;
-  });
-
-  const repo: RowScopeBaseRepository = { findOne, metadata, transform };
-  return { repo, findOne, transform };
+  const repo: RowScopeBaseRepository<RowFixture> = { findOne, metadata };
+  return { repo, findOne };
 };
 
-const repoOf = (...rows: PlainLiteralObject[]) =>
-  repoWith(SINGLE_KEY, rows, [
-    { name: 'tenant', on: { from: 'tenantId', to: 'id' } },
-  ]);
+const repoOf = (...rows: RowFixture[]) => repoWith(SINGLE_KEY, rows);
 
 /** The default: one column, one value, straight from the options. */
-class TestRowScope extends RowScopeBase<PlainLiteralObject, TenantScope> {
-  constructor(repo: RowScopeBaseRepository) {
+class TestRowScope extends RowScopeBase<RowFixture, TenantScope> {
+  constructor(repo: RowScopeBaseRepository<RowFixture>) {
     super(repo, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
   }
 }
 
 /** Returns whatever the test supplies, so any scope shape can be exercised. */
-class BoundRowScope extends RowScopeBase<PlainLiteralObject, TenantScope> {
+class BoundRowScope extends RowScopeBase<RowFixture, TenantScope> {
   constructor(
-    repo: RowScopeBaseRepository,
-    private readonly values: RowScopeValues<PlainLiteralObject>,
+    repo: RowScopeBaseRepository<RowFixture>,
+    private readonly values: RowScopeValues<RowFixture>,
   ) {
     super(repo, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
   }
 
-  protected override resolveScope(): RowScopeValues<PlainLiteralObject> {
+  protected override resolveScope(): RowScopeValues<RowFixture> {
     return this.values;
   }
 }
 
-const scopeOf = (...rows: PlainLiteralObject[]) =>
+const scopeOf = (...rows: RowFixture[]) =>
   new TestRowScope(repoOf(...rows).repo);
 
 const write = (
-  scope: RowScopeBase<PlainLiteralObject, TenantScope>,
+  scope: RowScopeBase<RowFixture, TenantScope>,
   overrides: Partial<RowScopeWriteParams<PlainLiteralObject, TenantScope>>,
 ) =>
   scope.scopeWrite({
@@ -143,7 +128,7 @@ const write = (
   });
 
 const read = (
-  scope: RowScopeBase<PlainLiteralObject, TenantScope>,
+  scope: RowScopeBase<RowFixture, TenantScope>,
   options: { where?: WhereClause } = {},
 ) =>
   scope.scopeQuery({
@@ -187,8 +172,8 @@ describe('RowScopeBase', () => {
     it('accepts a subclass that overrides resolveScope and configures nothing', () => {
       // Composite scope supplies its columns per request, so there is no
       // configuration to validate — and none should be demanded.
-      class Overriding extends RowScopeBase<PlainLiteralObject, TenantScope> {
-        protected override resolveScope(): RowScopeValues<PlainLiteralObject> {
+      class Overriding extends RowScopeBase<RowFixture, TenantScope> {
+        protected override resolveScope(): RowScopeValues<RowFixture> {
           return { tenantId: 'acme' };
         }
       }
@@ -197,10 +182,7 @@ describe('RowScopeBase', () => {
     });
 
     it('faults as a usage error when the default resolver has no configuration', async () => {
-      class Unconfigured extends RowScopeBase<
-        PlainLiteralObject,
-        TenantScope
-      > {}
+      class Unconfigured extends RowScopeBase<RowFixture, TenantScope> {}
       const scope = new Unconfigured(repoOf().repo, {});
 
       await expect(
@@ -370,31 +352,6 @@ describe('RowScopeBase', () => {
         await statusOf(() => write(scope, { target: { id: { nested: 1 } } })),
       ).toBe(HttpStatus.BAD_REQUEST);
     });
-
-    it('resolves a key supplied through a relation object', async () => {
-      // The key route that defeated three earlier guards: a driver prefers the
-      // relation over the column's own scalar.
-      // The Profile shape: the primary key is itself a join column.
-      const { repo, findOne } = repoWith(
-        [column('acctId', true), column('tenantId')],
-        [{ acctId: 'a1', tenantId: 'acme' }],
-        [{ name: 'acct', on: { from: 'acctId', to: 'id' } }],
-      );
-
-      await write(new TestRowScope(repo), { target: { acct: { id: 'a1' } } });
-
-      expect(findOne).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            operator: 'and',
-            conditions: [
-              { field: 'acctId', operator: 'eq', value: 'a1' },
-              { field: 'tenantId', operator: 'eq', value: 'acme' },
-            ],
-          },
-        }),
-      );
-    });
   });
 
   describe('rule 3 — create stamps, and names no existing row', () => {
@@ -428,16 +385,6 @@ describe('RowScopeBase', () => {
       expect(
         await statusOf(() =>
           write(scopeOf(OWN_ROW), { value: { tenantId: 'other' } }),
-        ),
-      ).toBe(HttpStatus.FORBIDDEN);
-    });
-
-    it('refuses a foreign scope supplied through a relation object', async () => {
-      // The scalar is absent, so a check reading only `value[column]` stamps
-      // 'acme' and the driver then writes 'other' from the relation.
-      expect(
-        await statusOf(() =>
-          write(scopeOf(OWN_ROW), { value: { tenant: { id: 'other' } } }),
         ),
       ).toBe(HttpStatus.FORBIDDEN);
     });

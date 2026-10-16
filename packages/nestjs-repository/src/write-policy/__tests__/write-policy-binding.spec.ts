@@ -1,6 +1,8 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
+import { type RepositoryModuleOptionsInterface } from '../../interfaces/repository-module-options.interface.js';
+import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
 import {
   type TestEntity,
   TestEntityClass,
@@ -41,11 +43,11 @@ class AppendableAdapter extends TestRepositoryAdapter {
 /**
  * A driver that knows nothing about write policy: it builds each adapter from
  * the key alone and never reads `writePolicy`. Whatever policy the adapter
- * ends up with can only have come from `RepositoryModule.forFeature()`.
+ * ends up with can only have come from `RepositoryModule.forRoot()`.
  */
 @Module({})
 class PolicyUnawareDriverModule {
-  static forFeature(entities: { key: string }[]): DynamicModule {
+  static register(entities: { key: string }[]): DynamicModule {
     return {
       module: PolicyUnawareDriverModule,
       providers: entities.map(({ key }) => ({
@@ -55,21 +57,19 @@ class PolicyUnawareDriverModule {
             ? new TestRepositoryAdapter(key)
             : new AppendableAdapter(key),
       })),
-      exports: entities.map(({ key }) => getDynamicRepositoryToken(key)),
     };
   }
 }
 
-function compile(
-  entities: Parameters<typeof RepositoryModule.forFeature>[0]['entities'],
-  rootOptions: Parameters<typeof RepositoryModule.forRoot>[0] = {},
+async function compile(
+  entities: RepositoryProviderOptions[],
+  moduleOptions: RepositoryModuleOptionsInterface = {},
 ): Promise<TestingModule> {
   return Test.createTestingModule({
     imports: [
-      RepositoryModule.forRoot(rootOptions),
-      RepositoryModule.forFeature({
-        module: PolicyUnawareDriverModule,
-        entities,
+      RepositoryModule.forRoot({
+        ...moduleOptions,
+        drivers: [{ driver: PolicyUnawareDriverModule, entities }],
       }),
     ],
   }).compile();
@@ -110,45 +110,48 @@ describe('write policy binding', () => {
   });
 
   it('refuses to start when an append-only entity has a soft-delete column', async () => {
-    const moduleRef = await compile([
-      { key: 'audited', entity: TestEntityClass, writePolicy: APPEND_ONLY },
-    ]);
-
-    await expect(moduleRef.init()).rejects.toThrow(WritePolicyBootException);
+    await expect(
+      compile([
+        { key: 'audited', entity: TestEntityClass, writePolicy: APPEND_ONLY },
+      ]),
+    ).rejects.toThrow(WritePolicyBootException);
   });
 
   it('refuses to start on an undeclared entity when declarations are required', async () => {
-    const moduleRef = await compile(
-      [{ key: 'items', entity: TestEntityClass }],
-      {
+    await expect(
+      compile([{ key: 'items', entity: TestEntityClass }], {
         requireWritePolicyDeclaration: true,
-      },
-    );
-
-    await expect(moduleRef.init()).rejects.toThrow(WritePolicyBootException);
+      }),
+    ).rejects.toThrow(WritePolicyBootException);
   });
 
-  it('binds a policy only once', () => {
-    const adapter = new AppendableAdapter('items');
-    adapter.setWritePolicy(APPEND_ONLY);
+  it('reads the requirement from forRootAsync settings', async () => {
+    const SETTINGS = 'SETTINGS';
 
-    expect(() => adapter.setWritePolicy({ access: 'mutable' })).toThrow(
-      WritePolicyBootException,
-    );
-    expect(adapter.writePolicyDeclaration).toEqual(APPEND_ONLY);
-  });
+    @Module({
+      providers: [{ provide: SETTINGS, useValue: { strict: true } }],
+      exports: [SETTINGS],
+    })
+    class SettingsModule {}
 
-  /**
-   * The usual cause is one key registered twice, both entries declaring a
-   * policy. The binding runs before the duplicate-key check, so this message
-   * is the one the developer sees.
-   */
-  it('points a double bind at a duplicate registration', () => {
-    const adapter = new AppendableAdapter('items');
-    adapter.setWritePolicy(APPEND_ONLY);
-
-    expect(() => adapter.setWritePolicy(APPEND_ONLY)).toThrow(
-      'Is "items" registered more than once in forFeature()?',
-    );
+    await expect(
+      Test.createTestingModule({
+        imports: [
+          RepositoryModule.forRootAsync({
+            imports: [SettingsModule],
+            inject: [SETTINGS],
+            useFactory: async (settings: { strict: boolean }) => ({
+              requireWritePolicyDeclaration: settings.strict,
+            }),
+            drivers: [
+              {
+                driver: PolicyUnawareDriverModule,
+                entities: [{ key: 'items', entity: TestEntityClass }],
+              },
+            ],
+          }),
+        ],
+      }).compile(),
+    ).rejects.toThrow(WritePolicyBootException);
   });
 });

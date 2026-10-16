@@ -17,11 +17,10 @@ import {
   TypeOrmModule,
 } from '@nestjs/typeorm';
 
-import { type HookOption, HookResolverService } from '@concepta/nestjs-core';
+import { HookResolverService } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
-  type RelationActionConfig,
-  type RowScopeRegistration,
+  type RelationConfig,
   TransactionScope,
 } from '@concepta/nestjs-repository';
 
@@ -95,10 +94,8 @@ export function createTypeOrmRepository<E extends PlainLiteralObject>(
   entityKey: string,
   dataSource?: string,
   hookResolver?: HookResolverService,
-  relationsConfig?: Record<string, RelationActionConfig>,
+  relationsConfig?: Record<string, RelationConfig>,
   transactionScope?: TransactionScope,
-  rowScope?: RowScopeRegistration,
-  hooks?: HookOption[],
 ): TypeOrmRepository<E> {
   return new TypeOrmRepository(repo, {
     entityKey,
@@ -106,8 +103,6 @@ export function createTypeOrmRepository<E extends PlainLiteralObject>(
     hookResolver,
     relationsConfig,
     transactionScope,
-    rowScope,
-    hooks,
   });
 }
 
@@ -122,9 +117,8 @@ export const OPTIONAL_HOOK_RESOLVER_INJECT = {
 
 /**
  * Injection token for optional TransactionScope.
- * `RepositoryModule.forRoot()` provides it globally, but repository
- * providers must still resolve cleanly for hand-wired/test usage that
- * doesn't import it.
+ * `RepositoryModule.forRoot()` provides it globally, but the driver's
+ * providers still resolve without it, so the driver can be tested alone.
  */
 export const OPTIONAL_TRANSACTION_SCOPE_INJECT = {
   token: TransactionScope,
@@ -137,8 +131,7 @@ export const OPTIONAL_TRANSACTION_SCOPE_INJECT = {
 export function createTypeOrmProvider<E extends PlainLiteralObject>(
   options: TypeOrmProviderOptionsInterface<E>,
 ): Provider {
-  const { key, entity, dataSource, factory, relations, rowScope, hooks } =
-    options;
+  const { key, entity, dataSource, factory, relations } = options;
   const dsName = resolveDataSourceName(dataSource);
   const dsToken = resolveTokenName(dsName);
 
@@ -162,8 +155,6 @@ export function createTypeOrmProvider<E extends PlainLiteralObject>(
           hookResolver,
           relations,
           transactionScope,
-          rowScope,
-          hooks,
         );
       },
     };
@@ -187,8 +178,6 @@ export function createTypeOrmProvider<E extends PlainLiteralObject>(
           hookResolver,
           relations,
           transactionScope,
-          rowScope,
-          hooks,
         );
       },
     };

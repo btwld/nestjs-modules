@@ -7,6 +7,8 @@ import {
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
+import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation-metadata.exception.js';
+import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 
 /**
  * Anti-drift check: every `RuntimeException` subclass in this package states
@@ -20,6 +22,16 @@ const CASES: {
   {
     name: 'TypeOrmEntityNameException',
     build: () => new TypeOrmEntityNameException(),
+    fault: 'usage',
+  },
+  {
+    name: 'TypeOrmRelationMetadataException',
+    build: () => new TypeOrmRelationMetadataException('posts', 'PostEntity'),
+    fault: 'usage',
+  },
+  {
+    name: 'TypeOrmUnsupportedDatabaseException',
+    build: () => new TypeOrmUnsupportedDatabaseException('Post', 'mongodb'),
     fault: 'usage',
   },
 ];

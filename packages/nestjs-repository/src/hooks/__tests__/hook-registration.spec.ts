@@ -60,6 +60,7 @@ class StampAdapter extends RepositoryAdapter<Row> {
   readonly metadata: RepositoryMetadataInterface<Row> = {
     name: 'Row',
     type: RowClass as Type<Row>,
+    urn: 'urn:memory:Row',
     columns: [
       { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
       {
@@ -82,7 +83,7 @@ class StampAdapter extends RepositoryAdapter<Row> {
 
   protected async doCreate(entity: DeepPartial<Row>): Promise<Row> {
     this.created.push(entity);
-    return this.transform({ id: 'row-1', owner: null, ...entity });
+    return this.toRow({ id: 'row-1', owner: null, ...entity });
   }
 
   protected async doFind(): Promise<Row[]> {
@@ -101,15 +102,13 @@ class StampAdapter extends RepositoryAdapter<Row> {
     entities: DeepPartial<Row>[],
     _options?: RepositoryCreateOptions,
   ): Promise<Row[]> {
-    return entities.map((e) =>
-      this.transform({ id: 'row-1', owner: null, ...e }),
-    );
+    return entities.map((e) => this.toRow({ id: 'row-1', owner: null, ...e }));
   }
   protected async doUpdate(entity: Row): Promise<Row> {
     return entity;
   }
   protected async doUpsert(entity: DeepPartial<Row>): Promise<Row> {
-    return this.transform({ id: 'row-1', owner: null, ...entity });
+    return this.toRow({ id: 'row-1', owner: null, ...entity });
   }
   protected async doReplace(entity: Row): Promise<Row> {
     return entity;
@@ -127,11 +126,8 @@ class StampAdapter extends RepositoryAdapter<Row> {
     return entity;
   }
 
-  transform(entityLike: DeepPartial<Row>): Row {
+  toRow(entityLike: DeepPartial<Row>): Row {
     return Object.assign(new RowClass(), entityLike) as Row;
-  }
-  merge(mergeIntoEntity: Row, ...entityLikes: DeepPartial<Row>[]): Row {
-    return Object.assign(mergeIntoEntity, ...entityLikes);
   }
 }
 
@@ -162,8 +158,8 @@ describe('repository hook registration', () => {
   });
 
   const bound = (...hooks: Type[]): StampAdapter => {
-    const adapter = new StampAdapter('rows', resolver, undefined, hooks);
-    adapter.setHooks(hooks);
+    const adapter = new StampAdapter('rows', resolver);
+    adapter.bind({ hooks });
     return adapter;
   };
 
@@ -189,6 +185,7 @@ describe('repository hook registration', () => {
 
   it('still runs a route-declared hook that was never registered', async () => {
     const adapter = new StampAdapter('rows', resolver);
+    adapter.bind({});
 
     await adapter.create({ id: 'row-1' }, { ctx: ctxWithHooks(StampHook) });
 
@@ -208,12 +205,9 @@ describe('repository hook registration', () => {
   // and running it twice is silent — a doubled stamp looks identical, a doubled
   // audit writes two rows.
   it('refuses the same class registered twice for one entity', () => {
-    const adapter = new StampAdapter('rows', resolver, undefined, [
-      SecondHook,
-      SecondHook,
-    ]);
+    const adapter = new StampAdapter('rows', resolver);
 
-    expect(() => adapter.setHooks([SecondHook, SecondHook])).toThrow(
+    expect(() => adapter.bind({ hooks: [SecondHook, SecondHook] })).toThrow(
       HookBootException,
     );
   });
@@ -290,71 +284,24 @@ describe('repository hook registration', () => {
     });
   });
 
-  describe('declared but unbound', () => {
-    // Without this the registration would reintroduce the silence it exists to
-    // remove: an entity whose binding was missed looks exactly like one that
-    // registered no hooks.
-    it('refuses the call rather than running as though there were no hooks', async () => {
-      const unbound = new StampAdapter('rows', resolver, undefined, [
-        StampHook,
-      ]);
-
-      await expect(unbound.create({ id: 'row-1' })).rejects.toThrow(
-        HookBootException,
-      );
-      expect(unbound.created).toEqual([]);
-    });
-
-    it('does not refuse an entity that declared no hooks', async () => {
-      const none = new StampAdapter('rows', resolver);
-
-      await expect(none.create({ id: 'row-1' })).resolves.toBeTruthy();
-    });
-
-    // This one returns before the permeator, so it needs the guard invoked
-    // explicitly — it was the single operation that stayed unrefused.
-    it('refuses a no-op softDelete of an already-deleted row', async () => {
-      const unbound = new StampAdapter('rows', resolver, undefined, [
-        StampHook,
-      ]);
-
-      await expect(
-        unbound.softDelete({
-          id: 'row-1',
-          owner: null,
-          dateDeleted: new Date(),
-        }),
-      ).rejects.toThrow(HookBootException);
-    });
-  });
-
   describe('declared with no hook resolver at all', () => {
     // `CoreModule` not imported, so there is nothing to run hooks with. The
     // declaration is the only reason we can tell this apart from an entity
     // that wants no hooks, and it is the one omission that would otherwise
     // reproduce exactly the silence this registration removes.
-    it('refuses rather than writing the row unhooked', async () => {
-      const noResolver = new StampAdapter('rows', undefined, undefined, [
-        StampHook,
-      ]);
-      noResolver.setHooks([StampHook]);
+    it('refuses to bind, so no row can be written unhooked', () => {
+      const noResolver = new StampAdapter('rows');
 
-      await expect(noResolver.create({ id: 'row-1' })).rejects.toThrow(
+      expect(() => noResolver.bind({ hooks: [StampHook] })).toThrow(
         HookBootException,
       );
-      expect(noResolver.created).toEqual([]);
     });
 
     it('still serves an entity that declared none', async () => {
       const noResolver = new StampAdapter('rows');
+      noResolver.bind({});
 
       await expect(noResolver.create({ id: 'row-1' })).resolves.toBeTruthy();
     });
-  });
-
-  it('binds once', () => {
-    const adapter = bound(StampHook);
-
-    expect(() => adapter.setHooks([SecondHook])).toThrow(HookBootException);
   });
 });

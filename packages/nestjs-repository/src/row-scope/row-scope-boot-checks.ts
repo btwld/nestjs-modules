@@ -1,5 +1,6 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
+import { type RepositoryMetadataInterface } from '../repository/interfaces/repository-metadata.interface.js';
 import { type RepositoryAdapter } from '../repository/repository-adapter.js';
 
 import { isRowScopeScoped } from './interfaces/row-scope-registration.interface.js';
@@ -7,25 +8,110 @@ import { isRowScopeScoped } from './interfaces/row-scope-registration.interface.
 type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
 
 /**
- * Check that every entity declared scoped has a resolver bound to it.
+ * Check that no entity without a row scope has a relation to one with a row
+ * scope.
  *
- * The adapter also refuses to serve calls while unbound, so this is the
- * earlier, louder half of the same guarantee — a misconfiguration surfaces at
- * startup rather than on the first request that happens to touch the entity.
+ * Reading such a relation would return related rows the caller is not allowed
+ * to see: the related entity's resolver never sees a relation read through
+ * another entity. Between two scoped entities the relation is allowed, but no
+ * read can join it, so its rows are only ever read through their own
+ * repository.
+ *
+ * Rows are matched by URN, not entity name, so this also covers a relation
+ * into rows a scoped entity reads under another name, and a many-to-many whose
+ * junction is scoped.
  */
-export function checkResolversBound(adapters: AnyAdapter[]): string[] {
-  return adapters.flatMap((adapter) => {
-    if (!isRowScopeScoped(adapter.rowScopeDeclaration)) return [];
-    if (adapter.hasRowScopeResolver) return [];
+export function checkRelationsIntoScoped(adapters: AnyAdapter[]): string[] {
+  const scopedUrns = scopedKeysByUrn(adapters);
 
-    return [
-      `"${adapter.entityKey}" declares a row scope but no resolver was bound ` +
-        'to it. Either the entity was registered by calling the driver module ' +
-        'directly rather than through RepositoryModule.forFeature(), or the ' +
-        'resolver is request-scoped, which leaves the binding provider ' +
-        'uninstantiated at bootstrap.',
-    ];
-  });
+  return adapters
+    .filter((adapter) => !isRowScopeScoped(adapter.rowScopeDeclaration))
+    .flatMap((adapter) =>
+      (adapter.metadata.relations ?? []).flatMap(
+        ({ name, targetEntity, targetUrn, through }) => {
+          if (scopedUrns.has(targetUrn)) {
+            return [
+              `"${adapter.entityKey}" has no row scope, but its "${name}" ` +
+                `relation points at ${targetEntity}, which does. Reading ` +
+                `"${name}" would return ${targetEntity} rows the caller is ` +
+                `not allowed to see. Give "${adapter.entityKey}" a row scope ` +
+                `in forRoot(), or remove "${name}" from the entity and ` +
+                `declare the relation on ${targetEntity}'s side only.`,
+            ];
+          }
+          const junctionKey = through && scopedUrns.get(through.urn);
+          if (junctionKey) {
+            return [
+              `"${adapter.entityKey}" has no row scope, but its "${name}" ` +
+                `relation reads through the rows of "${junctionKey}", which ` +
+                `has one. Reading "${name}" would follow links the caller is ` +
+                `not allowed to see. Give "${adapter.entityKey}" a row scope ` +
+                `in forRoot(), or remove "${name}" from the entity.`,
+            ];
+          }
+          return [];
+        },
+      ),
+    );
+}
+
+/**
+ * The relations in `metadata` whose rows, or whose junction rows, are among
+ * `scopedUrns`.
+ */
+export function findRelationsIntoScoped(
+  metadata: RepositoryMetadataInterface<PlainLiteralObject>,
+  scopedUrns: ReadonlySet<string>,
+): string[] {
+  return (metadata.relations ?? [])
+    .filter(
+      ({ targetUrn, through }) =>
+        scopedUrns.has(targetUrn) ||
+        (through !== undefined && scopedUrns.has(through.urn)),
+    )
+    .map(({ name }) => name);
+}
+
+/**
+ * Check that no entity allowing eager relations has a relation into rows with
+ * a row scope. An eager relation is loaded on every read, as a join no read
+ * asked for, so it would bypass that row scope.
+ */
+export function checkEagerRelationsIntoScoped(
+  adapters: AnyAdapter[],
+): string[] {
+  return adapters
+    .filter(
+      (adapter) =>
+        adapter.allowsEagerRelations && adapter.relationsIntoScoped.length > 0,
+    )
+    .map((adapter) => {
+      const targets = new Map(
+        (adapter.metadata.relations ?? []).map(({ name, targetEntity }) => [
+          name,
+          targetEntity,
+        ]),
+      );
+      const relations = adapter.relationsIntoScoped
+        .map((name) => `"${name}" (${targets.get(name)} rows)`)
+        .join(', ');
+
+      return (
+        `"${adapter.entityKey}" allows eager relations, but ${relations} ` +
+        'reach rows with a row scope, which an eager relation would bypass ' +
+        `on every read. Remove allowEagerRelations from ` +
+        `"${adapter.entityKey}" in forRoot().`
+      );
+    });
+}
+
+/** Each scoped URN, with the key of the entity scoping it. */
+function scopedKeysByUrn(adapters: AnyAdapter[]): Map<string, string> {
+  return new Map(
+    adapters
+      .filter((adapter) => isRowScopeScoped(adapter.rowScopeDeclaration))
+      .map((adapter) => [adapter.metadata.urn, adapter.entityKey]),
+  );
 }
 
 /**

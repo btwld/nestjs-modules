@@ -21,8 +21,6 @@ export type FederatedRelation =
      * because root IDs cannot be extracted from target data.
      */
     isOwning: boolean;
-    /** Copied from the JoinClause at build time. */
-    joinType: 'LEFT' | 'INNER';
   };
 
 /** Execution strategy type. */

@@ -213,6 +213,17 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
   ): (keyof Entity)[] {
     const allowed = this.getAllowedColumns(this.entityColumns, options);
 
+    // A field that is no column is refused, as a filter or sort on one is. A
+    // column the route does not allow is left out without saying so.
+    const unknown = (query.fields ?? []).find(
+      (field) => !this.isEntityColumn(String(field)),
+    );
+    if (unknown !== undefined) {
+      throw new BadRequestException(
+        `Invalid select field '${sanitizeForMessage(String(unknown))}' for entity '${this.entityName()}'`,
+      );
+    }
+
     const columns =
       query.fields && query.fields.length
         ? query.fields.filter((field) => allowed.some((col) => field === col))
@@ -235,16 +246,14 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
   prepareEntityBeforeSave(
     dto: DeepPartial<Entity>,
     context: CrudContextInterface<Entity>,
-  ): Entity | undefined {
+  ): DeepPartial<Entity> | undefined {
     if (!isObject(dto)) {
       return undefined;
     }
 
     // Route params always win over the body (e.g. a nested route's FK) —
     // matches update()/replace()'s merge below.
-    const merged = { ...dto, ...context.params };
-
-    return this.repository.prepare(merged);
+    return { ...dto, ...context.params };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -291,8 +300,8 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
       this.prepareEntityBeforeSave(one, context),
     );
 
-    const bulk: Entity[] = preparedBulk.filter(
-      (d): d is Entity => !isUndefined(d),
+    const bulk = preparedBulk.filter(
+      (d): d is DeepPartial<Entity> => !isUndefined(d),
     );
 
     if (!bulk.length) {
@@ -386,7 +395,7 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
    */
   async restore(context: CrudContextInterface<Entity>): Promise<Entity | null> {
     const { returnRestored = false } = context.options?.route ?? {};
-    const found = await this.getOneOrFail(context, true);
+    const found = await this.getOneOrFail(context, { withDeleted: true });
     const restored = await this.repository.restore(found, {
       ctx: context,
       expectedVersion: context.precondition?.version,
@@ -421,12 +430,18 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
    * @param context - The CRUD context interface.
    */
   async read(context: CrudContextInterface<Entity>): Promise<Entity> {
-    return this.getOneOrFail(context);
+    return this.getOneOrFail(context, { join: true });
   }
 
+  /**
+   * The one row the request names.
+   *
+   * Joins the route's relations only for a read: a write names its row by its
+   * own columns, and the repository refuses a stored row carrying relations.
+   */
   protected async getOneOrFail(
     context: CrudContextInterface<Entity>,
-    withDeleted = false,
+    { withDeleted = false, join = false } = {},
   ): Promise<Entity> {
     const { query } = context;
 
@@ -442,7 +457,7 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     const findOptions: RepositoryFindOneOptions<Entity> = {
       ctx: context,
       where,
-      join: context.options?.query?.join,
+      join: join ? context.options?.query?.join : undefined,
       withDeleted: includeDeleted || undefined,
     };
 

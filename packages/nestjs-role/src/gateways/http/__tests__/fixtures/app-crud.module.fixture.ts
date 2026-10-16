@@ -54,18 +54,21 @@ const USER_ROLE_ENTITY_KEY = 'userRole';
       entities: [RoleEntityFixture, UserRoleEntityFixture, UserEntityFixture],
     }),
     CqrsModule.forRoot(),
-    RepositoryModule.forRoot({}),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: ROLE_ENTITY_KEY, entity: RoleEntityFixture },
+            { key: USER_ROLE_ENTITY_KEY, entity: UserRoleEntityFixture },
+          ],
+        },
+      ],
+    }),
     CrudModule.forRoot({
       defaultResolver: CrudCqrsResolver,
     }),
     CoreModule.forRoot(),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: ROLE_ENTITY_KEY, entity: RoleEntityFixture },
-        { key: USER_ROLE_ENTITY_KEY, entity: UserRoleEntityFixture },
-      ],
-    }),
     RoleModule.forRoot({}),
     RoleModule.forFeature({
       roleEntityKey: ROLE_ENTITY_KEY,

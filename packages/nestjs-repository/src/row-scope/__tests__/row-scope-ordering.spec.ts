@@ -2,6 +2,10 @@ import { type PlainLiteralObject, type Type } from '@nestjs/common';
 
 import { AppContextHost, type DeepPartial } from '@concepta/nestjs-core';
 
+import {
+  columnFixture,
+  targetColumnsFixture,
+} from '../../__fixtures__/column-metadata.fixture.js';
 import { SoftDeletedImmutableException } from '../../exceptions/soft-deleted-immutable.exception.js';
 import { FederationOrchestrator } from '../../federation/federation-orchestrator.service.js';
 import { RepoHookMethodKey } from '../../hooks/repository-hook.decorators.js';
@@ -16,7 +20,6 @@ import {
 } from '../../repository/interfaces/repository-options.interface.js';
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import { RepositoryAdapter } from '../../repository/repository-adapter.js';
-import { RowScopeBootException } from '../exceptions/row-scope-boot.exception.js';
 import { RowScopeUnboundException } from '../exceptions/row-scope-unbound.exception.js';
 import { RowScopeCtx } from '../interfaces/row-scope-context.interface.js';
 import {
@@ -82,6 +85,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
   readonly metadata: RepositoryMetadataInterface<Row> = {
     name: 'Row',
     type: RowClass as Type<Row>,
+    urn: 'urn:memory:Row',
     columns: [
       { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
       { name: 'name', isPrimary: false, isRemoveDate: false, isVersion: false },
@@ -98,6 +102,11 @@ class TestAdapter extends RepositoryAdapter<Row> {
       {
         name: 'peer',
         targetEntity: 'Row',
+        targetUrn: 'urn:memory:Row',
+        targetColumns: [
+          ...targetColumnsFixture('id', 'name', 'peerId'),
+          columnFixture('dateDeleted', { isRemoveDate: true }),
+        ],
         cardinality: 'one',
         on: { from: 'peerId', to: 'id' },
       },
@@ -130,10 +139,10 @@ class TestAdapter extends RepositoryAdapter<Row> {
     return [[], 0];
   }
   protected async doCreate(entity: DeepPartial<Row>): Promise<Row> {
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doCreateMany(entities: DeepPartial<Row>[]): Promise<Row[]> {
-    return entities.map((e) => this.transform(e));
+    return entities.map((e) => this.toRow(e));
   }
   protected async doUpdate(entity: Row): Promise<Row> {
     return entity;
@@ -146,14 +155,14 @@ class TestAdapter extends RepositoryAdapter<Row> {
       operation: RowScopeOperation.UPSERT,
       payload: entity,
     });
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doReplace(entity: Row): Promise<Row> {
     return entity;
   }
   protected async doDelete(
     entity: Row,
-    _options?: RepositoryDeleteOneOptions<Row>,
+    _options?: RepositoryDeleteOneOptions,
   ): Promise<Row> {
     return entity;
   }
@@ -165,7 +174,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
   }
   protected async doSoftDelete(
     entity: Row,
-    _options?: RepositoryDeleteOneOptions<Row>,
+    _options?: RepositoryDeleteOneOptions,
   ): Promise<Row> {
     this.driverCalls.push({
       operation: RowScopeOperation.SOFT_DELETE,
@@ -175,16 +184,13 @@ class TestAdapter extends RepositoryAdapter<Row> {
   }
   protected async doRestore(
     entity: Row,
-    _options?: RepositoryRestoreOptions<Row>,
+    _options?: RepositoryRestoreOptions,
   ): Promise<Row> {
     return entity;
   }
 
-  transform(entityLike: DeepPartial<Row>): Row {
+  toRow(entityLike: DeepPartial<Row>): Row {
     return Object.assign(new RowClass(), entityLike) as Row;
-  }
-  merge(mergeIntoEntity: Row, ...entityLikes: DeepPartial<Row>[]): Row {
-    return Object.assign(mergeIntoEntity, ...entityLikes);
   }
 }
 
@@ -212,7 +218,8 @@ describe('row scope ordering guarantees', () => {
   beforeEach(() => {
     repo = new TestAdapter('rows');
     rowScope = new RecordingRowScope();
-    repo.setRowScope(rowScope);
+    repo.bind({ rowScope: scopedTo(RecordingRowScope) });
+    repo.setRowScopeResolver(rowScope);
   });
 
   describe('softDelete of an already soft-deleted row', () => {
@@ -227,9 +234,9 @@ describe('row scope ordering guarantees', () => {
       expect(repo.driverCalls).toEqual([]);
     });
 
-    it('strips relations before the resolver sees the row', async () => {
+    it('leaves relations out before the resolver sees the row', async () => {
       // This branch returns before the permeator, so it is the one write path
-      // that does its own stripping rather than inheriting it. A relation here
+      // that reduces the row itself rather than inheriting it. A relation here
       // would let the resolver identify a different row than the one the
       // caller named.
       await repo.softDelete({
@@ -250,7 +257,8 @@ describe('row scope ordering guarantees', () => {
         }
       }
       const refusingRepo = new TestAdapter('rows');
-      refusingRepo.setRowScope(new Refusing());
+      refusingRepo.bind({ rowScope: scopedTo(Refusing) });
+      refusingRepo.setRowScopeResolver(new Refusing());
 
       await expect(
         refusingRepo.softDelete(row({ dateDeleted: new Date() })),
@@ -280,7 +288,8 @@ describe('row scope ordering guarantees', () => {
         }
       }
       const narrowingRepo = new TestAdapter('rows');
-      narrowingRepo.setRowScope(new Narrowing());
+      narrowingRepo.bind({ rowScope: scopedTo(Narrowing) });
+      narrowingRepo.setRowScopeResolver(new Narrowing());
 
       await narrowingRepo.upsert({ id: 'row-1', name: 'next' });
 
@@ -341,6 +350,7 @@ describe('row scope ordering guarantees', () => {
       // An unscoped repository must not pay for a read it has no use for, so
       // only the soft-delete pre-read remains.
       const unbound = new TestAdapter('rows');
+      unbound.bind({});
       unbound.existing = row();
 
       await unbound.upsert({ id: 'row-1', name: 'next' });
@@ -360,7 +370,8 @@ describe('row scope ordering guarantees', () => {
         }
       }
       const substitutingRepo = new TestAdapter('rows');
-      substitutingRepo.setRowScope(new Substituting());
+      substitutingRepo.bind({ rowScope: scopedTo(Substituting) });
+      substitutingRepo.setRowScopeResolver(new Substituting());
 
       await substitutingRepo.find({ ctx: callerCtx() });
 
@@ -448,22 +459,16 @@ describe('row scope ordering guarantees', () => {
 
   describe('declared but unbound', () => {
     it('refuses reads rather than running them unscoped', async () => {
-      const declared = new TestAdapter(
-        'rows',
-        undefined,
-        scopedTo(PassthroughRowScope),
-      );
+      const declared = new TestAdapter('rows');
+      declared.bind({ rowScope: scopedTo(PassthroughRowScope) });
 
       await expect(declared.find({})).rejects.toThrow(RowScopeUnboundException);
       expect(declared.driverCalls).toEqual([]);
     });
 
     it('refuses writes rather than running them unscoped', async () => {
-      const declared = new TestAdapter(
-        'rows',
-        undefined,
-        scopedTo(PassthroughRowScope),
-      );
+      const declared = new TestAdapter('rows');
+      declared.bind({ rowScope: scopedTo(PassthroughRowScope) });
 
       await expect(declared.softDelete(row())).rejects.toThrow(
         RowScopeUnboundException,
@@ -471,20 +476,17 @@ describe('row scope ordering guarantees', () => {
     });
 
     it('serves normally once a resolver is bound', async () => {
-      const declared = new TestAdapter(
-        'rows',
-        undefined,
-        scopedTo(PassthroughRowScope),
-      );
-      declared.setRowScope(new PassthroughRowScope());
+      const declared = new TestAdapter('rows');
+      declared.bind({ rowScope: scopedTo(PassthroughRowScope) });
+      declared.setRowScopeResolver(new PassthroughRowScope());
 
       await expect(declared.find({})).resolves.toEqual([]);
     });
 
     it('does not refuse an entity declared public', async () => {
-      const publicRepo = new TestAdapter('rows', undefined, {
-        access: 'public',
-        reason: 'shared reference data',
+      const publicRepo = new TestAdapter('rows');
+      publicRepo.bind({
+        rowScope: { access: 'public', reason: 'shared reference data' },
       });
 
       await expect(publicRepo.find({})).resolves.toEqual([]);
@@ -516,7 +518,8 @@ describe('row scope ordering guarantees', () => {
 
     beforeEach(() => {
       rewriting = new CtxRewritingAdapter('rows');
-      rewriting.setRowScope(rowScope);
+      rewriting.bind({ rowScope: scopedTo(RecordingRowScope) });
+      rewriting.setRowScopeResolver(rowScope);
     });
 
     it('cannot change which principal the resolver enforces against', async () => {
@@ -553,7 +556,8 @@ describe('row scope ordering guarantees', () => {
         }
       }
       const writeRepo = new WriteHookAdapter('rows');
-      writeRepo.setRowScope(rowScope);
+      writeRepo.bind({ rowScope: scopedTo(RecordingRowScope) });
+      writeRepo.setRowScopeResolver(rowScope);
       const ctx = callerCtx('acme');
 
       await writeRepo.softDelete(row(), { ctx });
@@ -575,7 +579,8 @@ describe('row scope ordering guarantees', () => {
         }
       }
       const late = new LateScopeAdapter('rows');
-      late.setRowScope(rowScope);
+      late.bind({ rowScope: scopedTo(RecordingRowScope) });
+      late.setRowScopeResolver(rowScope);
 
       // Caller had no scope attached, so there is none — a hook cannot supply
       // one after the fact.
@@ -605,7 +610,8 @@ describe('row scope ordering guarantees', () => {
         }
       }
       const late = new LateScopeNoCtxAdapter('rows');
-      late.setRowScope(rowScope);
+      late.bind({ rowScope: scopedTo(RecordingRowScope) });
+      late.setRowScopeResolver(rowScope);
 
       await late.find();
 
@@ -618,11 +624,12 @@ describe('row scope ordering guarantees', () => {
   describe('federated findAndCount', () => {
     it('is scoped, because the orchestrator re-enters the public method', async () => {
       const federated = new TestAdapter('rows');
-      federated.setRowScope(rowScope);
       federated.metadata.relations = [
         {
           name: 'peers',
           targetEntity: 'Peer',
+          targetUrn: 'urn:memory:Peer',
+          targetColumns: targetColumnsFixture('id', 'rowId'),
           cardinality: 'many',
           on: { from: 'id', to: 'rowId' },
           federated: true,
@@ -636,26 +643,17 @@ describe('row scope ordering guarantees', () => {
         Object.create(FederationOrchestrator.prototype),
         { findAndCount: async () => federated.findAndCount({}) },
       );
-      federated.setFederationOrchestrator(orchestrator);
+      federated.bind({
+        rowScope: scopedTo(RecordingRowScope),
+        federationOrchestrator: orchestrator,
+      });
+      federated.setRowScopeResolver(rowScope);
 
       await federated.findAndCount({ join: [{ relation: 'peers' }] });
 
       expect(rowScope.queries.map((query) => query.operation)).toEqual([
         RowScopeOperation.FIND_AND_COUNT,
       ]);
-    });
-  });
-
-  describe('binding', () => {
-    it('refuses to replace a resolver that is already bound', () => {
-      expect(() => repo.setRowScope(new PassthroughRowScope())).toThrow(
-        RowScopeBootException,
-      );
-    });
-
-    it('reports whether a resolver is bound', () => {
-      expect(repo.hasRowScopeResolver).toBe(true);
-      expect(new TestAdapter('rows').hasRowScopeResolver).toBe(false);
     });
   });
 });

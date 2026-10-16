@@ -171,28 +171,26 @@ describe('CrudMetaview', () => {
 
     it('should resolve join from method decorator', () => {
       class TestController {
-        @CrudJoin([{ relation: 'profile', joinType: 'INNER' }])
+        @CrudJoin([{ relation: 'profile' }])
         testMethod() {}
       }
 
       const handler = TestController.prototype.testMethod;
       const result = metaview.getContextOptions(TestController, handler);
-      expect(result.query?.join).toEqual([
-        { relation: 'profile', joinType: 'INNER' },
-      ]);
+      expect(result.query?.join).toEqual([{ relation: 'profile' }]);
     });
 
     it('should merge class and method join with deduplication by relation', () => {
-      @CrudJoin([{ relation: 'posts', joinType: 'LEFT' }, { relation: 'tags' }])
+      @CrudJoin([{ relation: 'posts' }, { relation: 'tags' }])
       class TestController {
-        @CrudJoin([{ relation: 'posts', joinType: 'INNER' }])
+        @CrudJoin([{ relation: 'posts' }])
         testMethod() {}
       }
 
       const handler = TestController.prototype.testMethod;
       const result = metaview.getContextOptions(TestController, handler);
       expect(result.query?.join).toEqual([
-        { relation: 'posts', joinType: 'INNER' },
+        { relation: 'posts' },
         { relation: 'tags' },
       ]);
     });

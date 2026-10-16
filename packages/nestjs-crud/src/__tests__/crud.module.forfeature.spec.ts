@@ -56,13 +56,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),
@@ -244,13 +247,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),
@@ -407,13 +413,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),
@@ -628,13 +637,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),
@@ -776,13 +788,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),
@@ -834,13 +849,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),
@@ -907,13 +925,16 @@ describe('CrudModule.forFeature', () => {
       testModule = await Test.createTestingModule({
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
-          RepositoryModule.forRoot({}),
-          RepositoryModule.forFeature({
-            module: TypeOrmRepositoryModule,
-            entities: [
+          RepositoryModule.forRoot({
+            drivers: [
               {
-                key: CRUD_TEST_COMPANY_ENTITY_NAME,
-                entity: CompanyEntity,
+                driver: TypeOrmRepositoryModule,
+                entities: [
+                  {
+                    key: CRUD_TEST_COMPANY_ENTITY_NAME,
+                    entity: CompanyEntity,
+                  },
+                ],
               },
             ],
           }),

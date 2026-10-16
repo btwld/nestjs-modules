@@ -29,6 +29,7 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
 
   beforeEach(() => {
     adapter = new TrackingTestRepositoryAdapter('test-entity');
+    adapter.bind({});
   });
 
   describe('update', () => {
@@ -40,18 +41,7 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
       expect(adapter.doUpdateCalls).toEqual(0);
     });
 
-    it('should allow a soft-deleted entity when force is set', async () => {
-      const result = await adapter.update(
-        softDeletedEntity(),
-        { name: 'x' },
-        { force: true },
-      );
-
-      expect(adapter.doUpdateCalls).toEqual(1);
-      expect(result.name).toEqual('x');
-    });
-
-    it('should allow a live entity without force', async () => {
+    it('should allow a live entity', async () => {
       const result = await adapter.update(liveEntity(), { name: 'x' });
 
       expect(adapter.doUpdateCalls).toEqual(1);
@@ -67,20 +57,43 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
 
       expect(adapter.doReplaceCalls).toEqual(0);
     });
-
-    it('should allow a soft-deleted entity when force is set', async () => {
-      const result = await adapter.replace(
-        softDeletedEntity(),
-        { name: 'x' },
-        { force: true },
-      );
-
-      expect(adapter.doReplaceCalls).toEqual(1);
-      expect(result.name).toEqual('x');
-    });
   });
 
   describe('upsert', () => {
+    /** Rewrites the payload's primary key, as a `@BeforeUpsert` hook can. */
+    class KeyRewritingAdapter extends TrackingTestRepositoryAdapter {
+      protected override async runHooks<T>(
+        _methodKey: Parameters<TrackingTestRepositoryAdapter['runHooks']>[0],
+        payload: T,
+      ): Promise<T> {
+        if (payload && typeof payload === 'object') {
+          return { ...payload, id: 'deleted-row' };
+        }
+        return payload;
+      }
+    }
+
+    it.each([
+      ['a different key', { id: 'live-row', name: 'x' }],
+      ['no key', { name: 'x' }],
+    ])(
+      'should check the row a hook names, when the caller named %s',
+      async (_case, payload) => {
+        const rewriting = new KeyRewritingAdapter('test-entity');
+        rewriting.bind({});
+        rewriting.findOneResult = softDeletedEntity();
+
+        await expect(rewriting.upsert(payload)).rejects.toThrow(
+          SoftDeletedImmutableException,
+        );
+
+        expect(rewriting.doFindOneCalls.map((call) => call.where)).toEqual([
+          { field: 'id', operator: 'eq', value: 'deleted-row' },
+        ]);
+        expect(rewriting.doUpsertCalls).toEqual(0);
+      },
+    );
+
     it('should reject when the existing row at the primary key is soft-deleted', async () => {
       adapter.findOneResult = softDeletedEntity();
 
@@ -98,19 +111,6 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
 
       expect(adapter.doFindOneCalls).toHaveLength(1);
       expect(adapter.doFindOneCalls[0].withDeleted).toEqual(true);
-    });
-
-    it('should allow upsert when force is set, skipping the existing-row check', async () => {
-      adapter.findOneResult = softDeletedEntity();
-
-      const result = await adapter.upsert(
-        { id: '1', name: 'x' },
-        { force: true },
-      );
-
-      expect(adapter.doFindOneCalls).toHaveLength(0);
-      expect(adapter.doUpsertCalls).toEqual(1);
-      expect(result.name).toEqual('x');
     });
 
     it('should skip the existing-row check when no primary key is supplied', async () => {
@@ -145,6 +145,34 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
 
       expect(adapter.doSoftDeleteCalls).toEqual(1);
       expect(result.dateDeleted).not.toBeNull();
+    });
+  });
+
+  describe('on an entity with no soft-delete column', () => {
+    class NoDeleteDateAdapter extends TrackingTestRepositoryAdapter {
+      override readonly metadata = {
+        ...new TrackingTestRepositoryAdapter('test-entity').metadata,
+        columns: new TrackingTestRepositoryAdapter(
+          'test-entity',
+        ).metadata.columns.filter((column) => !column.isRemoveDate),
+      };
+    }
+
+    it.each([
+      ['softDelete', (a: NoDeleteDateAdapter) => a.softDelete(liveEntity())],
+      ['restore', (a: NoDeleteDateAdapter) => a.restore(liveEntity())],
+    ])('should refuse %s before the driver', async (operation, run) => {
+      const noDeleteDate = new NoDeleteDateAdapter('test-entity');
+      noDeleteDate.bind({});
+
+      await expect(run(noDeleteDate)).rejects.toThrow(
+        expect.objectContaining({
+          message: `Cannot ${operation} TestEntity: the entity has no soft-delete column`,
+          fault: 'usage',
+        }),
+      );
+      expect(noDeleteDate.doSoftDeleteCalls).toEqual(0);
+      expect(noDeleteDate.doRestoreCalls).toEqual(0);
     });
   });
 });

@@ -7,14 +7,30 @@ export class UserCredentialsMapper extends DomainMapper<
   UserCredentialEntityInterface,
   UserCredentials
 > {
+  /**
+   * Picks the credential's own fields, so a relation the consumer's entity loads
+   * never reaches the aggregate, or a write.
+   */
   createAggregate(entity: UserCredentialEntityInterface): UserCredentials {
-    const { id, version, dateCreated, dateUpdated, dateDeleted, ...props } =
-      entity;
-    return new UserCredentials(id, props, version, {
+    const {
+      id,
+      version,
       dateCreated,
       dateUpdated,
       dateDeleted,
-    });
+      passwordHash,
+      userId,
+      active,
+      validFrom,
+      validTo,
+    } = entity;
+
+    return new UserCredentials(
+      id,
+      { passwordHash, userId, active, validFrom, validTo },
+      version,
+      { dateCreated, dateUpdated, dateDeleted },
+    );
   }
 
   toPersistence(credentials: UserCredentials) {

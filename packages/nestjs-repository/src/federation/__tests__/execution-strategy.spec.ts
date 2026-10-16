@@ -1,3 +1,4 @@
+import { targetColumnsFixture } from '../../__fixtures__/column-metadata.fixture.js';
 import { WhereOperator } from '../../repository/repository.types.js';
 import { FederationException } from '../exceptions/federation.exception.js';
 import { analyzeExecution } from '../execution-strategy.js';
@@ -11,10 +12,11 @@ const makeRelation = (
   overrides: Partial<FederatedRelation> & { name: string },
 ): FederatedRelation => ({
   targetEntity: `${overrides.name}Entity`,
+  targetUrn: `urn:memory:${overrides.name}Entity`,
+  targetColumns: targetColumnsFixture('id', `${overrides.name}Id`),
   cardinality: 'many',
   on: { from: 'id', to: `${overrides.name}Id` },
   isOwning: false,
-  joinType: 'LEFT',
   ...overrides,
 });
 

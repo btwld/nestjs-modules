@@ -48,14 +48,12 @@ export function analyzeExecution(
   // caller-specified filter (not a sort — that's covered by
   // validateRelationSorts above) reports its total from matching child
   // rows, not distinct root ids, unless distinctFilter narrows it to one
-  // row per root. Structural NOT_NULL injection alone doesn't trigger
-  // this — see FilterAnalyzer.hasUserFiltersForRelation.
+  // row per root.
   if (
     !drivingRelation &&
     effectiveDrivingRelation &&
     effectiveDrivingRelation.cardinality === 'many' &&
-    !effectiveDrivingRelation.distinctFilter &&
-    filterAnalyzer.hasUserFiltersForRelation(effectiveDrivingRelation)
+    !effectiveDrivingRelation.distinctFilter
   ) {
     throw new FederationException({
       message:

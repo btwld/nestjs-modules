@@ -17,7 +17,7 @@ import {
 export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   /**
    * Repository metadata for entity introspection.
-   * Provides schema information without exposing ORM internals.
+   * Provides schema information without exposing the driver's internals.
    */
   readonly metadata: RepositoryMetadataInterface<Entity>;
 
@@ -40,9 +40,13 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   findOne(options: RepositoryFindOneOptions<Entity>): Promise<Entity | null>;
 
   /**
-   * Count entities matching the given options.
+   * Count the entities the given options match.
    *
-   * @param options - Find options (where conditions)
+   * Only `where`, `join` and `withDeleted` decide the count. `select`,
+   * `order`, `skip` and `take` change how rows are shaped or paged, not how
+   * many match, so the same options a `find` takes return that read's total.
+   *
+   * @param options - Find options; which rows to count
    * @returns Number of matching entities
    */
   count(options?: RepositoryFindOptions<Entity>): Promise<number>;
@@ -111,7 +115,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   update(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions,
   ): Promise<Entity>;
 
   /**
@@ -129,7 +133,10 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
 
   /**
    * Replace an entity's fields with new data.
-   * Overwrites all fields (clears fields not specified in data).
+   *
+   * Writes exactly the fields in `data`; a field it leaves out keeps its
+   * stored value. That `data` supplies every field is the caller's to
+   * validate, e.g. with a schema that requires the whole body.
    *
    * @param entity - Existing entity to replace (primary keys used for identification)
    * @param data - New data to replace entity with
@@ -139,7 +146,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   replace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions,
   ): Promise<Entity>;
 
   // Delete operations
@@ -151,10 +158,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    * @param options - Delete options
    * @returns The deleted entity
    */
-  delete(
-    entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
-  ): Promise<Entity>;
+  delete(entity: Entity, options?: RepositoryDeleteOneOptions): Promise<Entity>;
 
   /**
    * Permanently delete multiple entities (hard delete).
@@ -177,7 +181,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    */
   softDelete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions,
   ): Promise<Entity>;
 
   /**
@@ -187,36 +191,5 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    * @param options - Restore options
    * @returns The restored entity
    */
-  restore(
-    entity: Entity,
-    options?: RepositoryRestoreOptions<Entity>,
-  ): Promise<Entity>;
-
-  // Utility methods
-
-  /**
-   * Transform a partial entity-like object into an entity instance.
-   *
-   * @param entityLike - Partial entity data
-   * @returns Entity instance
-   */
-  transform(entityLike: DeepPartial<Entity>): Entity;
-
-  /**
-   * Merge multiple partial entities into an existing entity.
-   *
-   * @param mergeIntoEntity - Target entity to merge into
-   * @param entityLikes - Partial entities to merge
-   * @returns The merged entity
-   */
-  merge(mergeIntoEntity: Entity, ...entityLikes: DeepPartial<Entity>[]): Entity;
-
-  /**
-   * Prepare a DTO for write operations.
-   * Transforms DTO to entity instance if needed.
-   *
-   * @param dto - DTO or partial entity to prepare
-   * @returns Prepared entity instance, or undefined if invalid
-   */
-  prepare(dto: DeepPartial<Entity>): Entity | undefined;
+  restore(entity: Entity, options?: RepositoryRestoreOptions): Promise<Entity>;
 }

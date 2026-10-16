@@ -27,10 +27,11 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
     columns: RepositoryColumnMetadataInterface<PlainLiteralObject>[] = [],
   ) {
     super(entityKey);
-    if (writePolicy) this.setWritePolicy(writePolicy);
+    this.bind({ writePolicy });
     this.metadata = {
       name: entityName,
       type: EntityClass as Type<PlainLiteralObject>,
+      urn: `urn:memory:${entityName}`,
       columns,
       relations: [],
     };
@@ -75,11 +76,8 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
   protected async doRestore(): Promise<PlainLiteralObject> {
     throw new Error('structural check only');
   }
-  transform(entityLike: DeepPartial<PlainLiteralObject>): PlainLiteralObject {
+  toRow(entityLike: DeepPartial<PlainLiteralObject>): PlainLiteralObject {
     return entityLike;
-  }
-  merge(mergeInto: PlainLiteralObject): PlainLiteralObject {
-    return mergeInto;
   }
 }
 
@@ -158,18 +156,6 @@ describe('write policy boot checks', () => {
 
       expect(failures).toHaveLength(1);
       expect(failures[0]).toContain('"a"');
-    });
-
-    /**
-     * A misspelled `writePolcy` type-checks and lands here looking like a
-     * missing declaration, so the message has to name the option to check.
-     */
-    it('names the option, so a misspelling can be spotted', () => {
-      const failures = checkWritePolicyCompleteness([
-        new StubAdapter('a', 'A'),
-      ]);
-
-      expect(failures[0]).toContain('spelled writePolicy');
     });
   });
 });
