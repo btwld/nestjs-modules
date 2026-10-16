@@ -126,7 +126,6 @@ Each entity key maps to a `CacheRepository` instance resolved at runtime by
 
 ```ts
 interface CacheExtrasInterface {
-  global?: boolean;
   providers?: Provider[];
   repositories?: {
     cache?: Type<CacheRepositoryInterface>;
@@ -463,6 +462,10 @@ import {
   ReadCacheRequest,
   ReadCacheRequestHandler,
 } from '@concepta/nestjs-cache/optional/crud';
+import { Entity } from 'typeorm';
+
+@Entity()
+export class UserCacheEntity extends CacheSqliteEntity {}
 
 // The application's root module: RepositoryModule.forRoot() is imported once.
 @Module({
@@ -473,7 +476,7 @@ import {
       drivers: [
         {
           driver: TypeOrmRepositoryModule,
-          entities: [{ key: 'userCache', entity: CacheSqliteEntity }],
+          entities: [{ key: 'userCache', entity: UserCacheEntity }],
         },
       ],
     }),

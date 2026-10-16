@@ -128,7 +128,7 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 
 | Package | Required | Notes |
 | --- | --- | --- |
-| `@concepta/nestjs-crud` | Yes | The main entry imports `paginatedSchema` from it |
+| `@concepta/nestjs-crud` | No | Only for the `optional/crud` entry (CRUD gateway, `invitationPaginatedSchema`) |
 | `@nestjs/common` | Yes | NestJS framework peer |
 | `@nestjs/config` | Yes | Used by the module's config factory |
 | `@nestjs/core` | Yes | Required transitively by `@nestjs/cqrs` |
@@ -296,7 +296,7 @@ const plain = invitation.toPlain();
 | `code` | `string` | Unique invitation code |
 | `category` | `string` | Invitation category |
 | `userId` | `ReferenceId` | Invited user ID |
-| `constraints` | `LiteralObject \| undefined` | Optional constraints |
+| `constraints` | `PlainLiteralObject \| null \| undefined` | Optional constraints |
 | `dateAccepted` | `Date \| null` | Acceptance timestamp |
 | `dateRevoked` | `Date \| null` | Revocation timestamp |
 | `active` | `boolean` | `true` if not accepted and not revoked |

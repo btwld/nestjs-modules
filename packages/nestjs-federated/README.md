@@ -187,6 +187,9 @@ Your custom repository must implement `IdentityRepositoryInterface`.
 
 ### Module Options
 
+`forRoot()` / `forRootAsync()` register the module globally; `register()` /
+`registerAsync()` scope it to the importing module.
+
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
 | `userPort` | `FederatedUserPortSettings` | Yes | Query/command class references for user lookup and creation |
@@ -196,7 +199,6 @@ Your custom repository must implement `IdentityRepositoryInterface`.
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `global` | `boolean` | No | Register as a global module (default: `false`) |
 | `entities.identity` | `string` | No | Entity key for identity (default: `'identity'`) |
 | `repositories.identity` | `Type<IdentityRepositoryInterface>` | No | Custom repository class |
 

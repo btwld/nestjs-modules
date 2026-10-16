@@ -18,6 +18,7 @@ queries, and domain events.
 - [Quick Start](#quick-start)
 - [Module Registration](#module-registration)
 - [Architecture Overview](#architecture-overview)
+- [Context Overlay](#context-overlay)
 - [Domain Aggregates](#domain-aggregates)
 - [Commands](#commands)
 - [Queries](#queries)
@@ -52,7 +53,7 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 | `@nestjs/core` | Yes | Module reference and reflection — install explicitly |
 | `@nestjs/cqrs` | No | Optional peer — required in practice for the CQRS buses |
 | `typeorm` | No | Only when using TypeORM repository driver |
-| `@concepta/nestjs-crud` | Yes | The main entry imports `paginatedSchema` from it |
+| `@concepta/nestjs-crud` | No | Only for the `optional/crud` entry (CRUD gateway, paginated and batch schemas) |
 | `@concepta/typeorm-seeding` | No | Only when using database seeding |
 | `@faker-js/faker` | No | Only when using the seed factory |
 
@@ -218,7 +219,6 @@ RoleModule.forFeature({
 
 ```ts
 interface RoleExtrasInterface {
-  global?: boolean;
   providers?: Provider[];
   repositories?: {
     role?: Type<RoleRepositoryInterface>;
@@ -604,7 +604,7 @@ other assignment pairs into a second `CrudModule.forFeature()` call.
 
 ```text
 HTTP Request
-  → CrudContextInterceptor (parses params, query)
+  → CrudContextOverlay (parses params, query into CrudCtx)
   → CRUD Request (e.g. CreateRoleRequest)
   → Request Handler (bridges to CommandBus/QueryBus)
   → Command/Query Handler (domain logic + transaction)

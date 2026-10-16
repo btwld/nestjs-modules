@@ -157,10 +157,11 @@ export class TenantScopeHook {
 }
 ```
 
-Forgetting `@Hook()` is a hard failure, not a silent no-op: a class registered
-via `@UseHooks()` without the class-level `@Hook()` decorator throws
-`HookNotDecoratedException` at resolution time, and a hook that can't be
-resolved from the module's providers throws `HookProviderNotFoundException`.
+Forgetting `@Hook()` is a hard failure, not a silent no-op: passing a class
+without the class-level `@Hook()` decorator to `@UseHooks()` throws
+`HookNotDecoratedException` as soon as the decorated class is defined, and a
+hook that can't be resolved from the module's providers throws
+`HookProviderNotFoundException` when it first runs.
 Two more things have to be true:
 
 1. **`CoreModule.forRoot()`** must be imported — it provides
@@ -993,7 +994,7 @@ exercise correlation behavior directly.
 | --- | --- |
 | `HookResolverService` | Resolves and executes hook methods for a given hook type and method key. |
 | `HooksCtx` | `OverlayRef` token for the hook context. Use with `ctx.with(HooksCtx)` or `@Ctx(HooksCtx)`. |
-| `HookNotDecoratedException` | Thrown when a class passed to `@UseHooks()` is missing the class-level `@Hook()` decorator (error code `HOOK_NOT_DECORATED`). |
+| `HookNotDecoratedException` | Thrown by `@UseHooks()` when a class passed to it is missing the class-level `@Hook()` decorator (error code `HOOK_NOT_DECORATED`). |
 | `HookProviderNotFoundException` | Thrown when a hook registered via `@UseHooks()` cannot be resolved from the module's providers (error code `HOOK_PROVIDER_NOT_FOUND`). |
 
 ### Hook Types and Interfaces
@@ -1002,7 +1003,7 @@ exercise correlation behavior directly.
 | --- | --- |
 | `SpecificationInterface<Ctx>` | Contract: `isSatisfiedBy(context): boolean`. |
 | `HookOption` | Union: a bare hook class, or a `HookWithSpec` configuration object. |
-| `HookWithSpec` | `{ hook, type?, spec? }` — a hook class paired with an optional spec guard. |
+| `HookWithSpec` | `{ hook, type? }` — a hook class with its subsystem type, which is always read from the class's `@Hook()`. Gating specs go on the hook itself. |
 | `HookTypeInterface` | Interface for hook type constants. Requires `readonly KEY: string`. |
 | `HookContextInterface` | Request-scoped context carrying the resolved `hooks: HookWithSpec[]` array. |
 | `HookMethodKeyType` | String key that identifies a hook method slot (e.g. `'beforeFind'`). |
@@ -1100,13 +1101,13 @@ exercise correlation behavior directly.
 | Export | Description |
 | --- | --- |
 | `ActionEnum` | Enum of CRUD action names (`CREATE`, `READ`, `UPDATE`, `DELETE`). |
-| `Operation` | String-literal union of all operation names. |
-| `ReadOperations` | String-literal union of read-only operation names. |
-| `WriteOperations` | String-literal union of write operation names. |
-| `MutateOperations` | String-literal union of mutating operation names. |
-| `ReadOperation` | Branded string for a read operation value. |
-| `WriteOperation` | Branded string for a write operation value. |
-| `MutateOperation` | Branded string for a mutating operation value. |
+| `Operation` | String enum of the nine operations: `List`, `Read`, `Create`, `CreateBatch`, `Update`, `Replace`, `Delete`, `SoftDelete`, `Restore`. |
+| `ReadOperations` | Read-only tuple `[List, Read]`. |
+| `WriteOperations` | Read-only tuple `[Create, CreateBatch, Update, Replace]`. |
+| `MutateOperations` | Read-only tuple of `WriteOperations` plus `Delete`, `SoftDelete`, `Restore`. |
+| `ReadOperation` | Union of the `ReadOperations` members. |
+| `WriteOperation` | Union of the `WriteOperations` members. |
+| `MutateOperation` | Union of the `MutateOperations` members. |
 
 ### Utilities and Module Helpers
 

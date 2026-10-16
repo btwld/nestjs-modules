@@ -571,8 +571,10 @@ queries the user's roles (via `ResolveUserRolesQuery`), and strips any fields
 the user is not permitted to see using the `accesscontrol` library's
 `permission.filter(data)` utility.
 
-> **Note:** Roles granted `any` access bypass the attribute filter entirely —
-> `any` implies unrestricted access to all fields (see [IMPORTANT](#important)).
+The filter applies the attributes of the first grant on the route that the
+user's roles satisfy, trying `any` before `own` — the same grant the guard
+matched. Attributes apply to `any` grants too: `readAny('user', ['*',
+'!password'])` still strips `password`.
 
 The filter is enabled by default. To disable it:
 
@@ -919,8 +921,10 @@ Here is the pattern:
 
 !!! Important !!!
 
-> All roles that are given `any` access to a resource will NOT be passed
-through access filters since `any` implies they should have all access.
+> Roles given `any` access still pass through your access query services.
+> Each `canAccess` receives the matched grant through `context.getQuery()`;
+> allow when its `possession` is `'any'` if `any` should skip your
+> ownership check.
 
 ### What is Access Control?
 
@@ -980,29 +984,19 @@ authorized to access the resource.
 
 ### How AccessControlGuard Works
 
-The `AccessControlGuard` uses the methods provided by
-`AccessControlService` and `AccessQueryService` to enforce access
-control rules. Here’s how it works:
+When a request reaches a protected route, the `AccessControlGuard` checks it
+in three steps:
 
-1. **Guard Initialization**:
-
-- When a request is made to a protected route, the `AccessControlGuard`
-  is triggered.
-- The guard gets what permission was granted for what resource.
-
-1. **Role Verification**:
-
-- The guard then calls the `getUserRoles` method to get the roles of the
-  user.
-- Based on the roles, the guard checks if the user has the necessary
-  permissions to access the requested resource.
-
-1. **Access Queries Check**:
-
-- The guard then uses the access control queries defined to determine
-  if the user is allowed to perform the requested action on the resource.
-- If the user has the required permissions, the request is allowed to
-  proceed. Otherwise, it is denied.
+1. **Grants**: the guard reads the `@AccessControl*` grants on the route
+   handler. A handler with no grants is allowed.
+2. **Roles**: it gets the user's roles from your `AccessControlService`'s
+   `getUserRoles`, then checks each grant in order, trying `any` before
+   `own`. The first grant the roles satisfy is the match; if none matches,
+   the request is denied.
+3. **Access queries**: if the controller or handler declares
+   `@AccessControlQuery` services, each one's `canAccess` is called with the
+   matched grant. The request is allowed as soon as one returns `true`, and
+   denied if none does. With no query services, the match alone allows it.
 
 ### Practical Examples
 

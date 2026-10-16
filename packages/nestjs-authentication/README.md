@@ -1021,7 +1021,6 @@ AuthenticationModule.forRoot({
   settings?: AuthenticationSettingsInterface;
   ports?: AuthenticationPortsInterface;
   // extras (passed as the second arg to setExtras):
-  global?: boolean;            // forRoot sets this to true automatically
   appGuard?: false | CanActivate;
   guards?: AuthRouterGuardConfigInterface[];
 })
@@ -1209,7 +1208,7 @@ as:
 ```json
 {
   "statusCode": 401,
-  "message": "Invalid credentials.",
+  "message": "The provided username or password is incorrect. Please try again.",
   "errorCode": "AUTH_LOCAL_INVALID_CREDENTIALS_ERROR",
   "error": "Unauthorized"
 }

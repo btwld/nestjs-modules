@@ -55,7 +55,7 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 | `@nestjs/core` | Yes | Module reference and reflection — install explicitly |
 | `@nestjs/cqrs` | No | Optional peer — required in practice for the CQRS buses |
 | `typeorm` | No | Only when using TypeORM repository driver |
-| `@concepta/nestjs-crud` | Yes | The main entry imports `paginatedSchema` from it |
+| `@concepta/nestjs-crud` | No | Only for the `optional/crud` entry (CRUD gateway, `userPaginatedSchema`, `userCreateBatchSchema`) |
 | `@concepta/typeorm-seeding` | No | Only when using database seeding |
 | `@faker-js/faker` | No | Only when using the seed factory |
 
@@ -81,6 +81,13 @@ import {
   UserCredentialSqliteEntity,
   UserSqliteEntity,
 } from '@concepta/nestjs-user/optional/typeorm';
+import { Entity } from 'typeorm';
+
+@Entity()
+export class UserEntity extends UserSqliteEntity {}
+
+@Entity()
+export class UserCredentialEntity extends UserCredentialSqliteEntity {}
 
 @Module({
   imports: [
@@ -90,8 +97,8 @@ import {
         {
           driver: TypeOrmRepositoryModule,
           entities: [
-            { key: 'user', entity: UserSqliteEntity },
-            { key: 'user-credentials', entity: UserCredentialSqliteEntity },
+            { key: 'user', entity: UserEntity },
+            { key: 'user-credentials', entity: UserCredentialEntity },
           ],
         },
       ],
@@ -140,11 +147,10 @@ module.
 
 ```ts
 interface UserExtrasInterface {
-  global?: boolean;
   providers?: Provider[];
-  entities: {
-    user: string;              // Entity key for users (required)
-    credentials?: string;      // Entity key for credentials (optional)
+  entities?: {                 // default: { user: 'user' }
+    user: string;              // Entity key for users
+    credentials?: string;      // Entity key for credentials (omit to disable credentials)
   };
   repositories?: {
     user?: Type<UserRepositoryInterface>;
@@ -246,8 +252,7 @@ Extends `MutableAggregate<UserCredentialInterface>`.
 | --- | --- |
 | `id` | `string` |
 | `userId` | `string` |
-| `passwordHash` | `string \| null` |
-| `passwordSalt` | `string \| null` |
+| `passwordHash` | `string` |
 | `active` | `boolean` |
 | `validFrom` | `Date` |
 | `validTo` | `Date \| null` |
@@ -262,8 +267,7 @@ Extends `MutableAggregate<UserCredentialInterface>`.
 
 Reconstitution from a database entity is handled by `UserCredentialsMapper`.
 
-Credential events exclude `passwordHash` and `passwordSalt` from their
-payloads for security.
+Credential events exclude `passwordHash` from their payloads for security.
 
 ## Commands
 
@@ -521,8 +525,8 @@ legacy class-validator DTO classes.
 
 Notes:
 
-- `userCreateSchema` accepts a plaintext `password` — `passwordHash` and
-  `passwordSalt` are NOT public input anymore. This is a deliberate bug fix:
+- `userCreateSchema` accepts a plaintext `password` — `passwordHash` is NOT
+  public input anymore. This is a deliberate bug fix:
   the legacy `UserCreateDto` exposed `passwordHash` (never a valid external
   input — hashes are always computed internally via `UserPasswordPort`) and
   silently stripped `password`, so creating a user through the HTTP CRUD

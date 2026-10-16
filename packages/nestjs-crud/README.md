@@ -1352,7 +1352,7 @@ the hook-method decorator, on a method-level `@Specification`, or on the
 class-level `@RepoHook`:
 
 ```ts
-@RepoHook({ type: RepoHookType, spec: CrudSpec.isMutation() })
+@RepoHook(CrudSpec.isMutation())
 export class AuditHook {
   @BeforeWrite()
   async stamp(data, ctx) { ... }
@@ -1390,18 +1390,22 @@ Hook method decorators from `@concepta/nestjs-repository`:
 
 | Decorator | Fires on |
 | --- | --- |
-| `@BeforeRead` / `@AfterRead` | Any read (find, findOne, count, findAndCount) |
+| `@BeforeRead` | Any read (find, findOne, count, findAndCount) |
+| `@AfterRead` | `find()` and `findOne()` — `count()` and `findAndCount()` use `@AfterCount` and `@AfterFindAndCount` |
 | `@BeforeWrite` / `@AfterWrite` | Any write (create, createMany, update, upsert, replace) — note `CreateBatch` maps to `createMany`, so these fire for it |
 | `@BeforeTransition` / `@AfterTransition` | Lifecycle changes (softDelete, restore) |
 | `@BeforeDestroy` / `@AfterDestroy` | Hard delete |
 | `@BeforeFind` / `@AfterFind` | `find()` |
 | `@BeforeFindOne` / `@AfterFindOne` | `findOne()` |
+| `@BeforeCount` / `@AfterCount` | `count()` |
 | `@BeforeFindAndCount` / `@AfterFindAndCount` | `findAndCount()` |
 | `@BeforeCreate` / `@AfterCreate` | `create()` |
 | `@BeforeCreateMany` / `@AfterCreateMany` | `createMany()` |
 | `@BeforeUpdate` / `@AfterUpdate` | `update()` |
+| `@BeforeUpsert` / `@AfterUpsert` | `upsert()` |
 | `@BeforeReplace` / `@AfterReplace` | `replace()` |
 | `@BeforeDelete` / `@AfterDelete` | `delete()` |
+| `@BeforeDeleteMany` / `@AfterDeleteMany` | `deleteMany()` |
 | `@BeforeSoftDelete` / `@AfterSoftDelete` | `softDelete()` |
 | `@BeforeRestore` / `@AfterRestore` | `restore()` |
 

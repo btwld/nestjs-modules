@@ -136,7 +136,6 @@ Each entity key maps to an `OtpRepository` instance resolved at runtime by
 
 ```ts
 interface OtpExtrasInterface {
-  global?: boolean;
   providers?: Provider[];
   repositories?: {
     otp?: Type<OtpRepositoryInterface>;
@@ -382,12 +381,14 @@ class OtpPolicy {
 ```
 
 `resolveTypeService(type)` throws `OtpTypeNotDefinedException` when no
-type service is registered for `type`. Every `resolve*` method accepts a
+type service is registered for `type`. Every other `resolve*` method accepts a
 per-call override that takes precedence over the module-level setting — this
 is how command/query handlers apply request-level rate-limit or
-duplicate-strategy overrides without bypassing the module default. All five
-command/query handlers and the history-cleanup listener resolve settings
-through `OtpPolicy` rather than reading the settings token directly.
+duplicate-strategy overrides without bypassing the module default. The four
+handlers that need settings (`CreateOtpHandler`, `ConsumeOtpHandler`,
+`ClearOtpHistoryHandler`, `ValidateOtpHandler`) and the history-cleanup
+listener resolve them through `OtpPolicy` rather than reading the settings
+token directly.
 
 ## Repository
 
@@ -445,8 +446,10 @@ class-validator DTO classes.
 | --- | --- |
 | `otpCreateSchema` | `category`, `type`, `expiresIn`, `rateSeconds?` (int >= 0), `rateThreshold?` (int >= 1), `assigneeId` |
 
-The `expiresIn` field accepts time span strings: `'60'`, `'2 days'`, `'10h'`,
-`'7d'`.
+The `expiresIn` field accepts [`ms`](https://github.com/vercel/ms) time span
+strings such as `'2 days'`, `'10h'` or `'7d'`. A bare number is milliseconds,
+so `'60'` expires after 60 ms. A value `ms` cannot parse is refused with a
+`RuntimeException` (HTTP 400).
 
 `otpCreateSchema` is programmatic-only: it carries no OpenAPI wrapper
 (`withOpenApi`/`withNamedComponent`) because the module has no HTTP surface
@@ -461,7 +464,7 @@ throws `OtpValidationException` when validation fails.
 | `OtpEntityNotFoundException` | Entity key not registered via `forFeature()` |
 | `OtpTypeNotDefinedException` | OTP type not configured in settings |
 | `OtpLimitReachedException` | Rate limit exceeded (HTTP 429) |
-| `OtpInvalidExpirationDateException` | Invalid `expiresIn` format |
+| `OtpInvalidExpirationDateException` | `expiresIn` parses to a zero duration |
 | `OtpValidationException` | Schema validation failed (HTTP 400, error code `OTP_VALIDATION_ERROR`, context `{ schemaName, validationErrors }`) |
 | `OtpException` | Base OTP exception |
 
@@ -604,12 +607,16 @@ in a parent module for `forFeature()` to resolve its dependencies, and the
 import { RepositoryModule } from '@concepta/nestjs-repository';
 import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 import { OtpSqliteEntity } from '@concepta/nestjs-otp/optional/typeorm';
+import { Entity } from 'typeorm';
+
+@Entity()
+export class UserOtpEntity extends OtpSqliteEntity {}
 
 RepositoryModule.forRoot({
   drivers: [
     {
       driver: TypeOrmRepositoryModule,
-      entities: [{ key: 'userOtp', entity: OtpSqliteEntity }],
+      entities: [{ key: 'userOtp', entity: UserOtpEntity }],
     },
   ],
 });
