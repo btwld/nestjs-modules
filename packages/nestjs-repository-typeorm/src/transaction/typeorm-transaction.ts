@@ -2,6 +2,7 @@ import { type DataSource, type QueryRunner, type EntityManager } from 'typeorm';
 
 import { Logger } from '@nestjs/common';
 
+import { RuntimeException } from '@concepta/nestjs-core';
 import { type TransactionInterface } from '@concepta/nestjs-repository';
 
 /**
@@ -68,7 +69,10 @@ export class TypeOrmTransaction implements TransactionInterface {
    */
   async commit(): Promise<void> {
     if (!this.queryRunner) {
-      throw new Error('No active transaction to commit');
+      throw new RuntimeException({
+        message: 'No active transaction to commit',
+        fault: 'internal',
+      });
     }
 
     try {
@@ -101,7 +105,10 @@ export class TypeOrmTransaction implements TransactionInterface {
    */
   getClient<T = EntityManager>(): T {
     if (!this.queryRunner?.manager) {
-      throw new Error('No active transaction - cannot get client');
+      throw new RuntimeException({
+        message: 'No active transaction - cannot get client',
+        fault: 'internal',
+      });
     }
     return this.queryRunner.manager as T;
   }

@@ -115,7 +115,10 @@ describe(TypeOrmTransaction.name, () => {
   describe('commit', () => {
     it('should throw if no active transaction', async () => {
       await expect(transaction.commit()).rejects.toThrow(
-        'No active transaction to commit',
+        expect.objectContaining({
+          fault: 'internal',
+          message: 'No active transaction to commit',
+        }),
       );
     });
 
@@ -179,7 +182,10 @@ describe(TypeOrmTransaction.name, () => {
   describe('getClient', () => {
     it('should throw if no active transaction', () => {
       expect(() => transaction.getClient()).toThrow(
-        'No active transaction - cannot get client',
+        expect.objectContaining({
+          fault: 'internal',
+          message: 'No active transaction - cannot get client',
+        }),
       );
     });
 

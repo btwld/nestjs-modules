@@ -9,7 +9,8 @@ import { type TransactionFactoryInterface } from './transaction-factory.interfac
  */
 export interface TransactionFactoryDescriptor {
   /**
-   * Transaction key (e.g., 'typeorm:default', 'mongoose:default').
+   * Transaction key, unique per driver and data source (e.g.,
+   * '<driver>:default').
    */
   key: string;
 
@@ -26,10 +27,14 @@ export interface TransactionFactoryDescriptor {
 }
 
 /**
- * Result returned by repository module's forFeature method.
- * Extends DynamicModule with optional transaction factory descriptors.
+ * Result returned by a driver's `register` method: its repository providers,
+ * the modules they need, and its transaction factories.
+ * `RepositoryModule.forRoot()` exports the repositories itself.
  */
-export interface DynamicRepositoryModule extends DynamicModule {
+export interface DynamicRepositoryModule extends Pick<
+  DynamicModule,
+  'module' | 'imports' | 'providers'
+> {
   /**
    * Transaction factory descriptors for RepositoryModule to register.
    */
@@ -37,20 +42,25 @@ export interface DynamicRepositoryModule extends DynamicModule {
 }
 
 /**
- * Interface for repository module classes that provide a static forFeature().
- * Repository packages implement this to provide their own module.
+ * A repository driver: the static side of the driver's module class.
  *
- * This describes the static side of the class (the constructor object itself).
+ * `RepositoryModule.forRoot()` calls `register` with the entities listed under
+ * the driver, then binds and checks every repository it returns. Applications
+ * do not call `register` themselves.
  */
-export interface RepositoryModuleInterface {
+export interface RepositoryDriverInterface<
+  Options extends RepositoryProviderOptions = RepositoryProviderOptions,
+> {
   /**
-   * The class name of the module (inherited from Function.prototype.name).
+   * The class name of the driver's module (inherited from
+   * Function.prototype.name). Two drivers in one application must have
+   * different names.
    */
   readonly name: string;
 
   /**
-   * Register repositories for entities.
-   * This is a static method on the module class.
+   * Build one repository provider per entity, each under
+   * `getDynamicRepositoryToken(key)`.
    */
-  forFeature(entities: RepositoryProviderOptions[]): DynamicRepositoryModule;
+  register(entities: Options[]): DynamicRepositoryModule;
 }

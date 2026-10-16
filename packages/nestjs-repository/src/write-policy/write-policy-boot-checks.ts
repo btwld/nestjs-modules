@@ -43,21 +43,15 @@ export function checkNoSoftDeleteOnAppendOnly(
  * Opt-in per deployment, on the same reasoning as the equivalent row-scope
  * check: whether an undeclared entity is a mistake is a property of the
  * deployment.
- *
- * This is the only backstop against a misspelled option name.
- * `RepositoryProviderOptions` carries an index signature, so `writePolcy`
- * type-checks and is silently dropped, which looks the same as an entity that
- * was never declared. With this check off, it goes unreported.
  */
 export function checkWritePolicyCompleteness(adapters: AnyAdapter[]): string[] {
   return adapters.flatMap((adapter) => {
     if (adapter.writePolicyDeclaration) return [];
 
     return [
-      `"${adapter.entityKey}" has no writePolicy on its forFeature() entry, ` +
+      `"${adapter.entityKey}" has no writePolicy on its forRoot() entry, ` +
         "and this deployment requires one. Set writePolicy: { access: 'append-only', " +
-        "reason } or { access: 'mutable' }, and check the option is spelled " +
-        'writePolicy.',
+        "reason } or { access: 'mutable' }.",
     ];
   });
 }

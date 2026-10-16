@@ -1,15 +1,13 @@
-import { vi, type Mocked, type Mock } from 'vitest';
+import { type Mocked } from 'vitest';
 
 import { type PlainLiteralObject } from '@nestjs/common';
-import { type ModuleRef } from '@nestjs/core';
 
+import { targetColumnsFixture } from '../../../__fixtures__/column-metadata.fixture.js';
 import { type RepositoryRelationMetadataInterface } from '../../../repository/interfaces/repository-relation-metadata.interface.js';
 import { type RepositoryInterface } from '../../../repository/interfaces/repository.interface.js';
 import { RepositoryRegistryService } from '../../../services/repository-registry.service.js';
 import { createMockRepository } from '../../../testing/create-mock-repository.js';
-import { getDynamicRepositoryToken } from '../../../utils/get-dynamic-repository-token.js';
 import { FederationOrchestrator } from '../../federation-orchestrator.service.js';
-import { type FederatedRelation } from '../../federation.types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -89,38 +87,22 @@ export function mockTestRepo<T extends PlainLiteralObject = PlainLiteralObject>(
 export function mockOrchestrator(peerRepos: Record<string, MockRepo<any>>): {
   orchestrator: FederationOrchestrator;
   registry: RepositoryRegistryService;
-  moduleRef: { get: Mock };
 } {
   const registry = new RepositoryRegistryService();
 
-  // Register and bootstrap each peer repository
-  for (const entityName of Object.keys(peerRepos)) {
-    registry.register({
+  // Register each peer repository
+  registry.register(
+    Object.entries(peerRepos).map(([entityName, adapter]) => ({
       key: entityName,
       entityName,
-      moduleName: 'TestModule',
-    });
-  }
-  registry.onApplicationBootstrap();
-
-  // Mock ModuleRef.get to resolve peer repos by dynamic token
-  const moduleRef = {
-    get: vi.fn((token: string) => {
-      for (const [entityName, repo] of Object.entries(peerRepos)) {
-        if (token === getDynamicRepositoryToken(entityName)) {
-          return repo;
-        }
-      }
-      throw new Error(`No mock repo for token: ${token}`);
-    }),
-  };
-
-  const orchestrator = new FederationOrchestrator(
-    registry,
-    moduleRef as unknown as ModuleRef,
+      urn: `urn:mock:${entityName}`,
+      adapter,
+    })),
   );
 
-  return { orchestrator, registry, moduleRef };
+  const orchestrator = new FederationOrchestrator(registry);
+
+  return { orchestrator, registry };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -157,6 +139,8 @@ export function mockOneToManyRelation(
   return {
     name,
     targetEntity,
+    targetUrn: `urn:memory:${targetEntity}`,
+    targetColumns: targetColumnsFixture('id', 'userId'),
     cardinality: 'many',
     on: { from: 'id', to: 'userId' },
     federated: true,
@@ -177,6 +161,8 @@ export function mockOneToOneRelation(
   return {
     name,
     targetEntity,
+    targetUrn: `urn:memory:${targetEntity}`,
+    targetColumns: targetColumnsFixture('id', 'userId'),
     cardinality: 'one',
     on: { from: 'id', to: 'userId' },
     federated: true,
@@ -198,24 +184,10 @@ export function mockOwningOneToOneRelation(
   return {
     name,
     targetEntity,
+    targetUrn: `urn:memory:${targetEntity}`,
+    targetColumns: targetColumnsFixture(targetPK),
     cardinality: 'one',
     on: { from: rootFK, to: targetPK },
     federated: true,
-  };
-}
-
-/**
- * Convert a RepositoryRelationMetadataInterface to a FederatedRelation
- * with computed isOwning and joinType fields.
- */
-export function mockFederatedRelation(
-  rel: RepositoryRelationMetadataInterface,
-  rootPrimaryKeys: string[] = ['id'],
-  joinType: 'LEFT' | 'INNER' = 'LEFT',
-): FederatedRelation {
-  return {
-    ...rel,
-    isOwning: !rootPrimaryKeys.includes(rel.on.from),
-    joinType,
   };
 }

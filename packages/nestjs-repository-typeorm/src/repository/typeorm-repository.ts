@@ -8,10 +8,10 @@ import {
   IsNull,
   LessThan,
   LessThanOrEqual,
-  Like,
   MoreThan,
   MoreThanOrEqual,
   Not,
+  QueryFailedError,
   Raw,
   type Repository,
   type EntityManager,
@@ -27,27 +27,29 @@ import {
   type AppContextLike,
   type DeepPartial,
   RuntimeException,
-  type HookOption,
   type HookResolverService,
+  isObject,
 } from '@concepta/nestjs-core';
 import {
   isWhereCondition,
   isWhereNever,
   type JoinClause,
   OptimisticLockException,
-  type RelationActionConfig,
+  type RelationConfig,
   TrxCtx,
   RepositoryAdapter,
+  type RepositoryCountOptions,
   type RepositoryCreateOptions,
+  type RepositoryDatabaseErrorInterface,
   type RepositoryDeleteOneOptions,
   type RepositoryDeleteOptions,
   type RepositoryFindOneOptions,
   type RepositoryFindOptions,
   type RepositoryMetadataInterface,
   type RepositoryRestoreOptions,
+  type RepositoryVersionGuardOptions,
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
-  type RowScopeRegistration,
   type RepositoryVersionGuardInterface,
   type TransactionScope,
   type WhereClause,
@@ -56,6 +58,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
+import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 
 import {
   buildEntity,
@@ -63,6 +66,7 @@ import {
   buildOrder,
   buildRelations,
   buildSelect,
+  buildUrn,
 } from './typeorm-options.schema.js';
 
 /**
@@ -72,12 +76,8 @@ export interface TypeOrmRepositoryOptions {
   entityKey: string;
   transactionKey?: string;
   hookResolver?: HookResolverService;
-  relationsConfig?: Record<string, RelationActionConfig>;
+  relationsConfig?: Record<string, RelationConfig>;
   transactionScope?: TransactionScope;
-  /** Declaration only — the resolver is bound by RepositoryModule. */
-  rowScope?: RowScopeRegistration;
-  /** Declaration only — the hooks are bound by RepositoryModule. */
-  hooks?: HookOption[];
 }
 
 /**
@@ -89,16 +89,14 @@ export class TypeOrmRepository<
 > extends RepositoryAdapter<Entity> {
   readonly metadata: RepositoryMetadataInterface<Entity>;
 
+  /** How many parameters `like` has bound, so each gets a unique name. */
+  private likeParameters = 0;
+
   constructor(
     private readonly repo: Repository<Entity>,
     private readonly options: TypeOrmRepositoryOptions,
   ) {
-    super(
-      options.entityKey,
-      options.hookResolver,
-      options.rowScope,
-      options.hooks,
-    );
+    super(options.entityKey, options.hookResolver);
 
     const entityName = repo.metadata?.name || repo.metadata?.targetName;
 
@@ -106,17 +104,58 @@ export class TypeOrmRepository<
       throw new TypeOrmEntityNameException();
     }
 
+    // TypeORM hands a MongoDB find its options as a native filter, with no
+    // find operators or joins, so nothing this driver builds would translate.
+    const { options: dataSourceOptions, driver } = repo.manager.dataSource;
+    if (dataSourceOptions.type === 'mongodb') {
+      throw new TypeOrmUnsupportedDatabaseException(
+        entityName,
+        dataSourceOptions.type,
+      );
+    }
+
+    const database = driver.database;
     const entityType = buildEntity(repo.target, entityName);
     const columns = buildColumns<Entity>(repo.metadata.columns);
     const relations = repo.metadata.relations
-      ? buildRelations(repo.metadata.relations, options.relationsConfig)
+      ? buildRelations(
+          repo.metadata.relations,
+          database,
+          options.relationsConfig,
+        )
       : [];
 
     this.metadata = {
       name: entityName,
       type: entityType,
+      urn: buildUrn(repo.metadata, database),
       columns,
       relations,
+    };
+  }
+
+  /**
+   * A query the database failed, reported with the data source's type and the
+   * database client's own error code: `code` where the client sets one
+   * (`'23503'` on Postgres, `'SQLITE_CONSTRAINT_FOREIGNKEY'` on SQLite),
+   * otherwise its numeric `errno`.
+   */
+  protected override describeDatabaseError(
+    error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined {
+    if (!(error instanceof QueryFailedError)) return undefined;
+    const reported: Error = error.driverError;
+    const code =
+      'code' in reported &&
+      (typeof reported.code === 'string' || typeof reported.code === 'number')
+        ? reported.code
+        : 'errno' in reported && typeof reported.errno === 'number'
+          ? reported.errno
+          : undefined;
+    return {
+      database: this.repo.manager.dataSource.options.type,
+      code,
+      message: reported.message,
     };
   }
 
@@ -213,7 +252,12 @@ export class TypeOrmRepository<
         });
       }
 
-      if (!isWhereCondition(leaf)) continue;
+      if (!isWhereCondition(leaf)) {
+        throw new RuntimeException({
+          message: 'Unexpected where node inside a DNF branch',
+          fault: 'internal',
+        });
+      }
 
       const op = this.toFindOperator(leaf);
 
@@ -254,17 +298,17 @@ export class TypeOrmRepository<
       case WhereOperator.LTE:
         return LessThanOrEqual(cond.value);
       case WhereOperator.CONTAINS:
-        return Like(`%${cond.value}%`);
+        return this.like('%', cond.value, '%');
       case WhereOperator.NCONTAINS:
-        return Not(Like(`%${cond.value}%`));
+        return Not(this.like('%', cond.value, '%'));
       case WhereOperator.STARTS:
-        return Like(`${cond.value}%`);
+        return this.like('', cond.value, '%');
       case WhereOperator.NSTARTS:
-        return Not(Like(`${cond.value}%`));
+        return Not(this.like('', cond.value, '%'));
       case WhereOperator.ENDS:
-        return Like(`%${cond.value}`);
+        return this.like('%', cond.value, '');
       case WhereOperator.NENDS:
-        return Not(Like(`%${cond.value}`));
+        return Not(this.like('%', cond.value, ''));
       case WhereOperator.IN:
         return In(cond.value);
       case WhereOperator.NIN:
@@ -287,12 +331,38 @@ export class TypeOrmRepository<
     }
   }
 
+  /**
+   * `LIKE` matching `value` between `before` and `after`, with `%`, `_` and
+   * the escape character in `value` matched as themselves. TypeORM's `Like`
+   * cannot name an escape character, and SQLite has no default one. `!`
+   * escapes, because a backslash reads differently across SQL dialects.
+   *
+   * Each call binds its own parameter name, so several in one query never
+   * share a value.
+   */
+  protected like(
+    before: string,
+    value: string,
+    after: string,
+  ): FindOperator<unknown> {
+    const name = `like${++this.likeParameters}`;
+    const escaped = value.replace(/[!%_]/g, '!$&');
+    return Raw((column) => `${column} LIKE :${name} ESCAPE '!'`, {
+      [name]: `${before}${escaped}${after}`,
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // JoinClause → TypeORM relations
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
    * Translate JoinClause[] into TypeORM FindOptionsRelations.
+   *
+   * A join never narrows rows. TypeORM renders some required relations as an
+   * INNER JOIN, which returns the same rows as long as every foreign key points
+   * at a row that exists. A relation declared with
+   * `createForeignKeyConstraints: false` is at the implementer's risk.
    */
   protected translateJoin(
     join?: JoinClause[],
@@ -300,24 +370,6 @@ export class TypeOrmRepository<
     if (!join?.length) return undefined;
     const relations: Record<string, boolean> = {};
     for (const j of join) {
-      // TypeORM's `relations` find option always renders a LEFT JOIN, so an
-      // INNER clause cannot be honoured here. Refusing is the only safe
-      // answer: silently widening it to LEFT returns rows the caller asked to
-      // exclude. Federated relations never reach this method — the
-      // orchestrator implements INNER itself and strips those joins from the
-      // root options.
-      if (j.joinType === 'INNER') {
-        throw new RuntimeException({
-          message:
-            'INNER joins are not supported on relation "%s": this driver ' +
-            "renders joins through TypeORM's `relations` option, which is " +
-            'always a LEFT JOIN. Filter on the related column instead, or ' +
-            'declare the relation federated.',
-          messageParams: [j.relation],
-          fault: 'usage',
-        });
-      }
-
       relations[j.relation] = true;
     }
     return Object.assign<FindOptionsRelations<Entity>, Record<string, boolean>>(
@@ -355,9 +407,8 @@ export class TypeOrmRepository<
   private buildNativeFindBaseOptions(
     options: RepositoryFindOneOptions<Entity>,
   ): FindOneOptions<Entity> {
-    const resolvedJoin = this.resolveJoinClauses(options.join);
     const where = this.translateWhere(options.where);
-    const relations = this.translateJoin(resolvedJoin);
+    const relations = this.translateJoin(options.join);
     const order = buildOrder<Entity>(options.order ?? []);
     const select = buildSelect<Entity>(options.select ?? []);
     return {
@@ -366,6 +417,7 @@ export class TypeOrmRepository<
       relations,
       order,
       withDeleted: options.withDeleted,
+      loadEagerRelations: this.allowsEagerRelations,
     };
   }
 
@@ -377,28 +429,45 @@ export class TypeOrmRepository<
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<Entity[]> {
     const repo = await this.getRepo(options.ctx);
-    return repo.find(this.buildNativeFindManyOptions(options));
+    const rows = await repo.find(this.buildNativeFindManyOptions(options));
+    return rows.map((row) =>
+      this.toResult(row, options, this.allowsEagerRelations),
+    );
   }
 
   protected async doFindOne(
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
     const repo = await this.getRepo(options.ctx);
-    return repo.findOne(this.buildNativeFindOneOptions(options));
+    const row = await repo.findOne(this.buildNativeFindOneOptions(options));
+    return row && this.toResult(row, options, this.allowsEagerRelations);
   }
 
   protected async doCount(
-    options: RepositoryFindOptions<Entity> = {},
+    options: RepositoryCountOptions = {},
   ): Promise<number> {
     const repo = await this.getRepo(options.ctx);
-    return repo.count(this.buildNativeFindManyOptions(options));
+    // Joins as a find with the same options does, eager ones included, so a
+    // page and its total always describe the same rows.
+    return repo.count({
+      where: this.translateWhere(options.where),
+      relations: this.translateJoin(options.join),
+      withDeleted: options.withDeleted,
+      loadEagerRelations: this.allowsEagerRelations,
+    });
   }
 
   protected async doFindAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
     const repo = await this.getRepo(options.ctx);
-    return repo.findAndCount(this.buildNativeFindManyOptions(options));
+    const [rows, total] = await repo.findAndCount(
+      this.buildNativeFindManyOptions(options),
+    );
+    return [
+      rows.map((row) => this.toResult(row, options, this.allowsEagerRelations)),
+      total,
+    ];
   }
 
   // Create operations
@@ -408,7 +477,7 @@ export class TypeOrmRepository<
     options?: RepositoryCreateOptions,
   ): Promise<Entity> {
     const repo = await this.getRepo(options?.ctx);
-    return repo.save(entity);
+    return repo.save(this.toEntity(entity));
   }
 
   protected async doCreateMany(
@@ -416,7 +485,7 @@ export class TypeOrmRepository<
     options?: RepositoryCreateOptions,
   ): Promise<Entity[]> {
     const repo = await this.getRepo(options?.ctx);
-    return repo.save(entities);
+    return repo.save(entities.map((entity) => this.toEntity(entity)));
   }
 
   // Update operations
@@ -424,7 +493,7 @@ export class TypeOrmRepository<
   protected async doUpdate(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
     if (options?.versionGuard) {
       return this.saveWithVersionGuard(
@@ -436,51 +505,68 @@ export class TypeOrmRepository<
     }
 
     const repo = await this.getRepo(options?.ctx);
-    const merged = repo.merge(entity, data);
-    return repo.save(merged);
+    return repo.save(this.toEntity({ ...entity, ...data }));
   }
 
+  /**
+   * Inserts, or updates the row the payload's primary key names, through
+   * TypeORM's `save()` — so an update that changes the row bumps the version
+   * and stamps the update date like every other write, and an
+   * `expectedVersion` read before it conflicts afterwards. A version in the
+   * payload is ignored for the same reason; the database assigns it.
+   *
+   * Not transactional: `save()` looks the row up, then inserts or updates it.
+   * Two concurrent upserts of the same new key are not merged — the second
+   * fails on the primary key.
+   */
   protected async doUpsert(
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
     const repo = await this.getRepo(options?.ctx);
-    const conflictPaths = this.getPrimaryColumns();
-    const entityInstance = repo.create(entity);
-    const insertResult = await repo.upsert(entityInstance, conflictPaths);
+    const instance = this.toEntity(entity);
+    const versionColumn = this.getVersionColumn();
+    if (versionColumn) {
+      const values: PlainLiteralObject = instance;
+      delete values[versionColumn];
+    }
+    const saved = await repo.save(instance);
 
-    const identifiers = insertResult.identifiers[0] ?? {};
-    const primaryKeys: Partial<Record<keyof Entity, Entity[keyof Entity]>> = {};
-
-    for (const col of conflictPaths) {
-      const value = identifiers[col] ?? entityInstance[col];
-
-      if (value === undefined) {
-        throw new Error(`Upsert requires primary key "${col}" to be set`);
+    const primaryWhere: FindOptionsWhere<Entity> = {};
+    for (const col of this.getPrimaryColumns()) {
+      if (saved[col] === undefined) {
+        throw new RuntimeException({
+          message: 'Upsert of "%s" left primary key column "%s" unset',
+          messageParams: [this.metadata.name, col],
+          fault: 'internal',
+        });
       }
-
-      primaryKeys[col] = value;
+      primaryWhere[col] = saved[col];
     }
 
-    // `withDeleted: true` — identity re-read of the row `repo.upsert()` just
-    // wrote; it may legitimately be soft-deleted (e.g. via `{ force: true }`
-    // at the abstraction level). See `saveWithVersionCheck` below.
+    // Identity re-read of the row just written, whatever its delete date, for
+    // the columns `save()` did not hand back.
     const result = await repo.findOne({
-      where: primaryKeys,
+      where: primaryWhere,
       withDeleted: true,
+      loadEagerRelations: false,
     });
 
     if (!result) {
-      throw new Error('Upsert failed: entity not found after upsert');
+      throw new RuntimeException({
+        message: 'Entity "%s" not found after upsert',
+        messageParams: [this.metadata.name],
+        fault: 'internal',
+      });
     }
 
-    return result;
+    return this.toResult(result, {});
   }
 
   protected async doReplace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
     if (options?.versionGuard) {
       return this.saveWithVersionGuard(
@@ -492,8 +578,7 @@ export class TypeOrmRepository<
     }
 
     const repo = await this.getRepo(options?.ctx);
-    const replaced = repo.merge(entity, data);
-    return repo.save(replaced);
+    return repo.save(this.toEntity({ ...entity, ...data }));
   }
 
   /**
@@ -562,9 +647,9 @@ export class TypeOrmRepository<
       );
     }
 
-    // No TransactionScope wired (e.g. TypeOrmRepositoryModule used directly,
-    // without RepositoryModule.forRoot() — TransactionScope is only
-    // provided by the latter). If the caller is already inside their own
+    // No TransactionScope wired (a repository constructed by hand rather
+    // than through RepositoryModule.forRoot(), which always provides one).
+    // If the caller is already inside their own
     // active transaction, the guard and the write still resolve to the
     // same connection via getRepo()/TrxCtx, so it's still safe — only
     // refuse when neither guarantee is present, since running the guard
@@ -589,15 +674,14 @@ export class TypeOrmRepository<
   }
 
   /**
-   * `update`/`replace`'s operation for `withVersionGuard`: merge `data`
-   * onto a freshly re-read row and save it.
+   * `update`/`replace`'s operation for `withVersionGuard`: write `data` over
+   * the own columns of a freshly re-read row and save it.
    *
-   * `merged[guard.column]` is forced back to the freshly-read value
-   * immediately after merging so a client-supplied value for the version
-   * column in `data` can never override it. TypeORM only auto-increments a
-   * version column when its own diff of the entity finds no other pending
-   * change to it, so without this line a spoofed `data` value would both
-   * survive as written *and* suppress the real auto-increment.
+   * The version column is put back to the freshly-read value so a value for
+   * it in `data` can never override it. TypeORM only auto-increments a version
+   * column when its own diff of the entity finds no other pending change to
+   * it, so without this a spoofed `data` value would both survive as written
+   * and* suppress the real auto-increment.
    */
   private async saveWithVersionGuard(
     entity: Entity,
@@ -611,13 +695,15 @@ export class TypeOrmRepository<
       ctx,
       async (repo, primaryWhere) => {
         // `withDeleted: true` — identity re-read of the row the `increment`
-        // guard above just matched (full primary key + version); it may
-        // legitimately be soft-deleted (e.g. via `{ force: true }` at the
-        // abstraction level), and without this it would wrongly come back
-        // null and throw below for a row that demonstrably exists (#471).
+        // guard above just matched (full primary key + version), whatever its
+        // delete date, so it cannot come back null for a row that exists.
+        //
+        // `loadEagerRelations: false` — the row is reduced to its own
+        // columns below, so there is no point loading them.
         const fresh = await repo.findOne({
           where: primaryWhere,
           withDeleted: true,
+          loadEagerRelations: false,
         });
 
         if (!fresh) {
@@ -628,15 +714,13 @@ export class TypeOrmRepository<
           });
         }
 
-        // `repo.merge()` mutates `fresh` in place and returns the same
-        // reference, so the true version must be captured *before*
-        // merging — reading `fresh[guard.column]` afterward would just be
-        // reading back whatever `data` already overwrote it with.
-        const trueVersion = fresh[guard.column];
-        const merged = repo.merge(fresh, data);
-        merged[guard.column] = trueVersion;
+        // Own columns only: a relation on the row would outrank its foreign
+        // key column when saved, and TypeORM's constructor puts one there
+        // whenever the class initializes it (`badge = null`).
+        const next = this.toEntity({ ...this.toResult(fresh, {}), ...data });
+        next[guard.column] = fresh[guard.column];
 
-        return repo.save(merged);
+        return this.toResult(await repo.save(next), {});
       },
     );
   }
@@ -645,19 +729,21 @@ export class TypeOrmRepository<
 
   protected async doDelete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
     if (options?.versionGuard) {
       return this.withVersionGuard(
         entity,
         options.versionGuard,
         options.ctx,
-        (repo) => repo.remove(entity),
+        (repo) => this.remove(repo, [entity]).then(([deleted]) => deleted),
       );
     }
 
     const repo = await this.getRepo(options?.ctx);
-    return repo.remove(entity);
+    const [deleted] = await this.remove(repo, [entity]);
+    return deleted;
   }
 
   protected async doDeleteMany(
@@ -665,53 +751,138 @@ export class TypeOrmRepository<
     options?: RepositoryDeleteOptions,
   ): Promise<Entity[]> {
     const repo = await this.getRepo(options?.ctx);
-    return repo.remove(entities);
+    return this.remove(repo, entities);
+  }
+
+  /**
+   * Hard-delete `entities`, returning each as named. TypeORM's `remove`
+   * clears the primary key on every instance it deletes.
+   */
+  private async remove(
+    repo: Repository<Entity>,
+    entities: Entity[],
+  ): Promise<Entity[]> {
+    await repo.remove(entities.map((entity) => this.toEntity(entity)));
+    return entities.map((entity) => this.toEntity(entity));
   }
 
   protected async doSoftDelete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
     if (options?.versionGuard) {
       return this.withVersionGuard(
         entity,
         options.versionGuard,
         options.ctx,
-        (repo) => repo.softRemove(entity),
+        (repo) => repo.softRemove(this.toEntity(entity)),
       );
     }
 
     const repo = await this.getRepo(options?.ctx);
-    return repo.softRemove(entity);
+    return repo.softRemove(this.toEntity(entity));
   }
 
   protected async doRestore(
     entity: Entity,
-    options?: RepositoryRestoreOptions<Entity>,
+    options?: RepositoryRestoreOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
     if (options?.versionGuard) {
       return this.withVersionGuard(
         entity,
         options.versionGuard,
         options.ctx,
-        (repo) => repo.recover(entity),
+        (repo) => repo.recover(this.toEntity(entity)),
       );
     }
 
     const repo = await this.getRepo(options?.ctx);
-    return repo.recover(entity);
+    return repo.recover(this.toEntity(entity));
   }
 
-  // Utility methods
-
-  transform(entityLike: DeepPartial<Entity>): Entity {
-    return this.repo.create(entityLike);
-  }
-
-  merge(
-    mergeIntoEntity: Entity,
-    ...entityLikes: DeepPartial<Entity>[]
+  /**
+   * `row` holding only what the read asked for: the columns it selected, or
+   * all own columns, and each joined relation with its own columns. With
+   * `eager`, set by a read that asked TypeORM to load eager relations, the
+   * relations TypeORM loads eagerly come back too, as loaded.
+   *
+   * TypeORM builds a loaded row with the entity's constructor, so a field the
+   * class initializes comes back whether or not it was read — a relation the
+   * read never joined (`post = null`), or a column `select` left out
+   * (`status = 'draft'`). The result keeps the row's class but none of that.
+   */
+  private toResult(
+    row: Entity,
+    options: RepositoryFindOneOptions<Entity>,
+    eager = false,
   ): Entity {
-    return this.repo.merge(mergeIntoEntity, ...entityLikes);
+    const result = this.pick(
+      row,
+      options.select?.length
+        ? options.select.map(String)
+        : this.metadata.columns.map((column) => column.name),
+    );
+
+    const values: PlainLiteralObject = result;
+    const loaded: PlainLiteralObject = row;
+    for (const { relation } of options.join ?? []) {
+      const declared = this.metadata.relations?.find(
+        ({ name }) => name === relation,
+      );
+      const value: unknown = loaded[relation];
+      if (!declared || value === undefined) continue;
+
+      const columns = declared.targetColumns.map((column) => column.name);
+      values[relation] = Array.isArray(value)
+        ? value.map((related) => this.pickRelated(related, columns))
+        : this.pickRelated(value, columns);
+    }
+
+    if (eager) {
+      const joined = new Set(
+        (options.join ?? []).map(({ relation }) => relation),
+      );
+      for (const { propertyName } of this.repo.metadata.eagerRelations) {
+        if (!joined.has(propertyName) && loaded[propertyName] !== undefined) {
+          values[propertyName] = loaded[propertyName];
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /** A joined relation's value reduced to its own columns; `null` stays. */
+  private pickRelated(value: unknown, columns: string[]): unknown {
+    if (!isObject(value)) return value;
+    const related: PlainLiteralObject = value;
+    return this.pick(related, columns);
+  }
+
+  /**
+   * A new instance of `source`'s class, built without its constructor, with
+   * `keys` copied across.
+   */
+  private pick<T extends PlainLiteralObject>(source: T, keys: string[]): T {
+    const picked: T = Object.create(Object.getPrototypeOf(source));
+    const from: PlainLiteralObject = source;
+    const to: PlainLiteralObject = picked;
+    for (const key of keys) {
+      if (from[key] !== undefined) to[key] = from[key];
+    }
+    return picked;
+  }
+
+  /**
+   * `values` as an instance of the entity class, holding nothing else.
+   *
+   * TypeORM runs entity listeners only for an instance. The class constructor
+   * is not run: a field it initializes (`status = 'draft'`, `post = null`)
+   * would otherwise be written as though the caller had sent it.
+   */
+  private toEntity(values: DeepPartial<Entity>): Entity {
+    const entity: Entity = Object.create(this.metadata.type.prototype);
+    return Object.assign(entity, values);
   }
 }

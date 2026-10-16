@@ -11,4 +11,7 @@ export class AuthorEntityFixture extends CommonSqliteEntity {
 
   @OneToMany(() => PostEntityFixture, (post) => post.author)
   posts!: PostEntityFixture[];
+
+  /** Not a column; TypeORM's constructor sets it on every author it loads. */
+  featured = false;
 }

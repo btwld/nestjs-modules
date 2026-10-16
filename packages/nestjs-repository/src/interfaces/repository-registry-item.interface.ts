@@ -1,3 +1,7 @@
+import { type PlainLiteralObject } from '@nestjs/common';
+
+import { type RepositoryInterface } from '../repository/interfaces/repository.interface.js';
+
 /**
  * Item stored in the repository registry.
  */
@@ -8,12 +12,17 @@ export interface RepositoryRegistryItem {
   readonly key: string;
 
   /**
-   * Entity class name.
+   * Entity name, as the repository reports it.
    */
   readonly entityName: string;
 
   /**
-   * Module class name that registered this item (e.g., 'TypeOrmRepositoryModule').
+   * URN of the rows the entity reads, as its repository reports it.
    */
-  readonly moduleName: string;
+  readonly urn: string;
+
+  /**
+   * The bound repository.
+   */
+  readonly adapter: RepositoryInterface<PlainLiteralObject>;
 }

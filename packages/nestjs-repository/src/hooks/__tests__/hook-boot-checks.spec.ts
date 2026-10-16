@@ -1,12 +1,11 @@
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
-import { type PlainLiteralObject, type Type } from '@nestjs/common';
+import { type PlainLiteralObject } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 
 import { Hook, type HookWithSpec } from '@concepta/nestjs-core';
 
 import {
-  checkHooksBound,
   checkHooksUsable,
   type HookBootTargetInterface,
 } from '../hook-boot-checks.js';
@@ -42,63 +41,13 @@ class ForeignHook {
  */
 const adapterStub = (over: {
   entityKey?: string;
-  hooksDeclaration?: Type[];
-  hasBoundHooks?: boolean;
-  hasHookResolver?: boolean;
   boundHooks?: HookWithSpec[];
 }): HookBootTargetInterface => ({
   entityKey: over.entityKey ?? 'rows',
-  hooksDeclaration: over.hooksDeclaration,
-  hasBoundHooks: over.hasBoundHooks ?? false,
-  hasHookResolver: over.hasHookResolver ?? true,
   boundHooks: over.boundHooks ?? [],
 });
 
 describe('hook boot checks', () => {
-  describe(checkHooksBound.name, () => {
-    it('passes an entity that declared hooks and had them bound', () => {
-      expect(
-        checkHooksBound([
-          adapterStub({ hooksDeclaration: [GoodHook], hasBoundHooks: true }),
-        ]),
-      ).toEqual([]);
-    });
-
-    it('passes an entity that declared none', () => {
-      expect(checkHooksBound([adapterStub({})])).toEqual([]);
-    });
-
-    it('fails an entity with hooks but no resolver to run them', () => {
-      const failures = checkHooksBound([
-        adapterStub({
-          entityKey: 'notes',
-          hooksDeclaration: [GoodHook],
-          hasBoundHooks: true,
-          hasHookResolver: false,
-        }),
-      ]);
-
-      expect(failures).toHaveLength(1);
-      expect(failures[0]).toContain('CoreModule');
-    });
-
-    it('passes an entity with no resolver that declared no hooks', () => {
-      expect(
-        checkHooksBound([adapterStub({ hasHookResolver: false })]),
-      ).toEqual([]);
-    });
-
-    it('fails an entity whose declaration nothing bound', () => {
-      const failures = checkHooksBound([
-        adapterStub({ entityKey: 'notes', hooksDeclaration: [GoodHook] }),
-      ]);
-
-      expect(failures).toHaveLength(1);
-      expect(failures[0]).toContain('"notes"');
-      expect(failures[0]).toContain('declares hooks but none were bound');
-    });
-  });
-
   describe(checkHooksUsable.name, () => {
     let moduleRef: DeepMockProxy<ModuleRef>;
 

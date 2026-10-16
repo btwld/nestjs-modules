@@ -1,16 +1,98 @@
-# Current scope
-  * `@concepta/nestjs-common` is deprecated — reverted to v7 line (`7.0.0-alpha.10`) and excluded from the v8 workspace. Its remaining v8-only symbols were merged into nestjs-core. Run `npm deprecate @concepta/nestjs-common@8.0.0-alpha.6` at publish time.
-  * Non-v8 packages (everything under `packages/` not listed under the v8 block in `pnpm-workspace.yaml`) are install-only workspace members until migrated to the DDD pattern and NestJS 12 — see the install-only block in `pnpm-workspace.yaml` for the full list. Also removed `@concepta/nestjs-email` from devDependencies in nestjs-invitation and nestjs-authentication (only used in e2e tests — restore when nestjs-email is migrated).
-
 # Ranked backlog
 
-Single priority order across everything below (Fable review, 2026-08-30), ranked by
-(impact of leaving it undone) vs (effort × blast radius) — not grouped by the old
-Critical/High/Nice-To-Have labels, which were rough guesses and sometimes wrong. Effort
-tags: S/M/L. Completed items are removed from this list rather than marked done — see
-git history for what shipped.
+Single priority order (re-ranked 2026-10-16), ranked by (impact of leaving it undone)
+vs (effort × blast radius): repository work first, then test flakes, then the rest.
+Effort tags: S/M/L. Completed items are removed from this list rather than marked
+done — see git history for what shipped. Reference notes that are not work live under
+"Parked" at the end.
 
-  1. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+  1. **`repositories.cache|otp|role` overrides are silently ignored** (S) — the core
+      modules provide the custom-repository token (`CACHE_CUSTOM_REPOSITORY_TOKEN`
+      and the otp/role equivalents) but never export it, and the `forFeature()`
+      repository providers inject it as optional from a module that cannot see it,
+      so they always receive `undefined` and build the default repository. Each
+      README documents the override as working, and no test passes `repositories:`.
+      nestjs-user does it right (the override class goes straight into the core
+      providers and its key is dropped from `RepositoryModule.forFeature`, tested in
+      `user.module.spec.ts`); follow that.
+
+  2. **Context overlays assume an HTTP request** (S) — `ContextOverlayInterceptor`
+      (global via `APP_INTERCEPTOR`) and `Ctx` read
+      `context.switchToHttp().getRequest()` with no `getType()` check, and Nest hands
+      back the handler's first argument there on every transport. On WebSocket that
+      is the socket client, so `getAppContext` stores the context on the connection
+      and the first message's hook list applies to every later message on it. On RPC
+      it is the payload, so a null or primitive payload throws a `TypeError`.
+      `CorrelationContextOverlay` reads `request.headers[…]` and throws whenever that
+      argument has no `headers`. Scheduled jobs never pass through interceptors.
+      Fix: skip non-HTTP contexts in the interceptor base and `Ctx`, matching the
+      documented "route hooks absent outside HTTP".
+
+  3. **The TypeORM optimistic-lock version probe stamps `@UpdateDateColumn`** (S) —
+      `repo.increment(…, 0)` also sets the update-date column, a write the abstraction
+      didn't ask for. Probe with an update query that sets the version and update-date
+      columns to themselves instead.
+
+  4. **Federation gaps** (M) — **on hold, to revisit as a whole against the repository
+      direction** (don't extend federation or use it to satisfy a guarantee). The
+      orchestrator finds a related repository by entity class name, and that index
+      keeps the last registration without complaint, so two distinct entities with
+      the same class name (different databases or tables) federate through whichever
+      registered last. It
+      also ignores `through`, so a federated many-to-many hydrates the wrong rows; and
+      a peer's conditions and sort keep the root's relation tag, which TypeORM then
+      resolves as a property the peer lacks (`EntityPropertyNotFoundError`). Only
+      `findAndCount` federates; `find`, `findOne` and `count` join in the database.
+      Conflicts with the repository direction, to weigh when it resumes:
+      - `findAndCount` with a federated join skips the permeator, row scope and
+        `assertReadable` on entry. It relies on the orchestrator re-entering public
+        methods.
+      - Hydration adds relation properties and `null`/`[]` defaults that no driver
+        returned, so the result check must decide whether a federated relation counts
+        as joined.
+      - A missing `take` is silently capped at 10, and `getRootTotal` can return
+        `MAX_SAFE_INTEGER`.
+      - A `select` without `on.from` silently leaves relations un-hydrated.
+      - Sorting by a federated relation injects a not-null filter, so the sort drops
+        roots with no related row. On an owning relation that filter is on the root's
+        own foreign key, which keeps a root whose related row was soft-deleted.
+      - The TypeORM driver merges `relationsConfig` into the metadata it reports.
+      - crud's paginated type carries the federation-only `metrics`.
+
+  5. **Row scope cannot see the tables a view reads** (S) — row scope compares
+      URNs, and a view entity's URN names the view, not the tables it selects
+      from. `@ViewEntity({ name: 'open_orders', expression: 'SELECT … FROM
+      orders …' })` is `urn:typeorm:shop:open_orders` while a scoped `Order` is
+      `urn:typeorm:shop:orders`, so an unscoped `OpenOrder` reads every scope's
+      orders and is neither refused as a duplicate registration nor as a
+      relation into scoped rows. The same holds for a SQLite file named by two
+      paths (`./app.sqlite` and `/srv/app.sqlite` give different URNs).
+      Documented in the driver README as the implementer's to scope. Closing it
+      would need the driver to know which tables a view expression reads, and
+      to resolve SQLite paths.
+
+  6. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
+      (S) — `UserCacheFactoryFixture` sets `key = faker.person.jobArea()`, drawn from roughly
+      25 values, with constant `type` and `assigneeId`, and the spec calls `createMany(2)`
+      against `@Unique(['key', 'type', 'assigneeId'])`. Two draws therefore collide about
+      1 time in 25, independently of TypeORM version or worker concurrency — confirmed by
+      8 consecutive passes after one failure, with no other change. Make `key` unique per
+      iteration. This is a **different cause** from the parallel-load item below and may
+      account for its nestjs-cache `SQLITE_CONSTRAINT: UNIQUE` sightings, so fixing it
+      first narrows that investigation.
+
+  7. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+      — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`, and in
+      crud's optimistic-locking e2e. Every one passes in isolation and on a re-run of the
+      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row (likely item 6)
+      and as `TransactionScopeFailedException` after a timeout. The cost of leaving it is
+      that a red suite goes green on retry, which trains everyone to re-run rather than
+      look — so a genuine regression in a transactional path would be dismissed as this.
+      Every spec opens its own `:memory:` SQLite database, so workers share no database
+      file; suspect timeouts under CPU contention. Confirm by pinning a failing spec to a
+      single worker.
+
+  8. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
       `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
       hoisting in a way that breaks nestjs-crud's OpenAPI tests
@@ -19,23 +101,18 @@ git history for what shipped.
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  2. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
+  9. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
       driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
       tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
       deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
       count DISTINCT values of the *selected* columns whenever find options carry a `select`
       (typeorm PR #11965, "feat: support distinct count"), so a projected paginated query
       reports a distinct count where it used to report a total — measured on better-sqlite3,
-      100 rows with `select: { isActive }` counted as 2. Unblocking needs the projection kept
-      out of the count query, in two halves: `RepositoryAdapter.count()` stripping `select`
-      before `doCount` (the invariant belongs in the abstraction — no driver should see a
-      projection on a count), and the driver's `doFindAndCount` splitting into `find` +
-      `count`, since one options object cannot serve both halves, while recovering TypeORM's
-      `lazyCount` shortcut so a short page does not pay for an extra query. Worth doing
-      independently of the version range: a direct caller doing `findAndCount({ select })`
-      already gets a wrong total on 1.1+. Re-check on each TypeORM release whether
-      `findAndCount`'s documented entity-count contract is restored, which would make this
-      a range widening rather than a code change.
+      100 rows with `select: { isActive }` counted as 2. crud's list passes `select` into
+      `findAndCount`, so its totals break. The fix keeps the projection out of the count:
+      the driver splits `doFindAndCount` into a find plus a count without `select`.
+      After that, widening the range is a change of its own. Re-check on each TypeORM release whether
+      `findAndCount`'s documented entity-count contract is restored.
 
       The `~1.0.0` pin also accepts a known advisory: GHSA-2rp8-mm9q-fp49 /
       CVE-2026-73651 (medium) affects `>= 1.0.0, < 1.1.0`, and 1.1.0 is the only patched
@@ -44,143 +121,15 @@ git history for what shipped.
       so the exposure is a consumer who runs it against an untrusted schema. Landing the
       count fix above is what clears it.
 
-  3. **Cascaded writes bypass row scope and write policy** (M) — `repository.save()` honours
-      TypeORM's `cascade` on a relation, so a write reaches the related table without entering
-      that entity's repository. None of the target's entry-point guarantees apply: not its
-      row-scope resolver, not its write policy, not its hooks, not `assertMutable`. Reproduced:
-      a scoped write on a child carrying `{ parent: { id: <other tenant's> } }` overwrote and
-      re-tenanted the parent, with no refusal.
+# Parked
 
-      Cascading writes are not a feature of this system — `RelationAction` governs
-      `onDelete`/`onUpdate` only, and `RepositoryProviderOptions` narrows both to
-      `Extract<RelationAction, 'delegate'>`, so nothing else can even be configured. This is a
-      driver behaviour leaking through a payload the abstraction passes along unexamined.
+Not ranked: reference notes, and work waiting on something else.
 
-      The specific holes:
-
-      * Nested relation objects in write payloads reach `save()` unexamined.
-      * `withoutRelations` protects the **row target only**, not the payload. `update` and
-        `replace` call it on `entity`; `data` passes through untouched, as its own TSDoc says.
-      * `create`, `createMany` and `upsert` strip nothing at all — and the reproduced bypass
-        was a `create`.
-      * Append-only entities are equally exposed: a cascade can rewrite a row the write
-        policy declares immutable. The README documents it as a prohibition; nothing
-        refuses it.
-      * `RelationAction`'s `'cascade' | 'restrict' | 'setNull'` are exported publicly with
-        TSDoc describing behaviour no code provides and no config accepts.
-      * Unverified: how a cascading M:N writes its junction table. A junction has no
-        repository to route through, so the fix has to refuse it rather than reduce it.
-
-      Most likely fix is to extend the blocking of cascade mutations rather than to detect
-      them per entity: reduce owning-side relation objects in every write payload to their
-      join-column scalar before the driver sees them (`{ author: { id: 'a' } }` →
-      `{ authorId: 'a' }`), and refuse the non-reducible ones — many-cardinality, M:N, inverse
-      one-to-one — since those can only have meant a cascade write. Two facts worth not
-      re-deriving: `on: { from, to }` on `RepositoryRelationMetadataInterface` already carries
-      the local FK property, so the reduction needs **no new driver metadata**; and no entity
-      in the repo sets `cascade: true`, so it is behaviour-preserving today. That closes row
-      scope and write policy together and uniformly across drivers, since no driver cascades
-      on a scalar FK.
-
-  4. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
-      — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`. Every
-      one passes in isolation and on a re-run of the same suite, so it is a shared-resource
-      condition under concurrency rather than four unrelated bad tests. Seen as a
-      `SQLITE_CONSTRAINT: UNIQUE` on a fixture row and as
-      `TransactionScopeFailedException` after a timeout. The cost of leaving it is that a
-      red suite goes green on retry, which trains everyone to re-run rather than look —
-      so a genuine regression in a transactional path would be dismissed as this.
-      Suspect per-worker database isolation or fixture seeding shared across workers;
-      confirm by pinning the failing spec to a single worker.
-
-  5. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
-      (S) — `UserCacheFactoryFixture` sets `key = faker.person.jobArea()`, drawn from roughly
-      25 values, with constant `type` and `assigneeId`, and the spec calls `createMany(2)`
-      against `@Unique(['key', 'type', 'assigneeId'])`. Two draws therefore collide about
-      1 time in 25, independently of TypeORM version or worker concurrency — confirmed by
-      8 consecutive passes after one failure, with no other change. Make `key` unique per
-      iteration. This is a **different cause** from the parallel-load item above and may
-      account for some of its nestjs-cache `SQLITE_CONSTRAINT: UNIQUE` sightings, so fixing
-      it first narrows that investigation.
-
-  6. **`Join.inner()` is refused on the TypeORM driver rather than implemented** (M) —
-      TypeORM's `relations` find option always renders a LEFT JOIN, so the driver cannot
-      honour an `INNER` clause. It now throws (`fault: 'usage'`) rather than silently
-      returning the rows the caller asked to exclude, which was a wrong answer with no
-      signal. Federation is unaffected: it implements `INNER` itself by requiring the
-      related row to exist, and strips federated joins from the root options before the
-      driver sees them. Do it if a consumer needs INNER on a non-federated relation; until
-      then the refusal is the honest behaviour. Two routes if it is ever wanted: inject a
-      `NOT_NULL` predicate on the related entity's key into every AND-branch of the
-      `WHERE`, since a LEFT join plus a predicate on the joined column already excludes
-      non-matching roots — cheaper, but it has to respect the `never` and empty-compound
-      invariants in `toDnf`; or route joined reads through TypeORM's QueryBuilder instead
-      of `relations`, which is correct for every join shape but changes the driver's whole
-      read path. The first was not explored when this was deferred.
-
-  7. **A relation from an unscoped entity into a scoped one defeats row scope on reads**
-      — a `join` (or a `Where.rel()` filter) is resolved by the driver in one statement, so
-      the joined entity's resolver never runs. That is safe where every scoped entity carries
-      its own scope column and each resolver checks the foreign keys it owns on write, because
-      scope integrity is then established on write and reads inherit it. It is *not* safe when
-      an unscoped entity holds a relation into a scoped one: nothing checks the unscoped side,
-      so a join through it reads rows the caller's scope would have excluded. Reproduced three
-      ways — reading another tenant's rows through a public side-table, using `Where.rel()` as
-      a search oracle, and planting a public row against a guessed id. **Accepted as a schema
-      design responsibility**, not enforced: the framework's guarantee is that a resolver runs
-      at every repository entry point, and a join is not one. Documented in the row-scope
-      README. Revisit only if a deployment needs it policed — the options were a symmetric
-      boot check (forces a declaration on anything relating to a scoped entity) or injecting
-      the joined entity's predicate as relation-tagged conditions (no driver change needed,
-      but a LEFT join then drops roots whose related row is invisible).
-
-  8. **`HookContextOverlay` crashes on a non-HTTP execution context** (S) —
-      `attach()` calls `context.switchToHttp().getRequest()` unguarded and hands the
-      result to `getAppContext`, which indexes it. On a microservice, websocket or
-      scheduled handler that request is `undefined`, so the property access is a
-      `TypeError` — thrown from an interceptor registered globally via
-      `APP_INTERCEPTOR`, so it takes down the handler rather than degrading. Latent
-      only because nothing in the repo drives hooks over a non-HTTP transport; any
-      consumer with a queue consumer plus `CoreModule` hits it. The fix is a guard
-      returning early when there is no request, which is also the honest behaviour:
-      there is no request-scoped hook list to attach. Worth pairing with a decision on
-      whether a non-HTTP entry point should get a context at all, since entity-level
-      hook registration now means those calls run hooks without needing one.
-
-  9. **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
+  * `@concepta/nestjs-common` is deprecated — reverted to v7 line (`7.0.0-alpha.10`) and excluded from the v8 workspace. Its remaining v8-only symbols were merged into nestjs-core. Run `npm deprecate @concepta/nestjs-common@8.0.0-alpha.6` at publish time.
+  * Non-v8 packages (everything under `packages/` not listed under the v8 block in `pnpm-workspace.yaml`) are install-only workspace members until migrated to the DDD pattern and NestJS 12 — see the install-only block in `pnpm-workspace.yaml` for the full list. Also removed `@concepta/nestjs-email` from devDependencies in nestjs-invitation and nestjs-authentication (only used in e2e tests — restore when nestjs-email is migrated).
+  * **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
-
-  10. **A scope value typed unlike its column is a silent trap, and nothing documents it**
-      (S) — resolve `'42'` against an integer `tenantId` and the database compares the two
-      equal while row scope's post-read check does not, so every read succeeds and every
-      write 404s. It fails closed and it is loud on first run, which is why a diagnostic
-      was deliberately rejected: it would have put a `String()`-based loose compare next to
-      the strict compare that is the actual security decider. A sentence in the row-scope
-      README naming the symptom is the whole fix.
-
-  11. **Nothing stops a row-scope resolver regressing to `RowScopeBase<PlainLiteralObject>`**
-      (S) — naming the entity in both type parameters is what makes `column` checked
-      against the entity's real columns, turning a misspelling into a compile error instead
-      of a boot failure. The fixtures were the worked examples and had all drifted to the
-      weaker form, which also produced a wrong review finding when they were read as the
-      reference instead of the README. A lint rule or a type-level nudge would hold the
-      line; until then it relies on review.
-
-  12. **`console.log` in the crud README's hook examples** (S) — against the project's own
-      rule, and README examples get copied verbatim into consumer code where the shipped
-      ESLint config then rejects them. The hook section now injects a `Logger`; the rest of
-      the file was left alone because fixing it properly is a sweep across every package's
-      README rather than one example.
-
-  13. **`RepositoryProviderOptions`' index signature silently swallows misspelled options**
-      (M) — `[key: string]: unknown` lets `writePolcy` or `hook` type-check and then drops
-      it, so the entity behaves as if it declared nothing. Removing the signature turns a
-      misspelling into a compile error. It is a published type, so measure what breaks first
-      (driver-specific options passed through it) and land it as its own change. When it
-      lands, `checkWritePolicyCompleteness`'s TSDoc — "the only backstop against a
-      misspelled option name" — and the note on the signature itself both go stale.
-
-  14. **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
+  * **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.
       Full restore checklist per package:
       1. `pnpm-workspace.yaml` — move the dir from the install-only block to the v8
          `packages` list (or collapse both blocks to a single `packages/*` glob when all

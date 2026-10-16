@@ -17,10 +17,13 @@ import { UserEntityFixture } from './entities/user-entity.fixture.js';
       synchronize: true,
       entities: [UserEntityFixture, UserCacheEntityFixture],
     }),
-    RepositoryModule.forRoot({}),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [{ key: 'userCache', entity: UserCacheEntityFixture }],
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'userCache', entity: UserCacheEntityFixture }],
+        },
+      ],
     }),
     CacheModule.forRoot({}),
     CacheModule.forFeature(['userCache']),

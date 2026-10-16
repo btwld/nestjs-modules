@@ -12,7 +12,7 @@ import {
 // =============================================================================
 
 /**
- * Before find - receives FindManyOptions, returns modified options.
+ * Before find - receives the find options, returns modified options.
  */
 export type BeforeFindMethod<
   Entity extends PlainLiteralObject = PlainLiteralObject,
@@ -31,7 +31,7 @@ export type AfterFindMethod<
 > = (result: Entity[], ctx?: Ctx) => Promise<Entity[]>;
 
 /**
- * Before findOne - receives FindOneOptions, returns modified options.
+ * Before findOne - receives the findOne options, returns modified options.
  */
 export type BeforeFindOneMethod<
   Entity extends PlainLiteralObject = PlainLiteralObject,
@@ -50,7 +50,7 @@ export type AfterFindOneMethod<
 > = (result: Entity | null, ctx?: Ctx) => Promise<Entity | null>;
 
 /**
- * Before count - receives FindManyOptions, returns modified options.
+ * Before count - receives the find options, returns modified options.
  */
 export type BeforeCountMethod<
   Entity extends PlainLiteralObject = PlainLiteralObject,
@@ -68,7 +68,7 @@ export type AfterCountMethod<
 > = (result: number, ctx?: Ctx) => Promise<number>;
 
 /**
- * Before findAndCount - receives FindManyOptions, returns modified options.
+ * Before findAndCount - receives the find options, returns modified options.
  */
 export type BeforeFindAndCountMethod<
   Entity extends PlainLiteralObject = PlainLiteralObject,
@@ -260,7 +260,7 @@ export type AfterRestoreMethod<
 
 /**
  * Before any read operation (find, findOne, count, findAndCount).
- * Uses FindManyOptions as it's the superset.
+ * Receives the find options, the superset of every read's options.
  */
 export type BeforeReadMethod<
   Entity extends PlainLiteralObject = PlainLiteralObject,
@@ -301,7 +301,7 @@ export type AfterWriteMethod<
 > = (result: Entity | Entity[], ctx?: Ctx) => Promise<Entity | Entity[]>;
 
 /**
- * Before any transition operation (softRemove, restore).
+ * Before any transition operation (softDelete, restore).
  */
 export type BeforeTransitionMethod<
   Entity extends PlainLiteralObject = PlainLiteralObject,

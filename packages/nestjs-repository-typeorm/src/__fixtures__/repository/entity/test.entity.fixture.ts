@@ -11,6 +11,6 @@ export class TestEntityFixture
   @Column()
   firstName!: string;
 
-  @Column({ nullable: true })
-  lastName!: string;
+  @Column({ type: 'varchar', nullable: true })
+  lastName!: string | null;
 }

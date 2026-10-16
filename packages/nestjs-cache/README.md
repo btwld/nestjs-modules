@@ -424,12 +424,12 @@ gateway request/handler classes are exported from
 The CRUD gateway needs the surrounding modules registered as well:
 `CqrsModule.forRoot()`, `CrudModule.forRoot()` (with `CrudCqrsResolver` as
 the default resolver), `CoreModule.forRoot()` (context overlays), and a
-`RepositoryModule.forFeature()` mapping the entity key to your cache entity
+`RepositoryModule.forRoot()` entry mapping the entity key to your cache entity
 class.
 
 Cache rows carry an `assigneeId`, so in a multi-tenant deployment they are
 rows you will want scoped. That is declared on this same
-`RepositoryModule.forFeature()` registration via `rowScope` — see the Row Scope
+`RepositoryModule.forRoot()` entry via `rowScope` — see the Row Scope
 section of `@concepta/nestjs-repository`.
 
 ```ts
@@ -464,18 +464,23 @@ import {
   ReadCacheRequestHandler,
 } from '@concepta/nestjs-cache/optional/crud';
 
+// The application's root module: RepositoryModule.forRoot() is imported once.
 @Module({
   imports: [
     CqrsModule.forRoot(),
-    RepositoryModule.forRoot({}),
+    CacheModule.forRoot({ settings: { expiresIn: '1h' } }),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'userCache', entity: CacheSqliteEntity }],
+        },
+      ],
+    }),
     CrudModule.forRoot({
       defaultResolver: CrudCqrsResolver,
     }),
     CoreModule.forRoot(),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [{ key: 'userCache', entity: CacheSqliteEntity }],
-    }),
     CacheModule.forFeature(['userCache']),
     CrudModule.forFeature<CacheInterface>({
       crud: {
@@ -530,7 +535,7 @@ import {
     }),
   ],
 })
-export class UserCacheModule {}
+export class AppModule {}
 ```
 
 This registers a CRUD controller at `/cache/user` with List, Read, Create,
@@ -538,8 +543,9 @@ Update, Replace, and Delete operations. The `CrudCqrsResolver` bridges HTTP
 requests to domain commands and queries via the CQRS bus. Set `transactional:
 true` to wrap each operation in a database transaction.
 
-`CacheModule.forRoot()` (or `forRootAsync()`) must be registered globally
-in a parent module for `forFeature()` to resolve its dependencies.
+To put the `forFeature()` calls in a feature module instead, keep the
+`forRoot()` calls — `RepositoryModule.forRoot()` with every entity, and
+`CacheModule.forRoot()` (or `forRootAsync()`) — in the root module.
 
 This is a minimal example. `CrudModule.forFeature()` supports additional
 options including custom resolvers, route guards, schema-based per-operation

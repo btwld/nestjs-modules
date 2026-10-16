@@ -9,9 +9,9 @@ import {
  * resolver has been bound to it.
  *
  * Refusing is the only safe answer: the alternative is running the operation
- * with no scope applied at all. Usually means the entity was registered
- * somewhere `RepositoryModule.forFeature()` never saw, or that a repository
- * was used from another provider's constructor, before binding.
+ * with no scope applied at all. Means the resolver depends on a
+ * request-scoped provider, or that the repository was used from another
+ * provider's constructor before startup attached its resolver.
  */
 export class RowScopeUnboundException extends RuntimeException {
   declare context: RuntimeException['context'] & { entityKey: string };
@@ -20,8 +20,9 @@ export class RowScopeUnboundException extends RuntimeException {
     super({
       message:
         'Repository "%s" declares a row scope but has no resolver bound, so ' +
-        'it cannot serve this operation. Register the entity through ' +
-        'RepositoryModule.forFeature() so its resolver is bound at startup.',
+        'it cannot serve this operation. Keep the resolver and its ' +
+        'dependencies singleton-scoped, and do not use the repository from ' +
+        "another provider's constructor.",
       messageParams: [entityKey],
       fault: 'usage',
       ...options,

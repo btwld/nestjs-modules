@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, type PlainLiteralObject } from '@nestjs/common';
 
 import { Where, WhereOperator } from '@concepta/nestjs-repository';
 import { createMockRepository } from '@concepta/nestjs-repository/testing';
@@ -43,7 +43,6 @@ describe('CrudAdapter', () => {
         },
       ],
     });
-    repo.prepare.mockImplementation((dto) => dto as TestEntity);
     adapter = new TestCrudAdapter(repo);
   });
 
@@ -244,6 +243,52 @@ describe('CrudAdapter', () => {
     });
   });
 
+  describe('getSelectFields', () => {
+    it('should refuse a field that is not a column', () => {
+      // Parsed from a query string, so any field name can arrive.
+      const untyped = new TestCrudAdapter<PlainLiteralObject>(
+        createMockRepository<PlainLiteralObject>({
+          name: 'TestEntity',
+          type: TestEntityClass,
+          columns: [
+            {
+              name: 'id',
+              isPrimary: true,
+              isRemoveDate: false,
+              isVersion: false,
+            },
+            {
+              name: 'name',
+              isPrimary: false,
+              isRemoveDate: false,
+              isVersion: false,
+            },
+          ],
+        }),
+      );
+
+      expect(() =>
+        untyped.exposedGetSelectFields(
+          { ...mockCrudParsedQuery(), fields: ['name', 'nickname'] },
+          {},
+        ),
+      ).toThrow(
+        new BadRequestException(
+          "Invalid select field 'nickname' for entity 'TestEntity'",
+        ),
+      );
+    });
+
+    it('should leave out a column the route does not allow', () => {
+      expect(
+        adapter.exposedGetSelectFields(
+          { ...mockCrudParsedQuery(), fields: ['name', 'age'] },
+          { exclude: ['age'] },
+        ),
+      ).toEqual(['name', 'id']);
+    });
+  });
+
   describe('checkFilterIsArray', () => {
     it('should return true for non-empty array value', () => {
       const cond = {
@@ -274,12 +319,12 @@ describe('CrudAdapter', () => {
       ).toBeUndefined();
     });
 
-    it('should return an entity for an empty object (#466)', () => {
+    it('should return an empty payload for an empty object (#466)', () => {
       const ctx = mockCrudContext();
       expect(adapter.prepareEntityBeforeSave({} as never, ctx)).toEqual({});
     });
 
-    it('should return entity with dto field values', () => {
+    it('should return the dto field values', () => {
       const dto = { id: '1', name: 'Test' } as TestEntity;
       const ctx = mockCrudContext();
       const result = adapter.prepareEntityBeforeSave(dto, ctx);
@@ -288,7 +333,7 @@ describe('CrudAdapter', () => {
       expect(result?.name).toEqual('Test');
     });
 
-    it('should apply matching route params to entity', () => {
+    it('should apply matching route params over the dto', () => {
       const dto = { id: '1', name: 'Test' } as TestEntity;
       const context = mockCrudContext({ params: { id: 'overridden' } });
       const result = adapter.prepareEntityBeforeSave(dto, context);

@@ -2,10 +2,12 @@ import { type PlainLiteralObject, type Type } from '@nestjs/common';
 
 import { type DeepPartial } from '@concepta/nestjs-core';
 
+import { targetColumnsFixture } from '../../__fixtures__/column-metadata.fixture.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import { type RepositoryRelationMetadataInterface } from '../../repository/interfaces/repository-relation-metadata.interface.js';
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import { RepositoryAdapter } from '../../repository/repository-adapter.js';
+import { type RowScopeRegistration } from '../interfaces/row-scope-registration.interface.js';
 import {
   type RowScopeInterface,
   type RowScopeQueryParams,
@@ -13,7 +15,8 @@ import {
 } from '../interfaces/row-scope.interface.js';
 import {
   checkDeclarationCompleteness,
-  checkResolversBound,
+  checkRelationsIntoScoped,
+  findRelationsIntoScoped,
 } from '../row-scope-boot-checks.js';
 
 class Resolver implements RowScopeInterface {
@@ -41,13 +44,16 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
   constructor(
     entityKey: string,
     entityName: string,
-    declaration?: ConstructorParameters<typeof RepositoryAdapter>[2],
+    declaration?: RowScopeRegistration,
     relations: RepositoryRelationMetadataInterface[] = [],
+    urn = `urn:memory:${entityName}`,
   ) {
-    super(entityKey, undefined, declaration);
+    super(entityKey);
+    this.bind({ rowScope: declaration });
     this.metadata = {
       name: entityName,
       type: EntityClass as Type<PlainLiteralObject>,
+      urn,
       columns: [],
       relations,
     };
@@ -92,11 +98,8 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
   protected async doRestore(): Promise<PlainLiteralObject> {
     throw new Error('structural check only');
   }
-  transform(entityLike: DeepPartial<PlainLiteralObject>): PlainLiteralObject {
+  toRow(entityLike: DeepPartial<PlainLiteralObject>): PlainLiteralObject {
     return entityLike;
-  }
-  merge(mergeInto: PlainLiteralObject): PlainLiteralObject {
-    return mergeInto;
   }
 }
 
@@ -105,30 +108,183 @@ const publicly = { access: 'public', reason: 'shared reference data' } as const;
 
 const boundScoped = (entityKey: string, entityName: string): StubAdapter => {
   const adapter = new StubAdapter(entityKey, entityName, scoped);
-  adapter.setRowScope(new Resolver());
+  adapter.setRowScopeResolver(new Resolver());
   return adapter;
 };
 
 describe('row scope boot checks', () => {
-  describe('resolvers bound', () => {
-    it('passes when a scoped entity has its resolver bound', () => {
-      expect(checkResolversBound([boundScoped('a', 'A')])).toEqual([]);
+  describe('relations into a scoped entity', () => {
+    const toScoped = (
+      name: string,
+      flags: Partial<RepositoryRelationMetadataInterface> = {},
+    ): RepositoryRelationMetadataInterface => ({
+      name,
+      targetEntity: 'Order',
+      targetUrn: 'urn:memory:Order',
+      targetColumns: targetColumnsFixture('id', 'categoryId'),
+      cardinality: 'many',
+      on: { from: 'id', to: 'categoryId' },
+      ...flags,
     });
 
-    it('fails when a scoped entity was never bound', () => {
-      const failures = checkResolversBound([new StubAdapter('a', 'A', scoped)]);
+    it.each([
+      ['declared public', publicly],
+      ['not declared', undefined],
+    ])('fails a relation from an entity %s', (_case, declaration) => {
+      const failures = checkRelationsIntoScoped([
+        boundScoped('orders', 'Order'),
+        new StubAdapter('categories', 'Category', declaration, [
+          toScoped('orders'),
+        ]),
+      ]);
+
+      expect(failures).toEqual([
+        '"categories" has no row scope, but its "orders" relation points at ' +
+          'Order, which does. Reading "orders" would return Order rows the ' +
+          'caller is not allowed to see. Give "categories" a row scope in ' +
+          'forRoot(), or remove "orders" from the entity and declare the ' +
+          "relation on Order's side only.",
+      ]);
+    });
+
+    it('fails a federated relation too', () => {
+      const failures = checkRelationsIntoScoped([
+        boundScoped('orders', 'Order'),
+        new StubAdapter('categories', 'Category', publicly, [
+          toScoped('orders', { federated: true }),
+        ]),
+      ]);
 
       expect(failures).toHaveLength(1);
-      expect(failures[0]).toContain('"a"');
+      expect(failures[0]).toContain('"orders" relation');
     });
 
-    it('ignores entities that are declared public or not declared at all', () => {
-      expect(
-        checkResolversBound([
-          new StubAdapter('a', 'A', publicly),
-          new StubAdapter('b', 'B'),
+    it('fails an owning relation as well as an inverse one', () => {
+      const failures = checkRelationsIntoScoped([
+        boundScoped('orders', 'Order'),
+        new StubAdapter('notes', 'Note', publicly, [
+          toScoped('order', {
+            cardinality: 'one',
+            on: { from: 'orderId', to: 'id' },
+            foreignKey: [{ from: 'orderId', to: 'id' }],
+          }),
         ]),
-      ).toEqual([]);
+      ]);
+
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toContain('"order" relation');
+    });
+
+    it('fails a relation into rows a differently named scoped entity reads', () => {
+      // Two classes over one table, e.g. a single-table inheritance child
+      // registered scoped and its parent reachable by relation.
+      const invoices = new StubAdapter(
+        'invoices',
+        'Invoice',
+        scoped,
+        [],
+        'urn:memory:documents',
+      );
+      invoices.setRowScopeResolver(new Resolver());
+
+      const failures = checkRelationsIntoScoped([
+        invoices,
+        new StubAdapter('folders', 'Folder', publicly, [
+          toScoped('documents', {
+            targetEntity: 'Document',
+            targetUrn: 'urn:memory:documents',
+          }),
+        ]),
+      ]);
+
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toContain('points at Document');
+    });
+
+    it('passes a relation into a same-named entity that reads other rows', () => {
+      // Same class name, another data source.
+      const failures = checkRelationsIntoScoped([
+        boundScoped('orders', 'Order'),
+        new StubAdapter('categories', 'Category', publicly, [
+          toScoped('orders', { targetUrn: 'urn:memory:archive:Order' }),
+        ]),
+      ]);
+
+      expect(failures).toEqual([]);
+    });
+
+    it('fails a many-to-many whose junction rows are scoped', () => {
+      const failures = checkRelationsIntoScoped([
+        boundScoped('assignments', 'Assignment'),
+        new StubAdapter('users', 'User', publicly, [
+          toScoped('roles', {
+            targetEntity: 'Role',
+            targetUrn: 'urn:memory:Role',
+            on: { from: 'id', to: 'id' },
+            through: {
+              urn: 'urn:memory:Assignment',
+              fromKey: 'userId',
+              toKey: 'roleId',
+            },
+          }),
+        ]),
+      ]);
+
+      expect(failures).toEqual([
+        '"users" has no row scope, but its "roles" relation reads through the ' +
+          'rows of "assignments", which has one. Reading "roles" would follow ' +
+          'links the caller is not allowed to see. Give "users" a row scope ' +
+          'in forRoot(), or remove "roles" from the entity.',
+      ]);
+    });
+
+    it('passes relations between two scoped or two unscoped entities', () => {
+      const adapters = [
+        boundScoped('orders', 'Order'),
+        new StubAdapter('lines', 'OrderLine', scoped, [toScoped('order')]),
+        new StubAdapter('tags', 'Tag', publicly, [
+          toScoped('categories', {
+            targetEntity: 'Category',
+            targetUrn: 'urn:memory:Category',
+          }),
+        ]),
+        new StubAdapter('categories', 'Category'),
+      ];
+
+      expect(checkRelationsIntoScoped(adapters)).toEqual([]);
+    });
+  });
+
+  describe('which relations read scoped rows', () => {
+    const relation = (
+      name: string,
+      targetUrn: string,
+      junctionUrn?: string,
+    ): RepositoryRelationMetadataInterface => ({
+      name,
+      targetEntity: 'Target',
+      targetUrn,
+      targetColumns: targetColumnsFixture('id'),
+      cardinality: 'many',
+      on: { from: 'id', to: 'id' },
+      ...(junctionUrn && {
+        through: { urn: junctionUrn, fromKey: 'aId', toKey: 'bId' },
+      }),
+    });
+
+    it('names a relation into scoped rows, or through scoped junction rows', () => {
+      const adapter = new StubAdapter('users', 'User', scoped, [
+        relation('orders', 'urn:memory:Order'),
+        relation('roles', 'urn:memory:Role', 'urn:memory:Assignment'),
+        relation('tags', 'urn:memory:Tag', 'urn:memory:UserTag'),
+      ]);
+
+      expect(
+        findRelationsIntoScoped(
+          adapter.metadata,
+          new Set(['urn:memory:Order', 'urn:memory:Assignment']),
+        ),
+      ).toEqual(['orders', 'roles']);
     });
   });
 

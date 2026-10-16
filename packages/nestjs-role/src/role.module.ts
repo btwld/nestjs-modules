@@ -1,5 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
+import { RepositoryModule } from '@concepta/nestjs-repository';
+
 import { createRoleAssignmentRepositoryProvider } from './infrastructure/utils/create-role-assignment-repository-provider.js';
 import { createRoleRepositoryProvider } from './infrastructure/utils/create-role-repository-provider.js';
 import {
@@ -61,6 +63,12 @@ export class RoleModule {
 
     return {
       module: RoleModule,
+      imports: [
+        RepositoryModule.forFeature([
+          config.roleEntityKey,
+          ...config.assignmentEntityKeys,
+        ]),
+      ],
       providers,
       exports: providers,
     };

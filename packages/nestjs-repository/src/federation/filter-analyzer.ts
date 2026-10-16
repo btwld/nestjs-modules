@@ -18,7 +18,7 @@ import { type FederatedRelation } from './federation.types.js';
  * Separates a WhereClause tree into root conditions and
  * relation-tagged conditions grouped by relation name.
  *
- * Also injects NOT_NULL filters for INNER JOIN semantics
+ * Also injects NOT_NULL filters for sorted relations
  * and applies distinctFilter from relation metadata.
  */
 export class FilterAnalyzer {
@@ -27,7 +27,6 @@ export class FilterAnalyzer {
     string,
     WhereCondition<PlainLiteralObject>[]
   >();
-  private readonly userFilteredRelationNames: Set<string>;
 
   constructor(
     where: WhereClause | undefined,
@@ -36,14 +35,9 @@ export class FilterAnalyzer {
   ) {
     const federatedNames = new Set(relations.map((r) => r.name));
     this.rootWhere = this.extractRelationConditions(where, federatedNames);
-    // Snapshot before injection: NOT_NULL (INNER JOIN) and distinctFilter
-    // conditions are structural, not caller-specified, so they shouldn't
-    // count as a "filter" for validation that only cares about what the
-    // caller actually asked to filter by.
-    this.userFilteredRelationNames = new Set(this.relationConditions.keys());
 
     if (relations.length > 0) {
-      this.injectInnerJoinFilters(relations, sortedRelationNames);
+      this.injectSortedRelationFilters(relations, sortedRelationNames);
       this.injectDistinctFilters(relations);
     }
   }
@@ -64,15 +58,6 @@ export class FilterAnalyzer {
   hasFiltersForRelation(relation: FederatedRelation): boolean {
     const conditions = this.relationConditions.get(relation.name);
     return conditions !== undefined && conditions.length > 0;
-  }
-
-  /**
-   * Whether the caller specified a filter condition on this relation,
-   * excluding structural conditions this class injects itself (INNER JOIN
-   * NOT_NULL, distinctFilter).
-   */
-  hasUserFiltersForRelation(relation: FederatedRelation): boolean {
-    return this.userFilteredRelationNames.has(relation.name);
   }
 
   hasRelationFilters(relations: FederatedRelation[]): boolean {
@@ -189,20 +174,18 @@ export class FilterAnalyzer {
   }
 
   /**
-   * Inject NOT_NULL filters for INNER JOIN relations and sorted relations.
+   * Inject NOT_NULL filters for sorted relations.
    *
    * Owning: NOT_NULL on root's FK column (added to root where).
    * Non-owning: NOT_NULL on target's FK column (added to relation conditions).
    */
-  private injectInnerJoinFilters(
+  private injectSortedRelationFilters(
     relations: FederatedRelation[],
     sortedRelationNames: Set<string>,
   ): void {
-    const needsInnerJoin = relations.filter(
-      (r) => r.joinType === 'INNER' || sortedRelationNames.has(r.name),
-    );
+    const sorted = relations.filter((r) => sortedRelationNames.has(r.name));
 
-    for (const relation of needsInnerJoin) {
+    for (const relation of sorted) {
       if (relation.isOwning) {
         this.addRootCondition({
           field: relation.on.from,

@@ -15,7 +15,9 @@ import {
   RuntimeException,
 } from '@concepta/nestjs-core';
 
+import { RepositoryDatabaseException } from '../exceptions/repository-database.exception.js';
 import { RepositoryQueryException } from '../exceptions/repository-query.exception.js';
+import { type RepositoryDatabaseErrorInterface } from '../repository/interfaces/repository-database-error.interface.js';
 import {
   type RepositoryFindOptions,
   type RepositoryFindOneOptions,
@@ -32,6 +34,10 @@ type RunHooksFn = <T>(
   ctx: PlainLiteralObject | undefined,
   filter?: HookMethodFilter,
 ) => Promise<T>;
+
+type DescribeDatabaseErrorFn = (
+  error: unknown,
+) => RepositoryDatabaseErrorInterface | undefined;
 
 type Ctx = PlainLiteralObject;
 type HookCb = PassthroughPermeateCallback<Ctx>;
@@ -74,7 +80,11 @@ export class RepoPermeatorFactory<
   readonly softDelete: RepoPermeator<Entity, Entity>;
   readonly restore: RepoPermeator<Entity, Entity>;
 
-  constructor(runHooks: RunHooksFn, entityName: string) {
+  constructor(
+    runHooks: RunHooksFn,
+    entityName: string,
+    describeDatabaseError: DescribeDatabaseErrorFn = () => undefined,
+  ) {
     const cb =
       (key: HookMethodKeyType, filter?: HookMethodFilter): HookCb =>
       <T>(payload: T, ambient?: Ctx) =>
@@ -83,6 +93,12 @@ export class RepoPermeatorFactory<
     const options: PermeatorOptions<Ctx> = {
       onError: (error: unknown): never => {
         if (error instanceof RuntimeException) throw error;
+        const database = describeDatabaseError(error);
+        if (database) {
+          throw new RepositoryDatabaseException(entityName, database, {
+            originalError: error,
+          });
+        }
         throw new RepositoryQueryException(entityName, {
           originalError: error,
         });

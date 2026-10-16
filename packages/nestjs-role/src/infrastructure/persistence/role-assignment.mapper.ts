@@ -7,10 +7,22 @@ export class RoleAssignmentMapper extends DomainMapper<
   RoleAssignmentEntityInterface,
   RoleAssignment
 > {
+  /**
+   * Picks the role assignment's own fields, so a relation the consumer's entity loads
+   * never reaches the aggregate, or a write.
+   */
   createAggregate(entity: RoleAssignmentEntityInterface): RoleAssignment {
-    const { id, version, dateCreated, dateUpdated, dateDeleted, ...props } =
-      entity;
-    return new RoleAssignment(id, props, version, {
+    const {
+      id,
+      version,
+      dateCreated,
+      dateUpdated,
+      dateDeleted,
+      assigneeId,
+      roleId,
+    } = entity;
+
+    return new RoleAssignment(id, { assigneeId, roleId }, version, {
       dateCreated,
       dateUpdated,
       dateDeleted,

@@ -4,6 +4,7 @@ import { type DeepPartial, RuntimeException } from '@concepta/nestjs-core';
 
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import {
+  type RepositoryCountOptions,
   type RepositoryCreateOptions,
   type RepositoryDeleteOneOptions,
   type RepositoryDeleteOptions,
@@ -72,9 +73,18 @@ class TestAdapter extends RepositoryAdapter<Row> {
   readonly metadata: RepositoryMetadataInterface<Row> = {
     name: 'Row',
     type: RowClass as Type<Row>,
+    urn: 'urn:memory:Row',
     columns: [
       { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
       { name: 'name', isPrimary: false, isRemoveDate: false, isVersion: false },
+      // The column the stamping resolver below writes — only columns reach a
+      // driver.
+      {
+        name: 'stamped',
+        isPrimary: false,
+        isRemoveDate: false,
+        isVersion: false,
+      },
       {
         name: 'dateDeleted',
         isPrimary: false,
@@ -102,9 +112,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
     this.record(RowScopeOperation.FIND_ONE, options);
     return null;
   }
-  protected async doCount(
-    options?: RepositoryFindOptions<Row>,
-  ): Promise<number> {
+  protected async doCount(options?: RepositoryCountOptions): Promise<number> {
     this.record(RowScopeOperation.COUNT, options);
     return 0;
   }
@@ -119,19 +127,19 @@ class TestAdapter extends RepositoryAdapter<Row> {
     _options?: RepositoryCreateOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.CREATE, entity);
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doCreateMany(
     entities: DeepPartial<Row>[],
     _options?: RepositoryCreateOptions,
   ): Promise<Row[]> {
     this.record(RowScopeOperation.CREATE_MANY, entities);
-    return entities.map((e) => this.transform(e));
+    return entities.map((e) => this.toRow(e));
   }
   protected async doUpdate(
     entity: Row,
     data: DeepPartial<Row>,
-    _options?: RepositoryUpdateOptions<Row>,
+    _options?: RepositoryUpdateOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.UPDATE, data);
     return entity;
@@ -141,19 +149,19 @@ class TestAdapter extends RepositoryAdapter<Row> {
     _options?: RepositoryUpsertOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.UPSERT, entity);
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doReplace(
     entity: Row,
     data: DeepPartial<Row>,
-    _options?: RepositoryUpdateOptions<Row>,
+    _options?: RepositoryUpdateOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.REPLACE, data);
     return entity;
   }
   protected async doDelete(
     entity: Row,
-    _options?: RepositoryDeleteOneOptions<Row>,
+    _options?: RepositoryDeleteOneOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.DELETE, entity);
     return entity;
@@ -167,38 +175,46 @@ class TestAdapter extends RepositoryAdapter<Row> {
   }
   protected async doSoftDelete(
     entity: Row,
-    _options?: RepositoryDeleteOneOptions<Row>,
+    _options?: RepositoryDeleteOneOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.SOFT_DELETE, entity);
     return entity;
   }
   protected async doRestore(
     entity: Row,
-    _options?: RepositoryRestoreOptions<Row>,
+    _options?: RepositoryRestoreOptions,
   ): Promise<Row> {
     this.record(RowScopeOperation.RESTORE, entity);
     return entity;
   }
 
-  transform(entityLike: DeepPartial<Row>): Row {
+  toRow(entityLike: DeepPartial<Row>): Row {
     return Object.assign(new RowClass(), entityLike) as Row;
-  }
-
-  merge(mergeIntoEntity: Row, ...entityLikes: DeepPartial<Row>[]): Row {
-    return Object.assign(mergeIntoEntity, ...entityLikes);
   }
 }
 
 /** A resolver that refuses any write whose value carries `name`. */
-const refusingOn = (name: string): RowScopeInterface => ({
-  scopeQuery: (params) => params.options,
-  scopeWrite: (params) => {
-    if (params.value.name === name) {
+class RefusingOn implements RowScopeInterface {
+  constructor(private readonly name: string) {}
+
+  scopeQuery<Options extends { where?: WhereClause }>(
+    params: RowScopeQueryParams<Options>,
+  ): Options {
+    return params.options;
+  }
+
+  scopeWrite<Value extends PlainLiteralObject>(
+    params: RowScopeWriteParams<Value>,
+  ): Value {
+    if (params.value.name === this.name) {
       throw new RuntimeException({ message: 'refused', fault: 'client' });
     }
     return params.value;
-  },
-});
+  }
+}
+
+const scopedTo = (resolver: Type<RowScopeInterface>) =>
+  ({ access: 'scoped', resolver }) as const;
 
 const row = (overrides: Partial<Row> = {}): Row => ({
   id: 'row-1',
@@ -275,7 +291,8 @@ describe('row scope invocation guarantee', () => {
   beforeEach(() => {
     repo = new TestAdapter('rows');
     rowScope = new RecordingRowScope();
-    repo.setRowScope(rowScope);
+    repo.bind({ rowScope: scopedTo(RecordingRowScope) });
+    repo.setRowScopeResolver(rowScope);
   });
 
   it('covers every operation in the contract', () => {
@@ -310,6 +327,7 @@ describe('row scope invocation guarantee', () => {
 
   it('never invokes the resolver when none is bound', async () => {
     const unscoped = new TestAdapter('rows');
+    unscoped.bind({});
 
     await unscoped.find({});
 
@@ -337,7 +355,8 @@ describe('row scope invocation guarantee', () => {
 
     it('refuses the whole batch when any element is refused', async () => {
       const refusingRepo = new TestAdapter('rows');
-      refusingRepo.setRowScope(refusingOn('bad'));
+      refusingRepo.bind({ rowScope: scopedTo(RefusingOn) });
+      refusingRepo.setRowScopeResolver(new RefusingOn('bad'));
 
       await expect(
         refusingRepo.createMany([{ name: 'ok' }, { name: 'bad' }]),
@@ -348,10 +367,19 @@ describe('row scope invocation guarantee', () => {
 
   describe("the resolver's returned value is what the driver runs", () => {
     /** Stamps a marker so the driver payload is distinguishable from the input. */
-    const stamping: RowScopeInterface = {
-      scopeQuery: (params) => params.options,
-      scopeWrite: (params) => ({ ...params.value, stamped: true }),
-    };
+    class Stamping implements RowScopeInterface {
+      scopeQuery<Options extends { where?: WhereClause }>(
+        params: RowScopeQueryParams<Options>,
+      ): Options {
+        return params.options;
+      }
+
+      scopeWrite<Value extends PlainLiteralObject>(
+        params: RowScopeWriteParams<Value>,
+      ): Value {
+        return { ...params.value, stamped: true };
+      }
+    }
 
     /** Each operation's payload has a different shape; only the mark matters. */
     const stampOf = (payload: unknown): unknown =>
@@ -369,7 +397,8 @@ describe('row scope invocation guarantee', () => {
       RowScopeOperation.UPSERT,
     ])('hands the driver the stamped value for %s', async (operation) => {
       const stampingRepo = new TestAdapter('rows');
-      stampingRepo.setRowScope(stamping);
+      stampingRepo.bind({ rowScope: scopedTo(Stamping) });
+      stampingRepo.setRowScopeResolver(new Stamping());
 
       await CALLS[operation].run(stampingRepo);
 
@@ -381,7 +410,8 @@ describe('row scope invocation guarantee', () => {
 
     it('hands the driver every stamped element of a batch', async () => {
       const stampingRepo = new TestAdapter('rows');
-      stampingRepo.setRowScope(stamping);
+      stampingRepo.bind({ rowScope: scopedTo(Stamping) });
+      stampingRepo.setRowScopeResolver(new Stamping());
 
       await stampingRepo.createMany([{ name: 'a' }, { name: 'b' }]);
 

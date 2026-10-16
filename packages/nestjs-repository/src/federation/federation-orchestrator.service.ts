@@ -1,5 +1,4 @@
 import { Inject, Injectable, PlainLiteralObject } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
 
 import { RuntimeException } from '@concepta/nestjs-core';
 
@@ -13,7 +12,6 @@ import {
   REPOSITORY_REGISTRY,
   RepositoryRegistryService,
 } from '../services/repository-registry.service.js';
-import { getDynamicRepositoryToken } from '../utils/get-dynamic-repository-token.js';
 
 import { BufferStrategy } from './buffer-strategy.js';
 import { FederationException } from './exceptions/federation.exception.js';
@@ -49,7 +47,6 @@ export class FederationOrchestrator {
   constructor(
     @Inject(REPOSITORY_REGISTRY)
     private readonly registry: RepositoryRegistryService,
-    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -508,13 +505,12 @@ export class FederationOrchestrator {
   ): FederatedRelation[] {
     if (!joins?.length) return [];
 
-    const joinMap = new Map(joins.map((j) => [j.relation, j]));
+    const joined = new Set(joins.map((j) => j.relation));
 
     return relations
-      .filter((rel) => rel.federated && joinMap.has(rel.name))
+      .filter((rel) => rel.federated && joined.has(rel.name))
       .map((rel) => ({
         ...rel,
-        joinType: joinMap.get(rel.name)?.joinType ?? ('LEFT' as const),
         isOwning: !rootPrimaryKeys.includes(rel.on.from),
       }));
   }
@@ -566,11 +562,13 @@ export class FederationOrchestrator {
   }
 
   /**
-   * Resolve a peer repository by entity name via the registry.
+   * Resolve a peer repository by entity name: the repository
+   * `RepositoryModule.forRoot()` bound for it, never a provider looked up by
+   * token.
    */
-  private getPeerRepo<T extends PlainLiteralObject>(
+  private getPeerRepo(
     entityName: string,
-  ): RepositoryInterface<T> {
+  ): RepositoryInterface<PlainLiteralObject> {
     const item = this.registry.getByEntityName(entityName);
     if (!item) {
       throw new FederationException({
@@ -580,8 +578,6 @@ export class FederationOrchestrator {
       });
     }
 
-    return this.moduleRef.get(getDynamicRepositoryToken(item.key), {
-      strict: false,
-    });
+    return item.adapter;
   }
 }

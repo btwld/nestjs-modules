@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import { CommandBus, CqrsModule, QueryBus } from '@nestjs/cqrs';
 
 import { createSettingsProvider } from '@concepta/nestjs-core';
+import { RepositoryModule } from '@concepta/nestjs-repository';
 
 import { CreateIdentityHandler } from './application/commands/handlers/create-identity.handler.js';
 import { FindIdentityByProviderHandler } from './application/queries/handlers/find-identity-by-provider.handler.js';
@@ -60,7 +61,11 @@ function definitionTransform(
   return {
     ...definition,
     global,
-    imports: createFederatedImports({ imports }),
+    imports: createFederatedImports({
+      imports,
+      // A custom repository replaces the one injected under the key.
+      repositoryKeys: repositories?.identity ? [] : [entityKey],
+    }),
     providers: createFederatedProviders({
       providers,
       entityKey,
@@ -72,11 +77,13 @@ function definitionTransform(
 
 export function createFederatedImports(options: {
   imports: DynamicModule['imports'];
+  repositoryKeys: string[];
 }): DynamicModule['imports'] {
   return [
     ...(options.imports || []),
     ConfigModule.forFeature(federatedDefaultConfig),
     CqrsModule.forRoot(),
+    RepositoryModule.forFeature(options.repositoryKeys),
   ];
 }
 

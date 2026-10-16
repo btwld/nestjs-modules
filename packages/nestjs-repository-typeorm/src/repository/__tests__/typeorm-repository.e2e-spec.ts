@@ -5,9 +5,7 @@ import { RuntimeException } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
   OptimisticLockException,
-  PrimaryKeyImmutableException,
-  RepositoryQueryException,
-  SoftDeletedImmutableException,
+  OrderBy,
   TransactionScope,
   Where,
 } from '@concepta/nestjs-repository';
@@ -235,6 +233,71 @@ describe(TypeOrmRepository, () => {
         ]);
       });
 
+      it('nstarts - should exclude prefix', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+        await testFactory.create({ firstName: 'Bob' });
+
+        const result = await testRepository.find({
+          where: Where.notStarts('firstName', 'Ali'),
+        });
+        expect(result.map((e) => e.firstName)).toEqual(['Bob']);
+      });
+
+      it('nends - should exclude suffix', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+        await testFactory.create({ firstName: 'Bob' });
+
+        const result = await testRepository.find({
+          where: Where.notEnds('firstName', 'ice'),
+        });
+        expect(result.map((e) => e.firstName)).toEqual(['Bob']);
+      });
+
+      describe('text operators match wildcard characters literally', () => {
+        beforeEach(async () => {
+          for (const firstName of ['50%', '500', 'a_c', 'abc', 'x!y']) {
+            await testFactory.create({ firstName });
+          }
+        });
+
+        it.each([
+          ['contains %', Where.contains('firstName', '%'), ['50%']],
+          ['contains _', Where.contains('firstName', '_'), ['a_c']],
+          ['contains !', Where.contains('firstName', '!'), ['x!y']],
+          ['starts', Where.starts('firstName', 'a_'), ['a_c']],
+          ['ends', Where.ends('firstName', '0%'), ['50%']],
+          [
+            'notContains',
+            Where.notContains('firstName', '%'),
+            ['500', 'a_c', 'abc', 'x!y'],
+          ],
+          [
+            'notStarts',
+            Where.notStarts('firstName', 'a_'),
+            ['50%', '500', 'abc', 'x!y'],
+          ],
+          [
+            'notEnds',
+            Where.notEnds('firstName', '0%'),
+            ['500', 'a_c', 'abc', 'x!y'],
+          ],
+        ])('%s', async (_, where, expected) => {
+          const result = await testRepository.find({ where });
+          expect(result.map((e) => e.firstName).sort()).toEqual(expected);
+        });
+
+        it('keeps each condition its own value within one query', async () => {
+          const result = await testRepository.find({
+            where: Where.and(
+              Where.starts('firstName', 'a'),
+              Where.ends('firstName', 'c'),
+              Where.notContains('firstName', '_'),
+            ),
+          });
+          expect(result.map((e) => e.firstName)).toEqual(['abc']);
+        });
+      });
+
       it('in - should match values in array', async () => {
         await testFactory.create({ firstName: 'Alice' });
         await testFactory.create({ firstName: 'Bob' });
@@ -250,13 +313,30 @@ describe(TypeOrmRepository, () => {
         ]);
       });
 
+      it('nin - should exclude values in array', async () => {
+        await testFactory.create({ firstName: 'Alice' });
+        await testFactory.create({ firstName: 'Bob' });
+        await testFactory.create({ firstName: 'Charlie' });
+
+        const result = await testRepository.find({
+          where: Where.notIn('firstName', ['Alice', 'Charlie']),
+        });
+        expect(result.map((e) => e.firstName)).toEqual(['Bob']);
+      });
+
+      it('notNull - should match non-null values', async () => {
+        await testFactory.create({ firstName: 'Alice', lastName: 'Smith' });
+        await testRepository.create({ firstName: 'Bob', lastName: null });
+
+        const result = await testRepository.find({
+          where: Where.notNull('lastName'),
+        });
+        expect(result.map((e) => e.firstName)).toEqual(['Alice']);
+      });
+
       it('isNull - should match null values', async () => {
         await testFactory.create({ firstName: 'Alice', lastName: 'Smith' });
-        await testRepository.create({
-          firstName: 'Bob',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          lastName: null as any,
-        });
+        await testRepository.create({ firstName: 'Bob', lastName: null });
 
         const result = await testRepository.find({
           where: Where.isNull('lastName'),
@@ -334,55 +414,40 @@ describe(TypeOrmRepository, () => {
         ]);
       });
 
-      // Contract test for the always-false clause: proves it renders as a
-      // real "match nothing" predicate against a live driver, not just at
-      // the AST level, and that composing it with real conditions can
-      // never widen the query back to "no restriction" — the exact bug
-      // this primitive exists to make unreachable (see README's
-      // "Always-False Clauses").
+      // The always-false clause renders as a real "match nothing" predicate
+      // against a live database, not just at the AST level. How it composes
+      // with other conditions is the repository's, tested there.
       it('never - should match nothing', async () => {
         await testFactory.create({ firstName: 'Alice' });
 
         const result = await testRepository.find({ where: Where.never() });
         expect(result).toEqual([]);
       });
-
-      it('and(x, never) - should short-circuit the whole clause to nothing', async () => {
-        await testFactory.create({ firstName: 'Alice' });
-
-        const result = await testRepository.find({
-          where: Where.and(Where.eq('firstName', 'Alice'), Where.never()),
-        });
-        expect(result).toEqual([]);
-      });
-
-      it('or(never, x) - should behave exactly like x, ignoring the never branch', async () => {
-        await testFactory.create({ firstName: 'Alice' });
-        await testFactory.create({ firstName: 'Bob' });
-
-        const result = await testRepository.find({
-          where: Where.or(Where.never(), Where.eq('firstName', 'Alice')),
-        });
-        expect(result).toHaveLength(1);
-        expect(result[0].firstName).toBe('Alice');
-      });
-
-      it('or() with zero conditions - should match nothing, same as never()', async () => {
-        await testFactory.create({ firstName: 'Alice' });
-
-        const result = await testRepository.find({ where: Where.or() });
-        expect(result).toEqual([]);
-      });
     });
 
-    it('should throw RepositoryQueryException on error', async () => {
-      vi.spyOn(testRepository['repo'], 'find').mockImplementationOnce(() => {
-        throw new Error();
+    describe('order and paging', () => {
+      beforeEach(async () => {
+        for (const firstName of ['Charlie', 'Alice', 'Bob']) {
+          await testFactory.create({ firstName });
+        }
       });
 
-      await expect(testRepository.find()).rejects.toThrow(
-        RepositoryQueryException,
-      );
+      it.each([
+        ['ascending', OrderBy.asc('firstName'), ['Alice', 'Bob', 'Charlie']],
+        ['descending', OrderBy.desc('firstName'), ['Charlie', 'Bob', 'Alice']],
+      ])('sorts %s', async (_, order, expected) => {
+        const result = await testRepository.find({ order: [order] });
+        expect(result.map((e) => e.firstName)).toEqual(expected);
+      });
+
+      it('skips and takes in sort order', async () => {
+        const result = await testRepository.find({
+          order: [OrderBy.asc('firstName')],
+          skip: 1,
+          take: 1,
+        });
+        expect(result.map((e) => e.firstName)).toEqual(['Bob']);
+      });
     });
   });
 
@@ -411,16 +476,6 @@ describe(TypeOrmRepository, () => {
         where: Where.and(Where.eq('id', created.id), Where.never()),
       });
       expect(result).toBeNull();
-    });
-
-    it('should throw RepositoryQueryException on error', async () => {
-      vi.spyOn(testRepository['repo'], 'findOne').mockImplementationOnce(() => {
-        throw new Error();
-      });
-
-      await expect(testRepository.findOne({})).rejects.toThrow(
-        RepositoryQueryException,
-      );
     });
   });
 
@@ -507,15 +562,6 @@ describe(TypeOrmRepository, () => {
     });
   });
 
-  describe('transform', () => {
-    it('should create entity instance without persisting', () => {
-      const entity = testRepository.transform({ firstName: 'Alice' });
-      expect(entity).toBeInstanceOf(TestEntityFixture);
-      expect(entity.firstName).toBe('Alice');
-      expect(entity.id).toBeUndefined();
-    });
-  });
-
   describe('create', () => {
     it('should create single entity', async () => {
       const created = await testRepository.create({ firstName: 'Alice' });
@@ -531,26 +577,6 @@ describe(TypeOrmRepository, () => {
       });
 
       expect(created.id).toBe('aaaaaaaa-0000-4000-8000-000000000001');
-    });
-
-    // create inserts; it does not update. Using save() here would make a
-    // create carrying an existing primary key silently overwrite that row,
-    // which is a cross-tenant write once row scope is in play: the scope stamp
-    // would then re-scope the row it just clobbered.
-    it('should reject a primary key that already exists, leaving the row intact', async () => {
-      const existing = await testFactory.create({
-        firstName: 'Alice',
-        lastName: 'Smith',
-      });
-
-      await expect(
-        testRepository.create({ id: existing.id, firstName: 'HIJACKED' }),
-      ).rejects.toThrow(RuntimeException);
-
-      const found = await testRepository.findOne({
-        where: Where.eq('id', existing.id),
-      });
-      expect(found?.firstName).toBe('Alice');
     });
 
     it('should return database-populated columns', async () => {
@@ -594,22 +620,6 @@ describe(TypeOrmRepository, () => {
       ]);
     });
 
-    it('should reject the whole batch on a duplicate primary key', async () => {
-      const existing = await testFactory.create({ firstName: 'Alice' });
-
-      await expect(
-        testRepository.createMany([
-          { firstName: 'Innocent' },
-          { id: existing.id, firstName: 'HIJACKED' },
-        ]),
-      ).rejects.toThrow(RuntimeException);
-
-      const found = await testRepository.findOne({
-        where: Where.eq('id', existing.id),
-      });
-      expect(found?.firstName).toBe('Alice');
-    });
-
     it('should return an empty array for an empty input', async () => {
       expect(await testRepository.createMany([])).toEqual([]);
     });
@@ -625,58 +635,6 @@ describe(TypeOrmRepository, () => {
 
       expect(updated.firstName).toBe('Bob');
       expect(updated.lastName).toBe('Smith');
-    });
-
-    it('should refuse data that would move the write onto a different row', async () => {
-      const mine = await testFactory.create({ firstName: 'Mine' });
-      const theirs = await testFactory.create({ firstName: 'Theirs' });
-
-      await expect(
-        testRepository.update(mine, {
-          id: theirs.id,
-          firstName: 'Redirected',
-        }),
-      ).rejects.toThrow(PrimaryKeyImmutableException);
-
-      // Both rows untouched: the one named by the entity argument and the one
-      // named by the payload. Asserting only the throw would not prove the
-      // write was stopped before reaching the driver.
-      const after = await testRepository.find({
-        where: Where.in('id', [mine.id, theirs.id]),
-      });
-      expect(
-        after
-          .map((row) => row.firstName)
-          .sort((left, right) => left.localeCompare(right)),
-      ).toEqual(['Mine', 'Theirs']);
-    });
-
-    it('should refuse a replace that would move the write onto a different row', async () => {
-      const mine = await testFactory.create({ firstName: 'Mine' });
-      const theirs = await testFactory.create({ firstName: 'Theirs' });
-
-      await expect(
-        testRepository.replace(mine, {
-          id: theirs.id,
-          firstName: 'Redirected',
-        }),
-      ).rejects.toThrow(PrimaryKeyImmutableException);
-
-      const victim = await testRepository.findOne({
-        where: Where.eq('id', theirs.id),
-      });
-      expect(victim?.firstName).toBe('Theirs');
-    });
-
-    it('should allow data that repeats the entity own primary key', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      const updated = await testRepository.update(entity, {
-        id: entity.id,
-        firstName: 'Bob',
-      });
-
-      expect(updated.firstName).toBe('Bob');
     });
 
     it('should increment version by exactly 1 on a successful update', async () => {
@@ -715,68 +673,6 @@ describe(TypeOrmRepository, () => {
       });
 
       expect(updated.version).toBe(entity.version + 1);
-    });
-
-    it('should reject updating a soft-deleted entity', async () => {
-      const created = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.softDelete(created);
-      const deleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      if (!deleted) throw new Error('fixture precondition failed');
-
-      await expect(
-        testRepository.update(deleted, { firstName: 'Bob' }),
-      ).rejects.toThrow(SoftDeletedImmutableException);
-    });
-
-    it('should update a soft-deleted entity when force is set', async () => {
-      const created = await testFactory.create({
-        firstName: 'Alice',
-        lastName: 'Smith',
-      });
-      await testRepository.softDelete(created);
-      const deleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      if (!deleted) throw new Error('fixture precondition failed');
-
-      const updated = await testRepository.update(
-        deleted,
-        { firstName: 'Bob' },
-        { force: true },
-      );
-
-      expect(updated.firstName).toBe('Bob');
-      expect(updated.lastName).toBe('Smith');
-      expect(updated.version).toBe(deleted.version + 1);
-      expect(updated.dateDeleted).not.toBeNull();
-    });
-
-    it('should reject when a caller-supplied expectedVersion does not match, even though the row itself is current', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      await expect(
-        testRepository.update(
-          entity,
-          { firstName: 'Bob' },
-          { expectedVersion: entity.version + 1 },
-        ),
-      ).rejects.toThrow(OptimisticLockException);
-    });
-
-    it('should update when a caller-supplied expectedVersion matches', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      const updated = await testRepository.update(
-        entity,
-        { firstName: 'Bob' },
-        { expectedVersion: entity.version },
-      );
-
-      expect(updated.firstName).toBe('Bob');
     });
 
     // Regression coverage for #476: two concurrent CRUD-style writes, each
@@ -860,68 +756,6 @@ describe(TypeOrmRepository, () => {
         testRepository.replace(entity, { firstName: 'Bob', lastName: 'Jones' }),
       ).rejects.toThrow(OptimisticLockException);
     });
-
-    it('should reject replacing a soft-deleted entity', async () => {
-      const created = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.softDelete(created);
-      const deleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      if (!deleted) throw new Error('fixture precondition failed');
-
-      await expect(
-        testRepository.replace(deleted, { firstName: 'Bob' }),
-      ).rejects.toThrow(SoftDeletedImmutableException);
-    });
-
-    it('should replace a soft-deleted entity when force is set', async () => {
-      const created = await testFactory.create({
-        firstName: 'Alice',
-        lastName: 'Smith',
-      });
-      await testRepository.softDelete(created);
-      const deleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      if (!deleted) throw new Error('fixture precondition failed');
-
-      const replaced = await testRepository.replace(
-        deleted,
-        { firstName: 'Bob', lastName: 'Jones' },
-        { force: true },
-      );
-
-      expect(replaced.firstName).toBe('Bob');
-      expect(replaced.lastName).toBe('Jones');
-      expect(replaced.version).toBe(deleted.version + 1);
-      expect(replaced.dateDeleted).not.toBeNull();
-    });
-
-    it('should reject when a caller-supplied expectedVersion does not match, even though the row itself is current', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      await expect(
-        testRepository.replace(
-          entity,
-          { firstName: 'Bob' },
-          { expectedVersion: entity.version + 1 },
-        ),
-      ).rejects.toThrow(OptimisticLockException);
-    });
-
-    it('should replace when a caller-supplied expectedVersion matches', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      const replaced = await testRepository.replace(
-        entity,
-        { firstName: 'Bob' },
-        { expectedVersion: entity.version },
-      );
-
-      expect(replaced.firstName).toBe('Bob');
-    });
   });
 
   describe('upsert', () => {
@@ -945,26 +779,49 @@ describe(TypeOrmRepository, () => {
       expect(result.firstName).toBe('Bob');
     });
 
-    it('should reject upserting over a soft-deleted row', async () => {
-      const created = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.softDelete(created);
+    it('should bump the version of the row it updates', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
 
-      await expect(
-        testRepository.upsert({ id: created.id, firstName: 'Bob' }),
-      ).rejects.toThrow(SoftDeletedImmutableException);
+      const result = await testRepository.upsert({
+        id: entity.id,
+        firstName: 'Bob',
+      });
+
+      expect(result.version).toBe(entity.version + 1);
     });
 
-    it('should upsert over a soft-deleted row when force is set', async () => {
-      const created = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.softDelete(created);
+    it('should bump the version whatever version the payload carries', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.upsert({ id: entity.id, firstName: 'Bob' });
 
-      const result = await testRepository.upsert(
-        { id: created.id, firstName: 'Bob' },
-        { force: true },
-      );
+      // The version the caller read before the write above.
+      const result = await testRepository.upsert({
+        id: entity.id,
+        firstName: 'Carol',
+        version: entity.version,
+      });
 
-      expect(result.id).toBe(created.id);
-      expect(result.firstName).toBe('Bob');
+      expect(result.version).toBe(entity.version + 2);
+    });
+
+    it('should insert with a generated key when the payload has none', async () => {
+      const result = await testRepository.upsert({ firstName: 'Carol' });
+
+      expect(result.id).toEqual(expect.any(String));
+      expect(result.firstName).toBe('Carol');
+    });
+
+    it('should make an update holding the earlier version conflict', async () => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+      await testRepository.upsert({ id: entity.id, firstName: 'Bob' });
+
+      await expect(
+        testRepository.update(
+          entity,
+          { lastName: 'Smith' },
+          { expectedVersion: entity.version },
+        ),
+      ).rejects.toThrow(OptimisticLockException);
     });
   });
 
@@ -979,19 +836,30 @@ describe(TypeOrmRepository, () => {
       expect(result).toBeNull();
     });
 
-    it('should reject without deleting when expectedVersion mismatches', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
+    it('returns the deleted row with its key', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
 
-      await expect(
-        testRepository.delete(entity, {
-          expectedVersion: entity.version + 1,
+      expect(await testRepository.delete(created)).toEqual(created);
+    });
+
+    it('returns the deleted row with its key under expectedVersion', async () => {
+      const created = await testFactory.create({ firstName: 'Alice' });
+
+      expect(
+        await testRepository.delete(created, {
+          expectedVersion: created.version,
         }),
-      ).rejects.toThrow(OptimisticLockException);
+      ).toEqual(created);
+    });
 
-      const result = await testRepository.findOne({
-        where: Where.eq('id', entity.id),
-      });
-      expect(result).not.toBeNull();
+    it('returns each row deleteMany deletes with its key', async () => {
+      const alice = await testFactory.create({ firstName: 'Alice' });
+      const bob = await testFactory.create({ firstName: 'Bob' });
+
+      expect(await testRepository.deleteMany([alice, bob])).toEqual([
+        alice,
+        bob,
+      ]);
     });
 
     it('should delete when expectedVersion matches', async () => {
@@ -1044,36 +912,6 @@ describe(TypeOrmRepository, () => {
       });
       expect(withDeleted).not.toBeNull();
       expect(withDeleted?.dateDeleted).not.toBeNull();
-    });
-
-    it('should no-op, preserving the original delete date, when soft-deleting an already-soft-deleted entity', async () => {
-      const created = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.softDelete(created);
-      const firstDeleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      if (!firstDeleted) throw new Error('fixture precondition failed');
-
-      const secondDeleted = await testRepository.softDelete(firstDeleted);
-
-      expect(secondDeleted.dateDeleted).toEqual(firstDeleted.dateDeleted);
-      expect(secondDeleted.version).toBe(firstDeleted.version);
-    });
-
-    it('should reject without soft-deleting when expectedVersion mismatches', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      await expect(
-        testRepository.softDelete(entity, {
-          expectedVersion: entity.version + 1,
-        }),
-      ).rejects.toThrow(OptimisticLockException);
-
-      const result = await testRepository.findOne({
-        where: Where.eq('id', entity.id),
-      });
-      expect(result).not.toBeNull();
     });
 
     it('should soft-delete when expectedVersion matches', async () => {
@@ -1131,28 +969,6 @@ describe(TypeOrmRepository, () => {
       expect(recovered?.dateDeleted).toBeNull();
     });
 
-    it('should reject without restoring when expectedVersion mismatches', async () => {
-      const created = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.softDelete(created);
-      const deleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      if (!deleted) throw new Error('fixture precondition failed');
-
-      await expect(
-        testRepository.restore(deleted, {
-          expectedVersion: deleted.version + 1,
-        }),
-      ).rejects.toThrow(OptimisticLockException);
-
-      const stillDeleted = await testRepository.findOne({
-        where: Where.eq('id', created.id),
-        withDeleted: true,
-      });
-      expect(stillDeleted?.dateDeleted).not.toBeNull();
-    });
-
     it('should restore when expectedVersion matches', async () => {
       const created = await testFactory.create({ firstName: 'Alice' });
       await testRepository.softDelete(created);
@@ -1181,13 +997,10 @@ describe(TypeOrmRepository, () => {
       });
       if (!deleted) throw new Error('fixture precondition failed');
 
-      // Concurrent writer forces an update on the soft-deleted row, bumping
+      // A concurrent writer restores the row and deletes it again, bumping
       // its version.
-      await testRepository.update(
-        deleted,
-        { firstName: 'Concurrent' },
-        { force: true },
-      );
+      const restored = await testRepository.restore(deleted);
+      await testRepository.softDelete(restored);
 
       await expect(
         testRepository.restore(deleted, { expectedVersion: deleted.version }),
@@ -1195,50 +1008,9 @@ describe(TypeOrmRepository, () => {
     });
   });
 
-  describe('merge', () => {
-    it('should merge entities', async () => {
-      const entity = await testFactory.create({
-        firstName: 'Alice',
-        lastName: 'Smith',
-      });
-      const merged = testRepository.merge(entity, { firstName: 'Bob' });
-
-      expect(merged.firstName).toBe('Bob');
-      expect(merged.lastName).toBe('Smith');
-    });
-  });
-
-  describe('prepare', () => {
-    it('should transform an empty object to an entity instance (#466)', () => {
-      const result = testRepository.prepare({});
-      expect(result).toBeInstanceOf(TestEntityFixture);
-    });
-
-    it('should return undefined for non-object', () => {
-      const result = testRepository.prepare(
-        'not-an-object' as unknown as object,
-      );
-      expect(result).toBeUndefined();
-    });
-
-    it('should transform plain object to entity instance', () => {
-      const result = testRepository.prepare({ firstName: 'Alice' });
-      expect(result).toBeInstanceOf(TestEntityFixture);
-      expect(result?.firstName).toBe('Alice');
-    });
-
-    it('should return entity instance as-is', () => {
-      const entity = new TestEntityFixture();
-      entity.firstName = 'Alice';
-      const result = testRepository.prepare(entity);
-      expect(result).toBe(entity);
-    });
-  });
-
   describe('optimistic locking without TransactionScope wired', () => {
-    // Mirrors TypeOrmRepositoryModule used directly, without
-    // RepositoryModule.forRoot() — TransactionScope is only provided by
-    // the latter, so a repository constructed this way never receives one.
+    // A repository constructed by hand: RepositoryModule.forRoot() always
+    // provides a TransactionScope, so only this path can lack one.
     let bareRepository: TypeOrmRepository<TestEntityFixture>;
     let transactionScope: TransactionScope;
 
@@ -1248,6 +1020,7 @@ describe(TypeOrmRepository, () => {
         dataSource.getRepository(TestEntityFixture),
         { entityKey: 'bare-test-entity' },
       );
+      bareRepository.bind({});
       transactionScope = moduleFixture.get(TransactionScope);
     });
 

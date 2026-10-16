@@ -49,22 +49,25 @@ const USER_CREDENTIALS_ENTITY_KEY_FIXTURE = 'user-credentials';
   imports: [
     TypeOrmModule.forRoot(ormConfig),
     CqrsModule.forRoot(),
-    RepositoryModule.forRoot({}),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: USER_ENTITY_KEY_FIXTURE, entity: UserEntityFixture },
+            {
+              key: USER_CREDENTIALS_ENTITY_KEY_FIXTURE,
+              entity: UserCredentialEntityFixture,
+            },
+          ],
+        },
+      ],
+    }),
     CrudModule.forRoot({
       defaultResolver: CrudCqrsResolver,
     }),
     CoreModule.forRoot(),
     PasswordModule.forRoot({}),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: USER_ENTITY_KEY_FIXTURE, entity: UserEntityFixture },
-        {
-          key: USER_CREDENTIALS_ENTITY_KEY_FIXTURE,
-          entity: UserCredentialEntityFixture,
-        },
-      ],
-    }),
     UserModule.forRoot({
       entities: {
         user: USER_ENTITY_KEY_FIXTURE,

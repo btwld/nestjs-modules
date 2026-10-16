@@ -60,45 +60,14 @@ NestJS 12.
 
 ## Module Registration
 
+Register every entity once, in `forRoot()` in your application's root module.
+Then import `forFeature()` with the keys each feature module injects.
+
 ### forRoot
 
-`forRoot()` registers the module **globally** and sets up the transaction
-infrastructure (factory registry, scope, runner, interceptor).
-
-```ts
-import { RepositoryModule } from '@concepta/nestjs-repository';
-
-@Module({
-  imports: [
-    RepositoryModule.forRoot({
-      defaultTimeout: 30000, // transaction timeout in ms (default)
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-### forRootAsync
-
-```ts
-@Module({
-  imports: [
-    RepositoryModule.forRootAsync({
-      useFactory: async (configService: ConfigService) => ({
-        defaultTimeout: configService.get('TX_TIMEOUT', 30000),
-      }),
-      inject: [ConfigService],
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-### forFeature
-
-`forFeature()` registers repository providers for specific entities. It
-delegates to the driver module's own `forFeature()` method and automatically
-registers entities in the repository registry and transaction factories.
+`forRoot()` registers every entity, grouped by the driver that serves it, and
+sets up the transaction infrastructure (factory registry, scope, runner,
+interceptor). Import it once.
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
@@ -106,20 +75,32 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
 @Module({
   imports: [
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: 'orders', entity: Order },
-        { key: 'customers', entity: Customer },
+    RepositoryModule.forRoot({
+      defaultTimeout: 30000, // transaction timeout in ms (default)
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: 'orders', entity: Order },
+            { key: 'customers', entity: Customer },
+          ],
+        },
       ],
     }),
+    OrdersModule,
   ],
 })
-export class OrderModule {}
+export class AppModule {}
 ```
 
-Each entity registration creates a dynamic repository provider that can be
-injected by key using `@InjectDynamicRepository()`.
+Each entry is checked against its driver's options, so a misspelled option,
+or one only another driver understands, does not compile.
+
+Every repository is checked while the application is created: a
+misconfigured entity stops `NestFactory.create()` (or `Test.compile()`) with an
+exception naming it. A second registration that reads the same rows, under
+any key or entity class, fails with `RepositoryDuplicateUrnException`, because
+its row scope, write policy and hooks could otherwise disagree with the first.
 
 Further options for scoped or append-only entities:
 
@@ -127,21 +108,83 @@ Further options for scoped or append-only entities:
 | --- | --- |
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
-| `imports` | Modules exporting providers this registration must resolve. **Required** when any entity declares a resolver: the resolver is bound inside the module `forFeature()` returns, which cannot see providers declared alongside it |
+| `imports` | Modules exporting the row scope resolvers your entities declare |
 
 ```ts
-RepositoryModule.forFeature({
-  module: TypeOrmRepositoryModule,
-  imports: [OrdersRowScopeModule], // exports OrdersRowScope
-  entities: [
+RepositoryModule.forRoot({
+  imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
+  drivers: [
     {
-      key: 'orders',
-      entity: Order,
-      rowScope: { access: 'scoped', resolver: OrdersRowScope },
+      driver: TypeOrmRepositoryModule,
+      entities: [
+        {
+          key: 'orders',
+          entity: Order,
+          rowScope: { access: 'scoped', resolver: OrdersRowScope },
+        },
+      ],
     },
   ],
 });
 ```
+
+### forRootAsync
+
+Entities stay static; only the settings come from the factory.
+
+```ts
+@Module({
+  imports: [
+    RepositoryModule.forRootAsync({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'orders', entity: Order }],
+        },
+      ],
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        defaultTimeout: configService.get('TX_TIMEOUT', 30000),
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Everything the factory injects must be singleton-scoped: a request-scoped
+dependency would keep the repositories from being bound and checked at
+startup, so `app.init()` refuses it (`RepositoryBootException`).
+
+### forFeature
+
+`forFeature()` makes repositories registered in `forRoot()` injectable in the
+module that imports it, by key:
+
+```ts
+@Module({
+  imports: [RepositoryModule.forFeature(['orders', 'customers'])],
+  providers: [OrdersService],
+})
+export class OrdersModule {}
+
+@Injectable()
+export class OrdersService {
+  constructor(
+    @InjectDynamicRepository('orders')
+    private readonly orders: RepositoryInterface<Order>,
+  ) {}
+}
+```
+
+A repository is injectable only where its key is imported. A key `forRoot()`
+did not register fails at startup, and so does `forFeature()` in an
+application that never imports `forRoot()`.
+
+Modules from other packages that take repository keys, such as
+`UserModule.forRoot({ entities: { user: 'user' } })` or
+`CrudModule.forFeature()`, import their keys themselves.
 
 ### Settings
 
@@ -166,10 +209,10 @@ among many does not — see [Row Scope](#row-scope).
 ```text
 Application Code
   |
-RepositoryModule (forRoot / forFeature)
+RepositoryModule (forRoot registers / forFeature exposes)
   |
   +-- RepositoryAdapter (abstract, driver-agnostic)
-  |     Concrete implementations: TypeOrmRepository, etc.
+  |     Concrete implementations: one per driver
   |
   +-- Transaction Layer
   |     TransactionScope -> TransactionManager -> TransactionFactory
@@ -178,7 +221,7 @@ RepositoryModule (forRoot / forFeature)
   |     @RepoHook + @BeforeCreate / @AfterFind / etc.
   |
   +-- Registry
-        RepositoryRegistryService (duplicate key detection at bootstrap)
+        RepositoryRegistryService (every registered repository)
 ```
 
 - **RepositoryAdapter** -- abstract base class implementing
@@ -190,8 +233,8 @@ RepositoryModule (forRoot / forFeature)
   factories are registered per driver/datasource
 - **Hook System** -- two-level decorators (high-level semantic + fine-grained)
   for cross-cutting concerns like auditing, tenant filtering, and validation
-- **Registry** -- validates at application bootstrap that no duplicate
-  repository keys exist across features
+- **Registry** -- every repository `forRoot()` registered, checked so that no
+  two read the same rows
 
 ## Repository Adapter
 
@@ -204,7 +247,7 @@ protected abstract `do*` method that the driver implements.
 ### Abstract Members
 
 Concrete implementations must provide these protected `do*` methods, plus
-the abstract `transform`/`merge` utilities and the `metadata` property:
+the `metadata` property:
 
 | Category | Method | Signature |
 | --- | --- | --- |
@@ -221,9 +264,13 @@ the abstract `transform`/`merge` utilities and the `metadata` property:
 | Delete | `doDeleteMany` | `(entities, options?) => Promise<Entity[]>` |
 | Delete | `doSoftDelete` | `(entity, options?) => Promise<Entity>` |
 | Lifecycle | `doRestore` | `(entity, options?) => Promise<Entity>` |
-| Utility | `transform` | `(entityLike) => Entity` |
-| Utility | `merge` | `(mergeIntoEntity, ...entityLikes) => Entity` |
 | Utility | `metadata` | `RepositoryMetadataInterface<Entity>` (abstract property) |
+
+Override `describeDatabaseError(error)` to report an error your database raised
+as `{ database, code?, message }`; the caller then receives a
+`RepositoryDatabaseException` carrying them. It returns `undefined` by
+default, so a database error arrives as a plain `RepositoryQueryException`
+like any other opaque error.
 
 ### Create Inserts, It Never Updates
 
@@ -256,10 +303,6 @@ at READ COMMITTED, where the driver's own re-read sees the committed row.
 Losing the race requires a concurrent insert of the *same* primary key:
 unreachable for generated keys, narrow for caller-supplied ones.
 
-A primary key supplied through a relation object (`{ account: { id } }`) counts
-as supplied — the guard reads both routes, because a driver resolves the column
-from the relation when the scalar is absent and prefers it.
-
 ### Concrete Members
 
 The public `find`, `findOne`, `count`, `findAndCount`, `create`,
@@ -269,13 +312,12 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 
 | Member | Visibility | Description |
 | --- | --- | --- |
-| `prepare(dto)` | public | Returns `dto` unchanged if it is already an entity instance, otherwise `Object.assign(new entityType(), dto)` |
 | `getPrimaryColumns()` | protected | Get primary key column names from metadata (subclass-author API) |
 | `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any — backs both the in-request lock and `expectedVersion` (subclass-author API) |
 | `getDeleteDateColumn()` | protected | Get the soft-remove date column name from metadata, if any (subclass-author API) |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
 | `runHooks(methodKey, payload, ctx, filter?)` | protected | Execute repository hooks for a lifecycle event; `filter` selects by hook metadata, which is how `{ replace: true }` routing works (subclass-author API) |
-| `resolveJoinClauses(join?)` | protected | Validate join relation names against entity metadata (subclass-author API) |
+| `allowsEagerRelations` | public | Whether the entity set `allowEagerRelations`, so a driver knows whether to load eager relations |
 
 ### Implementing a Repository
 
@@ -287,14 +329,14 @@ class MyDriverRepository<Entity extends PlainLiteralObject>
   readonly metadata = { /* ... */ };
 
   protected async doFind(options?) {
-    return this.repo.find(options);
+    return this.client.select(translate(options));
   }
 
   protected async doCreate(entity, options?) {
-    return this.repo.save(entity);
+    return this.client.insert(entity);
   }
 
-  // ... implement the remaining do* methods, transform, and merge
+  // ... implement the remaining do* methods
 }
 ```
 
@@ -309,6 +351,34 @@ Each entry in `metadata.columns` must supply `name`, `isPrimary`,
 optimistic-locking version column, if the driver has one — `getVersionColumn()`
 reads it. Adapters that leave it `false` everywhere simply get no
 optimistic-locking support.
+
+Setting `isRemoveDate: true` on a column declares that your driver supports soft
+delete for that entity. `softDelete` and `restore` set and clear it, and a read
+without `withDeleted` leaves out rows where it is set, both on the entity and on
+every relation the read joins. A driver that cannot do all of that reports no
+such column, and `softDelete` and `restore` then throw.
+
+`metadata.urn` names the rows an entity reads, and each relation's `targetUrn`
+(and `through.urn` for a many-to-many junction) names the rows it reaches.
+Derive them from your entity definitions as `urn:<driver>:…`, so that two
+entities reading the same rows report the same URN whatever their class names.
+The repository only compares them; row scope uses them to find relations into
+scoped rows.
+
+Your driver's module class is what applications list in `forRoot()`'s
+`drivers`. It implements `RepositoryDriverInterface`: a static
+`register(entities)` that returns one provider per entity, under
+`getDynamicRepositoryToken(key)`, the `imports` those providers need, and any
+`transactionFactories`. Keep those providers and everything your transaction
+factories inject singleton-scoped: anything request-scoped is never built at
+startup, and `app.init()` refuses it.
+Construct each repository with its key and the optional `HookResolverService`
+only. Row scope, hooks, write policy and the eager opt-in are not yours to
+pass: `forRoot()` binds them to every repository you return, from the
+application's entry, and a repository that was never bound refuses every call
+(`RepositoryUnboundException`). Applications never call `register`. Extend
+`RepositoryProviderOptions` with your driver's own entity options, and
+`forRoot()` type-checks each entry against them.
 
 ### Soft-Deleted Immutability
 
@@ -325,14 +395,10 @@ try {
   await repository.update(entity, { name: 'New Name' });
 } catch (err) {
   if (err instanceof SoftDeletedImmutableException) {
-    // entity is soft-deleted — restore it first, or use { force: true }
+    // entity is soft-deleted — restore it first
   }
 }
 ```
-
-Pass `{ force: true }` to bypass the guard for server-side carve-outs (e.g.
-pre-purge PII masking, admin data-integrity corrections). It is not exposed
-over HTTP by `nestjs-crud` — only server-side callers can opt in.
 
 Soft-deleting an already-soft-deleted row is a no-op rather than an error:
 `softDelete()` returns the entity unchanged instead of re-stamping its delete
@@ -340,14 +406,16 @@ date, since a retried HTTP DELETE must not fail.
 
 ### Expected Version
 
-The in-request optimistic lock (see
-[nestjs-repository-typeorm's Optimistic Locking](../nestjs-repository-typeorm/README.md#optimistic-locking))
-guards a read-then-write inside one request, but two requests that each
+On an entity with a version column, `update` and `replace` reject a write
+whose stored row's version is no longer current. That guards a read-then-write
+inside one request, but two requests that each
 re-read before writing both pass it, since each compares against its own
 fresh value. `expectedVersion` closes that gap: pass the version the caller
 last read, and `update`, `replace`, `delete`, `softDelete`, and `restore`
 all reject a mismatch with `OptimisticLockException` (409 Conflict) —
-enforced once in `RepositoryAdapter`, for every driver.
+enforced once in `RepositoryAdapter`, for every driver. Every write that
+changes a stored row bumps its version, `upsert` included, so a version read
+before any of them conflicts after it.
 
 ```ts
 import { OptimisticLockException } from '@concepta/nestjs-repository';
@@ -371,8 +439,9 @@ Drivers never decide any of this — `RepositoryAdapter` resolves a
 `RepositoryVersionGuardInterface` descriptor (`{ column, value }`) and
 passes it down via `options.versionGuard`; a driver's only job is to
 execute an atomic compare-and-swap on `column === value` before writing.
-Passing `versionGuard` directly is a no-op — the adapter always overwrites
-it with its own resolution.
+`versionGuard` is not a caller option: it is added to the options a driver's
+`do*` methods receive (`RepositoryVersionGuardOptions`), and a value a caller
+passes anyway is overwritten.
 
 ## Relations and Joins
 
@@ -381,62 +450,56 @@ related entities alongside the root query.
 
 ### JoinClause
 
-Each `JoinClause` describes how to join a related entity:
+Each `JoinClause` names a relation to include in every row the read returns:
 
 ```ts
 interface JoinClause {
-  relation: string;           // relation name (must match entity metadata)
-  joinType?: 'LEFT' | 'INNER';  // default: 'LEFT'
+  relation: string; // relation name (must match entity metadata)
 }
 ```
 
-`joinType` is honoured by federation, which implements `INNER` by requiring the
-related row to exist. The TypeORM driver renders joins through TypeORM's
-`relations` find option, which is always a LEFT JOIN, so it **refuses** an
-`INNER` clause on a non-federated relation rather than silently returning the
-rows you asked to exclude. Filter on the related column instead, or declare the
-relation federated.
-
-`resolveJoinClauses()` validates each clause's relation name against
-`metadata.relations` and refuses an unknown one with a `400`; it does not alter
-the clauses. Structural relation data (`on`, `through`, `cardinality`) lives on
-`metadata.relations`, where the driver and federation read it — it is never
-attached to a join clause.
-
-### Join Helper
-
-The `Join` helper builds `JoinClause` arrays:
-
 ```ts
-import { Join } from '@concepta/nestjs-repository';
-
-// Load a single relation (LEFT join by default)
+// Load a single relation
 const [users, total] = await userRepo.findAndCount({
-  ...Join.join(Join.left('company')),
+  join: [{ relation: 'company' }],
 });
 // users[0].company → Company | null
 
-// Multiple relations with different join types
+// Several relations; many-to-many junctions come from relation metadata
 const [users, total] = await userRepo.findAndCount({
-  ...Join.join(
-    Join.left('posts'),
-    Join.inner('company'),
-  ),
-});
-
-// Many-to-many (junction configured in relation metadata)
-const [users, total] = await userRepo.findAndCount({
-  ...Join.join(Join.left('roles')),
+  join: [{ relation: 'posts' }, { relation: 'roles' }],
 });
 ```
 
-### Join Methods
+A join never changes which rows come back. A user with no company is still
+returned, with `company: null`, and a user with no posts with `posts: []`.
+Only `where` narrows rows.
 
-| Method | Description |
-| --- | --- |
-| `left(relation)` | LEFT JOIN (default — includes rows with no match) |
-| `inner(relation)` | INNER JOIN (excludes rows with no match) — federated relations only; see above |
-| `join(...clauses)` | Wrap join clauses into `{ join: clauses }` for passing to `find()` |
+A join naming a relation the entity does not declare is refused with a `400`
+(see [What a read may name](#what-a-read-may-name)).
+
+### Rows That Have a Related Row
+
+To return only rows that have a related row, filter on a column the related
+row always holds, such as its primary key:
+
+```ts
+// Users with at least one post
+const withPosts = await userRepo.find({
+  join: [{ relation: 'posts' }],
+  where: Where.rel('posts', Where.notNull<PostEntity>('id')),
+});
+
+// Users whose company exists
+const withCompany = await userRepo.find({
+  join: [{ relation: 'company' }],
+  where: Where.rel('company', Where.notNull<CompanyEntity>('id')),
+});
+```
+
+Filter on the related row, not on the user's own `companyId`. A user whose
+company was soft-deleted still holds its `companyId`, so a filter on that key
+keeps the user, with `company: null`.
 
 ### Filtering by Relations
 
@@ -447,11 +510,11 @@ must be included in the join:
 const w = Where.for<UserEntity>();
 
 const [users, total] = await userRepo.findAndCount({
-  ...Join.join(Join.left('posts')),
+  join: [{ relation: 'posts' }],
   ...w.where(
     w.and(
       w.eq('status', 'active'),
-      w.rel('posts', Where.eq<PostEntity>('published', true)),
+      Where.rel('posts', Where.eq<PostEntity>('published', true)),
     ),
   ),
 });
@@ -462,43 +525,148 @@ const [users, total] = await userRepo.findAndCount({
 Use `OrderBy.rel()` to sort by fields on a related entity:
 
 ```ts
-const o = OrderBy.for<UserEntity>();
-
 const [users, total] = await userRepo.findAndCount({
-  ...Join.join(Join.left('posts')),
-  ...o.order(
-    o.rel('posts', OrderBy.desc<PostEntity>('createdAt')),
-    o.asc('name'),
+  join: [{ relation: 'posts' }],
+  ...OrderBy.order(
+    OrderBy.rel('posts', OrderBy.desc<PostEntity>('createdAt')),
+    OrderBy.asc<UserEntity>('name'),
   ),
 });
 ```
 
 ### Relation Metadata
 
-Relation metadata is populated automatically by the ORM driver (e.g.,
-`TypeOrmRepository` reads TypeORM's `RelationMetadata`). You can also
-configure per-relation behavior in `forFeature()`:
+Your driver reports each entity's relations from its entity definitions. You
+can also configure per-relation behavior on its `forRoot()` entry:
 
 ```ts
-RepositoryModule.forFeature({
-  module: TypeOrmRepositoryModule,
-  entities: [{
-    key: 'users',
-    entity: UserEntity,
-    relations: {
-      posts: { federated: true },        // use separate queries
-      company: { onDelete: 'delegate' }, // defer to DB cascade settings
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [{
+        key: 'users',
+        entity: UserEntity,
+        relations: {
+          posts: { federated: true }, // use separate queries
+        },
+      }],
     },
-  }],
+  ],
 });
 ```
 
 Relations marked `federated: true` use separate queries instead of SQL
 JOINs. See [Federation](#federation) for details.
 
+### Writing relations
+
+A write changes only the entity's own table, and only its columns reach the
+driver:
+
+| In the payload | Result |
+| --- | --- |
+| a foreign key column, e.g. `{ companyId: 7 }` | written; `null` clears it |
+| any relation, e.g. `{ company: { id: 7 } }` or `{ users: [...] }` | refused with `RelationWriteException` (`400`), naming the foreign key column to send instead where there is one |
+| any other property that is not a column | refused with `UnknownColumnException` (`400`) |
+| a function in place of a column value, or an object in a key column | refused with `InvalidColumnValueException` (`400`) |
+| a property whose value is `undefined` | left out; it carries no value |
+
+The entity that names the stored row in `update`, `replace`, `delete`,
+`deleteMany`, `softDelete` and `restore` is a row, not data to write: its
+relations and any other property that is not a column are left out, however
+the row was read. A function value, or an object in a key column, is still
+refused there.
+
+To change related rows, write them through their own repository, so their row
+scope, write policy and hooks run. What happens to related rows on delete is
+your database's foreign key action.
+
+Behaviour you declare on an entity for your driver to run on its own, such as
+code that runs whenever a row is written, runs outside these guarantees, at
+your own risk. Your driver's README lists what it runs.
+
+A `join` still returns related rows as objects.
+
+Two entity shapes are refused at startup with `RepositoryBootException`: a
+relation whose foreign key has no column of its own, since it could never be
+written, and a primary or foreign key column defined as a getter or setter on
+the entity class. Keys are plain properties.
+
+### What a read may name
+
+A read reaches another table only through a relation it names in `join`:
+
+| In the read options | Result |
+| --- | --- |
+| an own column in `select`, `where` or `order` | passed to the driver |
+| a relation in `join`, and a `Where.rel()` filter or relation sort on a joined relation | passed to the driver |
+| a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`) |
+| a relation that is not declared | refused (`400`) |
+| a relation into rows that have a row scope, in `join` | refused (`400`); see [Relations and row scope](#relations-and-row-scope) |
+| a `Where.rel()` filter or relation sort on a relation missing from `join` | refused (`400`); add it to `join` |
+| a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
+| a sort direction other than `ASC` or `DESC` | refused (`400`) |
+
+```ts
+// Refused: `orders` is a relation, not a column.
+await customers.find({ where: Where.gt('orders', 0) });
+
+// Passed: the relation is joined, then filtered.
+await customers.find({
+  join: [{ relation: 'orders' }],
+  where: Where.rel('orders', Where.eq('status', 'open')),
+});
+```
+
+The check runs on every read, after hooks and after a row scope resolver, so
+nothing those return can name more than a caller could.
+
+A count is decided by `where`, `join` and `withDeleted` alone. `select`,
+`order`, `skip` and `take` shape or page the rows, not how many match, so
+`count` takes the same options as the `find` it totals:
+
+```ts
+const query = { where: Where.eq('status', 'active'), skip: 40, take: 20 };
+
+const page = await customers.find(query);
+const total = await customers.count(query); // every match, not the page
+```
+
+`findAndCount` returns both at once.
+
+### What a result holds
+
+A row comes back holding its own columns and the relations its read joined,
+each of those holding the related entity's own columns. That holds for the
+rows a write returns too. If the driver hands back anything else, the call
+throws `RepositoryQueryException` instead of returning it.
+
+An entity whose relations load on their own, eagerly, opts in with
+`allowEagerRelations`:
+
+```ts
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [
+        { key: 'comments', entity: CommentEntity, allowEagerRelations: true },
+      ],
+    },
+  ],
+});
+```
+
+Its rows may then also hold any declared relation, holding that relation's own
+columns, as a join would. A relation loaded inside it, or anything that is not
+a column or a declared relation, still throws. An entity with a relation into
+rows that have a row scope cannot opt in: startup refuses it (see
+[Relations and row scope](#relations-and-row-scope)).
+
 ## Where Clause Builder
 
-The `Where` helper builds ORM-agnostic
+The `Where` helper builds driver-neutral
 `WhereClause` AST objects that `RepositoryAdapter` implementations translate
 into driver-specific queries.
 
@@ -508,7 +676,7 @@ into driver-specific queries.
    compound operators)
 2. `RepositoryAdapter.toDnf()` flattens the AST into Disjunctive Normal Form
    (an OR of ANDs)
-3. The concrete driver (e.g., `TypeOrmRepository`) translates each AND-branch
+3. The driver translates each AND-branch
    into a driver-specific query object
 4. Same-field conditions within a branch are merged (e.g., `gt` + `lt` on the
    same field become a combined range)
@@ -618,7 +786,7 @@ const orders = await orderRepo.find(
   ),
 );
 
-// Pattern matching
+// Text matching
 const orders = await orderRepo.find(
   w.where(
     w.and(
@@ -639,7 +807,7 @@ const w = Where.for<OrderEntity>();
 
 // Filter orders by customer tier
 const orders = await orderRepo.findAndCount({
-  ...Join.join(Join.left('customer')),
+  join: [{ relation: 'customer' }],
   ...w.where(
     w.and(
       w.eq('status', 'active'),
@@ -671,6 +839,11 @@ const orders = await orderRepo.findAndCount({
 | `notNull(field)` | Is not null |
 | `between(field, from, to)` | Between range (inclusive) |
 
+The text operators (`contains` through `notEnds`) take a string and match it
+as written: no character in it is a wildcard, so `contains('sku', '50%')`
+finds SKUs containing `50%`. Whether case matters depends on your database;
+your driver's README says which.
+
 ### Compound Operators
 
 | Method | Description |
@@ -689,7 +862,7 @@ const orders = await orderRepo.findAndCount({
 
 ## Order Clause Builder
 
-The `OrderBy` helper builds ORM-agnostic
+The `OrderBy` helper builds driver-neutral
 `OrderClause` arrays that `RepositoryAdapter` implementations translate
 into driver-specific sort options.
 
@@ -737,7 +910,7 @@ Use `rel()` to sort by a field on a related entity (see
 ```ts
 // Sort users by post title, then by creation date
 const users = await userRepo.findAndCount({
-  ...Join.join(Join.left('posts')),
+  join: [{ relation: 'posts' }],
   ...OrderBy.order(
     OrderBy.rel('posts', OrderBy.asc<PostEntity>('title')),
     OrderBy.desc<UserEntity>('createdAt'),
@@ -1033,8 +1206,8 @@ interface TransactionFactoryInterface {
 }
 ```
 
-Factories are registered automatically when using `RepositoryModule.forFeature()`
-with a driver module that returns `transactionFactories` in its
+Factories are registered automatically by `RepositoryModule.forRoot()` from
+each driver that returns `transactionFactories` in its
 `DynamicRepositoryModule`.
 
 `supportsConcurrentTransactions` defaults to `true` when omitted — the normal
@@ -1216,15 +1389,14 @@ export class TenantScopeHook {
 
 ### Wiring Hooks
 
-Register the hook on the entity it belongs to, in `forFeature`. Two things
+Register the hook on the entity it belongs to, in `forRoot`. Two things
 have to be true for it to run:
 
 1. **`CoreModule.forRoot()`** (or `.register()`) is imported. It provides
    `HookResolverService`.
 2. **The hook class is listed in `providers`** of some module, so Nest's DI
-   can resolve it. Any module will do — it is resolved with
-   `moduleRef.get(hook, { strict: false })`, so no extra `imports` entry is
-   needed.
+   can resolve it. Any module the application imports when it starts will
+   do; no extra `imports` entry is needed.
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -1235,16 +1407,20 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 @Module({
   imports: [
     CoreModule.forRoot(), // 1. required for any hook to run
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: 'orders', entity: Order, hooks: [TenantScopeHook] },
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            { key: 'orders', entity: Order, hooks: [TenantScopeHook] },
+          ],
+        },
       ],
     }),
   ],
   providers: [TenantScopeHook], // 2. required so DI can resolve it
 })
-export class OrderModule {}
+export class AppModule {}
 ```
 
 A hook registered this way runs on **every** call that reaches the entity —
@@ -1252,12 +1428,11 @@ an HTTP route, another entity's hook calling this repository, a queue
 consumer, a seeder, a test. Nothing further is needed outside HTTP.
 
 A declared hook that could never run is a startup failure
-(`HookBootException`), not a silent no-op. Caught at boot: a missing
-`CoreModule`, a declaration nothing bound, a class listed twice for one
-entity, a hook missing its `@RepoHook()`, one decorated for another
-subsystem, and one the container cannot resolve. The first two are also
-refused on the call itself, which is what covers an app that never reaches the
-startup checks.
+(`HookBootException`), not a silent no-op. Caught when the application is
+created: a missing `CoreModule`, a class listed twice for one entity, a hook
+missing its `@RepoHook()`, one decorated for another subsystem, and one the
+container cannot resolve — including one provided only by a lazily loaded
+module.
 
 #### Request-scoped hooks
 
@@ -1297,8 +1472,8 @@ one route.
 
 ### Scoped Hooks
 
-To target one entity, register the hook on it — `hooks:` in `forFeature`
-reaches that entity and nothing else.
+To target one entity, register the hook on it — `hooks:` on its `forRoot`
+entry reaches that entity and nothing else.
 
 Specifications are for the cuts registration cannot express: a subset of
 operations, or a condition on the context. `RepoSpec.isEntity` narrows a hook
@@ -1402,6 +1577,10 @@ in `RepositoryQueryException`. `RuntimeException` subclasses — `OptimisticLock
 `RepositoryQueryException` — pass through unchanged, so callers can catch
 them by type and their `httpStatus` survives to the transport layer.
 
+An error your database raised arrives as `RepositoryDatabaseException`, a
+`RepositoryQueryException` whose `context` also names the database and its
+own error code, for logs and diagnosis. Those codes differ between databases.
+
 Two `OverlayRef` tokens are exported for reading repository state from an
 `AppContextHost` (via `ctx.with(ref)` or `@Ctx(ref)`):
 
@@ -1496,9 +1675,18 @@ export class OrdersRowScope implements RowScopeInterface<TenantScope> {
 ```
 
 A resolver may read back through the repository it scopes — that nested read
-is itself scoped, which is the point. Injecting your own repository is not a
-circular dependency: repository tokens come from a global module, and a
-repository never depends on its resolver.
+is itself scoped, which is the point. Its module imports the repository like
+any other, and that is not a circular dependency, because a repository never
+depends on its resolver:
+
+```ts
+@Module({
+  imports: [RepositoryModule.forFeature(['orders'])],
+  providers: [OrdersRowScope],
+  exports: [OrdersRowScope],
+})
+export class OrdersRowScopeModule {}
+```
 
 ### `RowScopeBase`
 
@@ -1531,18 +1719,26 @@ It implements four rules and nothing else:
    on the same reasoning, and is stamped rather than pre-checked; one whose key
    names a row falls under rule 2.
 4. **The scope columns take precedence** over any same-named value in the
-   payload, and a mismatch is refused rather than rewritten — by whichever route
-   the value arrives, including a relation object that resolves to the column.
+   payload, and a mismatch is refused rather than rewritten.
+
+Name your entity type, as `RowScopeBase<Order, TenantScope>` does: `column` is
+then checked against `Order`'s columns, so a misspelling is a compile error. An
+entity type that accepts any property name, such as `PlainLiteralObject`, does
+not compile, and neither does a subclass that is generic over its entity.
 
 `label` defaults to `Row`. Scope values and primary keys may be strings or
 numbers. Primary key columns are read from the entity's own metadata, so
 composite primary keys work too — a key counts as naming a row only when every
 primary column is present.
 
+Resolve each scope value with the same type as its column. If every read works
+but every write is a `404`, that is the usual cause: a string `'42'` against an
+integer `tenantId` column matches in the database, but not in `RowScopeBase`'s
+own strict comparison.
+
 It assumes **every scoped entity carries its own scope column**, so scope is
 decided per row without following a relation. That assumption is what makes the
-rest simple, and what makes a join safe (see
-[Relations and row scope](#relations-and-row-scope)).
+rest simple (see [Relations and row scope](#relations-and-row-scope)).
 
 #### Composite scope
 
@@ -1602,7 +1798,7 @@ either its own rows or another entity's — injects what it needs itself:
 export class OrderLinesRowScope extends RowScopeBase<OrderLine, TenantScope> {
   constructor(
     @InjectDynamicRepository('order-lines')
-    private readonly orderLines: RepositoryInterface<OrderLine>,
+    orderLines: RepositoryInterface<OrderLine>,
     @InjectDynamicRepository('orders')
     private readonly orders: RepositoryInterface<Order>,
   ) {
@@ -1618,11 +1814,7 @@ export class OrderLinesRowScope extends RowScopeBase<OrderLine, TenantScope> {
   ): Promise<Value> {
     const scoped = await super.scopeWrite(params);
 
-    // `transform` settles an `order` relation *object* into the `orderId`
-    // column it backs, so one read covers both the scalar and the object. A
-    // bare id (`order: '…'`) reads as undefined, so the driver fails the
-    // write.
-    const orderId = this.orderLines.transform(scoped).orderId;
+    const orderId = scoped.orderId;
     if (orderId === undefined) return scoped;
 
     const order = await this.orders.findOne({
@@ -1639,45 +1831,56 @@ export class OrderLinesRowScope extends RowScopeBase<OrderLine, TenantScope> {
 }
 ```
 
-Read a column through `transform` rather than off the payload directly. A column
-can be supplied as its own scalar or through a relation object that resolves to
-it, and a driver prefers the relation — so reading the payload misses the
-relation route entirely. `transform` is the driver's own materialization and
-answers what the write will actually use.
-
-One foot-gun: `transform` does not fill database defaults, but it *does* apply
-class-field initializers. `@Column() tenantId: string = 'default'` makes every
-`create` refuse as scoped elsewhere. It fails closed, but the cause is not
-obvious.
+The value a resolver receives holds only the entity's own columns — a write
+carrying a relation is refused before it runs — so read columns straight off
+the value.
 
 #### Relations and row scope
 
-A `join` — and a `Where.rel()` filter — is resolved by the driver in a single
-statement, so **the joined entity's resolver never runs**. Row scope does not
-apply to it, by design.
+A `join`, a `Where.rel()` filter or a sort on a relation runs in the database,
+so **the related entity's resolver never sees it**. Whether that is safe depends
+on which side has a row scope:
 
-That is safe under the model above, and the safety comes from the write side:
+| From → to | A relation |
+| --- | --- |
+| scoped → scoped | allowed, but **never joined**: see below |
+| unscoped → unscoped | allowed |
+| unscoped → scoped | **refused at startup**, federated or not: reading it would return rows the caller is not allowed to see |
 
-1. every scoped entity carries its own scope column, so each row's owner is
-   decided without following a relation;
-2. a resolver checks the foreign keys it owns when a row is *written*
-   ([above](#checks-this-class-cannot-make));
-3. so by the time anything is read, every row already points inside its own
-   scope, and a join has nothing left to enforce.
+For the last case, give the unscoped entity a row scope, or remove the relation
+from it and declare the relation on the scoped entity's side only.
 
-Reading orders with their lines is in scope precisely because every line passed
-its foreign-key check when it was written.
+The check follows rows, not entity names. A relation is refused when it reaches
+rows any scoped entity reads — under another class name, or through a
+many-to-many whose junction rows are scoped.
 
-What defeats this is a relation from an **unscoped** entity into a scoped one:
-nothing checks the unscoped side on write, so a join through it reads rows the
-caller's scope would have excluded. That is a schema design decision the
-implementer owns — the framework's guarantee is that a resolver runs at every
-repository *entry point*, and a join is not one.
+Rows are registered once ([forRoot](#forroot)), so they have one row
+scope. For access that must see every scope, such as a back-office report or a
+seeder, go through the scoped repository with a `ctx` your resolver recognises
+and leaves unnarrowed.
 
-See also the driver's note on
-[relation cascades](../nestjs-repository-typeorm/README.md#relation-cascades-and-row-scope):
-a cascaded write reaches a related table without entering its repository, so
-`cascade` must not be enabled on a relation of a scoped entity.
+A relation between two scoped entities stays declared, but no read can join
+it: a `join` naming it is refused with a `400`, and the entity cannot set
+`allowEagerRelations` (startup refuses it). That includes a scoped entity's
+relation to its own rows, such as an employee's `manager` or `reports`. Read
+the related rows through their own repository, with the caller's `ctx`, so
+their resolver runs:
+
+```ts
+const line = await orderLines.findOne({ where: Where.eq('id', id), ctx });
+const order =
+  line &&
+  (await orders.findOne({ where: Where.eq('id', line.orderId), ctx }));
+```
+
+Keep each resolver checking the foreign keys it owns on write
+([above](#checks-this-class-cannot-make)). `RowScopeBase` does not do this for
+you, so without that override a line can name another scope's order. Reading
+through `orders` still returns nothing for it, but the line points there.
+
+Writes never cross a relation: a relation in a write payload is refused
+([Writing relations](#writing-relations)), so a related entity is only written
+through its own repository, where its resolver runs.
 
 #### Natural keys need a serializable transaction
 
@@ -1763,9 +1966,9 @@ existing row, and for an `upsert` whose key matches none. `value` is what will
 be written.
 
 Both name the same row. For `update`/`replace` the repository pins it before a
-resolver runs: it refuses data that would change the primary key, and strips
-relation objects from the merge base so a relation on the caller's entity cannot
-decide which row is written.
+resolver runs: it refuses data that would change the primary key, and refuses
+an entity argument carrying anything but its own columns, so a relation on the
+caller's entity cannot decide which row is written.
 
 Check the right object for the operation:
 
@@ -1778,10 +1981,6 @@ Check the right object for the operation:
   yours" are different answers and a resolver's own reads cannot tell them
   apart. So `target` here is not a row to trust — it answers "can the conflict
   clause fire?", and a present one still has to be checked.
-
-If you write these yourself, read every primary key column through `transform`
-rather than off the payload — `RowScopeBase` does, and it is how a key supplied
-as `{ account: { id } }` is seen at all.
 
 `createMany` and `deleteMany` invoke the callback once per element, and a
 refusal rejects the whole call. Handle `deleteMany` explicitly: falling
@@ -1796,10 +1995,14 @@ into a generic 500.
 
 Structural only — nothing probes what a resolver decides:
 
-- every scoped entity has a resolver bound, and a declared-but-unbound
-  repository refuses to serve at all (`RowScopeUnboundException`). This also
-  catches a request-scoped resolver: its binding provider is never
-  instantiated at bootstrap, so nothing gets bound;
+- a resolver must be singleton-scoped, and so must everything it depends on.
+  One declared request-scoped fails while the application is created; one
+  that is request-scoped through a dependency fails when it initializes
+  (`app.init()`), once every provider is built;
+- no entity without a row scope has a relation to one with a row scope
+  ([Relations and row scope](#relations-and-row-scope));
+- no entity that sets `allowEagerRelations` has a relation into rows with a
+  row scope, its own included;
 - with `requireRowScopeDeclaration`, every entity carries a declaration.
 
 A `RowScopeBase` subclass adds two of its own, at construction: the entity must
@@ -1814,13 +2017,17 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 *whether* a stored row may change at all.
 
 ```ts
-RepositoryModule.forFeature({
-  module: TypeOrmRepositoryModule,
-  entities: [
+RepositoryModule.forRoot({
+  drivers: [
     {
-      key: 'statement-items',
-      entity: StatementItem,
-      writePolicy: { access: 'append-only', reason: 'financial lineage is retained' },
+      driver: TypeOrmRepositoryModule,
+      entities: [
+        {
+          key: 'statement-items',
+          entity: StatementItem,
+          writePolicy: { access: 'append-only', reason: 'financial lineage is retained' },
+        },
+      ],
     },
   ],
 });
@@ -1838,8 +2045,7 @@ declaration but satisfies `requireWritePolicyDeclaration`.
 
 ### There is no escape hatch
 
-Unlike the soft-delete guard, there is no `{ force: true }`. Run migrations
-and backfills outside the repository.
+Run migrations and backfills outside the repository.
 
 ### Correcting an append-only record
 
@@ -1870,36 +2076,10 @@ by querying for one whose `correctedId` matches it.
 The policy does not keep the chain well formed: `create` is not checked, so
 two rows can share a `correctedId` or name a missing row. If each record may
 be corrected only once, add a unique index on `correctedId` and a
-self-referencing foreign key:
-
-```ts
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
-import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm';
-
-@Entity()
-@Index(['correctedId'], { unique: true })
-export class StatementItem extends AppendOnlyPostgresEntity {
-  @Column({ type: 'uuid', nullable: true })
-  correctedId!: string | null;
-
-  @ManyToOne(() => StatementItem, { nullable: true })
-  @JoinColumn({ name: 'correctedId' })
-  corrected?: StatementItem | null;
-
-  @Column({ type: 'text', nullable: true })
-  reason!: string | null;
-
-  // amount, currency, …
-}
-```
-
-`NULL`s are distinct in a unique index on Postgres and SQLite, so originals
-coexist while a second correction of one record is refused. Leave `cascade`
-off the self-relation; see below.
-
-Both refusals reach you as `RepositoryQueryException` (`500`), with the
-database's constraint error as its `cause`; the top-level message does not
-name the constraint. Map it in your service if the caller should see a `409`.
+self-referencing foreign key; your driver's README shows how. The database then
+refuses a second correction of one record, or a correction of a missing one,
+and the call throws `RepositoryDatabaseException` (`500`) carrying the
+database's own error.
 
 ### Aggregates persist through `create`, not `upsert`
 
@@ -1916,12 +2096,11 @@ the second can overwrite the first.
 
 ### What the guarantee covers
 
-The refusal only covers writes made through the repository. Three routes
-bypass it:
+The refusal only covers writes made through the repository. Another entity's
+write can't reach it either, because
+[relation writes](#writing-relations) never leave that entity's table. Two
+routes bypass it:
 
-- **Driver `cascade`.** Never enable `cascade` on a relation that reaches an
-  append-only entity; write the related record through its own repository.
-  Nothing refuses a cascaded write yet.
 - **Foreign-key actions.** `ON DELETE CASCADE` or `SET NULL` from an
   append-only table lets a parent delete rewrite its rows. Declare those
   foreign keys `RESTRICT` or `NO ACTION`.
@@ -1932,28 +2111,31 @@ bypass it:
 | Check | Always on | What it catches |
 | --- | --- | --- |
 | No soft-delete column on an append-only entity | yes | The entity has a soft-delete column, e.g. it extends an audited base entity. Use your driver's append-only base instead |
-| Every entity declares a policy | `requireWritePolicyDeclaration` | An entity nobody decided about, and a misspelled `writePolicy` key, which otherwise type-checks and is ignored |
+| Every entity declares a policy | `requireWritePolicyDeclaration` | An entity nobody decided about |
 
 ## Repository Registry
 
-`RepositoryRegistryService` validates at application bootstrap that no
-duplicate repository keys exist across `forFeature()` calls. If duplicates
-are found, it throws `RepositoryDuplicateKeyException` with details about
-which keys conflict.
+`forRoot()` refuses two entries with the same key
+(`RepositoryDuplicateKeyException`), and `RepositoryRegistryService` refuses
+two that read the same rows (`RepositoryDuplicateUrnException`), each naming
+the registrations that conflict.
 
 ```ts
-// These two registrations would conflict at bootstrap:
-RepositoryModule.forFeature({
-  module: TypeOrmRepositoryModule,
-  entities: [{ key: 'users', entity: UserEntity }],
-});
-
-RepositoryModule.forFeature({
-  module: TypeOrmRepositoryModule,
-  entities: [{ key: 'users', entity: AdminEntity }], // duplicate key!
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [
+        { key: 'users', entity: UserEntity },
+        { key: 'users', entity: AdminEntity }, // duplicate key!
+      ],
+    },
+  ],
 });
 // Throws: Duplicate repository keys: "users" (registered for UserEntity, attempted for AdminEntity)
 ```
+
+`forRoot()` is imported once. Importing it a second time fails at startup.
 
 ## Federation
 
@@ -1961,7 +2143,9 @@ When a relation is marked `federated: true` (see
 [Relation Metadata](#relation-metadata)), the `FederationOrchestrator`
 intercepts `findAndCount` calls and executes **separate queries** for the
 root entity and each relation instead of using SQL JOINs. Results are
-hydrated together transparently.
+hydrated together transparently. Each related entity is read through the
+repository `forRoot()` registered for it, so its own row scope and hooks
+apply.
 
 This is useful when:
 
@@ -2017,16 +2201,17 @@ relations: {
 - OR conditions across federated relations are not supported (throws
   `FederationException`)
 - Filtering or sorting by the owning side of a federated relation (the
-  side holding the foreign key, e.g. the many side of a `@ManyToOne`) is
+  side holding the foreign key, e.g. the many side of a many-to-one) is
   not supported — only the non-owning side can drive relation-first
   discovery (throws `FederationException`)
 - Only `findAndCount` is federated; `find`, `findOne`, and `count` use
-  standard ORM queries
+  the driver's own queries
 
 ## Injecting Repositories
 
-Use `@InjectDynamicRepository()` to inject
-repositories registered via `forFeature()`:
+Use `@InjectDynamicRepository()` to inject a repository registered in
+`forRoot()`, from a module that imports its key with
+[`forFeature()`](#forfeature):
 
 ```ts
 import { InjectDynamicRepository } from '@concepta/nestjs-repository';
@@ -2052,20 +2237,27 @@ also exported for manual provider wiring.
 
 | Exception | Description |
 | --- | --- |
-| `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
+| `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline, and is thrown when a driver returns a property the call did not ask for — see [What a result holds](#what-a-result-holds). `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
+| `RepositoryDatabaseException` | A `RepositoryQueryException` for an error the database raised, such as a foreign key or unique constraint it refused. `context.database` and `context.code` name the database and its own error code, for logs and diagnosis |
 | `OptimisticLockException` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — the row was modified by another request since it was read |
-| `RepositoryDuplicateKeyException` | Duplicate repository keys detected at bootstrap |
+| `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
+| `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
 | `PartialPrimaryKeyException` | A `create`/`createMany` supplied only part of a composite primary key. A partial key cannot be looked up, so nothing can tell whether it is taken. Supply every key column, or none for a generated key |
+| `RelationWriteException` | A write payload carried a relation. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
+| `UnknownColumnException` | A write payload, or a read's `select`, `where` or `order`, named a property that is not a column of the entity; the message lists them — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
+| `InvalidColumnValueException` | A write payload carried a function in place of a column value, or an object in a primary or foreign key column; the message lists the columns |
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |
 | `TransactionClosedException` | A settled scope was used again — `getOrStart`, `enter`, `onCommit`, or `onRollback` after close |
 | `TransactionHeuristicCommitException` | A multi-datasource commit failed after at least one datasource had already committed |
 | `TransactionReadOnlyConflictException` | A joining `run()`/`runReadOnly()` call's `readOnly` option conflicts with the scope it's joining |
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |
 | `FederationException` | Unsupported federated query (e.g., OR across federated relations). A `RuntimeException` from a scoped peer repository passes through unwrapped, so a refusal keeps its own status hint |
-| `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before a resolver was bound to it — it refuses rather than running unscoped |
+| `RepositoryBootException` | One or more structural repository checks failed at startup, such as a foreign key with no column of its own; the message lists every failure. Also thrown for a `forFeature()` key `forRoot()` did not register |
+| `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
+| `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
-| `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. No `force` option — append a correcting record instead |
+| `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. Append a correcting record instead |
 | `WritePolicyBootException` | One or more structural write-policy checks failed at startup; the message lists every failure |
 | `CorrectionChainDepthException` | `resolveCorrectionChain` found more corrections than `maxDepth` (default 100); raise `maxDepth` if the chain is genuinely that long |
 
@@ -2073,5 +2265,5 @@ also exported for manual provider wiring.
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy/Join builders, transaction management, hooks, federation, decorators, exceptions |
+| `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle` |

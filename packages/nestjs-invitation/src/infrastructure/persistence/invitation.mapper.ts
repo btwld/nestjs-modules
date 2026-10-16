@@ -8,22 +8,31 @@ export class InvitationMapper extends DomainMapper<
   InvitationEntityInterface,
   Invitation
 > {
+  /**
+   * Picks the invitation's own fields, so a relation the consumer's entity loads
+   * never reaches the aggregate, or a write.
+   */
   createAggregate(entity: InvitationEntityInterface): Invitation {
     const {
       id,
       version,
-      active: _active,
       dateCreated,
       dateUpdated,
       dateDeleted,
-      ...props
+      userId,
+      code,
+      category,
+      constraints,
+      dateAccepted,
+      dateRevoked,
     } = entity;
 
-    return new Invitation(id, props, version, {
-      dateCreated,
-      dateUpdated,
-      dateDeleted,
-    });
+    return new Invitation(
+      id,
+      { userId, code, category, constraints, dateAccepted, dateRevoked },
+      version,
+      { dateCreated, dateUpdated, dateDeleted },
+    );
   }
 
   toPersistence(aggregate: Invitation) {

@@ -22,7 +22,7 @@ export interface RowScopePublicRegistration {
 }
 
 /**
- * A row scope declaration, written inline in the `forFeature()` entities
+ * A row scope declaration, written inline in the `forRoot()` entities
  * array.
  *
  * Discriminated on an explicit `access` tag rather than on shape, so adding a

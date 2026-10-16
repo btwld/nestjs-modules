@@ -4,7 +4,9 @@ import { type PlainLiteralObject } from '@nestjs/common';
 
 import { type DeepPartial } from '@concepta/nestjs-core';
 
+import { InvalidColumnValueException } from '../../exceptions/invalid-column-value.exception.js';
 import { PrimaryKeyImmutableException } from '../../exceptions/primary-key-immutable.exception.js';
+import { RelationWriteException } from '../../exceptions/relation-write.exception.js';
 import { type RepositoryMetadataInterface } from '../interfaces/repository-metadata.interface.js';
 import { type RepositoryUpdateOptions } from '../interfaces/repository-options.interface.js';
 import { RepositoryAdapter } from '../repository-adapter.js';
@@ -28,6 +30,7 @@ const column = (name: string, isPrimary = false) => ({
 const metadataOf = (columns: ReturnType<typeof column>[]) => ({
   name: 'Row',
   type: RowClass,
+  urn: 'urn:memory:Row',
   columns,
 });
 
@@ -42,18 +45,23 @@ class TestAdapter extends RepositoryAdapter<Row> {
 
   constructor(primaries: string[] = ['id']) {
     super('row');
+    this.bind({});
     this.metadata = {
       ...metadataOf([
         column('id', primaries.includes('id')),
         column('accountId', primaries.includes('accountId')),
         column('name'),
+        { ...column('dateDeleted'), isRemoveDate: true },
       ]),
       relations: [
         {
           name: 'account',
           targetEntity: 'Account',
+          targetUrn: 'urn:memory:Account',
+          targetColumns: [column('id', true)],
           cardinality: 'one',
           on: { from: 'accountId', to: 'id' },
+          foreignKey: [{ from: 'accountId', to: 'id' }],
         },
       ],
     };
@@ -64,21 +72,21 @@ class TestAdapter extends RepositoryAdapter<Row> {
   protected async doUpdate(
     entity: Row,
     data: DeepPartial<Row>,
-    _options?: RepositoryUpdateOptions<Row>,
+    _options?: RepositoryUpdateOptions,
   ): Promise<Row> {
     this.mergeBases.push(entity);
     this.updated.push(data);
-    return this.transform(data);
+    return this.toRow(data);
   }
 
   protected async doReplace(
     entity: Row,
     data: DeepPartial<Row>,
-    _options?: RepositoryUpdateOptions<Row>,
+    _options?: RepositoryUpdateOptions,
   ): Promise<Row> {
     this.mergeBases.push(entity);
     this.replaced.push(data);
-    return this.transform(data);
+    return this.toRow(data);
   }
 
   // Unused here, but required by the abstract base.
@@ -95,13 +103,13 @@ class TestAdapter extends RepositoryAdapter<Row> {
     return [[], 0];
   }
   protected async doCreate(entity: DeepPartial<Row>): Promise<Row> {
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doCreateMany(entities: DeepPartial<Row>[]): Promise<Row[]> {
-    return entities.map((entity) => this.transform(entity));
+    return entities.map((entity) => this.toRow(entity));
   }
   protected async doUpsert(entity: DeepPartial<Row>): Promise<Row> {
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   readonly removed: Row[] = [];
 
@@ -122,12 +130,8 @@ class TestAdapter extends RepositoryAdapter<Row> {
     return entity;
   }
 
-  transform(entityLike: DeepPartial<Row>): Row {
+  toRow(entityLike: DeepPartial<Row>): Row {
     return Object.assign(new RowClass(), entityLike);
-  }
-
-  merge(mergeInto: Row, ...sources: DeepPartial<Row>[]): Row {
-    return Object.assign(mergeInto, ...sources);
   }
 }
 
@@ -174,6 +178,18 @@ describe('primary key immutability on update and replace', () => {
     expect(adapter.updated).toEqual([{ id: EXISTING.id, name: 'Renamed' }]);
   });
 
+  it('compares a binary primary key by its bytes', async () => {
+    const adapter = new TestAdapter();
+    const entity: Row = { ...EXISTING, id: Buffer.from([1, 2]) };
+
+    await adapter.update(entity, { id: Buffer.from([1, 2]), name: 'Renamed' });
+    await expect(
+      adapter.update(entity, { id: Buffer.from([1, 3]) }),
+    ).rejects.toThrow(PrimaryKeyImmutableException);
+
+    expect(adapter.updated).toHaveLength(1);
+  });
+
   it('allows data that does not mention the primary key', async () => {
     const adapter = new TestAdapter();
 
@@ -201,39 +217,40 @@ describe('primary key immutability on update and replace', () => {
     expect(adapter.updated).toEqual([]);
   });
 
-  describe('a relation on the entity argument of a replace', () => {
-    it('does not reach the driver as part of the merge base', async () => {
-      const adapter = new TestAdapter();
+  // This fixture's `merge` copies properties as given, so nothing but the
+  // repository stands between the relation object and the driver.
+  it.each([
+    ['update', (a: TestAdapter, data: Row) => a.update(EXISTING, data)],
+    ['replace', (a: TestAdapter, data: Row) => a.replace(EXISTING, data)],
+  ])('refuses on %s a key sent through a relation object', async (_n, run) => {
+    const adapter = new TestAdapter(['id', 'accountId']);
 
-      await adapter.replace(
-        { ...EXISTING, account: { id: 'acct-9' } },
-        { name: 'Renamed' },
-      );
-
-      expect(adapter.mergeBases).toEqual([
-        { id: EXISTING.id, accountId: EXISTING.accountId, name: EXISTING.name },
-      ]);
-    });
+    await expect(run(adapter, { account: { id: 'acct-2' } })).rejects.toThrow(
+      RelationWriteException,
+    );
+    expect(adapter.updated).toEqual([]);
+    expect(adapter.replaced).toEqual([]);
   });
 
   describe('a relation on the entity argument', () => {
     // A driver resolves a column from its relation object in preference to the
-    // column's own scalar, and the entity argument is the merge base — so a
-    // relation planted on it decides which row the write lands on, whatever
-    // the scalar says. Reproducible against a real driver on an entity with no
-    // row scope at all.
-    it('does not reach the driver, leaving the scalar to decide', async () => {
+    // column's own scalar, so a relation on the stored row would decide which
+    // row the write lands on, whatever the scalar says. It never reaches the
+    // driver, leaving the scalar to decide.
+    it.each([
+      ['update', (a: TestAdapter, e: Row) => a.update(e, { name: 'Renamed' })],
+      [
+        'replace',
+        (a: TestAdapter, e: Row) => a.replace(e, { name: 'Renamed' }),
+      ],
+    ])('is left out of %s', async (_name, run) => {
       const adapter = new TestAdapter();
 
-      await adapter.update(
-        { ...EXISTING, account: { id: 'acct-9' } },
-        { name: 'Renamed' },
-      );
+      await run(adapter, { ...EXISTING, account: { id: 'acct-9' } });
 
-      expect(adapter.mergeBases).toEqual([
-        { id: EXISTING.id, accountId: EXISTING.accountId, name: EXISTING.name },
+      expect(adapter.mergeBases.map((row) => Object.keys(row))).toEqual([
+        Object.keys(EXISTING),
       ]);
-      expect(adapter.mergeBases[0].account).toBeUndefined();
     });
   });
 
@@ -275,6 +292,35 @@ describe('primary key immutability on update and replace', () => {
     });
   });
 
+  describe('a payload whose key changes between reads', () => {
+    class AccessorAdapter extends TestAdapter {
+      protected async runHooks<T>(
+        _methodKey: Parameters<TestAdapter['runHooks']>[0],
+        payload: T,
+      ): Promise<T> {
+        if (!payload || typeof payload !== 'object') return payload;
+        let reads = 0;
+        return Object.defineProperty({ ...payload }, 'id', {
+          enumerable: true,
+          get: () => (reads++ === 0 ? EXISTING.id : 'row-2'),
+        });
+      }
+    }
+
+    it.each([
+      ['update', (a: AccessorAdapter) => a.update(EXISTING, { name: 'X' })],
+      ['replace', (a: AccessorAdapter) => a.replace(EXISTING, { name: 'X' })],
+    ])('writes on %s the key the check saw', async (_n, run) => {
+      const adapter = new AccessorAdapter();
+
+      await run(adapter);
+
+      expect([...adapter.updated, ...adapter.replaced]).toEqual([
+        { id: EXISTING.id, name: 'X' },
+      ]);
+    });
+  });
+
   it('leaves an entity with no primary key columns alone', async () => {
     const adapter = new TestAdapter([]);
 
@@ -285,13 +331,12 @@ describe('primary key immutability on update and replace', () => {
 });
 
 describe('the delete family pins the row the entity argument names', () => {
-  // These operations act on the entity itself rather than on separate data, so
-  // there is no merge to pin. The hazard is the same one update and replace
-  // face: a driver resolves a column from its relation object in preference to
-  // the column's own scalar, and a driver's own identifying read may take
-  // either route. Where the two disagree, the resolver's pre-check and the
-  // statement the driver runs can name different rows — so the relation is
-  // stripped before either sees the entity.
+  // These operations act on the entity itself rather than on separate data.
+  // The hazard is the one update and replace face: a driver resolves a column
+  // from its relation object in preference to the column's own scalar, so the
+  // resolver's pre-check and the statement the driver runs could name
+  // different rows. A relation on the entity is left out before either sees
+  // it.
   const PLANTED: Row = { ...EXISTING, account: { id: 'acct-9' } };
 
   it.each([
@@ -304,19 +349,43 @@ describe('the delete family pins the row the entity argument names', () => {
 
     await run(adapter, { ...PLANTED });
 
-    expect(adapter.removed).toEqual([
-      { id: EXISTING.id, accountId: EXISTING.accountId, name: EXISTING.name },
+    expect(adapter.removed.map((row) => Object.keys(row))).toEqual([
+      Object.keys(EXISTING),
     ]);
-    expect(adapter.removed[0].account).toBeUndefined();
-    expect(adapter.removed[0].accountId).toBe(EXISTING.accountId);
   });
 
-  it('does not mutate the caller entity', async () => {
+  it.each([
+    ['an object', { id: 'row-9' }],
+    ['a function', () => 'row-9'],
+  ])('refuses %s in a key column of the entity', async (_case, key) => {
     const adapter = new TestAdapter();
-    const entity: Row = { ...PLANTED };
+
+    await expect(adapter.delete({ ...EXISTING, id: key })).rejects.toThrow(
+      InvalidColumnValueException,
+    );
+    expect(adapter.removed).toEqual([]);
+  });
+
+  it('leaves out a property that is not a column', async () => {
+    const adapter = new TestAdapter();
+
+    // An entity class built with `new` carries what its constructor sets.
+    await adapter.delete({ ...EXISTING, featured: false });
+
+    expect(adapter.removed.map((row) => Object.keys(row))).toEqual([
+      Object.keys(EXISTING),
+    ]);
+  });
+
+  it('leaves off a property with no value, without mutating the caller', async () => {
+    const adapter = new TestAdapter();
+    const entity: Row = { ...EXISTING, unset: undefined };
 
     await adapter.delete(entity);
 
-    expect(entity).toEqual(PLANTED);
+    expect(adapter.removed.map((row) => Object.keys(row))).toEqual([
+      Object.keys(EXISTING),
+    ]);
+    expect(Object.keys(entity)).toContain('unset');
   });
 });

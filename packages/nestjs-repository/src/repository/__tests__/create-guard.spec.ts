@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { type PlainLiteralObject, type Type } from '@nestjs/common';
 
-import { type DeepPartial, isObject } from '@concepta/nestjs-core';
+import { type DeepPartial } from '@concepta/nestjs-core';
 
 import { EntityAlreadyExistsException } from '../../exceptions/entity-already-exists.exception.js';
 import { PartialPrimaryKeyException } from '../../exceptions/partial-primary-key.exception.js';
+import { RelationWriteException } from '../../exceptions/relation-write.exception.js';
 import { type RepositoryMetadataInterface } from '../interfaces/repository-metadata.interface.js';
 import {
   type RepositoryCreateOptions,
@@ -38,9 +39,8 @@ const COLUMN = (name: string, isPrimary = false) => ({
  * Adapter whose `doFindOne` answers from a fixed set of rows, so the create
  * guard can be exercised without a driver.
  *
- * `primaries` picks which columns are primary, and the `account` relation maps
- * onto the `accountId` column — the shape where a primary key can arrive by two
- * routes.
+ * `primaries` picks which columns are primary, and the `account` relation's
+ * foreign key is the `accountId` column.
  */
 class TestAdapter extends RepositoryAdapter<Row> {
   readonly metadata: RepositoryMetadataInterface<Row>;
@@ -52,9 +52,11 @@ class TestAdapter extends RepositoryAdapter<Row> {
     primaries: string[] = ['id'],
   ) {
     super('row');
+    this.bind({});
     this.metadata = {
       name: 'Row',
       type: RowClass as Type<Row>,
+      urn: 'urn:memory:Row',
       columns: [
         COLUMN('id', primaries.includes('id')),
         COLUMN('accountId', primaries.includes('accountId')),
@@ -64,8 +66,11 @@ class TestAdapter extends RepositoryAdapter<Row> {
         {
           name: 'account',
           targetEntity: 'Account',
+          targetUrn: 'urn:memory:Account',
+          targetColumns: [COLUMN('id', true)],
           cardinality: 'one',
           on: { from: 'accountId', to: 'id' },
+          foreignKey: [{ from: 'accountId', to: 'id' }],
         },
       ],
     };
@@ -91,7 +96,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
 
   protected async doCreate(entity: DeepPartial<Row>): Promise<Row> {
     this.written.push(entity);
-    return this.transform(entity);
+    return this.toRow(entity);
   }
 
   protected async doCreateMany(
@@ -99,7 +104,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
     _options?: RepositoryCreateOptions,
   ): Promise<Row[]> {
     this.written.push(...entities);
-    return entities.map((entity) => this.transform(entity));
+    return entities.map((entity) => this.toRow(entity));
   }
 
   // Unused by these specs, but required by the abstract base.
@@ -116,7 +121,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
     return entity;
   }
   protected async doUpsert(entity: DeepPartial<Row>): Promise<Row> {
-    return this.transform(entity);
+    return this.toRow(entity);
   }
   protected async doReplace(entity: Row): Promise<Row> {
     return entity;
@@ -134,26 +139,8 @@ class TestAdapter extends RepositoryAdapter<Row> {
     return entity;
   }
 
-  /**
-   * Settles a relation object into the scalar column it backs, as a driver
-   * does — the behaviour the create guard relies on to see a key supplied as
-   * `{ account: { id } }` rather than `{ accountId }`.
-   */
-  transform(entityLike: DeepPartial<Row>): Row {
-    const row = Object.assign(new RowClass(), entityLike);
-
-    for (const relation of this.metadata.relations ?? []) {
-      const related = row[relation.name];
-      if (row[relation.on.from] === undefined && isObject(related)) {
-        row[relation.on.from] = Reflect.get(related, relation.on.to);
-      }
-    }
-
-    return row;
-  }
-
-  merge(mergeInto: Row, ...sources: DeepPartial<Row>[]): Row {
-    return Object.assign(mergeInto, ...sources);
+  toRow(entityLike: DeepPartial<Row>): Row {
+    return Object.assign(new RowClass(), entityLike);
   }
 }
 
@@ -211,27 +198,17 @@ describe('create guard', () => {
   });
 
   describe('a primary key that is also a join column', () => {
-    // A driver resolves the column from the relation when the scalar is
-    // absent, and prefers it, so reading only the scalar saw no key at all and
-    // let the write through onto whatever row the relation named.
     it('refuses a key supplied through the relation object', async () => {
       const adapter = new TestAdapter([EXISTING], ['accountId']);
 
       await expect(
         adapter.create({ account: { id: EXISTING.accountId }, name: 'Hijack' }),
-      ).rejects.toThrow(EntityAlreadyExistsException);
+      ).rejects.toThrow(RelationWriteException);
+      expect(adapter.reads).toEqual([]);
       expect(adapter.written).toEqual([]);
     });
 
-    it('allows a relation-supplied key that names no row', async () => {
-      const adapter = new TestAdapter([EXISTING], ['accountId']);
-
-      await expect(
-        adapter.create({ account: { id: 'acct-2' }, name: 'New' }),
-      ).resolves.toBeDefined();
-    });
-
-    it('still reads the scalar when it is the one supplied', async () => {
+    it('reads the key column', async () => {
       const adapter = new TestAdapter([EXISTING], ['accountId']);
 
       await expect(

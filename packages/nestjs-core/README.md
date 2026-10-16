@@ -166,9 +166,10 @@ Two more things have to be true:
 1. **`CoreModule.forRoot()`** must be imported — it provides
    `HookResolverService` and the interceptor that populates hook state on
    the request context. A subsystem that registers hooks against a declared
-   target fails outright without it — `@concepta/nestjs-repository` refuses at
-   startup and on the call, and emits a `ROCKETS_HOOKS_NOT_WIRED` warning once
-   per process.
+   target fails outright without it — `@concepta/nestjs-repository` refuses an
+   entity registered with hooks at startup. The first repository built without
+   it emits a `ROCKETS_HOOKS_NOT_WIRED` warning, once per process, because a
+   route-declared `@UseHooks` hook does not run without it.
 2. **The hook class must be listed in `providers`** for DI to resolve it.
 
 A hook attached with `@UseHooks()` alone, in an app with no repository module,
@@ -212,7 +213,7 @@ single thing, so choose by where you register it rather than by adding a guard:
 | Intent | Where to register | Specification |
 | --- | --- | --- |
 | Cross-cutting — logging, metrics, audit | `@UseHooks` on the controller | Not needed |
-| Specific to one entity — stamp, scope, validation | `hooks:` in the subsystem's own registration, e.g. `RepositoryModule.forFeature` | Not needed |
+| Specific to one entity — stamp, scope, validation | `hooks:` in the subsystem's own registration, e.g. `RepositoryModule.forRoot` | Not needed |
 | A subset of either | Either | Required |
 
 A cross-cutting hook should *not* enumerate entities with a specification: a forgotten

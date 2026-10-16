@@ -7,7 +7,6 @@ import {
   RuntimeException,
   type HookMethodFilter,
   type HookMethodKeyType,
-  type HookOption,
   type HookResolverService,
   type HookWithSpec,
   HooksCtx,
@@ -17,11 +16,16 @@ import {
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
+import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
 import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
+import { RelationWriteException } from '../exceptions/relation-write.exception.js';
+import { RepositoryBootException } from '../exceptions/repository-boot.exception.js';
+import { RepositoryQueryException } from '../exceptions/repository-query.exception.js';
+import { RepositoryUnboundException } from '../exceptions/repository-unbound.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
-import { type FederationOrchestrator } from '../federation/federation-orchestrator.service.js';
+import { UnknownColumnException } from '../exceptions/unknown-column.exception.js';
 import { RepoPermeatorFactory } from '../hooks/repo-permeator-factory.js';
 import { RepoHook } from '../hooks/repository-hook.decorators.js';
 import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
@@ -38,33 +42,37 @@ import {
   type RowScopeWriteOperation,
 } from '../row-scope/row-scope.types.js';
 import { AppendOnlyViolationException } from '../write-policy/exceptions/append-only-violation.exception.js';
-import { WritePolicyBootException } from '../write-policy/exceptions/write-policy-boot.exception.js';
 import {
   isAppendOnly,
   type WritePolicyRegistration,
 } from '../write-policy/interfaces/write-policy-registration.interface.js';
 
 import { type JoinClause } from './interfaces/join-clause.interface.js';
+import { type RepositoryBindingInterface } from './interfaces/repository-binding.interface.js';
+import { type RepositoryDatabaseErrorInterface } from './interfaces/repository-database-error.interface.js';
 import { type RepositoryMetadataInterface } from './interfaces/repository-metadata.interface.js';
 import {
   type RepositoryFindOptions,
   type RepositoryFindOneOptions,
+  type RepositoryCountOptions,
   type RepositoryCreateOptions,
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
   type RepositoryDeleteOptions,
   type RepositoryDeleteOneOptions,
   type RepositoryRestoreOptions,
+  type RepositoryVersionGuardOptions,
 } from './interfaces/repository-options.interface.js';
 import { type RepositoryVersionGuardInterface } from './interfaces/repository-version-guard.interface.js';
 import { type RepositoryInterface } from './interfaces/repository.interface.js';
 import {
   type WhereClause,
+  type WhereCondition,
   isWhereCondition,
   isWhereCompound,
   isWhereNever,
 } from './interfaces/where-clause.interface.js';
-import { WhereCompoundOperator } from './repository.types.js';
+import { SortOrder, WhereCompoundOperator } from './repository.types.js';
 import { Where } from './where.helpers.js';
 
 // Module-scoped: the root cause (CoreModule not imported) is identical no
@@ -86,11 +94,11 @@ let warnedHooksNotWired = false;
  * class MyDriverRepository<Entity extends PlainLiteralObject>
  *   extends RepositoryAdapter<Entity> {
  *   protected async doFind(options?: RepositoryFindOptions<Entity>) {
- *     return this.repo.find(translate(options));
+ *     return this.client.select(translate(options));
  *   }
  *
  *   protected async doCreate(entity: DeepPartial<Entity>) {
- *     return this.repo.save(entity);
+ *     return this.client.insert(entity);
  *   }
  * }
  * ```
@@ -103,19 +111,14 @@ export abstract class RepositoryAdapter<
   readonly entityKey: string;
 
   private _permeator?: RepoPermeatorFactory<Entity>;
-  private _federationOrchestrator?: FederationOrchestrator;
+  private _binding?: RepositoryBindingInterface;
+  private _hooks: HookWithSpec[] = [];
   private _rowScope?: RowScopeInterface;
-  private _hooks?: HookWithSpec[];
-  private _writePolicy?: WritePolicyRegistration;
   private readonly _warnedDuplicates = new Set<Type>();
 
   constructor(
     entityKey: string,
     protected readonly hookResolver?: HookResolverService,
-    /** Held here so the unbound state fails closed. */
-    readonly rowScopeDeclaration?: RowScopeRegistration,
-    /** Held for the same reason. */
-    readonly hooksDeclaration?: HookOption[],
   ) {
     this.entityKey = entityKey;
 
@@ -123,34 +126,73 @@ export abstract class RepositoryAdapter<
       warnedHooksNotWired = true;
       process.emitWarning(
         `Repository "${entityKey}" was constructed without a HookResolverService — ` +
-          'no hook will ever run for this repository (or any other, until ' +
-          'CoreModule is imported), silently. Import CoreModule (e.g. ' +
-          'CoreModule.forRoot()) to enable them.',
+          'route hooks (@UseHooks) will not run for this repository, or any ' +
+          'other, until CoreModule is imported, and hooks registered on an ' +
+          'entity fail startup. Import CoreModule (e.g. CoreModule.forRoot()).',
         { code: 'ROCKETS_HOOKS_NOT_WIRED' },
       );
     }
   }
 
   /**
-   * Set the federation orchestrator for this repository.
-   * When set, `findAndCount` will delegate to the orchestrator
-   * for queries that include federated joins.
+   * Bind this entity's declarations: its row scope, hooks, write policy and
+   * eager opt-in, as its `RepositoryModule.forRoot()` entry declares them.
+   *
+   * Called by `RepositoryModule.forRoot()`, never by a driver, so no driver
+   * can drop a declaration. Binds once: enforcement that can be swapped at
+   * runtime is not enforcement. Until it runs, the repository refuses every
+   * operation.
    */
-  setFederationOrchestrator(orchestrator: FederationOrchestrator): void {
-    this._federationOrchestrator = orchestrator;
+  bind(binding: RepositoryBindingInterface): void {
+    if (this._binding) {
+      throw new RepositoryBootException([
+        `"${this.entityKey}" is already bound. A repository is bound once, ` +
+          'at startup, and cannot be rebound.',
+      ]);
+    }
+
+    const hooks = (binding.hooks ?? []).map(normalizeHookOption);
+
+    // Refused rather than deduplicated: listing a class twice for one entity
+    // has no reading that differs from listing it once, so it is a typo, and
+    // running it twice would be silent — a doubled stamp looks identical.
+    const duplicate = hooks.find(
+      (config, i) => hooks.findIndex((c) => c.hook === config.hook) !== i,
+    );
+    if (duplicate) {
+      throw new HookBootException([
+        `Hook "${duplicate.hook.name}" is registered more than once for ` +
+          `"${this.entityKey}". Remove the duplicate.`,
+      ]);
+    }
+
+    if (hooks.length && !this.hookResolver) {
+      throw new HookBootException([
+        `"${this.entityKey}" declares hooks but no HookResolverService is ` +
+          'available to run them. Import CoreModule (e.g. ' +
+          'CoreModule.forRoot()).',
+      ]);
+    }
+
+    this._hooks = hooks;
+    this._binding = binding;
   }
 
   /**
-   * Bind this entity's resolver instance.
+   * Attach the row scope resolver instance, after `bind()` declared the
+   * entity scoped.
    *
-   * The declaration arrives by constructor, but the instance can only come
-   * from DI — so it is bound by `RepositoryModule.forFeature()` rather than by
-   * each driver's provider factory, where a driver that forgot would fail open
-   * silently.
-   *
-   * Binds once: enforcement that can be swapped at runtime is not enforcement.
+   * Separate from `bind()` because the instance comes from DI, through a
+   * provider of its own. Until it is attached, the entity refuses every
+   * operation rather than run unscoped. Attaches once.
    */
-  setRowScope(rowScope: RowScopeInterface): void {
+  setRowScopeResolver(rowScope: RowScopeInterface): void {
+    if (!isRowScopeScoped(this._binding?.rowScope)) {
+      throw new RowScopeBootException([
+        `"${this.entityKey}" is not bound as scoped, so it takes no row ` +
+          'scope resolver.',
+      ]);
+    }
     if (this._rowScope) {
       throw new RowScopeBootException([
         `"${this.entityKey}" already has a row scope resolver bound. ` +
@@ -161,30 +203,19 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * Whether a resolver is bound. Read by the boot checks.
+   * Whether a resolver is attached. Read by the startup check that every
+   * scoped entity got one.
    */
   get hasRowScopeResolver(): boolean {
     return this._rowScope !== undefined;
   }
 
   /**
-   * Bind this entity's write policy.
-   *
-   * Bound by `RepositoryModule.forFeature()` rather than passed by each
-   * driver, where a driver that forgot would leave an append-only entity
-   * silently mutable.
-   *
-   * Binds once: a policy that can be swapped at runtime is not a policy.
+   * The bound row scope declaration, or `undefined` if the entity declared
+   * none. Read by the boot checks.
    */
-  setWritePolicy(writePolicy: WritePolicyRegistration): void {
-    if (this._writePolicy) {
-      throw new WritePolicyBootException([
-        `"${this.entityKey}" already has a write policy bound. Write ` +
-          'policies are bound once, at startup, and cannot be replaced. ' +
-          `Is "${this.entityKey}" registered more than once in forFeature()?`,
-      ]);
-    }
-    this._writePolicy = writePolicy;
+  get rowScopeDeclaration(): RowScopeRegistration | undefined {
+    return this._binding?.rowScope;
   }
 
   /**
@@ -192,95 +223,48 @@ export abstract class RepositoryAdapter<
    * by the guard and the boot checks.
    */
   get writePolicyDeclaration(): WritePolicyRegistration | undefined {
-    return this._writePolicy;
+    return this._binding?.writePolicy;
   }
 
   /**
-   * Bind this entity's registered hooks.
-   *
-   * Bound once, by `RepositoryModule.forFeature()`, for the same reason as
-   * `setRowScope`.
+   * Whether a result may hold declared relations nobody joined, loaded by the
+   * driver on its own. Drivers read this to decide whether to load them.
    */
-  setHooks(hooks: HookOption[]): void {
-    if (this._hooks) {
-      throw new HookBootException([
-        `"${this.entityKey}" already has hooks bound. Hooks are bound once, ` +
-          'at startup, and cannot be replaced.',
-      ]);
-    }
-
-    const normalized = hooks.map(normalizeHookOption);
-
-    // Refused rather than deduplicated: listing a class twice for one entity
-    // has no reading that differs from listing it once, so it is a typo, and
-    // running it twice would be silent — a doubled stamp looks identical.
-    const duplicate = normalized.find(
-      (config, i) => normalized.findIndex((c) => c.hook === config.hook) !== i,
-    );
-    if (duplicate) {
-      throw new HookBootException([
-        `Hook "${duplicate.hook.name}" is registered more than once for ` +
-          `"${this.entityKey}". Remove the duplicate.`,
-      ]);
-    }
-
-    this._hooks = normalized;
+  get allowsEagerRelations(): boolean {
+    return this._binding?.allowEagerRelations ?? false;
   }
 
   /**
-   * Whether a resolver is available to run hooks. Read by the boot checks.
+   * The relations whose rows, or whose junction rows, have a row scope. Read
+   * by the join refusal and the boot checks.
    */
-  get hasHookResolver(): boolean {
-    return this.hookResolver !== undefined;
-  }
-
-  /**
-   * Whether hooks are bound. Read by the boot checks.
-   */
-  get hasBoundHooks(): boolean {
-    return this._hooks !== undefined;
+  get relationsIntoScoped(): readonly string[] {
+    return this._binding?.relationsIntoScoped ?? [];
   }
 
   /**
    * The bound hooks, for the boot checks to validate.
    */
   get boundHooks(): readonly HookWithSpec[] {
-    return this._hooks ?? [];
+    return this._hooks;
   }
 
   /**
-   * Refuse an entity whose declared hooks could never run. Without this, a
-   * declaration that was missed is indistinguishable from an entity with no
-   * hooks — the silent failure this registration exists to remove.
-   *
-   * Called from every path that would otherwise proceed hookless, including
-   * the ones that return before reaching the permeator.
+   * The binding, refusing every operation until `bind()` has run. Called first
+   * by every public operation, so a repository built outside
+   * `RepositoryModule.forRoot()` cannot run without its declarations.
    */
-  protected assertHooksRunnable(): void {
-    if (!this.hooksDeclaration?.length) return;
-
-    if (!this.hookResolver) {
-      throw new HookBootException([
-        `"${this.entityKey}" declares hooks but no HookResolverService is ` +
-          'available to run them. Import CoreModule (e.g. ' +
-          'CoreModule.forRoot()).',
-      ]);
+  protected requireBinding(): RepositoryBindingInterface {
+    if (!this._binding) {
+      throw new RepositoryUnboundException(this.entityKey);
     }
-
-    if (!this._hooks) {
-      throw new HookBootException([
-        `"${this.entityKey}" declares hooks but none were bound to it. The ` +
-          'entity was registered by calling the driver module directly ' +
-          'rather than through RepositoryModule.forFeature().',
-      ]);
-    }
+    return this._binding;
   }
 
   /**
-   * Resolve the bound resolver, refusing to serve a declared-but-unbound
-   * entity. Reached before every operation, so the window between construction
-   * and binding — and a declaration that nothing ever bound — both fail closed
-   * rather than silently running unscoped.
+   * Resolve the attached resolver, refusing to serve a scoped entity whose
+   * resolver never arrived — one depending on a request-scoped provider, or
+   * used before startup finished — rather than run it unscoped.
    */
   private requireRowScope(): RowScopeInterface | undefined {
     if (this._rowScope) return this._rowScope;
@@ -297,9 +281,22 @@ export abstract class RepositoryAdapter<
       this._permeator = new RepoPermeatorFactory<Entity>(
         this.runHooks.bind(this),
         this.entityKey,
+        (error) => this.describeDatabaseError(error),
       );
     }
     return this._permeator;
+  }
+
+  /**
+   * What the driver can report about `error` when its database raised it, or
+   * `undefined` otherwise. A reported error reaches the caller as a
+   * `RepositoryDatabaseException`; any other opaque error as a
+   * `RepositoryQueryException`.
+   */
+  protected describeDatabaseError(
+    _error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined {
+    return undefined;
   }
 
   /**
@@ -351,18 +348,253 @@ export abstract class RepositoryAdapter<
    * what stops a hook returning `{ ...options, ctx: other }` from choosing
    * which principal is enforced. `options.ctx` stays exactly as hooks left it,
    * since that is what the driver will run under.
+   *
+   * What it returns is then checked by `assertReadable`, so a resolver cannot
+   * name anything a caller could not.
    */
   private async applyQueryScope<
-    Options extends { where?: WhereClause; ctx?: PlainLiteralObject },
+    Options extends RepositoryFindOneOptions<Entity>,
   >(
     operation: RowScopeQueryOperation,
     options: Options,
     scope: PlainLiteralObject | undefined,
   ): Promise<Options> {
     const rowScope = this.requireRowScope();
-    if (!rowScope) return options;
+    const scoped = rowScope
+      ? await rowScope.scopeQuery({
+          operation,
+          options,
+          ctx: options.ctx,
+          scope,
+        })
+      : options;
 
-    return rowScope.scopeQuery({ operation, options, ctx: options.ctx, scope });
+    this.assertReadable(scoped);
+
+    return scoped;
+  }
+
+  /**
+   * Refuse a read that names anything but this entity's own columns and the
+   * relations it joins — the read-side counterpart of `toOwnColumns`.
+   *
+   * - A field selected, filtered or sorted on must be one of the entity's own
+   *   columns. A relation is not a column: a driver may read one as a join or
+   *   a count over the related table, which the related entity's row scope
+   *   never sees.
+   * - A relation joined, or tagged on a filter or sort, must be declared.
+   * - A relation whose rows have a row scope cannot be joined: the joined
+   *   rows would come back unscoped.
+   * - A relation tagged on a filter or sort must also be joined, so a read
+   *   only ever reaches the relations it names in `join`, and its field must
+   *   be one of that relation's own columns.
+   * - A sort direction is ascending or descending.
+   * - A filter stays within the complexity every driver can translate.
+   */
+  private assertReadable(options: RepositoryFindOneOptions<Entity>): void {
+    const relations = new Set(
+      (this.metadata.relations ?? []).map((relation) => relation.name),
+    );
+    const columns = new Set(this.metadata.columns.map((column) => column.name));
+
+    const leaves = options.where ? this.whereConditions(options.where) : [];
+    const order = options.order ?? [];
+
+    const fields = [
+      ...(options.select ?? []).map(String),
+      ...leaves.filter((leaf) => !leaf.relation).map((leaf) => leaf.field),
+      ...order.filter((key) => !key.relation).map((key) => key.field),
+    ];
+    const unknown = [...new Set(fields)].filter((field) => !columns.has(field));
+    if (unknown.length > 0) {
+      throw new UnknownColumnException(this.metadata.name, unknown, {
+        message:
+          'Cannot read %s — not a column of this entity: %s. Select, filter ' +
+          'and sort on its own columns, and on a relation through join',
+        messageParams: [this.metadata.name, unknown.join(', ')],
+      });
+    }
+
+    const joined = (options.join ?? []).map((join) => join.relation);
+    const tagged = [
+      ...leaves.map((leaf) => leaf.relation),
+      ...order.map((key) => key.relation),
+    ].filter((relation) => relation !== undefined);
+
+    const undeclared = [...joined, ...tagged].find(
+      (relation) => !relations.has(relation),
+    );
+    if (undeclared !== undefined) {
+      throw new RuntimeException({
+        message: 'Unknown relation "%s" on entity "%s"',
+        messageParams: [undeclared, this.metadata.name],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+
+    const intoScoped = joined.find((relation) =>
+      this.relationsIntoScoped.includes(relation),
+    );
+    if (intoScoped !== undefined) {
+      throw new RuntimeException({
+        message:
+          'Cannot join "%s" on %s: the rows it reads have a row scope, which ' +
+          'a join would bypass. Read them through their own repository.',
+        messageParams: [intoScoped, this.metadata.name],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+
+    const unjoined = tagged.find((relation) => !joined.includes(relation));
+    if (unjoined !== undefined) {
+      throw new RuntimeException({
+        message:
+          'Cannot filter or sort on relation "%s" of %s without joining it. ' +
+          'Add it to join.',
+        messageParams: [unjoined, this.metadata.name],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+
+    for (const relation of this.metadata.relations ?? []) {
+      const targetColumns = new Set(
+        relation.targetColumns.map((column) => column.name),
+      );
+      const unknownRelated = [
+        ...new Set(
+          [...leaves, ...order]
+            .filter((key) => key.relation === relation.name)
+            .map((key) => key.field)
+            .filter((field) => !targetColumns.has(field)),
+        ),
+      ];
+      if (unknownRelated.length > 0) {
+        throw new UnknownColumnException(this.metadata.name, unknownRelated, {
+          message:
+            'Cannot read %s.%s — not a column of %s: %s. Filter and sort on ' +
+            'its own columns',
+          messageParams: [
+            this.metadata.name,
+            relation.name,
+            relation.targetEntity,
+            unknownRelated.join(', '),
+          ],
+        });
+      }
+    }
+
+    // Read untyped: the type admits only the two directions, a caller's
+    // runtime value need not.
+    const direction = order.find((key) => {
+      const { order: value }: PlainLiteralObject = key;
+      return value !== SortOrder.ASC && value !== SortOrder.DESC;
+    });
+    if (direction !== undefined) {
+      throw new RuntimeException({
+        message: 'Cannot sort %s on "%s": the direction must be ASC or DESC',
+        messageParams: [this.metadata.name, direction.field],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+
+    // Refuses a filter too complex to translate here, whatever the driver.
+    if (options.where) this.toDnf(options.where);
+  }
+
+  /**
+   * Throw when a row the driver returned is not what the call asked for. A row
+   * holds each relation in `join`, holding that relation's own columns, and may
+   * hold its own columns; with `allowEagerRelations`, also any other declared
+   * relation, holding its own columns too. A joined relation that is absent or
+   * `undefined` is refused; any other property whose value is `undefined`
+   * carries nothing and is not counted.
+   */
+  private assertRows(rows: (Entity | null)[], join: JoinClause[] = []): void {
+    const columns = new Set(this.metadata.columns.map((column) => column.name));
+    const relationColumns = new Map(
+      (this.metadata.relations ?? []).map((relation) => [
+        relation.name,
+        new Set(relation.targetColumns.map((column) => column.name)),
+      ]),
+    );
+    const joined = new Set(join.map((clause) => clause.relation));
+    const unexpected = new Set<string>();
+    const missing = new Set<string>();
+
+    for (const row of rows) {
+      if (!row) continue;
+      const values: PlainLiteralObject = row;
+
+      for (const name of joined) {
+        if (values[name] === undefined) missing.add(name);
+      }
+
+      for (const key of Object.keys(values)) {
+        const value: unknown = values[key];
+        if (value === undefined || columns.has(key)) continue;
+
+        const targetColumns = relationColumns.get(key);
+        if (targetColumns && (joined.has(key) || this.allowsEagerRelations)) {
+          for (const related of Array.isArray(value) ? value : [value]) {
+            if (related === null) continue;
+            if (!isObject(related)) {
+              unexpected.add(key);
+              continue;
+            }
+            const relatedValues: PlainLiteralObject = related;
+            for (const field of Object.keys(relatedValues)) {
+              if (
+                relatedValues[field] !== undefined &&
+                !targetColumns.has(field)
+              ) {
+                unexpected.add(`${key}.${field}`);
+              }
+            }
+          }
+          continue;
+        }
+
+        unexpected.add(key);
+      }
+    }
+
+    if (missing.size > 0) {
+      throw new RepositoryQueryException(this.metadata.name, {
+        message:
+          'The driver returned %s rows without relations their read joins: %s',
+        messageParams: [this.metadata.name, [...missing].join(', ')],
+      });
+    }
+
+    if (unexpected.size > 0) {
+      throw new RepositoryQueryException(this.metadata.name, {
+        message:
+          'The driver returned %s properties nothing asked for: %s. A result ' +
+          'holds its own columns and the relations its read joins',
+        messageParams: [this.metadata.name, [...unexpected].join(', ')],
+      });
+    }
+  }
+
+  /** `row`, once `assertRows` has checked it. */
+  private checkedRow(row: Entity): Entity {
+    this.assertRows([row]);
+    return row;
+  }
+
+  /**
+   * Every condition in a where clause, at any depth.
+   */
+  private whereConditions(clause: WhereClause): WhereCondition[] {
+    if (isWhereCondition(clause)) return [clause];
+    if (isWhereCompound(clause)) {
+      return clause.conditions.flatMap((child) => this.whereConditions(child));
+    }
+    return [];
   }
 
   /**
@@ -388,7 +620,7 @@ export abstract class RepositoryAdapter<
    * `target` is the existing row the call is aimed at, where there is one —
    * the pre-hook argument, not the post-hook payload.
    *
-   * The row is pinned before this runs — see `withoutRelations` and, for
+   * The row is pinned before this runs — see `toStoredRow` and, for
    * `update`/`replace`, `assertKeyUnchanged`.
    *
    * The delete/lifecycle operations act on the returned `value` rather than on
@@ -439,14 +671,21 @@ export abstract class RepositoryAdapter<
   // Query operations
 
   async find(options: RepositoryFindOptions<Entity> = {}): Promise<Entity[]> {
+    this.requireBinding();
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.find.permeate(
       options,
-      async (scoped) =>
-        this.doFind(
-          await this.applyQueryScope(RowScopeOperation.FIND, scoped, scope),
-        ),
+      async (scoped) => {
+        const query = await this.applyQueryScope(
+          RowScopeOperation.FIND,
+          scoped,
+          scope,
+        );
+        const rows = await this.doFind(query);
+        this.assertRows(rows, query.join);
+        return rows;
+      },
       this.entityCtx(options.ctx),
     );
   }
@@ -458,14 +697,21 @@ export abstract class RepositoryAdapter<
   async findOne(
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
+    this.requireBinding();
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.findOne.permeate(
       options,
-      async (scoped) =>
-        this.doFindOne(
-          await this.applyQueryScope(RowScopeOperation.FIND_ONE, scoped, scope),
-        ),
+      async (scoped) => {
+        const query = await this.applyQueryScope(
+          RowScopeOperation.FIND_ONE,
+          scoped,
+          scope,
+        );
+        const row = await this.doFindOne(query);
+        this.assertRows([row], query.join);
+        return row;
+      },
       this.entityCtx(options.ctx),
     );
   }
@@ -475,21 +721,26 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity | null>;
 
   async count(options: RepositoryFindOptions<Entity> = {}): Promise<number> {
+    this.requireBinding();
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.count.permeate(
       options,
-      async (scoped) =>
-        this.doCount(
-          await this.applyQueryScope(RowScopeOperation.COUNT, scoped, scope),
-        ),
+      async (scoped) => {
+        const { where, join, withDeleted, ctx } = await this.applyQueryScope(
+          RowScopeOperation.COUNT,
+          scoped,
+          scope,
+        );
+        // Only these decide how many rows match. The rest shape or page the
+        // rows, so the driver is never handed them to interpret.
+        return this.doCount({ where, join, withDeleted, ctx });
+      },
       this.entityCtx(options.ctx),
     );
   }
 
-  protected abstract doCount(
-    options?: RepositoryFindOptions<Entity>,
-  ): Promise<number>;
+  protected abstract doCount(options?: RepositoryCountOptions): Promise<number>;
 
   /**
    * Find entities and return with total count.
@@ -501,22 +752,25 @@ export abstract class RepositoryAdapter<
   async findAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
-    if (this._federationOrchestrator && this.hasFederatedJoins(options?.join)) {
-      return this._federationOrchestrator.findAndCount(this, options);
+    const orchestrator = this.requireBinding().federationOrchestrator;
+    if (orchestrator && this.hasFederatedJoins(options?.join)) {
+      return orchestrator.findAndCount(this, options);
     }
 
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.findAndCount.permeate(
       options,
-      async (scoped) =>
-        this.doFindAndCount(
-          await this.applyQueryScope(
-            RowScopeOperation.FIND_AND_COUNT,
-            scoped,
-            scope,
-          ),
-        ),
+      async (scoped) => {
+        const query = await this.applyQueryScope(
+          RowScopeOperation.FIND_AND_COUNT,
+          scoped,
+          scope,
+        );
+        const [rows, total] = await this.doFindAndCount(query);
+        this.assertRows(rows, query.join);
+        return [rows, total];
+      },
       this.entityCtx(options.ctx),
     );
   }
@@ -531,18 +785,21 @@ export abstract class RepositoryAdapter<
     entity: DeepPartial<Entity>,
     options?: RepositoryCreateOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     return this.permeator.create.permeate(
       entity,
       async (scoped) => {
-        const value = await this.applyWriteScope(
-          RowScopeOperation.CREATE,
-          scoped,
-          undefined,
-          options?.ctx,
+        const value = this.toOwnColumns(
+          await this.applyWriteScope(
+            RowScopeOperation.CREATE,
+            this.toOwnColumns(scoped),
+            undefined,
+            options?.ctx,
+          ),
         );
         this.assertKeyNotPartial(value);
         await this.assertNotExisting(value, options?.ctx);
-        return this.doCreate(value, options);
+        return this.checkedRow(await this.doCreate(value, options));
       },
       this.entityCtx(options?.ctx),
     );
@@ -557,20 +814,25 @@ export abstract class RepositoryAdapter<
     entities: DeepPartial<Entity>[],
     options?: RepositoryCreateOptions,
   ): Promise<Entity[]> {
+    this.requireBinding();
     return this.permeator.createMany.permeate(
       entities,
       async (scoped) => {
-        const values = await this.applyWriteScopeMany(
-          RowScopeOperation.CREATE_MANY,
-          scoped,
-          [],
-          options?.ctx,
-        );
+        const values = (
+          await this.applyWriteScopeMany(
+            RowScopeOperation.CREATE_MANY,
+            scoped.map((entity) => this.toOwnColumns(entity)),
+            [],
+            options?.ctx,
+          )
+        ).map((entity) => this.toOwnColumns(entity));
         for (const value of values) {
           this.assertKeyNotPartial(value);
           await this.assertNotExisting(value, options?.ctx);
         }
-        return this.doCreateMany(values, options);
+        const rows = await this.doCreateMany(values, options);
+        this.assertRows(rows);
+        return rows;
       },
       this.entityCtx(options?.ctx),
     );
@@ -586,29 +848,34 @@ export abstract class RepositoryAdapter<
   async update(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     this.assertAppendable('update');
-    const versionGuard = this.resolveVersionGuard(entity, options, 'guard');
-    this.assertMutable(entity, options);
+    const stored = this.toStoredRow(entity);
+    const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
+    this.assertMutable(stored);
     return this.permeator.update.permeate(
       data,
       async (scoped) => {
         // Before row scope: moving the write is a repository-level error
         // whatever the scope, and reporting it as such is clearer than the
         // scope refusal it would otherwise surface as. Still after hooks, so
-        // a hook cannot redirect the write either.
-        this.assertKeyUnchanged(entity, scoped);
-        const stored = this.withoutRelations(entity);
-        return this.doUpdate(
-          stored,
+        // a hook cannot redirect the write either. Checked again on what the
+        // resolver returns, since that is what is written.
+        const values = this.toOwnColumns(scoped);
+        this.assertKeyUnchanged(stored, values);
+        const written = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.UPDATE,
-            scoped,
+            values,
             stored,
             options?.ctx,
           ),
-          { ...options, versionGuard },
+        );
+        this.assertKeyUnchanged(stored, written);
+        return this.checkedRow(
+          await this.doUpdate(stored, written, { ...options, versionGuard }),
         );
       },
       this.entityCtx(options?.ctx),
@@ -618,31 +885,38 @@ export abstract class RepositoryAdapter<
   protected abstract doUpdate(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity>;
 
   async upsert(
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     this.assertAppendable('upsert');
-    await this.assertUpsertMutable(entity, options);
     return this.permeator.upsert.permeate(
       entity,
-      async (scoped) =>
-        this.doUpsert(
+      async (scoped) => {
+        const reduced = this.toOwnColumns(scoped);
+        // After hooks, so the row checked is the row the payload now names.
+        await this.assertUpsertMutable(reduced, options?.ctx);
+        const written = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.UPSERT,
-            scoped,
+            reduced,
             // Upsert names its row by the key in its own payload, so the row
             // it aims at has to be looked up rather than passed in. Absent
             // means the conflict clause cannot fire, which is the difference
             // between an insert and an update a resolver has to police.
-            await this.findByKey(scoped, options?.ctx),
+            await this.findByKey(reduced, options?.ctx),
             options?.ctx,
           ),
-          options,
-        ),
+        );
+        // The resolver checked the row `reduced` names; its output must not
+        // name another.
+        this.assertKeyUnchanged(reduced, written);
+        return this.checkedRow(await this.doUpsert(written, options));
+      },
       this.entityCtx(options?.ctx),
     );
   }
@@ -655,25 +929,29 @@ export abstract class RepositoryAdapter<
   async replace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     this.assertAppendable('replace');
-    const versionGuard = this.resolveVersionGuard(entity, options, 'guard');
-    this.assertMutable(entity, options);
+    const stored = this.toStoredRow(entity);
+    const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
+    this.assertMutable(stored);
     return this.permeator.replace.permeate(
       data,
       async (scoped) => {
-        this.assertKeyUnchanged(entity, scoped);
-        const stored = this.withoutRelations(entity);
-        return this.doReplace(
-          stored,
+        const values = this.toOwnColumns(scoped);
+        this.assertKeyUnchanged(stored, values);
+        const written = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.REPLACE,
-            scoped,
+            values,
             stored,
             options?.ctx,
           ),
-          { ...options, versionGuard },
+        );
+        this.assertKeyUnchanged(stored, written);
+        return this.checkedRow(
+          await this.doReplace(stored, written, { ...options, versionGuard }),
         );
       },
       this.entityCtx(options?.ctx),
@@ -683,29 +961,34 @@ export abstract class RepositoryAdapter<
   protected abstract doReplace(
     entity: Entity,
     data: DeepPartial<Entity>,
-    options?: RepositoryUpdateOptions<Entity>,
+    options?: RepositoryUpdateOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity>;
 
   // Delete operations
 
   async delete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     this.assertAppendable('delete');
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
       entity,
       async (scoped) => {
-        const stored = this.withoutRelations(scoped);
-        return this.doDelete(
-          await this.applyWriteScope(
-            RowScopeOperation.DELETE,
-            stored,
-            stored,
-            options?.ctx,
+        const stored = this.toStoredRow(scoped);
+        return this.checkedRow(
+          await this.doDelete(
+            this.toStoredRow(
+              await this.applyWriteScope(
+                RowScopeOperation.DELETE,
+                stored,
+                stored,
+                options?.ctx,
+              ),
+            ),
+            { ...options, versionGuard },
           ),
-          { ...options, versionGuard },
         );
       },
       this.entityCtx(options?.ctx),
@@ -714,27 +997,32 @@ export abstract class RepositoryAdapter<
 
   protected abstract doDelete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity>;
 
   async deleteMany(
     entities: Entity[],
     options?: RepositoryDeleteOptions,
   ): Promise<Entity[]> {
+    this.requireBinding();
     this.assertAppendable('deleteMany');
     return this.permeator.deleteMany.permeate(
       entities,
       async (scoped) => {
-        const stored = scoped.map((entity) => this.withoutRelations(entity));
-        return this.doDeleteMany(
-          await this.applyWriteScopeMany(
-            RowScopeOperation.DELETE_MANY,
-            stored,
-            stored,
-            options?.ctx,
-          ),
+        const stored = scoped.map((entity) => this.toStoredRow(entity));
+        const values = await this.applyWriteScopeMany(
+          RowScopeOperation.DELETE_MANY,
+          stored,
+          stored,
+          options?.ctx,
+        );
+        const rows = await this.doDeleteMany(
+          values.map((entity) => this.toStoredRow(entity)),
           options,
         );
+        this.assertRows(rows);
+        return rows;
       },
       this.entityCtx(options?.ctx),
     );
@@ -747,32 +1035,29 @@ export abstract class RepositoryAdapter<
 
   async softDelete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     this.assertAppendable('softDelete');
+    const deleteDateColumn = this.requireDeleteDateColumn('softDelete');
     // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
     // below, so a stale precondition against a row someone else already
     // deleted conflicts instead of quietly succeeding.
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
 
-    const deleteDateColumn = this.getDeleteDateColumn();
-    if (deleteDateColumn && this.isSoftDeleted(entity, deleteDateColumn)) {
+    if (this.isSoftDeleted(entity, deleteDateColumn)) {
       // The no-op below returns without reaching the permeator, so scope is
       // consulted here or not at all — and "already deleted" must not become a
       // way to soft-delete a row the caller was never allowed to touch. The
       // returned value is discarded rather than returned: nothing is written,
       // so only the resolver's refusal is meaningful.
-      const stored = this.withoutRelations(entity);
+      const stored = this.toStoredRow(entity);
       await this.applyWriteScope(
         RowScopeOperation.SOFT_DELETE,
         stored,
         stored,
         options?.ctx,
       );
-
-      // Same reasoning for hooks: this path skips the permeator, so a
-      // declaration that could never run would go unrefused here alone.
-      this.assertHooksRunnable();
 
       // Idempotent rather than rejected: a retried delete must not fail.
       return entity;
@@ -781,15 +1066,19 @@ export abstract class RepositoryAdapter<
     return this.permeator.softDelete.permeate(
       entity,
       async (scoped) => {
-        const stored = this.withoutRelations(scoped);
-        return this.doSoftDelete(
-          await this.applyWriteScope(
-            RowScopeOperation.SOFT_DELETE,
-            stored,
-            stored,
-            options?.ctx,
+        const stored = this.toStoredRow(scoped);
+        return this.checkedRow(
+          await this.doSoftDelete(
+            this.toStoredRow(
+              await this.applyWriteScope(
+                RowScopeOperation.SOFT_DELETE,
+                stored,
+                stored,
+                options?.ctx,
+              ),
+            ),
+            { ...options, versionGuard },
           ),
-          { ...options, versionGuard },
         );
       },
       this.entityCtx(options?.ctx),
@@ -798,27 +1087,34 @@ export abstract class RepositoryAdapter<
 
   protected abstract doSoftDelete(
     entity: Entity,
-    options?: RepositoryDeleteOneOptions<Entity>,
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity>;
 
   async restore(
     entity: Entity,
-    options?: RepositoryRestoreOptions<Entity>,
+    options?: RepositoryRestoreOptions,
   ): Promise<Entity> {
+    this.requireBinding();
     this.assertAppendable('restore');
+    this.requireDeleteDateColumn('restore');
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,
       async (scoped) => {
-        const stored = this.withoutRelations(scoped);
-        return this.doRestore(
-          await this.applyWriteScope(
-            RowScopeOperation.RESTORE,
-            stored,
-            stored,
-            options?.ctx,
+        const stored = this.toStoredRow(scoped);
+        return this.checkedRow(
+          await this.doRestore(
+            this.toStoredRow(
+              await this.applyWriteScope(
+                RowScopeOperation.RESTORE,
+                stored,
+                stored,
+                options?.ctx,
+              ),
+            ),
+            { ...options, versionGuard },
           ),
-          { ...options, versionGuard },
         );
       },
       this.entityCtx(options?.ctx),
@@ -827,37 +1123,10 @@ export abstract class RepositoryAdapter<
 
   protected abstract doRestore(
     entity: Entity,
-    options?: RepositoryRestoreOptions<Entity>,
+    options?: RepositoryRestoreOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity>;
 
   // Utility methods
-
-  abstract transform(entityLike: DeepPartial<Entity>): Entity;
-
-  abstract merge(
-    mergeIntoEntity: Entity,
-    ...entityLikes: DeepPartial<Entity>[]
-  ): Entity;
-
-  /**
-   * Prepare a DTO for write operations.
-   * Transforms DTO to entity instance if needed. An empty object is a
-   * valid entity (e.g. every column is server-populated) — rejecting it
-   * is a schema/validation-layer decision, not this adapter's (see #466).
-   */
-  prepare(dto: DeepPartial<Entity>): Entity | undefined {
-    if (!isObject(dto)) {
-      return undefined;
-    }
-
-    const entityType = this.metadata.type;
-
-    if (dto instanceof entityType) {
-      return dto;
-    }
-
-    return Object.assign(new entityType(), dto);
-  }
 
   /**
    * Get primary key column names from metadata
@@ -883,6 +1152,21 @@ export abstract class RepositoryAdapter<
    */
   getDeleteDateColumn(): (keyof Entity & string) | undefined {
     return this.metadata.columns.find((col) => col.isRemoveDate)?.name;
+  }
+
+  /**
+   * The soft-remove date column, or a refusal: soft delete and restore are
+   * meaningless on an entity without one.
+   */
+  private requireDeleteDateColumn(operation: string): keyof Entity & string {
+    const column = this.getDeleteDateColumn();
+    if (column) return column;
+
+    throw new RuntimeException({
+      message: 'Cannot %s %s: the entity has no soft-delete column',
+      messageParams: [operation, this.metadata.name],
+      fault: 'usage',
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -913,13 +1197,11 @@ export abstract class RepositoryAdapter<
    * the refusal would depend on whether the entity happened to have a delete
    * date column.
    *
-   * Takes no `force` option, deliberately — see
-   * {@link AppendOnlyViolationException}.
-   *
    * **Scope of this guarantee.** It covers the repository's own entry points.
-   * It does not cover a write that reaches the table without passing through
-   * one: a driver `cascade` on a relation, or a direct `@InjectRepository`
-   * handle. Neither is refused here, as for row scope.
+   * It does not cover a direct `@InjectRepository` handle or a database
+   * foreign key action, neither of which passes through one. Another entity's
+   * write cannot reach this table: `toOwnColumns` keeps every write to its own
+   * entity's table.
    */
   private assertAppendable(operation: string): void {
     if (isAppendOnly(this.writePolicyDeclaration)) {
@@ -929,11 +1211,9 @@ export abstract class RepositoryAdapter<
 
   /**
    * Throw `SoftDeletedImmutableException` if `entity` is currently
-   * soft-deleted, unless the caller opted out via `{ force: true }`.
+   * soft-deleted. `restore()` is the only way back.
    */
-  private assertMutable(entity: Entity, options?: { force?: boolean }): void {
-    if (options?.force) return;
-
+  private assertMutable(entity: Entity): void {
     const deleteDateColumn = this.getDeleteDateColumn();
     if (!deleteDateColumn) return;
 
@@ -945,10 +1225,8 @@ export abstract class RepositoryAdapter<
   /**
    * Same guard as `assertMutable`, but for `upsert()` — the caller only
    * supplies a partial entity, not an existing row, so whether the target is
-   * soft-deleted has to be read first. `prepare()` materializes a typed
-   * `Entity` so the primary key columns can be read without a cast. Uses
-   * `withDeleted: true` since the row being checked is expected to be
-   * soft-deleted.
+   * soft-deleted has to be read first. Uses `withDeleted: true` since the row
+   * being checked is expected to be soft-deleted.
    *
    * Reads via the protected `doFindOne` rather than the public `findOne`, so
    * the find permeator is bypassed and a `beforeFindOne` hook cannot decide
@@ -962,36 +1240,21 @@ export abstract class RepositoryAdapter<
    */
   private async assertUpsertMutable(
     entity: DeepPartial<Entity>,
-    options?: { force?: boolean; ctx?: PlainLiteralObject },
+    ctx?: PlainLiteralObject,
   ): Promise<void> {
-    if (options?.force) return;
-
     const deleteDateColumn = this.getDeleteDateColumn();
     if (!deleteDateColumn) return;
 
-    const primaryColumns = this.getPrimaryColumns();
-    if (primaryColumns.length === 0) return;
-
-    const prepared = this.prepare(entity);
-    if (!prepared) return;
-
-    const conditions: WhereClause[] = [];
-    for (const col of primaryColumns) {
-      const value = prepared[col];
-      // No primary key supplied — this is a fresh insert, not a write
-      // against an existing (possibly soft-deleted) row.
-      if (value === undefined) return;
-      conditions.push(Where.eq(col, value));
-    }
-
-    const where =
-      conditions.length === 1 ? conditions[0] : Where.and(...conditions);
+    // No complete primary key supplied — this is a fresh insert, not a write
+    // against an existing (possibly soft-deleted) row.
+    const where = this.keyClause(entity);
+    if (!where) return;
 
     const existing = await this.doFindOne(
       await this.applyQueryScope(
         RowScopeOperation.FIND_ONE,
-        { where, withDeleted: true, ctx: options?.ctx },
-        this.resolveRowScopeContext(options?.ctx),
+        { where, withDeleted: true, ctx },
+        this.resolveRowScopeContext(ctx),
       ),
     );
 
@@ -1051,14 +1314,6 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * An equality clause on every primary key column, or `undefined` when the
-   * key is incomplete — nothing to identify a row with.
-   *
-   * Read off `transform` rather than the raw value: it settles a relation
-   * object into the scalar column it backs, and does not fill database
-   * defaults, so a partial key stays partial.
-   */
-  /**
    * Refuse a create that supplies only part of a composite primary key.
    *
    * A partial key cannot be looked up, so `assertNotExisting` cannot tell
@@ -1075,8 +1330,8 @@ export abstract class RepositoryAdapter<
 
     if (!isObject(entity)) return;
 
-    const prepared = this.transform(entity);
-    const missing = primaryColumns.filter((col) => prepared[col] === undefined);
+    const values: PlainLiteralObject = entity;
+    const missing = primaryColumns.filter((col) => values[col] === undefined);
 
     if (missing.length === 0 || missing.length === primaryColumns.length) {
       return;
@@ -1085,17 +1340,20 @@ export abstract class RepositoryAdapter<
     throw new PartialPrimaryKeyException(this.metadata.name, missing);
   }
 
+  /**
+   * An equality clause on every primary key column, read as given, or
+   * `undefined` when the key is incomplete — nothing to identify a row with.
+   */
   private keyClause(entity: DeepPartial<Entity>): WhereClause | undefined {
     const primaryColumns = this.getPrimaryColumns();
     if (primaryColumns.length === 0) return undefined;
 
     if (!isObject(entity)) return undefined;
 
-    const prepared = this.transform(entity);
-
+    const values: PlainLiteralObject = entity;
     const conditions: WhereClause[] = [];
     for (const col of primaryColumns) {
-      const value = prepared[col];
+      const value = values[col];
       if (value === undefined) return undefined;
       conditions.push(Where.eq(col, value));
     }
@@ -1126,64 +1384,146 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * `entity` with its relation properties removed, for any write that names an
-   * existing row.
+   * `payload` checked to hold only this entity's own columns, so a write
+   * reaches only this entity's table.
    *
-   * A driver resolving a column prefers a relation object over the column's
-   * own scalar — so a relation on the caller's entity decides which row is
-   * written, whatever the scalar says. Planting one redirects the write to a
-   * row the caller never named, invisibly to every check above the repository.
+   * A relation is refused, an owning one included: its foreign key column is
+   * the one way to set it. A key column — primary or foreign — takes a plain
+   * value only, since a driver may read an object there as the related row.
+   * So every check reads the same key the driver writes. Any other property
+   * that is not a column is refused too, since a driver may write other tables
+   * from it, skipping their row scope, write policy and hooks.
    *
-   * It also lets two checks disagree: a resolver reads the key through
-   * `transform` (relation-first) while a driver's identifying read may take the
-   * scalar, so the pre-check clears one row and the statement hits another.
+   * A property whose value is `undefined` carries nothing and is left off, so it
+   * neither reaches the driver nor fails a check — an entity class compiled
+   * with standard class fields defines every declared property that way.
    *
-   * Removing them leaves the scalars to decide, which is what the rest of the
-   * write path already reads. On `update`/`replace` this is the merge base, so
-   * `data`'s own relations are applied afterwards and are unaffected; a
-   * relation absent from a merge base means "unchanged" to a driver, not
-   * "cleared".
+   * Checks the payload of every write; see `toStoredRow` for the row a
+   * write names.
    */
-  private withoutRelations(entity: Entity): Entity {
-    const relations = this.metadata.relations;
-    if (!relations?.length) return entity;
+  private toOwnColumns<T extends DeepPartial<Entity>>(payload: T): T {
+    if (!isObject(payload)) return payload;
 
-    const stripped = { ...entity };
-    for (const relation of relations) {
-      delete stripped[relation.name];
+    const owned = { ...payload };
+    const values: PlainLiteralObject = owned;
+    for (const key of Object.keys(values)) {
+      if (values[key] === undefined) delete values[key];
     }
 
-    return this.prepare(stripped) ?? entity;
+    const relations = this.metadata.relations ?? [];
+    for (const relation of relations) {
+      if (!(relation.name in values)) continue;
+
+      throw new RelationWriteException(
+        this.metadata.name,
+        relation.name,
+        (relation.foreignKey ?? [])
+          .map((column) => column.from)
+          .filter((column) => column !== relation.name),
+      );
+    }
+
+    const allowed = new Set<string>(
+      this.metadata.columns.map((column) => column.name),
+    );
+    const keys = new Set<string>([
+      ...this.getPrimaryColumns(),
+      ...relations.flatMap(({ foreignKey = [] }) =>
+        foreignKey.map(({ from }) => from),
+      ),
+    ]);
+
+    const invalid = Object.keys(values).filter(
+      (key) =>
+        typeof values[key] === 'function' ||
+        (keys.has(key) && !this.isKeyValue(values[key])),
+    );
+    if (invalid.length) {
+      throw new InvalidColumnValueException(this.metadata.name, invalid);
+    }
+
+    const unknown = Object.keys(values).filter((key) => !allowed.has(key));
+    if (unknown.length) {
+      throw new UnknownColumnException(this.metadata.name, unknown);
+    }
+
+    return owned;
   }
 
   /**
-   * Refuse an `update` or `replace` whose data would change the primary key.
+   * The stored row named by `update`, `replace` and the delete family,
+   * reduced to its own columns.
    *
-   * Both name the row to write in their entity argument; `data` carries field
-   * values, not a target. A primary key arriving through `data` decides the row
-   * instead — the write lands on a row the caller never named, and the row they
-   * passed is left untouched. Nothing above the repository can see that happen,
-   * because on the way in it looks like an ordinary update of the entity.
-   *
-   * Compares after a merge rather than reading `data` directly: a column can be
-   * supplied as its own scalar or through a relation object that resolves to
-   * it, and merging settles both into the scalar column a driver will write.
-   * The merge runs against a copy, so the caller's entity is not touched.
-   *
-   * `upsert` is deliberately not guarded — its key comes from the payload by
-   * contract, and it has no entity argument to contradict.
+   * It names a row rather than carrying data to write, so a relation or
+   * other property on it — however the row was read — is left out rather
+   * than refused; nothing on it reaches the driver but its columns. Its
+   * values are then checked as a payload's are: a function anywhere, or an
+   * object in a key column, would still decide what the driver writes.
    */
-  private assertKeyUnchanged(entity: Entity, data: DeepPartial<Entity>): void {
+  private toStoredRow<T extends DeepPartial<Entity>>(row: T): T {
+    if (!isObject(row)) return row;
+
+    const columns = new Set<string>(
+      this.metadata.columns.map((column) => column.name),
+    );
+    const stored = { ...row };
+    const values: PlainLiteralObject = stored;
+    for (const key of Object.keys(values)) {
+      if (!columns.has(key)) delete values[key];
+    }
+
+    return this.toOwnColumns(stored);
+  }
+
+  /**
+   * Whether `value` can be written to a key column: a scalar, a date, binary,
+   * `null` or `undefined` — anything but an object a driver could read as a
+   * related row.
+   */
+  private isKeyValue(value: unknown): boolean {
+    return (
+      value === null ||
+      typeof value !== 'object' ||
+      value instanceof Date ||
+      value instanceof Uint8Array
+    );
+  }
+
+  /**
+   * Whether two key values are the same: identical, or binary keys with the
+   * same bytes.
+   */
+  private sameKey(current: unknown, key: unknown): boolean {
+    if (current === key) return true;
+    return (
+      current instanceof Uint8Array &&
+      key instanceof Uint8Array &&
+      current.length === key.length &&
+      current.every((byte, index) => byte === key[index])
+    );
+  }
+
+  /**
+   * Refuse a write whose values would name a different row than `target`.
+   *
+   * `update` and `replace` name the row to write in their entity argument;
+   * their data carries field values, not a target. A primary key arriving
+   * through the data decides the row instead — the write lands on a row the
+   * caller never named. For `upsert`, `target` is the payload whose key the
+   * row scope resolver checked, so its output cannot move the write either.
+   *
+   * Both arguments are already checked to hold only their own columns.
+   */
+  private assertKeyUnchanged(
+    target: PlainLiteralObject,
+    values: PlainLiteralObject,
+  ): void {
     const primaryColumns = this.getPrimaryColumns();
     if (primaryColumns.length === 0) return;
 
-    const base = this.prepare({ ...entity });
-    if (!base) return;
-
-    const probe = this.merge(base, data);
-
     const changed = primaryColumns.filter(
-      (column) => probe[column] !== entity[column],
+      (column) =>
+        column in values && !this.sameKey(values[column], target[column]),
     );
 
     if (changed.length > 0) {
@@ -1271,35 +1611,7 @@ export abstract class RepositoryAdapter<
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // JoinClause resolution (ORM-agnostic)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Validate JoinClauses against repository relation metadata.
-   *
-   * Called by ORM adapters before translating to native find options.
-   */
-  protected resolveJoinClauses(join?: JoinClause[]): JoinClause[] | undefined {
-    if (!join?.length) return undefined;
-
-    const relMap = new Map(this.metadata.relations?.map((r) => [r.name, r]));
-
-    for (const j of join) {
-      if (!relMap.has(j.relation)) {
-        throw new RuntimeException({
-          message: 'Unknown relation "%s" on entity "%s"',
-          messageParams: [j.relation, this.metadata.name],
-          httpStatus: HttpStatus.BAD_REQUEST,
-          fault: 'client',
-        });
-      }
-    }
-
-    return join;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // WhereClause AST helpers (ORM-agnostic)
+  // WhereClause AST helpers
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -1308,7 +1620,7 @@ export abstract class RepositoryAdapter<
    * of WhereClause leaves. The outer array represents OR.
    *
    * Leaves are either WhereConditions or not(...) compounds
-   * preserved for ORM-specific translation.
+   * preserved for the driver to translate.
    *
    * `[]` is never returned — it would be ambiguous between "no constraint"
    * and "nothing matches," and a where-clause compiler resolving that
@@ -1435,8 +1747,6 @@ export abstract class RepositoryAdapter<
     ctx: PlainLiteralObject | undefined,
     filter?: HookMethodFilter,
   ): Promise<T> {
-    this.assertHooksRunnable();
-
     if (!this.hookResolver) {
       return payload;
     }
@@ -1462,7 +1772,7 @@ export abstract class RepositoryAdapter<
    * than the registration.
    */
   private applicableHooks(ctx: PlainLiteralObject | undefined): HookWithSpec[] {
-    const registered = this._hooks ?? [];
+    const registered = this._hooks;
     const carried = this.contextHooks(ctx);
     if (!carried.length) return registered;
 

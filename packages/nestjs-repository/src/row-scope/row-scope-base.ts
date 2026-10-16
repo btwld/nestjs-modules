@@ -23,24 +23,13 @@ import {
 /**
  * The slice of a repository {@link RowScopeBase} needs.
  *
- * `findOne` for the pre-check, `metadata` to discover the primary key columns,
- * and `transform` to materialize a value the way the driver will. All public
- * repository methods — row scope is not a repository function, so the adapter
- * interface does not grow to serve it.
+ * `findOne` for the pre-check and `metadata` to discover the primary key
+ * columns. Both are public repository methods — row scope is not a repository
+ * function, so the adapter interface does not grow to serve it.
  */
 export type RowScopeBaseRepository<
   Entity extends PlainLiteralObject = PlainLiteralObject,
-> = Pick<RepositoryInterface<Entity>, 'findOne' | 'metadata'> & {
-  /**
-   * Materialize an entity-like value the way the driver will.
-   *
-   * Declared over `PlainLiteralObject` rather than `DeepPartial<Entity>`
-   * because a scope callback is handed the operation's real input, which is
-   * typed that way. Only columns are read off the result, so the narrower
-   * return type is not needed either.
-   */
-  transform(entityLike: PlainLiteralObject): PlainLiteralObject;
-};
+> = Pick<RepositoryInterface<Entity>, 'findOne' | 'metadata'>;
 
 /**
  * Configuration for {@link RowScopeBase}.
@@ -65,6 +54,18 @@ export interface RowScopeBaseOptions<
 }
 
 /**
+ * Required of `RowScopeBase`'s options when `Entity` accepts any property name
+ * — `PlainLiteralObject`, the default, or a type extending it — so a resolver
+ * that leaves `column` unchecked does not compile. Nothing can supply it; the
+ * fix is to name a real entity type.
+ */
+export type RowScopeNamedEntity<Entity> = string extends keyof Entity
+  ? {
+      readonly 'Name the entity type, e.g. RowScopeBase<Order, Scope>': never;
+    }
+  : unknown;
+
+/**
  * A ready-to-extend row scope for scope expressed as columns on the entity.
  *
  * Four rules, and nothing else:
@@ -76,7 +77,7 @@ export interface RowScopeBaseOptions<
  *    `upsert` whose key names no stored row; one whose key names a row falls
  *    under rule 2.
  * 4. The scope columns take precedence over any same-named value in the
- *    payload, and a mismatch is refused — by whichever route the value arrives.
+ *    payload, and a mismatch is refused.
  *
  * It assumes every scoped entity carries its own scope column, so scope is
  * decided per row without following a relation.
@@ -92,9 +93,11 @@ export interface RowScopeBaseOptions<
  * - `scopeWrite` for a check this class cannot make, such as a foreign key that
  *   must point inside the caller's scope. Call `super.scopeWrite(params)` first.
  *
- * Name the entity in both type parameters rather than leaving them to default:
- * `column` is then checked against the entity's own columns, so a misspelled
- * scope column is a compile error rather than a boot failure.
+ * Name the entity type: `column` is then checked against the entity's own
+ * columns, so a misspelled scope column is a compile error rather than a boot
+ * failure. An entity type that accepts any property name, `PlainLiteralObject`
+ * included, does not compile — and neither does a subclass generic over its
+ * entity, which cannot know its columns either.
  *
  * @example
  * ```typescript
@@ -118,7 +121,8 @@ export abstract class RowScopeBase<
 
   constructor(
     private readonly repo: RowScopeBaseRepository<Entity>,
-    private readonly options: RowScopeBaseOptions<Entity>,
+    private readonly options: RowScopeBaseOptions<Entity> &
+      RowScopeNamedEntity<Entity>,
   ) {
     this.label = options.label ?? 'Row';
 
@@ -299,19 +303,18 @@ export abstract class RowScopeBase<
   /**
    * The primary key `source` names, or `undefined` if any column is missing.
    *
-   * Read off `transform`, never the raw payload: a driver prefers a relation
-   * object over the column's own scalar, so `{ account: { id } }` is a key.
+   * The repository hands a resolver only the entity's own columns, so the key
+   * is read off `source`.
    */
   private resolveKey(
     source: PlainLiteralObject | undefined,
   ): PlainLiteralObject | undefined {
     if (!source) return undefined;
 
-    const materialized = this.repo.transform(source);
     const key: PlainLiteralObject = {};
 
     for (const column of this.primaryColumns) {
-      const value = materialized[column];
+      const value: unknown = source[column];
 
       if (value === undefined) return undefined;
 
@@ -381,11 +384,7 @@ export abstract class RowScopeBase<
   /**
    * Rules 3 and 4. Stamp the scope columns; refuse a value scoped elsewhere.
    *
-   * Reads the incoming value off `transform` so a scope column arriving through
-   * a relation object is seen, and returns a copy rather than stamping the
-   * caller's object. The copy is shallow — a nested relation object is shared,
-   * which is fine for plain data and no defence against an accessor, and
-   * supplying one of those means running code in the process.
+   * Returns a copy rather than stamping the caller's object.
    */
   private stampOrRefuse<Value extends PlainLiteralObject>(
     value: Value,
@@ -395,10 +394,8 @@ export abstract class RowScopeBase<
       this.refuse(HttpStatus.FORBIDDEN, 'Not permitted to write in this scope');
     }
 
-    const materialized = this.repo.transform(value);
-
     for (const [column, scopeValue] of Object.entries(values)) {
-      const current = materialized[column];
+      const current: unknown = value[column];
 
       if (current !== undefined && current !== scopeValue) {
         // Deliberately does not name the column — that leaks scope structure.

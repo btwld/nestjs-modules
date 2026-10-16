@@ -17,13 +17,16 @@ import { UserOtpEntityFixture } from './entities/user-otp-entity.fixture.js';
       synchronize: true,
       entities: [UserEntityFixture, UserOtpEntityFixture],
     }),
-    RepositoryModule.forRoot({}),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
+    RepositoryModule.forRoot({
+      drivers: [
         {
-          key: 'userOtp',
-          entity: UserOtpEntityFixture,
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            {
+              key: 'userOtp',
+              entity: UserOtpEntityFixture,
+            },
+          ],
         },
       ],
     }),

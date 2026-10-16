@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { CommandBus, CqrsModule } from '@nestjs/cqrs';
 
 import { createSettingsProvider } from '@concepta/nestjs-core';
+import { RepositoryModule } from '@concepta/nestjs-repository';
 
 import { CreateUserCredentialHandler } from './application/commands/handlers/create-user-credential.handler.js';
 import { CreateUserHandler } from './application/commands/handlers/create-user.handler.js';
@@ -67,7 +68,7 @@ function definitionTransform(
   return {
     ...definition,
     global,
-    imports: createUserImports({ imports }),
+    imports: createUserImports({ imports, entities, repositories }),
     providers: createUserProviders({
       providers: [...providers, ...(overrideProviders ?? [])],
       entities,
@@ -79,11 +80,24 @@ function definitionTransform(
 
 export function createUserImports(options: {
   imports: DynamicModule['imports'];
+  entities: UserExtrasInterface['entities'];
+  repositories?: UserExtrasInterface['repositories'];
 }): DynamicModule['imports'] {
+  const { entities, repositories } = options;
+  // Only the keys a provider below injects: a custom repository replaces its
+  // entity's, and credentials are optional.
+  const keys = [
+    ...(repositories?.user ? [] : [entities.user]),
+    ...(entities.credentials && !repositories?.userCredentials
+      ? [entities.credentials]
+      : []),
+  ];
+
   return [
     ...(options.imports || []),
     ConfigModule.forFeature(userDefaultConfig),
     CqrsModule.forRoot(),
+    RepositoryModule.forFeature(keys),
   ];
 }
 

@@ -49,7 +49,7 @@ import { type HookOption } from '../hook.types.js';
  * for every operation of its subsystem that the request touches — not only the
  * one this controller serves. Right for a cross-cutting hook; for one that
  * belongs to a single entity, prefer that subsystem's own registration (e.g.
- * `hooks:` on `RepositoryModule.forFeature`).
+ * `hooks:` on `RepositoryModule.forRoot`).
  *
  * Gating is a property of the hook, not of the registration: pass a
  * specification to the hook-method decorator, to a method-level

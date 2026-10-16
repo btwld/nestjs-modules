@@ -39,17 +39,23 @@ import { ReadCacheRequest } from '../../queries/impl/read-cache.request.js';
       entities: [UserEntityFixture, UserCacheEntityFixture],
     }),
     CqrsModule.forRoot(),
-    RepositoryModule.forRoot({}),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [
+            {
+              key: CACHE_MODULE_CACHE_ENTITY_KEY,
+              entity: UserCacheEntityFixture,
+            },
+          ],
+        },
+      ],
+    }),
     CrudModule.forRoot({
       defaultResolver: CrudCqrsResolver,
     }),
     CoreModule.forRoot(),
-    RepositoryModule.forFeature({
-      module: TypeOrmRepositoryModule,
-      entities: [
-        { key: CACHE_MODULE_CACHE_ENTITY_KEY, entity: UserCacheEntityFixture },
-      ],
-    }),
     CacheModule.forRoot({
       settings: {
         expiresIn: '1h',

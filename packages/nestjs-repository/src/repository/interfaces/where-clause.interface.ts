@@ -8,6 +8,7 @@ import {
   WhereOperator,
   type WherePairOperator,
   type WhereScalarOperator,
+  type WhereTextOperator,
 } from '../repository.types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -26,7 +27,7 @@ export interface WhereConditionNullary<
 }
 
 /**
- * Condition with a scalar value (EQ, NE, GT, GTE, LT, LTE, pattern ops).
+ * Condition with a scalar value (EQ, NE, GT, GTE, LT, LTE).
  */
 export interface WhereConditionScalar<
   T extends PlainLiteralObject = PlainLiteralObject,
@@ -34,6 +35,19 @@ export interface WhereConditionScalar<
   field: EntityColumn<T>;
   operator: WhereScalarOperator;
   value: unknown;
+  relation?: string;
+}
+
+/**
+ * Condition matching text (CONTAINS, STARTS, ENDS and their negations). The
+ * value is matched literally: no character in it is a wildcard.
+ */
+export interface WhereConditionText<
+  T extends PlainLiteralObject = PlainLiteralObject,
+> {
+  field: EntityColumn<T>;
+  operator: WhereTextOperator;
+  value: string;
   relation?: string;
 }
 
@@ -67,6 +81,7 @@ export interface WhereConditionPair<
 export type WhereCondition<T extends PlainLiteralObject = PlainLiteralObject> =
   | WhereConditionNullary<T>
   | WhereConditionScalar<T>
+  | WhereConditionText<T>
   | WhereConditionArray<T>
   | WhereConditionPair<T>;
 

@@ -1,19 +1,33 @@
 import {
-  ConfigurableModuleBuilder,
   type DynamicModule,
+  type ModuleMetadata,
   type Provider,
+  Scope,
+  type Type,
 } from '@nestjs/common';
-import { DiscoveryModule } from '@nestjs/core';
+import { SCOPE_OPTIONS_METADATA } from '@nestjs/common/constants.js';
+import { ModuleRef } from '@nestjs/core';
 
+import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
+import { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
 import {
   FEDERATION_ORCHESTRATOR,
   FederationOrchestrator,
 } from './federation/federation-orchestrator.service.js';
-import { HookBootService } from './hooks/hook-boot.service.js';
 import { TransactionInterceptor } from './interceptors/transaction.interceptor.js';
 import { type RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
+import { type RepositoryDriverRegistration } from './interfaces/repository-root-options.interface.js';
+import { RepositoryBindingCheck } from './repository-binding.check.js';
+import {
+  bindRepositories,
+  REPOSITORY_BINDING,
+  type RepositoryBinding,
+  type RepositoryBindingEntry,
+} from './repository-binding.js';
 import { REPOSITORY_MODULE_OPTIONS } from './repository.constants.js';
-import { RowScopeBootService } from './row-scope/row-scope-boot.service.js';
+import { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
+import { isRowScopeScoped } from './row-scope/interfaces/row-scope-registration.interface.js';
+import { type RowScopeInterface } from './row-scope/interfaces/row-scope.interface.js';
 import {
   RepositoryRegistryService,
   REPOSITORY_REGISTRY,
@@ -24,46 +38,232 @@ import {
 } from './transaction/transaction-factory-registry.js';
 import { TransactionScope } from './transaction/transaction-scope.js';
 import { TransactionalRunner } from './transaction/transactional-runner.js';
-import { WritePolicyBootService } from './write-policy/write-policy-boot.service.js';
+import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.js';
 
-const RAW_OPTIONS_TOKEN = Symbol('__REPOSITORY_MODULE_RAW_OPTIONS_TOKEN__');
+/**
+ * Build the global module `RepositoryModule.forRoot()` and `forRootAsync()`
+ * return.
+ *
+ * Every driver registers its entities here, and one provider binds and checks
+ * them all. Only that provider's result is exported, for
+ * `RepositoryModule.forFeature()` to hand repositories out from.
+ */
+export function createRepositoryRootModule(params: {
+  module: Type;
+  drivers: RepositoryDriverRegistration[];
+  imports: NonNullable<ModuleMetadata['imports']>;
+  optionsProvider: Provider<RepositoryModuleOptionsInterface>;
+}): DynamicModule {
+  const { module, drivers, imports, optionsProvider } = params;
 
-export const {
-  ConfigurableModuleClass: RepositoryModuleClass,
-  OPTIONS_TYPE: REPOSITORY_OPTIONS_TYPE,
-  ASYNC_OPTIONS_TYPE: REPOSITORY_ASYNC_OPTIONS_TYPE,
-} = new ConfigurableModuleBuilder<RepositoryModuleOptionsInterface>({
-  moduleName: 'Repository',
-  optionsInjectionToken: RAW_OPTIONS_TOKEN,
-})
-  .setExtras({}, (definition: DynamicModule) => {
-    const { providers = [], imports = [] } = definition;
+  // Copied before any driver sees the entries, so nothing a driver does to
+  // them can change what is checked and bound.
+  const entries: RepositoryBindingEntry[] = drivers.flatMap(
+    ({ driver, entities }) =>
+      entities.map((options) => ({
+        driverName: driver.name,
+        options: {
+          ...options,
+          rowScope: options.rowScope && { ...options.rowScope },
+          hooks: options.hooks && [...options.hooks],
+          writePolicy: options.writePolicy && { ...options.writePolicy },
+        },
+      })),
+  );
 
-    return {
-      ...definition,
-      global: true,
-      // Row scope's boot checks discover adapters across every registration
-      // path, including driver modules the repository registry never sees.
-      imports: [...imports, DiscoveryModule],
-      providers: createRepositoryProviders({ providers }),
-      exports: createRepositoryExports(),
-    };
-  })
-  .setClassMethodName('forRoot')
-  .build();
+  assertDistinctDrivers(drivers);
+  assertDistinctKeys(entries);
+  assertResolversNotRequestScoped(entries);
 
-export type RepositoryOptions = typeof REPOSITORY_OPTIONS_TYPE;
-export type RepositoryAsyncOptions = typeof REPOSITORY_ASYNC_OPTIONS_TYPE;
+  const driverModules = drivers.map(({ driver, entities }) =>
+    driver.register(entities),
+  );
+  const transactionFactories = driverModules.flatMap(
+    ({ transactionFactories: factories = [] }) => factories,
+  );
+  assertDistinctTransactionKeys(transactionFactories.map(({ key }) => key));
 
-export function createRepositoryProviders(options: {
-  providers?: Provider[];
-}): Provider[] {
-  return [
-    ...(options.providers ?? []),
+  const repoTokens = entries.map(({ options }) =>
+    getDynamicRepositoryToken(options.key),
+  );
+
+  const providers: Provider[] = [
+    optionsProvider,
+    ...createRepositoryProviders(),
     {
-      provide: REPOSITORY_MODULE_OPTIONS,
-      useExisting: RAW_OPTIONS_TOKEN,
+      provide: RepositoryBindingCheck,
+      inject: [ModuleRef],
+      useFactory: (moduleRef: ModuleRef) =>
+        new RepositoryBindingCheck(
+          moduleRef,
+          transactionFactories.map(({ key }) => key),
+        ),
     },
+    ...driverModules.flatMap(({ providers: driven = [] }) => driven),
+    {
+      provide: REPOSITORY_BINDING,
+      inject: [
+        REPOSITORY_MODULE_OPTIONS,
+        REPOSITORY_REGISTRY,
+        FEDERATION_ORCHESTRATOR,
+        ModuleRef,
+        ...repoTokens,
+      ],
+      useFactory: (
+        moduleOptions: RepositoryModuleOptionsInterface,
+        registry: RepositoryRegistryService,
+        orchestrator: FederationOrchestrator,
+        moduleRef: ModuleRef,
+        ...repos: unknown[]
+      ) =>
+        bindRepositories({
+          entries,
+          repos,
+          moduleOptions,
+          registry,
+          orchestrator,
+          moduleRef,
+        }),
+    },
+    // Row scope resolver — one provider per scoped entity, depending on the
+    // repository, its resolver and the binding, so the resolver is attached
+    // after bind() declared the entity scoped, and before any onModuleInit
+    // can run a seeder. Kept apart from the binding above: a resolver
+    // depending on a request-scoped provider would keep the provider
+    // injecting it from running at all, and the entity then refuses every
+    // call rather than run unscoped.
+    ...entries.flatMap(({ options }) => {
+      const registration = options.rowScope;
+      if (!isRowScopeScoped(registration)) return [];
+
+      return [
+        {
+          provide: Symbol(`ROW_SCOPE_BINDING_${options.key}`),
+          inject: [REPOSITORY_BINDING, registration.resolver],
+          useFactory: (
+            binding: RepositoryBinding,
+            resolver: RowScopeInterface,
+          ) => {
+            binding.get(options.key)?.setRowScopeResolver(resolver);
+            return true;
+          },
+        },
+      ];
+    }),
+    ...transactionFactories.map((descriptor) => ({
+      provide: Symbol(`TX_FACTORY_${descriptor.key}`),
+      inject: [TRANSACTION_FACTORY_REGISTRY, ...descriptor.inject],
+      useFactory: (
+        registry: TransactionFactoryRegistry,
+        ...args: unknown[]
+      ) => {
+        registry.register(descriptor.key, descriptor.useFactory(...args));
+        return null;
+      },
+    })),
+  ];
+
+  return {
+    module,
+    global: true,
+    imports: [
+      ...imports,
+      ...driverModules.flatMap(({ imports: driven = [] }) => driven),
+    ],
+    providers,
+    exports: [...createRepositoryExports(), REPOSITORY_BINDING],
+  };
+}
+
+function assertDistinctDrivers(drivers: RepositoryDriverRegistration[]): void {
+  const names = drivers.map(({ driver }) => driver.name);
+  const repeated = names.filter((name, i) => names.indexOf(name) !== i);
+
+  if (repeated.length > 0) {
+    throw new RepositoryBootException(
+      [...new Set(repeated)].map(
+        (name) =>
+          `Driver "${name}" is listed more than once in ` +
+          'RepositoryModule.forRoot(). List each driver once, with all of ' +
+          'its entities.',
+      ),
+    );
+  }
+}
+
+function assertDistinctKeys(entries: RepositoryBindingEntry[]): void {
+  const firstByKey = new Map<string, string>();
+  const duplicates: { key: string; existing: string; attempted: string }[] = [];
+
+  for (const { options } of entries) {
+    const existing = firstByKey.get(options.key);
+    if (existing === undefined) {
+      firstByKey.set(options.key, options.entity.name);
+    } else {
+      duplicates.push({
+        key: options.key,
+        existing,
+        attempted: options.entity.name,
+      });
+    }
+  }
+
+  if (duplicates.length > 0) {
+    throw new RepositoryDuplicateKeyException(duplicates);
+  }
+}
+
+/**
+ * Refuse a resolver declared request-scoped, before anything is built. One
+ * that is request-scoped only through a dependency is refused once every
+ * provider is built, by `RepositoryBindingCheck`.
+ */
+function assertResolversNotRequestScoped(
+  entries: RepositoryBindingEntry[],
+): void {
+  const failures = entries.flatMap(({ options }) => {
+    const registration = options.rowScope;
+    if (!isRowScopeScoped(registration)) return [];
+
+    const scopeOptions: unknown = Reflect.getMetadata(
+      SCOPE_OPTIONS_METADATA,
+      registration.resolver,
+    );
+    const requestScoped =
+      typeof scopeOptions === 'object' &&
+      scopeOptions !== null &&
+      'scope' in scopeOptions &&
+      scopeOptions.scope === Scope.REQUEST;
+    if (!requestScoped) return [];
+
+    return [
+      `"${options.key}" declares the request-scoped resolver ` +
+        `${registration.resolver.name}. Resolvers are bound once, at ` +
+        'startup; make it singleton-scoped and read the caller from ctx.',
+    ];
+  });
+
+  if (failures.length > 0) {
+    throw new RowScopeBootException(failures);
+  }
+}
+
+function assertDistinctTransactionKeys(keys: string[]): void {
+  const repeated = keys.filter((key, i) => keys.indexOf(key) !== i);
+
+  if (repeated.length > 0) {
+    throw new RepositoryBootException(
+      [...new Set(repeated)].map(
+        (key) =>
+          `Transaction key "${key}" is registered by more than one driver. ` +
+          'Each driver must name its transaction keys uniquely.',
+      ),
+    );
+  }
+}
+
+function createRepositoryProviders(): Provider[] {
+  return [
     {
       provide: TRANSACTION_FACTORY_REGISTRY,
       useClass: TransactionFactoryRegistry,
@@ -76,16 +276,13 @@ export function createRepositoryProviders(options: {
       provide: FEDERATION_ORCHESTRATOR,
       useClass: FederationOrchestrator,
     },
-    RowScopeBootService,
-    WritePolicyBootService,
-    HookBootService,
     TransactionScope,
     TransactionalRunner,
     TransactionInterceptor,
   ];
 }
 
-export function createRepositoryExports(): (
+function createRepositoryExports(): (
   | symbol
   | typeof TransactionScope
   | typeof TransactionFactoryRegistry

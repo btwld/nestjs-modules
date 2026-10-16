@@ -4,7 +4,8 @@ import {
   RuntimeException,
 } from '@concepta/nestjs-core';
 
-import { type JoinClause } from '../interfaces/join-clause.interface.js';
+import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
+import { RepositoryQueryException } from '../../exceptions/repository-query.exception.js';
 import {
   isWhereNever,
   type WhereClause,
@@ -13,10 +14,7 @@ import { RepositoryAdapter } from '../repository-adapter.js';
 import { WhereCompoundOperator } from '../repository.types.js';
 import { Where } from '../where.helpers.js';
 
-import {
-  TestEntityClass,
-  TestRepositoryAdapter,
-} from './fixtures/test-repository-adapter.fixture.js';
+import { TestRepositoryAdapter } from './fixtures/test-repository-adapter.fixture.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -25,34 +23,7 @@ describe(RepositoryAdapter.name, () => {
 
   beforeEach(() => {
     adapter = new TestRepositoryAdapter('test-entity');
-  });
-
-  describe('resolveJoinClauses', () => {
-    it('should return undefined for undefined input', () => {
-      expect(adapter.exposedResolveJoinClauses(undefined)).toBeUndefined();
-    });
-
-    it('should return undefined for empty array', () => {
-      expect(adapter.exposedResolveJoinClauses([])).toBeUndefined();
-    });
-
-    it('should pass through valid join clauses', () => {
-      const input: JoinClause[] = [{ relation: 'posts' }];
-      const result = adapter.exposedResolveJoinClauses(input);
-      expect(result).toBe(input);
-    });
-
-    it('should validate multiple joins', () => {
-      const input: JoinClause[] = [{ relation: 'posts' }, { relation: 'tags' }];
-      const result = adapter.exposedResolveJoinClauses(input);
-      expect(result).toBe(input);
-    });
-
-    it('should throw RuntimeException for unknown relation', () => {
-      expect(() => {
-        adapter.exposedResolveJoinClauses([{ relation: 'nonexistent' }]);
-      }).toThrow(RuntimeException);
-    });
+    adapter.bind({});
   });
 
   describe('toDnf', () => {
@@ -183,17 +154,59 @@ describe(RepositoryAdapter.name, () => {
     });
   });
 
-  describe('prepare', () => {
-    it('should return an entity instance for an empty object', () => {
-      const result = adapter.prepare({});
-      expect(result).toBeInstanceOf(TestEntityClass);
-    });
+  describe('a driver error', () => {
+    const reads: [string, (repo: TestRepositoryAdapter) => Promise<unknown>][] =
+      [
+        ['find', (repo) => repo.find()],
+        ['findOne', (repo) => repo.findOne({})],
+      ];
 
-    it('should return entity instance as-is', () => {
-      const entity = new TestEntityClass();
-      entity.id = '1';
-      expect(adapter.prepare(entity)).toBe(entity);
-    });
+    it.each(reads)(
+      'is wrapped by %s in a RepositoryQueryException that keeps it as the cause',
+      async (_, run) => {
+        const failure = run(adapter);
+
+        await expect(failure).rejects.toBeInstanceOf(RepositoryQueryException);
+        await expect(failure).rejects.toHaveProperty(
+          'cause.message',
+          'not implemented',
+        );
+      },
+    );
+
+    it.each(reads)(
+      'is wrapped by %s in a RepositoryDatabaseException when the driver reports it',
+      async (_, run) => {
+        class ReportingAdapter extends TestRepositoryAdapter {
+          protected override describeDatabaseError(error: unknown) {
+            return error instanceof Error
+              ? { database: 'testdb', code: 'E42', message: error.message }
+              : undefined;
+          }
+        }
+
+        const reporting = new ReportingAdapter('test-entity');
+        reporting.bind({});
+        const failure = run(reporting);
+
+        await expect(failure).rejects.toBeInstanceOf(RepositoryQueryException);
+        await expect(failure).rejects.toThrow(
+          expect.objectContaining({
+            name: RepositoryDatabaseException.name,
+            errorCode: 'REPOSITORY_DATABASE_ERROR',
+            fault: 'internal',
+            message:
+              'The testdb database failed a query on the test-entity ' +
+              'repository: not implemented',
+            context: expect.objectContaining({
+              entityName: 'test-entity',
+              database: 'testdb',
+              code: 'E42',
+            }),
+          }),
+        );
+      },
+    );
   });
 
   describe('getPrimaryColumns', () => {

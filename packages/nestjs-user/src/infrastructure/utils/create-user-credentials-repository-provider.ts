@@ -31,22 +31,12 @@ export function createUserCredentialsRepositoryProvider(
   return [
     {
       provide: USER_CREDENTIALS_REPOSITORY_TOKEN,
-      inject: [
-        {
-          token: getDynamicRepositoryToken(entityKey),
-          optional: true,
-        },
-        UserCredentialsMapper,
-      ],
+      inject: [getDynamicRepositoryToken(entityKey), UserCredentialsMapper],
       useFactory: (
-        repository:
-          RepositoryInterface<UserCredentialEntityInterface> | undefined,
+        repository: RepositoryInterface<UserCredentialEntityInterface>,
         mapper: UserCredentialsMapper,
       ) => {
-        if (repository) {
-          return new UserCredentialsRepository(repository, mapper);
-        }
-        return undefined;
+        return new UserCredentialsRepository(repository, mapper);
       },
     },
   ];

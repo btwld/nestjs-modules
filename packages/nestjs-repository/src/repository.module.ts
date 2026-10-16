@@ -1,27 +1,21 @@
 import { Module, DynamicModule, Provider } from '@nestjs/common';
 
+import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
+import { RepositoryProviderOptions } from './interfaces/repository-provider-options.interface.js';
 import {
-  FEDERATION_ORCHESTRATOR,
-  FederationOrchestrator,
-} from './federation/federation-orchestrator.service.js';
-import { RepositoryFeatureOptions } from './interfaces/repository-feature-options.interface.js';
-import { DynamicRepositoryModule } from './interfaces/repository-module.interface.js';
-import { RepositoryAdapter } from './repository/repository-adapter.js';
-import { RepositoryModuleClass } from './repository.module-definition.js';
-import { isRowScopeScoped } from './row-scope/interfaces/row-scope-registration.interface.js';
-import { type RowScopeInterface } from './row-scope/interfaces/row-scope.interface.js';
-import {
-  RepositoryRegistryService,
-  REPOSITORY_REGISTRY,
-} from './services/repository-registry.service.js';
-import {
-  TransactionFactoryRegistry,
-  TRANSACTION_FACTORY_REGISTRY,
-} from './transaction/transaction-factory-registry.js';
+  RepositoryRootAsyncOptions,
+  RepositoryRootOptions,
+} from './interfaces/repository-root-options.interface.js';
+import { REPOSITORY_BINDING, RepositoryBinding } from './repository-binding.js';
+import { REPOSITORY_MODULE_OPTIONS } from './repository.constants.js';
+import { createRepositoryRootModule } from './repository.module-definition.js';
 import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.js';
 
 /**
  * Repository module providing data access abstraction with transaction support.
+ *
+ * Register every entity once, in `forRoot()`, and import `forFeature()` with
+ * the keys a module injects.
  *
  * @example
  * ```typescript
@@ -29,173 +23,110 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  * @Module({
  *   imports: [
  *     TypeOrmModule.forRoot({ ... }),
- *     RepositoryModule.forRoot({}),
- *     RepositoryModule.forFeature({
- *       module: TypeOrmRepositoryModule,
- *       entities: [
- *         { key: 'orders', entity: Order },
- *         { key: 'customers', entity: Customer },
+ *     RepositoryModule.forRoot({
+ *       drivers: [
+ *         {
+ *           driver: TypeOrmRepositoryModule,
+ *           entities: [
+ *             { key: 'orders', entity: Order },
+ *             { key: 'customers', entity: Customer },
+ *           ],
+ *         },
  *       ],
  *     }),
+ *     OrdersModule,
  *   ],
  * })
  * export class AppModule {}
+ *
+ * // orders.module.ts
+ * @Module({
+ *   imports: [RepositoryModule.forFeature(['orders', 'customers'])],
+ *   providers: [OrdersService],
+ * })
+ * export class OrdersModule {}
  * ```
  */
 @Module({})
-export class RepositoryModule extends RepositoryModuleClass {
+export class RepositoryModule {
   /**
-   * Register repositories for entities.
+   * Register every entity in the application, grouped by driver.
    *
-   * Delegates to the repository module's forFeature method.
+   * Binds each repository to its declarations and runs the startup checks
+   * while the application is created; a failure stops it there.
+   */
+  static forRoot<const Options extends readonly RepositoryProviderOptions[]>(
+    options: RepositoryRootOptions<Options>,
+  ): DynamicModule {
+    const { drivers = [], imports = [], ...moduleOptions } = options;
+
+    return createRepositoryRootModule({
+      module: RepositoryModule,
+      drivers,
+      imports,
+      optionsProvider: {
+        provide: REPOSITORY_MODULE_OPTIONS,
+        useValue: moduleOptions,
+      },
+    });
+  }
+
+  /**
+   * {@link RepositoryModule.forRoot}, with the module options built by a
+   * factory. Entities stay static.
+   */
+  static forRootAsync<
+    const Options extends readonly RepositoryProviderOptions[],
+  >(options: RepositoryRootAsyncOptions<Options>): DynamicModule {
+    const { drivers = [], imports = [], inject = [], useFactory } = options;
+
+    return createRepositoryRootModule({
+      module: RepositoryModule,
+      drivers,
+      imports,
+      optionsProvider: {
+        provide: REPOSITORY_MODULE_OPTIONS,
+        inject,
+        useFactory,
+      },
+    });
+  }
+
+  /**
+   * Make repositories registered in `forRoot()` injectable in this module,
+   * under their keys.
    *
    * @example
    * ```typescript
-   * RepositoryModule.forFeature({
-   *   module: TypeOrmRepositoryModule,
-   *   entities: [
-   *     { key: 'orders', entity: Order },
-   *     { key: 'customers', entity: Customer },
-   *   ],
+   * @Module({
+   *   imports: [RepositoryModule.forFeature(['orders'])],
+   *   providers: [OrdersService], // @InjectDynamicRepository('orders')
    * })
+   * export class OrdersModule {}
    * ```
    */
-  static forFeature(options: RepositoryFeatureOptions): DynamicModule {
-    const { module, entities, imports = [] } = options;
-    const dynamicModule: DynamicRepositoryModule = module.forFeature(entities);
-    const moduleName = module.name;
-
-    const providers: Provider[] = [...(dynamicModule.providers ?? [])];
-
-    // Repository registry registration
-    const registrationToken = Symbol(
-      `REPOSITORY_REGISTRATION_${moduleName}_${Date.now()}`,
-    );
-
-    const repoTokens = entities.map((e) => getDynamicRepositoryToken(e.key));
-
-    providers.push({
-      provide: registrationToken,
-      inject: [REPOSITORY_REGISTRY, FEDERATION_ORCHESTRATOR, ...repoTokens],
-      useFactory: (
-        registry: RepositoryRegistryService,
-        orchestrator: FederationOrchestrator,
-        ...repos: unknown[]
-      ) => {
-        for (const entity of entities) {
-          registry.register({
-            key: entity.key,
-            entityName: entity.entity.name,
-            moduleName,
-          });
+  static forFeature(keys: string[]): DynamicModule {
+    const providers: Provider[] = keys.map((key) => ({
+      provide: getDynamicRepositoryToken(key),
+      // Required, not optional: Nest turns any failure resolving an optional
+      // dependency into `undefined`, which would hide why the binding failed.
+      inject: [REPOSITORY_BINDING],
+      useFactory: (binding: RepositoryBinding) => {
+        const repo = binding.get(key);
+        if (!repo) {
+          throw new RepositoryBootException([
+            `RepositoryModule.forFeature() asks for "${key}", which is not ` +
+              'registered in RepositoryModule.forRoot().',
+          ]);
         }
-        for (const repo of repos) {
-          if (repo instanceof RepositoryAdapter) {
-            repo.setFederationOrchestrator(orchestrator);
-          }
-        }
-        return true;
+        return repo;
       },
-    });
-
-    // Row scope binding — one provider per scoped entity, depending on both
-    // the repository and its resolver, so Nest constructs both before binding
-    // and the whole graph is bound before any onModuleInit can run a seeder.
-    // Deliberately not delegated to the driver's provider factory: a driver
-    // that forgot would fail open, and no driver can forget what it never does.
-    for (const entity of entities) {
-      const registration = entity.rowScope;
-      if (!isRowScopeScoped(registration)) continue;
-
-      providers.push({
-        provide: Symbol(`ROW_SCOPE_BINDING_${entity.key}_${Date.now()}`),
-        inject: [getDynamicRepositoryToken(entity.key), registration.resolver],
-        useFactory: (repo: unknown, resolver: RowScopeInterface) => {
-          if (repo instanceof RepositoryAdapter) {
-            repo.setRowScope(resolver);
-          }
-          return true;
-        },
-      });
-    }
-
-    // Hook binding — one provider per entity that registered hooks. Same
-    // reasoning as the row scope binding above: a driver that forgot would
-    // leave the hooks unbound, and the adapter then refuses rather than
-    // running as though the entity had none.
-    //
-    // The hook classes are deliberately not injected here. Resolution stays
-    // `moduleRef.get(hook, { strict: false })` at call time, as it has always
-    // been for `@UseHooks`, so a hook provided in two modules cannot yield one
-    // instance at boot and a different one at runtime — and registering a hook
-    // needs no `imports` entry. The startup checks cover resolvability.
-    for (const entity of entities) {
-      if (!entity.hooks?.length) continue;
-
-      providers.push({
-        provide: Symbol(`HOOK_BINDING_${entity.key}_${Date.now()}`),
-        inject: [getDynamicRepositoryToken(entity.key)],
-        useFactory: (repo: unknown) => {
-          if (repo instanceof RepositoryAdapter) {
-            repo.setHooks(entity.hooks ?? []);
-          }
-          return true;
-        },
-      });
-    }
-
-    // Write policy binding — same reasoning again: a driver that forgot to pass
-    // the declaration would leave an append-only entity silently mutable.
-    for (const entity of entities) {
-      const registration = entity.writePolicy;
-      if (!registration) continue;
-
-      providers.push({
-        provide: Symbol(`WRITE_POLICY_BINDING_${entity.key}_${Date.now()}`),
-        inject: [getDynamicRepositoryToken(entity.key)],
-        useFactory: (repo: unknown) => {
-          if (repo instanceof RepositoryAdapter) {
-            repo.setWritePolicy(registration);
-          }
-          return true;
-        },
-      });
-    }
-
-    // Transaction factory registration
-    if (dynamicModule.transactionFactories) {
-      for (const descriptor of dynamicModule.transactionFactories) {
-        const txToken = Symbol(`TX_FACTORY_${descriptor.key}_${Date.now()}`);
-        providers.push({
-          provide: txToken,
-          inject: [
-            { token: TRANSACTION_FACTORY_REGISTRY, optional: true },
-            ...descriptor.inject,
-          ],
-          useFactory: (
-            registry: TransactionFactoryRegistry | undefined,
-            ...args: unknown[]
-          ) => {
-            if (registry) {
-              const factory = descriptor.useFactory(...args);
-              registry.register(descriptor.key, factory);
-            }
-            return null;
-          },
-        });
-      }
-    }
-
-    // Export public tokens (providers now use getDynamicRepositoryToken directly)
-    const exports = entities.map((entity) =>
-      getDynamicRepositoryToken(entity.key),
-    );
+    }));
 
     return {
-      ...dynamicModule,
-      imports: [...(dynamicModule.imports ?? []), ...imports],
+      module: RepositoryModule,
       providers,
-      exports,
+      exports: keys.map((key) => getDynamicRepositoryToken(key)),
     };
   }
 }

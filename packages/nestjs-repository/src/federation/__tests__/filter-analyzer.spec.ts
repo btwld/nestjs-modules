@@ -1,3 +1,4 @@
+import { targetColumnsFixture } from '../../__fixtures__/column-metadata.fixture.js';
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import {
   WhereCompoundOperator,
@@ -11,10 +12,11 @@ const makeRelation = (
   overrides: Partial<FederatedRelation> & { name: string },
 ): FederatedRelation => ({
   targetEntity: `${overrides.name}Entity`,
+  targetUrn: `urn:memory:${overrides.name}Entity`,
+  targetColumns: targetColumnsFixture('id', `${overrides.name}Id`),
   cardinality: 'many',
   on: { from: 'id', to: `${overrides.name}Id` },
   isOwning: false,
-  joinType: 'LEFT',
   ...overrides,
 });
 
@@ -179,20 +181,19 @@ describe('FilterAnalyzer', () => {
     });
   });
 
-  describe('INNER JOIN injection', () => {
-    it('should inject NOT_NULL on root FK for owning INNER JOIN', () => {
+  describe('sorted relation injection', () => {
+    it('should inject NOT_NULL on root FK for a sorted owning relation', () => {
       const owningRelation = makeRelation({
         name: 'profile',
         cardinality: 'one',
         isOwning: true,
-        joinType: 'INNER',
         on: { from: 'profileId', to: 'id' },
       });
 
       const analyzer = new FilterAnalyzer(
         undefined,
         [owningRelation],
-        new Set(),
+        new Set(['profile']),
       );
 
       expect(analyzer.getRootWhere()).toEqual({
@@ -201,24 +202,7 @@ describe('FilterAnalyzer', () => {
       });
     });
 
-    it('should inject NOT_NULL on target FK for non-owning INNER JOIN', () => {
-      const nonOwning = makeRelation({
-        name: 'posts',
-        joinType: 'INNER',
-      });
-
-      const analyzer = new FilterAnalyzer(undefined, [nonOwning], new Set());
-
-      expect(analyzer.getRelationConditions(nonOwning)).toEqual([
-        {
-          field: 'postsId',
-          operator: WhereOperator.NOT_NULL,
-          relation: 'posts',
-        },
-      ]);
-    });
-
-    it('should inject NOT_NULL for sorted relations (treated as INNER)', () => {
+    it('should inject NOT_NULL on target FK for a sorted non-owning relation', () => {
       const analyzer = new FilterAnalyzer(
         undefined,
         [posts],

@@ -6,16 +6,20 @@ import {
 
 import { type Type, type PlainLiteralObject } from '@nestjs/common';
 
+import { RuntimeException } from '@concepta/nestjs-core';
 import {
   type OrderClause,
   type RepositoryColumnMetadataInterface,
   type RepositoryRelationMetadataInterface,
-  type RelationActionConfig,
+  type RelationConfig,
 } from '@concepta/nestjs-repository';
+
+import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation-metadata.exception.js';
 
 import {
   type TypeOrmColumnMetadata,
   type TypeOrmRelationMetadata,
+  type TypeOrmTableMetadata,
 } from './typeorm-metadata.types.js';
 
 /**
@@ -35,61 +39,100 @@ export function buildEntity<Entity extends PlainLiteralObject>(
   entityName: string,
 ): Type<Entity> {
   if (!isEntity(target)) {
-    throw new Error(`Invalid entity for "${entityName}"`);
+    throw new RuntimeException({
+      message: 'Invalid entity for "%s": expected an entity class',
+      messageParams: [entityName],
+      fault: 'usage',
+    });
   }
   return target;
 }
 
 /**
+ * A relation as mapped from one side, before its target's columns and URN are
+ * added.
+ */
+type MappedRelation = Omit<
+  RepositoryRelationMetadataInterface,
+  'targetColumns' | 'targetUrn'
+>;
+
+/**
+ * The URN of the rows a table holds: `urn:typeorm:<database>:<table>`.
+ *
+ * The database is the table's own, else the connection's (as its driver
+ * resolves it, from `database`, `url` or `replication`), and the table name
+ * carries no schema. Every connection to one database names its tables alike;
+ * two databases sharing a name and a table name collide, which the repository
+ * treats as the same rows. An unknown database leaves its segment empty.
+ */
+export function buildUrn(
+  table: TypeOrmTableMetadata,
+  connection: string | undefined,
+): string {
+  return `urn:typeorm:${table.database ?? connection ?? ''}:${table.tableName}`;
+}
+
+/**
  * Map TypeORM column metadata to typed repository column metadata.
+ *
+ * A relation with no column of its own for its foreign key still gets a
+ * column from TypeORM, named after the relation. It is not an own column, so
+ * it is left out; the relation's `foreignKey` still names it.
  */
 export function buildColumns<Entity extends PlainLiteralObject>(
-  columns: TypeOrmColumnMetadata[],
+  columns: readonly TypeOrmColumnMetadata[],
 ): RepositoryColumnMetadataInterface<Entity>[] {
-  return columns.map((col) => {
-    return {
-      name: col.propertyName,
-      isPrimary: col.isPrimary,
-      isRemoveDate: col.isDeleteDate,
-      isVersion: col.isVersion,
-    };
-  });
+  return columns
+    .filter((col) => col.relationMetadata?.propertyName !== col.propertyName)
+    .map((col) => {
+      return {
+        name: col.propertyName,
+        isPrimary: col.isPrimary,
+        isRemoveDate: col.isDeleteDate,
+        isVersion: col.isVersion,
+      };
+    });
 }
 
 /**
  * Map TypeORM relation metadata to ORM-agnostic relation metadata.
  *
- * Handles owning/non-owning sides and M:N junction tables.
- * Skips relations where required FK metadata is unavailable.
+ * Handles owning/non-owning sides and M:N junction tables. Throws on a
+ * relation it cannot map rather than leaving it out of the metadata.
  *
  * @param relations - TypeORM relation metadata array
- * @param relationsConfig - optional per-relation action config from forFeature()
+ * @param database - the connection's database, for the relations' URNs
+ * @param relationsConfig - optional per-relation config from forRoot()
  */
 export function buildRelations(
   relations: TypeOrmRelationMetadata[],
-  relationsConfig?: Record<string, RelationActionConfig>,
+  database: string | undefined,
+  relationsConfig?: Record<string, RelationConfig>,
 ): RepositoryRelationMetadataInterface[] {
-  const result: RepositoryRelationMetadataInterface[] = [];
-
-  for (const rel of relations) {
-    const mapped = mapRelation(rel);
-    if (mapped) {
-      const cfg = relationsConfig?.[mapped.name];
-      result.push(
-        cfg
-          ? {
-              ...mapped,
-              onDelete: cfg.onDelete,
-              onUpdate: cfg.onUpdate,
-              federated: cfg.federated,
-              distinctFilter: cfg.distinctFilter,
-            }
-          : mapped,
+  return relations.map((rel) => {
+    const relation = mapRelation(rel, database);
+    if (!relation) {
+      throw new TypeOrmRelationMetadataException(
+        rel.propertyName,
+        rel.inverseEntityMetadata.name,
       );
     }
-  }
 
-  return result;
+    const mapped = {
+      ...relation,
+      targetUrn: buildUrn(rel.inverseEntityMetadata, database),
+      targetColumns: buildColumns(rel.inverseEntityMetadata.columns),
+    };
+    const cfg = relationsConfig?.[mapped.name];
+    return cfg
+      ? {
+          ...mapped,
+          federated: cfg.federated,
+          distinctFilter: cfg.distinctFilter,
+        }
+      : mapped;
+  });
 }
 
 /**
@@ -106,12 +149,13 @@ function getCardinality(rel: TypeOrmRelationMetadata): 'one' | 'many' {
  */
 function mapRelation(
   rel: TypeOrmRelationMetadata,
-): RepositoryRelationMetadataInterface | undefined {
+  database: string | undefined,
+): MappedRelation | undefined {
   const name = rel.propertyName;
   const targetEntity = rel.inverseEntityMetadata.name;
 
   if (rel.isManyToMany) {
-    return mapManyToMany(rel, name, targetEntity);
+    return mapManyToMany(rel, name, targetEntity, database);
   }
 
   const cardinality = getCardinality(rel);
@@ -132,21 +176,26 @@ function mapOwning(
   name: string,
   targetEntity: string,
   cardinality: 'one' | 'many',
-): RepositoryRelationMetadataInterface | undefined {
-  const joinCol = rel.joinColumns[0];
-  if (!joinCol) return undefined;
+): MappedRelation | undefined {
+  const foreignKey: { from: string; to: string }[] = [];
+  for (const joinCol of rel.joinColumns) {
+    const referencedCol = joinCol.referencedColumn;
+    if (!referencedCol) return undefined;
+    foreignKey.push({
+      from: joinCol.propertyName,
+      to: referencedCol.propertyName,
+    });
+  }
 
-  const referencedCol = joinCol.referencedColumn;
-  if (!referencedCol) return undefined;
+  const [first] = foreignKey;
+  if (!first) return undefined;
 
   return {
     name,
     targetEntity,
     cardinality,
-    on: {
-      from: joinCol.propertyName,
-      to: referencedCol.propertyName,
-    },
+    on: first,
+    foreignKey,
   };
 }
 
@@ -159,7 +208,7 @@ function mapNonOwning(
   name: string,
   targetEntity: string,
   cardinality: 'one' | 'many',
-): RepositoryRelationMetadataInterface | undefined {
+): MappedRelation | undefined {
   const inverse = rel.inverseRelation;
   if (!inverse) return undefined;
 
@@ -189,11 +238,12 @@ function mapManyToMany(
   rel: TypeOrmRelationMetadata,
   name: string,
   targetEntity: string,
-): RepositoryRelationMetadataInterface | undefined {
+  database: string | undefined,
+): MappedRelation | undefined {
   if (rel.isManyToManyOwner) {
-    return mapManyToManyOwner(rel, name, targetEntity);
+    return mapManyToManyOwner(rel, name, targetEntity, database);
   }
-  return mapManyToManyNonOwner(rel, name, targetEntity);
+  return mapManyToManyNonOwner(rel, name, targetEntity, database);
 }
 
 /**
@@ -203,7 +253,8 @@ function mapManyToManyOwner(
   rel: TypeOrmRelationMetadata,
   name: string,
   targetEntity: string,
-): RepositoryRelationMetadataInterface | undefined {
+  database: string | undefined,
+): MappedRelation | undefined {
   const junctionMeta = rel.junctionEntityMetadata;
   if (!junctionMeta) return undefined;
 
@@ -224,7 +275,7 @@ function mapManyToManyOwner(
       to: targetRef.propertyName,
     },
     through: {
-      relation: junctionMeta.name,
+      urn: buildUrn(junctionMeta, database),
       fromKey: sourceJoinCol.propertyName,
       toKey: targetJoinCol.propertyName,
     },
@@ -239,7 +290,8 @@ function mapManyToManyNonOwner(
   rel: TypeOrmRelationMetadata,
   name: string,
   targetEntity: string,
-): RepositoryRelationMetadataInterface | undefined {
+  database: string | undefined,
+): MappedRelation | undefined {
   const inverse = rel.inverseRelation;
   if (!inverse) return undefined;
 
@@ -264,7 +316,7 @@ function mapManyToManyNonOwner(
       to: theirRef.propertyName,
     },
     through: {
-      relation: junctionMeta.name,
+      urn: buildUrn(junctionMeta, database),
       fromKey: ourJoinCol.propertyName,
       toKey: theirJoinCol.propertyName,
     },
@@ -299,7 +351,13 @@ export function buildOrder<Entity extends PlainLiteralObject>(
   let hasEntries = false;
 
   for (const key of keys) {
-    if (!isOrderValue(key.order)) continue;
+    if (!isOrderValue(key.order)) {
+      throw new RuntimeException({
+        message: 'Cannot translate sort direction "%s" on "%s"',
+        messageParams: [String(key.order), key.field],
+        fault: 'internal',
+      });
+    }
     hasEntries = true;
 
     if (key.relation) {

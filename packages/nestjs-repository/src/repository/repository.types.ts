@@ -21,7 +21,7 @@ export const WhereOperator = {
   NE: 'ne',
   IN: 'in',
   NIN: 'nin',
-  // Pattern filters (string matching)
+  // Text filters (literal string matching)
   CONTAINS: 'contains',
   NCONTAINS: 'ncontains',
   STARTS: 'starts',
@@ -53,7 +53,9 @@ export type WhereScalarOperator =
   | typeof WhereOperator.GT
   | typeof WhereOperator.GTE
   | typeof WhereOperator.LT
-  | typeof WhereOperator.LTE
+  | typeof WhereOperator.LTE;
+
+export type WhereTextOperator =
   | typeof WhereOperator.CONTAINS
   | typeof WhereOperator.NCONTAINS
   | typeof WhereOperator.STARTS
@@ -83,16 +85,6 @@ export type WhereCompoundOperator =
 export type WhereConditionArr<
   T extends PlainLiteralObject = PlainLiteralObject,
 > = [EntityColumn<T>, WhereOperator, unknown?];
-
-/**
- * Relation action types for onDelete / onUpdate behavior.
- *
- * - `delegate` — defer to native schema settings (default)
- * - `cascade` — adapter handles it (guarantees hooks/events run)
- * - `restrict` — throw error if related records exist
- * - `setNull` — set FK to null, leaving orphans
- */
-export type RelationAction = 'delegate' | 'cascade' | 'restrict' | 'setNull';
 
 /**
  * Sort order constants.

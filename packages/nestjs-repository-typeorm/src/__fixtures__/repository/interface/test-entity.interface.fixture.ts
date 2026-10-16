@@ -6,5 +6,5 @@ import {
 export interface TestInterfaceFixture
   extends ReferenceIdInterface, AuditInterface {
   firstName: string;
-  lastName?: string;
+  lastName?: string | null;
 }

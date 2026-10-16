@@ -7,18 +7,24 @@ export { RepositoryModule } from './repository.module.js';
 // Repository Adapter
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryAdapter } from './repository/repository-adapter.js';
+export { RepositoryBindingInterface } from './repository/interfaces/repository-binding.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Repository Implementation Interfaces
 // ═══════════════════════════════════════════════════════════════════
 export {
-  RelationActionConfig,
+  RelationConfig,
   RepositoryProviderOptions,
 } from './interfaces/repository-provider-options.interface.js';
 export {
-  RepositoryModuleInterface,
+  RepositoryDriverInterface,
   DynamicRepositoryModule,
 } from './interfaces/repository-module.interface.js';
+export {
+  RepositoryDriverRegistration,
+  RepositoryRootAsyncOptions,
+  RepositoryRootOptions,
+} from './interfaces/repository-root-options.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Row Scope
@@ -65,17 +71,24 @@ export {
 // Exceptions
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
+export { RepositoryDuplicateUrnException } from './exceptions/repository-duplicate-urn.exception.js';
 export { EntityAlreadyExistsException } from './exceptions/entity-already-exists.exception.js';
 export { PartialPrimaryKeyException } from './exceptions/partial-primary-key.exception.js';
 export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
+export { RelationWriteException } from './exceptions/relation-write.exception.js';
+export { UnknownColumnException } from './exceptions/unknown-column.exception.js';
+export { InvalidColumnValueException } from './exceptions/invalid-column-value.exception.js';
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
 export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
 export { AppendOnlyViolationException } from './write-policy/exceptions/append-only-violation.exception.js';
 export { WritePolicyBootException } from './write-policy/exceptions/write-policy-boot.exception.js';
 export { CorrectionChainDepthException } from './write-policy/exceptions/correction-chain-depth.exception.js';
 export { HookBootException } from './exceptions/hook-boot.exception.js';
-export { HookBootTargetInterface } from './hooks/hook-boot-checks.js';
+export { RepositoryBootException } from './exceptions/repository-boot.exception.js';
+export { RepositoryUnboundException } from './exceptions/repository-unbound.exception.js';
 export { RepositoryQueryException } from './exceptions/repository-query.exception.js';
+export { RepositoryDatabaseException } from './exceptions/repository-database.exception.js';
+export { RepositoryDatabaseErrorInterface } from './repository/interfaces/repository-database-error.interface.js';
 export { OptimisticLockException } from './exceptions/optimistic-lock.exception.js';
 export { SoftDeletedImmutableException } from './exceptions/soft-deleted-immutable.exception.js';
 export { FederationException } from './federation/exceptions/federation.exception.js';
@@ -221,12 +234,14 @@ export { RepositoryRelationMetadataInterface } from './repository/interfaces/rep
 export {
   RepositoryFindOneOptions,
   RepositoryFindOptions,
+  RepositoryCountOptions,
   RepositoryCreateOptions,
   RepositoryUpdateOptions,
   RepositoryUpsertOptions,
   RepositoryDeleteOptions,
   RepositoryDeleteOneOptions,
   RepositoryRestoreOptions,
+  RepositoryVersionGuardOptions,
 } from './repository/interfaces/repository-options.interface.js';
 export { RepositoryVersionGuardInterface } from './repository/interfaces/repository-version-guard.interface.js';
 
@@ -236,11 +251,11 @@ export {
   WhereOperator,
   WhereNullaryOperator,
   WhereScalarOperator,
+  WhereTextOperator,
   WhereArrayOperator,
   WherePairOperator,
   WhereCompoundOperator,
   WhereConditionArr,
-  RelationAction,
   SortOrder,
   OrderSortKey,
   OrderSortKeyArr,
@@ -260,6 +275,7 @@ export { JoinClause } from './repository/interfaces/join-clause.interface.js';
 export {
   WhereConditionNullary,
   WhereConditionScalar,
+  WhereConditionText,
   WhereConditionArray,
   WhereConditionPair,
   WhereCondition,
@@ -279,9 +295,6 @@ export { Where } from './repository/where.helpers.js';
 
 // Order clause helpers
 export { OrderBy } from './repository/order-by.helpers.js';
-
-// Join clause helpers
-export { Join } from './repository/join.helpers.js';
 
 // Repository utils
 export { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.js';
