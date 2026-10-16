@@ -1,7 +1,9 @@
 import { SetMetadata } from '@nestjs/common';
 
+import { HookNotDecoratedException } from '../exceptions/hook-not-decorated.exception.js';
 import { HOOKS_METADATA_KEY } from '../hook.constants.js';
 import { type HookOption } from '../hook.types.js';
+import { normalizeHookOption } from '../utils/normalize-hook-option.js';
 
 /**
  * Decorator to specify hooks for a controller class or method.
@@ -54,9 +56,20 @@ import { type HookOption } from '../hook.types.js';
  * Gating is a property of the hook, not of the registration: pass a
  * specification to the hook-method decorator, to a method-level
  * `@Specification`, or to the class-level `@Hook`/`@RepoHook`.
+ *
+ * A hook class without the class-level `@Hook()` (or subsystem-specific, e.g.
+ * `@RepoHook()`) decorator throws `HookNotDecoratedException` as soon as the
+ * decorated class is defined.
  */
 export function UseHooks(
   ...hooks: HookOption[]
 ): ClassDecorator & MethodDecorator {
+  for (const option of hooks) {
+    const { hook, type } = normalizeHookOption(option);
+    if (type === undefined) {
+      throw new HookNotDecoratedException(hook.name);
+    }
+  }
+
   return SetMetadata(HOOKS_METADATA_KEY, hooks);
 }
