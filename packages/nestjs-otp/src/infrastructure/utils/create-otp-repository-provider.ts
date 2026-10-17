@@ -1,12 +1,12 @@
-import { type Provider, type Type } from '@nestjs/common';
+import { type Provider } from '@nestjs/common';
 
 import {
   getDynamicRepositoryToken,
   type RepositoryInterface,
 } from '@concepta/nestjs-repository';
 
-import { type OtpRepositoryInterface } from '../../domain/repositories/otp-repository.interface.js';
 import { OTP_CUSTOM_REPOSITORY_TOKEN } from '../../otp.constants.js';
+import { type OtpRepositoryConstructor } from '../config/interfaces/otp-extras.interface.js';
 import { type OtpEntityInterface } from '../persistence/interfaces/otp-entity.interface.js';
 import { OtpMapper } from '../persistence/otp.mapper.js';
 import { OtpRepository } from '../persistence/otp.repository.js';
@@ -26,12 +26,12 @@ export function createOtpRepositoryProvider(entityKey: string): Provider {
     inject: [
       getDynamicRepositoryToken(entityKey),
       OtpMapper,
-      { token: OTP_CUSTOM_REPOSITORY_TOKEN, optional: true },
+      OTP_CUSTOM_REPOSITORY_TOKEN,
     ],
     useFactory: (
       repository: RepositoryInterface<OtpEntityInterface>,
       mapper: OtpMapper,
-      customRepo?: Type<OtpRepositoryInterface>,
+      customRepo: OtpRepositoryConstructor | null,
     ) => {
       const RepoClass = customRepo ?? OtpRepository;
       return new RepoClass(repository, mapper);

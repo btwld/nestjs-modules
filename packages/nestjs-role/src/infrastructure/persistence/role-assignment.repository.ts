@@ -12,7 +12,7 @@ import { type RoleAssignmentMapper } from './role-assignment.mapper.js';
 export class RoleAssignmentRepository implements RoleAssignmentRepositoryInterface {
   constructor(
     protected readonly repository: RepositoryInterface<RoleAssignmentEntityInterface>,
-    private readonly mapper: RoleAssignmentMapper,
+    protected readonly mapper: RoleAssignmentMapper,
   ) {}
 
   async get(

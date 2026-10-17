@@ -122,7 +122,12 @@ export function createOtpProviders(options: {
 export function createOtpExports(): Required<
   Pick<DynamicModule, 'exports'>
 >['exports'] {
-  return [OTP_MODULE_SETTINGS_TOKEN, OtpPolicy, OtpMapper];
+  return [
+    OTP_MODULE_SETTINGS_TOKEN,
+    OTP_CUSTOM_REPOSITORY_TOKEN,
+    OtpPolicy,
+    OtpMapper,
+  ];
 }
 
 export function createOtpSettingsProvider(

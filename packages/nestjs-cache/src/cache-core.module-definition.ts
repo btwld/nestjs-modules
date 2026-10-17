@@ -113,7 +113,12 @@ export function createCacheProviders(options: {
 export function createCacheExports(): Required<
   Pick<DynamicModule, 'exports'>
 >['exports'] {
-  return [CACHE_MODULE_SETTINGS_TOKEN, CacheExpirationPolicy, CacheMapper];
+  return [
+    CACHE_MODULE_SETTINGS_TOKEN,
+    CACHE_CUSTOM_REPOSITORY_TOKEN,
+    CacheExpirationPolicy,
+    CacheMapper,
+  ];
 }
 
 export function createCacheSettingsProvider(

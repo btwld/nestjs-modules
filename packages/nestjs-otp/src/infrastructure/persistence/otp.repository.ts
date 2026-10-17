@@ -12,7 +12,7 @@ import { type OtpMapper } from './otp.mapper.js';
 export class OtpRepository implements OtpRepositoryInterface {
   constructor(
     protected readonly repository: RepositoryInterface<OtpEntityInterface>,
-    private readonly mapper: OtpMapper,
+    protected readonly mapper: OtpMapper,
   ) {}
 
   async get(ctx: PlainLiteralObject, id: ReferenceId): Promise<Otp | null> {

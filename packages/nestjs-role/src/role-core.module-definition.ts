@@ -119,5 +119,10 @@ export function createRoleProviders(options: {
 export function createRoleExports(): Required<
   Pick<DynamicModule, 'exports'>
 >['exports'] {
-  return [RoleMapper, RoleAssignmentMapper];
+  return [
+    ROLE_CUSTOM_REPOSITORY_TOKEN,
+    ROLE_ASSIGNMENT_CUSTOM_REPOSITORY_TOKEN,
+    RoleMapper,
+    RoleAssignmentMapper,
+  ];
 }

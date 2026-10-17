@@ -128,7 +128,9 @@ Each entity key maps to a `CacheRepository` instance resolved at runtime by
 interface CacheExtrasInterface {
   providers?: Provider[];
   repositories?: {
-    cache?: Type<CacheRepositoryInterface>;
+    cache?: new (
+      ...args: ConstructorParameters<typeof CacheRepository>
+    ) => CacheRepositoryInterface;
   };
 }
 
@@ -151,8 +153,22 @@ dynamic `CacheRepository` provider:
 CacheModule.forFeature(entityKeys: string[])
 ```
 
-Pass `repositories.cache` to override the default `CacheRepository` with a
-custom implementation.
+To customise the repository, extend `CacheRepository` and pass the class as
+`repositories.cache`:
+
+```ts
+import { CacheModule, CacheRepository } from '@concepta/nestjs-cache';
+
+class AuditedCacheRepository extends CacheRepository {
+  // override the methods you need, using this.repository and this.mapper
+}
+
+CacheModule.forRoot({ repositories: { cache: AuditedCacheRepository } });
+```
+
+Your class replaces `CacheRepository` for every `forFeature()` key. Each
+`forFeature()` call builds one instance per key, with the same constructor
+arguments as `CacheRepository`, so it can't inject other providers.
 
 ## Architecture Overview
 

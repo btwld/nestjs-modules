@@ -138,7 +138,9 @@ Each entity key maps to an `OtpRepository` instance resolved at runtime by
 interface OtpExtrasInterface {
   providers?: Provider[];
   repositories?: {
-    otp?: Type<OtpRepositoryInterface>;
+    otp?: new (
+      ...args: ConstructorParameters<typeof OtpRepository>
+    ) => OtpRepositoryInterface;
   };
 }
 
@@ -175,8 +177,22 @@ OtpModule.forFeature(entityKeys: string[])
   and maximum creation attempts within that window. Exceeding the threshold
   throws `OtpLimitReachedException`.
 
-Pass `repositories.otp` to override the default `OtpRepository` with a
-custom implementation.
+To customise the repository, extend `OtpRepository` and pass the class as
+`repositories.otp`:
+
+```ts
+import { OtpModule, OtpRepository } from '@concepta/nestjs-otp';
+
+class AuditedOtpRepository extends OtpRepository {
+  // override the methods you need, using this.repository and this.mapper
+}
+
+OtpModule.forRoot({ repositories: { otp: AuditedOtpRepository } });
+```
+
+Your class replaces `OtpRepository` for every `forFeature()` key. Each
+`forFeature()` call builds one instance per key, with the same constructor
+arguments as `OtpRepository`, so it can't inject other providers.
 
 ## Architecture Overview
 

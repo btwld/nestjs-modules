@@ -41,7 +41,7 @@ describe('createCacheRepositoryProvider', () => {
     expect(provider.inject).toEqual([
       getDynamicRepositoryToken('user'),
       CacheMapper,
-      { token: CACHE_CUSTOM_REPOSITORY_TOKEN, optional: true },
+      CACHE_CUSTOM_REPOSITORY_TOKEN,
     ]);
   });
 
@@ -52,7 +52,7 @@ describe('createCacheRepositoryProvider', () => {
 
     const mockRepo = {} as never;
     const mockMapper = new CacheMapper();
-    const result = provider.useFactory(mockRepo, mockMapper);
+    const result = provider.useFactory(mockRepo, mockMapper, null);
 
     expect(result).toBeInstanceOf(CacheRepository);
   });

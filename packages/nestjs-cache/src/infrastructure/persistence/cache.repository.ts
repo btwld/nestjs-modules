@@ -12,7 +12,7 @@ import { type CacheEntityInterface } from './interfaces/cache-entity.interface.j
 export class CacheRepository implements CacheRepositoryInterface {
   constructor(
     protected readonly repository: RepositoryInterface<CacheEntityInterface>,
-    private readonly mapper: CacheMapper,
+    protected readonly mapper: CacheMapper,
   ) {}
 
   async get(ctx: PlainLiteralObject, id: ReferenceId): Promise<Cache | null> {

@@ -1,4 +1,8 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
 import { type OtpRepositoryResolverInterface } from '../domain/repositories/otp-repository-resolver.interface.js';
 import { OtpRepository } from '../infrastructure/persistence/otp.repository.js';
@@ -6,6 +10,8 @@ import { OTP_REPOSITORY_RESOLVER_TOKEN } from '../otp.constants.js';
 import { OtpModule } from '../otp.module.js';
 
 import { AppModuleFixture } from './fixtures/app.module.fixture.js';
+import { UserEntityFixture } from './fixtures/entities/user-entity.fixture.js';
+import { UserOtpEntityFixture } from './fixtures/entities/user-otp-entity.fixture.js';
 
 describe(OtpModule.name, () => {
   let otpModule: OtpModule;
@@ -79,6 +85,37 @@ describe(OtpModule.name, () => {
       const repo = resolver.resolve('userOtp');
 
       expect(repo).toBeInstanceOf(OtpRepository);
+    });
+
+    it('should build repositories.otp for each forFeature key', async () => {
+      class CustomOtpRepository extends OtpRepository {}
+
+      const testModule: TestingModule = await Test.createTestingModule({
+        imports: [
+          TypeOrmModule.forRoot({
+            type: 'better-sqlite3',
+            database: ':memory:',
+            synchronize: true,
+            entities: [UserEntityFixture, UserOtpEntityFixture],
+          }),
+          RepositoryModule.forRoot({
+            drivers: [
+              {
+                driver: TypeOrmRepositoryModule,
+                entities: [{ key: 'userOtp', entity: UserOtpEntityFixture }],
+              },
+            ],
+          }),
+          OtpModule.forRoot({ repositories: { otp: CustomOtpRepository } }),
+          OtpModule.forFeature(['userOtp']),
+        ],
+      }).compile();
+
+      const resolver = testModule.get<OtpRepositoryResolverInterface>(
+        OTP_REPOSITORY_RESOLVER_TOKEN,
+      );
+
+      expect(resolver.resolve('userOtp')).toBeInstanceOf(CustomOtpRepository);
     });
   });
 });

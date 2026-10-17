@@ -221,8 +221,12 @@ RoleModule.forFeature({
 interface RoleExtrasInterface {
   providers?: Provider[];
   repositories?: {
-    role?: Type<RoleRepositoryInterface>;
-    roleAssignment?: Type<RoleAssignmentRepositoryInterface>;
+    role?: new (
+      ...args: ConstructorParameters<typeof RoleRepository>
+    ) => RoleRepositoryInterface;
+    roleAssignment?: new (
+      ...args: ConstructorParameters<typeof RoleAssignmentRepository>
+    ) => RoleAssignmentRepositoryInterface;
   };
 }
 
@@ -244,8 +248,38 @@ RoleModule.forFeature(config: {
 })
 ```
 
-Pass `repositories.role` or `repositories.roleAssignment` to override the
-default repository implementations.
+To customise a repository, extend `RoleRepository` or
+`RoleAssignmentRepository` and pass the class as `repositories.role` or
+`repositories.roleAssignment`:
+
+```ts
+import {
+  RoleAssignmentRepository,
+  RoleModule,
+  RoleRepository,
+} from '@concepta/nestjs-role';
+
+class AuditedRoleRepository extends RoleRepository {
+  // override the methods you need, using this.repository and this.mapper
+}
+
+class AuditedRoleAssignmentRepository extends RoleAssignmentRepository {
+  // override the methods you need, using this.repository and this.mapper
+}
+
+RoleModule.forRoot({
+  repositories: {
+    role: AuditedRoleRepository,
+    roleAssignment: AuditedRoleAssignmentRepository,
+  },
+});
+```
+
+Your classes replace the defaults for the `forFeature()` keys: the role
+repository for `roleEntityKey`, the assignment repository for each of
+`assignmentEntityKeys`. Each `forFeature()` call builds one instance per key,
+with the same constructor arguments as the class it extends, so it can't
+inject other providers.
 
 ## Architecture Overview
 
