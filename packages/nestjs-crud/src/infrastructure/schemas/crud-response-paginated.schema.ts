@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 /**
  * Schema equivalent of `CrudResponsePaginatedDto<T>` — the Zod counterpart
- * used by schema-based (migrated) CRUD packages. `metrics` is intentionally
- * omitted, matching the legacy DTO (which never `@Expose()`s it either).
+ * used by schema-based (migrated) CRUD packages.
  *
  * Callers wrap the result with `withNamedComponent` to register it as its
  * own OpenAPI component, e.g.

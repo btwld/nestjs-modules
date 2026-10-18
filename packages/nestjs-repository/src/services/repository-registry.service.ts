@@ -15,18 +15,26 @@ export const REPOSITORY_REGISTRY = Symbol('RepositoryRegistry');
  */
 @Injectable()
 export class RepositoryRegistryService {
-  private readonly entityIndex = new Map<
+  private readonly urnIndex = new Map<
     string,
     Readonly<RepositoryRegistryItem>
   >();
 
   /**
-   * Look up a registry item by entity name.
+   * Look up the repository reading the rows `urn` names.
    */
-  getByEntityName(
-    entityName: string,
-  ): Readonly<RepositoryRegistryItem> | undefined {
-    return this.entityIndex.get(entityName);
+  getByUrn(urn: string): Readonly<RepositoryRegistryItem> | undefined {
+    return this.urnIndex.get(urn);
+  }
+
+  /**
+   * Every repository whose entity is named `name`. Names are not unique, so
+   * a caller needing one decides what more than one means.
+   */
+  getByEntityName(name: string): Readonly<RepositoryRegistryItem>[] {
+    return [...this.urnIndex.values()].filter(
+      (item) => item.entityName === name,
+    );
   }
 
   /**
@@ -35,7 +43,6 @@ export class RepositoryRegistryService {
    * Throws if two registrations read the same rows.
    */
   register(items: RepositoryRegistryItem[]): void {
-    const firstByUrn = new Map<string, Readonly<RepositoryRegistryItem>>();
     const duplicateUrns: {
       urn: string;
       existing: string;
@@ -43,9 +50,7 @@ export class RepositoryRegistryService {
     }[] = [];
 
     for (const item of items.map((entry) => Object.freeze({ ...entry }))) {
-      this.entityIndex.set(item.entityName, item);
-
-      const sameRows = firstByUrn.get(item.urn);
+      const sameRows = this.urnIndex.get(item.urn);
       if (sameRows) {
         duplicateUrns.push({
           urn: item.urn,
@@ -53,7 +58,7 @@ export class RepositoryRegistryService {
           attempted: item.key,
         });
       } else {
-        firstByUrn.set(item.urn, item);
+        this.urnIndex.set(item.urn, item);
       }
     }
 

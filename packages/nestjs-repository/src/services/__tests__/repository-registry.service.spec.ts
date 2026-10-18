@@ -180,7 +180,7 @@ describe('RepositoryRegistryService', () => {
     await moduleRef.close();
   });
 
-  it('should look up registry item by entity name', async () => {
+  it('should look up registry item by URN', async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         mockRoot([
@@ -193,7 +193,7 @@ describe('RepositoryRegistryService', () => {
     const registry =
       moduleRef.get<RepositoryRegistryService>(REPOSITORY_REGISTRY);
 
-    const userItem = registry.getByEntityName('UserEntity');
+    const userItem = registry.getByUrn('urn:mock:users');
     expect(userItem).toEqual({
       key: 'users',
       entityName: 'UserEntity',
@@ -201,7 +201,7 @@ describe('RepositoryRegistryService', () => {
       adapter: moduleRef.get(getDynamicRepositoryToken('users')),
     });
 
-    const orderItem = registry.getByEntityName('OrderEntity');
+    const orderItem = registry.getByUrn('urn:mock:orders');
     expect(orderItem).toEqual({
       key: 'orders',
       entityName: 'OrderEntity',
@@ -209,7 +209,29 @@ describe('RepositoryRegistryService', () => {
       adapter: moduleRef.get(getDynamicRepositoryToken('orders')),
     });
 
-    expect(registry.getByEntityName('NonExistent')).toBeUndefined();
+    expect(registry.getByUrn('urn:mock:invoices')).toBeUndefined();
+
+    await moduleRef.close();
+  });
+
+  it('should look up every registry item with an entity name', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        mockRoot([
+          { key: 'users', entity: UserEntity },
+          { key: 'archivedUsers', entity: UserEntity },
+          { key: 'orders', entity: OrderEntity },
+        ]),
+      ],
+    }).compile();
+
+    const registry =
+      moduleRef.get<RepositoryRegistryService>(REPOSITORY_REGISTRY);
+
+    expect(
+      registry.getByEntityName('UserEntity').map(({ key }) => key),
+    ).toEqual(['users', 'archivedUsers']);
+    expect(registry.getByEntityName('InvoiceEntity')).toEqual([]);
 
     await moduleRef.close();
   });

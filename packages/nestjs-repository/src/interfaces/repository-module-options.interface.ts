@@ -25,4 +25,14 @@ export interface RepositoryModuleOptionsInterface {
    * failure instead of a default.
    */
   requireWritePolicyDeclaration?: boolean;
+
+  /** How reads of federated relations are bounded. */
+  federation?: {
+    /**
+     * The most keys one federated query may carry, and the most rows a filter
+     * on a federated relation may match on each side before it is refused.
+     * Defaults to 1000.
+     */
+    maxKeys?: number;
+  };
 }

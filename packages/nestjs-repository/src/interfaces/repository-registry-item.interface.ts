@@ -12,7 +12,7 @@ export interface RepositoryRegistryItem {
   readonly key: string;
 
   /**
-   * Entity name, as the repository reports it.
+   * The entity's name, as its repository reports it.
    */
   readonly entityName: string;
 

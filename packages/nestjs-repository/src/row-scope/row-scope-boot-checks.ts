@@ -19,7 +19,8 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  *
  * Rows are matched by URN, not entity name, so this also covers a relation
  * into rows a scoped entity reads under another name, and a many-to-many whose
- * junction is scoped.
+ * junction is scoped. A federated relation is exempt: it is read through the
+ * related entity's own repository, under its row scope.
  */
 export function checkRelationsIntoScoped(adapters: AnyAdapter[]): string[] {
   const scopedUrns = scopedKeysByUrn(adapters);
@@ -27,8 +28,9 @@ export function checkRelationsIntoScoped(adapters: AnyAdapter[]): string[] {
   return adapters
     .filter((adapter) => !isRowScopeScoped(adapter.rowScopeDeclaration))
     .flatMap((adapter) =>
-      (adapter.metadata.relations ?? []).flatMap(
-        ({ name, targetEntity, targetUrn, through }) => {
+      (adapter.metadata.relations ?? [])
+        .filter(({ name }) => !adapter.federatedRelations.has(name))
+        .flatMap(({ name, targetEntity, targetUrn, through }) => {
           if (scopedUrns.has(targetUrn)) {
             return [
               `"${adapter.entityKey}" has no row scope, but its "${name}" ` +
@@ -50,8 +52,7 @@ export function checkRelationsIntoScoped(adapters: AnyAdapter[]): string[] {
             ];
           }
           return [];
-        },
-      ),
+        }),
     );
 }
 

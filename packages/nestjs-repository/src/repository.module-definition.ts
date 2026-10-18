@@ -11,9 +11,9 @@ import { ModuleRef } from '@nestjs/core';
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
 import { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
 import {
-  FEDERATION_ORCHESTRATOR,
-  FederationOrchestrator,
-} from './federation/federation-orchestrator.service.js';
+  FEDERATION_READER,
+  FederationReader,
+} from './federation/federation-reader.service.js';
 import { TransactionInterceptor } from './interceptors/transaction.interceptor.js';
 import { type RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
 import { type RepositoryDriverRegistration } from './interfaces/repository-root-options.interface.js';
@@ -105,14 +105,14 @@ export function createRepositoryRootModule(params: {
       inject: [
         REPOSITORY_MODULE_OPTIONS,
         REPOSITORY_REGISTRY,
-        FEDERATION_ORCHESTRATOR,
+        FEDERATION_READER,
         ModuleRef,
         ...repoTokens,
       ],
       useFactory: (
         moduleOptions: RepositoryModuleOptionsInterface,
         registry: RepositoryRegistryService,
-        orchestrator: FederationOrchestrator,
+        reader: FederationReader,
         moduleRef: ModuleRef,
         ...repos: unknown[]
       ) =>
@@ -121,7 +121,7 @@ export function createRepositoryRootModule(params: {
           repos,
           moduleOptions,
           registry,
-          orchestrator,
+          reader,
           moduleRef,
         }),
     },
@@ -273,8 +273,8 @@ function createRepositoryProviders(): Provider[] {
       useClass: RepositoryRegistryService,
     },
     {
-      provide: FEDERATION_ORCHESTRATOR,
-      useClass: FederationOrchestrator,
+      provide: FEDERATION_READER,
+      useClass: FederationReader,
     },
     TransactionScope,
     TransactionalRunner,
@@ -293,7 +293,7 @@ function createRepositoryExports(): (
     REPOSITORY_MODULE_OPTIONS,
     TRANSACTION_FACTORY_REGISTRY,
     REPOSITORY_REGISTRY,
-    FEDERATION_ORCHESTRATOR,
+    FEDERATION_READER,
     TransactionScope,
     TransactionalRunner,
     TransactionInterceptor,

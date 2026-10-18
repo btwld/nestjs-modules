@@ -7,7 +7,17 @@ export { RepositoryModule } from './repository.module.js';
 // Repository Adapter
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryAdapter } from './repository/repository-adapter.js';
-export { RepositoryBindingInterface } from './repository/interfaces/repository-binding.interface.js';
+export {
+  RepositoryBindingInterface,
+  RepositoryFederationBinding,
+} from './repository/interfaces/repository-binding.interface.js';
+export {
+  FederatedRelation,
+  FederationReader,
+  FederationReadOptions,
+  FederationRoot,
+} from './federation/federation-reader.service.js';
+export { FederatedWhere } from './federation/federated-where.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Repository Implementation Interfaces

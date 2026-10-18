@@ -7,7 +7,6 @@ import {
   targetColumnsFixture,
 } from '../../__fixtures__/column-metadata.fixture.js';
 import { SoftDeletedImmutableException } from '../../exceptions/soft-deleted-immutable.exception.js';
-import { FederationOrchestrator } from '../../federation/federation-orchestrator.service.js';
 import { RepoHookMethodKey } from '../../hooks/repository-hook.decorators.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import {
@@ -618,42 +617,6 @@ describe('row scope ordering guarantees', () => {
       expect(log).toEqual([RepoHookMethodKey.BEFORE_READ]);
       expect(rowScope.queries).toHaveLength(1);
       expect(rowScope.queries[0]?.scope).toBeUndefined();
-    });
-  });
-
-  describe('federated findAndCount', () => {
-    it('is scoped, because the orchestrator re-enters the public method', async () => {
-      const federated = new TestAdapter('rows');
-      federated.metadata.relations = [
-        {
-          name: 'peers',
-          targetEntity: 'Peer',
-          targetUrn: 'urn:memory:Peer',
-          targetColumns: targetColumnsFixture('id', 'rowId'),
-          cardinality: 'many',
-          on: { from: 'id', to: 'rowId' },
-          federated: true,
-        },
-      ];
-
-      // Stands in for FederationOrchestrator: it decomposes the query and
-      // re-enters findAndCount without the federated join. Nothing about row
-      // scope is wired into it — that is the point.
-      const orchestrator: FederationOrchestrator = Object.assign(
-        Object.create(FederationOrchestrator.prototype),
-        { findAndCount: async () => federated.findAndCount({}) },
-      );
-      federated.bind({
-        rowScope: scopedTo(RecordingRowScope),
-        federationOrchestrator: orchestrator,
-      });
-      federated.setRowScopeResolver(rowScope);
-
-      await federated.findAndCount({ join: [{ relation: 'peers' }] });
-
-      expect(rowScope.queries.map((query) => query.operation)).toEqual([
-        RowScopeOperation.FIND_AND_COUNT,
-      ]);
     });
   });
 });

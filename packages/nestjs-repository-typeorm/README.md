@@ -116,11 +116,15 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   `DataSourceOptions`; defaults to `'default'`
 - **`factory`** -- optional factory for custom TypeORM repositories; receives
   `DataSource`, returns `Repository<Entity>`
-- **`relations`** -- per-relation federation settings, keyed by relation
-  property name
-- **`rowScope`**, **`writePolicy`**, **`allowEagerRelations`**, **`hooks`** --
-  the entity's declarations. Read and bound by `RepositoryModule.forRoot()`;
-  this driver ignores them
+- **`relations`**, **`rowScope`**, **`writePolicy`**, **`allowEagerRelations`**,
+  **`hooks`** -- the entity's declarations, including which relations are
+  federated. Read and bound by `RepositoryModule.forRoot()`; this driver
+  ignores them
+
+A federated relation into an entity on another data source still needs that
+entity in its own data source's `entities`, since TypeORM resolves a relation
+only within one data source. Its rows are read from the other data source,
+through the repository registered for it.
 
 ### Injecting Repositories
 

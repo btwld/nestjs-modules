@@ -1,6 +1,9 @@
 import { type HookOption } from '@concepta/nestjs-core';
 
-import { type FederationOrchestrator } from '../../federation/federation-orchestrator.service.js';
+import {
+  type FederatedRelation,
+  type FederationReader,
+} from '../../federation/federation-reader.service.js';
 import { type RowScopeRegistration } from '../../row-scope/interfaces/row-scope-registration.interface.js';
 import { type WritePolicyRegistration } from '../../write-policy/interfaces/write-policy-registration.interface.js';
 
@@ -25,10 +28,22 @@ export interface RepositoryBindingInterface {
 
   /**
    * The relations whose rows, or whose junction rows, have a row scope. A
-   * read cannot join them: a join would bypass that row scope.
+   * read cannot join them, since a join would bypass that row scope, unless
+   * they are federated; and the entity cannot allow eager relations.
    */
   readonly relationsIntoScoped?: readonly string[];
 
-  /** Runs `findAndCount` calls that join federated relations. */
-  readonly federationOrchestrator?: FederationOrchestrator;
+  /** The entity's federated relations, and how they are read. */
+  readonly federation?: RepositoryFederationBinding;
+}
+
+/**
+ * The relations an entity reads through their own repositories instead of a
+ * join, by name.
+ */
+export interface RepositoryFederationBinding {
+  readonly reader: FederationReader;
+  readonly relations: ReadonlyMap<string, FederatedRelation>;
+  /** The most keys any one federated query may carry. */
+  readonly maxKeys: number;
 }

@@ -10,11 +10,14 @@ import { type WritePolicyRegistration } from '../write-policy/interfaces/write-p
  * Per-relation federation settings for forRoot() registration.
  */
 export interface RelationConfig {
-  /** Use separate queries instead of DB joins for this relation. */
+  /**
+   * Read this relation through the related entity's own repository instead
+   * of a join, so it can live in another database.
+   */
   federated?: boolean;
   /**
-   * Required for many-cardinality federated relations with sorts/filters.
-   * Ensures exactly one relation entity per root for deterministic ordering.
+   * A condition on the related entity's own columns that its rows must meet
+   * to belong to this federated relation, on every join and filter.
    */
   distinctFilter?: WhereCondition<PlainLiteralObject>;
 }

@@ -6,33 +6,7 @@ Effort tags: S/M/L. Completed items are removed from this list rather than marke
 done — see git history for what shipped. Reference notes that are not work live under
 "Parked" at the end.
 
-  1. **Federation gaps** (M) — **on hold, to revisit as a whole against the repository
-      direction** (don't extend federation or use it to satisfy a guarantee). The
-      orchestrator finds a related repository by entity class name, and that index
-      keeps the last registration without complaint, so two distinct entities with
-      the same class name (different databases or tables) federate through whichever
-      registered last. It
-      also ignores `through`, so a federated many-to-many hydrates the wrong rows; and
-      a peer's conditions and sort keep the root's relation tag, which TypeORM then
-      resolves as a property the peer lacks (`EntityPropertyNotFoundError`). Only
-      `findAndCount` federates; `find`, `findOne` and `count` join in the database.
-      Conflicts with the repository direction, to weigh when it resumes:
-      - `findAndCount` with a federated join skips the permeator, row scope and
-        `assertReadable` on entry. It relies on the orchestrator re-entering public
-        methods.
-      - Hydration adds relation properties and `null`/`[]` defaults that no driver
-        returned, so the result check must decide whether a federated relation counts
-        as joined.
-      - A missing `take` is silently capped at 10, and `getRootTotal` can return
-        `MAX_SAFE_INTEGER`.
-      - A `select` without `on.from` silently leaves relations un-hydrated.
-      - Sorting by a federated relation injects a not-null filter, so the sort drops
-        roots with no related row. On an owning relation that filter is on the root's
-        own foreign key, which keeps a root whose related row was soft-deleted.
-      - The TypeORM driver merges `relationsConfig` into the metadata it reports.
-      - crud's paginated type carries the federation-only `metrics`.
-
-  2. **Row scope cannot see the tables a view reads** (S) — row scope compares
+  1. **Row scope cannot see the tables a view reads** (S) — row scope compares
       URNs, and a view entity's URN names the view, not the tables it selects
       from. `@ViewEntity({ name: 'open_orders', expression: 'SELECT … FROM
       orders …' })` is `urn:typeorm:shop:open_orders` while a scoped `Order` is
@@ -44,7 +18,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       would need the driver to know which tables a view expression reads, and
       to resolve SQLite paths.
 
-  3. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
+  2. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
       (S) — `UserCacheFactoryFixture` sets `key = faker.person.jobArea()`, drawn from roughly
       25 values, with constant `type` and `assigneeId`, and the spec calls `createMany(2)`
       against `@Unique(['key', 'type', 'assigneeId'])`. Two draws therefore collide about
@@ -54,10 +28,10 @@ done — see git history for what shipped. Reference notes that are not work liv
       account for its nestjs-cache `SQLITE_CONSTRAINT: UNIQUE` sightings, so fixing it
       first narrows that investigation.
 
-  4. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+  3. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
       — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`, and in
       crud's optimistic-locking e2e. Every one passes in isolation and on a re-run of the
-      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row (likely item 3)
+      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row (likely item 2)
       and as `TransactionScopeFailedException` after a timeout. The cost of leaving it is
       that a red suite goes green on retry, which trains everyone to re-run rather than
       look — so a genuine regression in a transactional path would be dismissed as this.
@@ -65,7 +39,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       file; suspect timeouts under CPU contention. Confirm by pinning a failing spec to a
       single worker.
 
-  5. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+  4. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
       `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
       hoisting in a way that breaks nestjs-crud's OpenAPI tests
@@ -74,7 +48,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  6. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
+  5. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
       driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
       tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
       deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
@@ -107,6 +81,15 @@ Not ranked: reference notes, and work waiting on something else.
       pattern, proven by a real gateway e2e. gRPC call-stream handlers could share
       it. No AsyncLocalStorage: context is passed explicitly so nothing ambient
       leaks across calls.
+  * **Sorting by a to-one federated relation** — refused, like every sort by a
+      federated relation; only the to-one case is worth designing.
+      Exact design when wanted: read the related rows already sorted by value with
+      the related key as tie-breaker and nulls at a fixed end, check each candidate
+      root against the root's filter and row scope, and stop by the Threshold
+      Algorithm's rule (Fagin 2001) once the page is full. Cursor paging costs about
+      one page of reads; offset paging grows with page depth. The old relation-first
+      loop was not a base for it: it stopped on the wrong condition, counted `skip`
+      in related rows, and capped silently.
   * **Tutorial Topics** — Support of the minimum interface; Provider Overrides. Docs
       work; sequence after the API stabilizes.
   * **When non-v8 packages are migrated to NestJS 12** — not actionable until triggered.

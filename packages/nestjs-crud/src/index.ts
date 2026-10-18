@@ -6,7 +6,6 @@ export { CrudContextInterface } from './infrastructure/interceptors/interfaces/c
 export { CrudPreconditionInterface } from './infrastructure/interceptors/interfaces/crud-precondition.interface.js';
 export { CrudParsedQueryInterface } from './infrastructure/request/interfaces/crud-parsed-query.interface.js';
 export { CrudResponsePaginatedInterface } from './infrastructure/interfaces/crud-response-paginated.interface.js';
-export { CrudResponseMetrics } from './infrastructure/interfaces/crud-response-metrics.interface.js';
 export { CrudCreateBatchInterface } from './infrastructure/interfaces/crud-create-batch.interface.js';
 export { CrudModuleForFeatureOptionsInterface } from './infrastructure/config/interfaces/crud-module-for-feature-options.interface.js';
 export {

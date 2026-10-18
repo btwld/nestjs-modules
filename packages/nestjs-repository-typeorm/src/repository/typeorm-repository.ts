@@ -35,7 +35,6 @@ import {
   isWhereNever,
   type JoinClause,
   OptimisticLockException,
-  type RelationConfig,
   TrxCtx,
   RepositoryAdapter,
   type RepositoryCountOptions,
@@ -76,7 +75,6 @@ export interface TypeOrmRepositoryOptions {
   entityKey: string;
   transactionKey?: string;
   hookResolver?: HookResolverService;
-  relationsConfig?: Record<string, RelationConfig>;
   transactionScope?: TransactionScope;
 }
 
@@ -118,11 +116,7 @@ export class TypeOrmRepository<
     const entityType = buildEntity(repo.target, entityName);
     const columns = buildColumns<Entity>(repo.metadata.columns);
     const relations = repo.metadata.relations
-      ? buildRelations(
-          repo.metadata.relations,
-          database,
-          options.relationsConfig,
-        )
+      ? buildRelations(repo.metadata.relations, database)
       : [];
 
     this.metadata = {

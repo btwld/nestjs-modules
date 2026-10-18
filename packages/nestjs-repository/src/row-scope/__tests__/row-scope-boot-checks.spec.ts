@@ -3,10 +3,13 @@ import { type PlainLiteralObject, type Type } from '@nestjs/common';
 import { type DeepPartial } from '@concepta/nestjs-core';
 
 import { targetColumnsFixture } from '../../__fixtures__/column-metadata.fixture.js';
+import { FederationReader } from '../../federation/federation-reader.service.js';
+import { type RepositoryFederationBinding } from '../../repository/interfaces/repository-binding.interface.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import { type RepositoryRelationMetadataInterface } from '../../repository/interfaces/repository-relation-metadata.interface.js';
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import { RepositoryAdapter } from '../../repository/repository-adapter.js';
+import { RepositoryRegistryService } from '../../services/repository-registry.service.js';
 import { type RowScopeRegistration } from '../interfaces/row-scope-registration.interface.js';
 import {
   type RowScopeInterface,
@@ -47,9 +50,10 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
     declaration?: RowScopeRegistration,
     relations: RepositoryRelationMetadataInterface[] = [],
     urn = `urn:memory:${entityName}`,
+    federation?: RepositoryFederationBinding,
   ) {
     super(entityKey);
-    this.bind({ rowScope: declaration });
+    this.bind({ rowScope: declaration, federation });
     this.metadata = {
       name: entityName,
       type: EntityClass as Type<PlainLiteralObject>,
@@ -147,16 +151,25 @@ describe('row scope boot checks', () => {
       ]);
     });
 
-    it('fails a federated relation too', () => {
+    it('allows a federated relation, read through its own repository', () => {
+      const relation = toScoped('orders');
       const failures = checkRelationsIntoScoped([
         boundScoped('orders', 'Order'),
-        new StubAdapter('categories', 'Category', publicly, [
-          toScoped('orders', { federated: true }),
-        ]),
+        new StubAdapter(
+          'categories',
+          'Category',
+          publicly,
+          [relation],
+          undefined,
+          {
+            reader: new FederationReader(new RepositoryRegistryService()),
+            relations: new Map([['orders', { relation }]]),
+            maxKeys: 10,
+          },
+        ),
       ]);
 
-      expect(failures).toHaveLength(1);
-      expect(failures[0]).toContain('"orders" relation');
+      expect(failures).toEqual([]);
     });
 
     it('fails an owning relation as well as an inverse one', () => {

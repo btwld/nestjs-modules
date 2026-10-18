@@ -548,7 +548,7 @@ RepositoryModule.forRoot({
         key: 'users',
         entity: UserEntity,
         relations: {
-          posts: { federated: true }, // use separate queries
+          posts: { federated: true }, // read through its own repository
         },
       }],
     },
@@ -556,8 +556,8 @@ RepositoryModule.forRoot({
 });
 ```
 
-Relations marked `federated: true` use separate queries instead of SQL
-JOINs. See [Federation](#federation) for details.
+A relation marked `federated: true` is read through the related entity's own
+repository instead of a join. See [Federation](#federation).
 
 ### Writing relations
 
@@ -661,7 +661,8 @@ RepositoryModule.forRoot({
 Its rows may then also hold any declared relation, holding that relation's own
 columns, as a join would. A relation loaded inside it, or anything that is not
 a column or a declared relation, still throws. An entity with a relation into
-rows that have a row scope cannot opt in: startup refuses it (see
+rows that have a row scope cannot opt in, nor can one with a
+[federated](#federation) relation: startup refuses it (see
 [Relations and row scope](#relations-and-row-scope)).
 
 ## Where Clause Builder
@@ -1850,10 +1851,16 @@ on which side has a row scope:
 | --- | --- |
 | scoped → scoped | allowed, but **never joined**: see below |
 | unscoped → unscoped | allowed |
-| unscoped → scoped | **refused at startup**, federated or not: reading it would return rows the caller is not allowed to see |
+| unscoped → scoped | **refused at startup**: reading it would return rows the caller is not allowed to see |
 
 For the last case, give the unscoped entity a row scope, or remove the relation
 from it and declare the relation on the scoped entity's side only.
+
+A [federated](#federation) relation is allowed and joinable in every case: it
+is read through the related entity's own repository, so that entity's resolver
+runs. The one exception is `allowEagerRelations`: an entity with any relation
+into scoped rows, or any federated relation, cannot set it, since the driver
+would load those rows on its own.
 
 The check follows rows, not entity names. A relation is refused when it reaches
 rows any scoped entity reads — under another class name, or through a
@@ -2144,45 +2151,110 @@ RepositoryModule.forRoot({
 
 ## Federation
 
-When a relation is marked `federated: true` (see
-[Relation Metadata](#relation-metadata)), the `FederationOrchestrator`
-intercepts `findAndCount` calls and executes **separate queries** for the
-root entity and each relation instead of using SQL JOINs. Results are
-hydrated together transparently. Each related entity is read through the
-repository `forRoot()` registered for it, so its own row scope and hooks
-apply.
+Mark a relation `federated: true` to read it through the related entity's own
+repository instead of a database join, for example when the related entity
+lives in another database. You query it like any other relation, with `join`
+and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 
-This is useful when:
+```ts
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [
+        { key: 'users', entity: UserEntity, relations: { posts: { federated: true } } },
+        { key: 'posts', entity: PostEntity, dataSource: 'content' },
+      ],
+    },
+  ],
+});
 
-- JOINs produce expensive Cartesian products
-- Relations live in different datasources
-- Precise pagination control is needed (JOINs inflate row counts)
+const [page, total] = await users.findAndCount({
+  where: Where.and(
+    Where.eq('companyId', 7),
+    Where.rel('posts', Where.eq('published', true)),
+  ),
+  join: [{ relation: 'posts' }],
+  order: [{ field: 'name', order: 'ASC' }],
+  take: 20,
+  skip: 20,
+  ctx,
+});
+```
 
-### How It Works
+`page` is the second page of company 7's users who have a published post,
+`total` counts all of them, and each user's `posts` holds their published
+posts, as a join would return:
 
-The caller uses the same `join`, `Where.rel()`, and `OrderBy.rel()` APIs
-described in [Relations and Joins](#relations-and-joins). The orchestrator
-analyzes the query and picks a strategy:
+- **Pages and totals are exact.** The users' own database pages, sorts and
+  counts the read, with the published-post condition already in its query.
+- **The related rows are read the way their own repository reads them**,
+  under your `ctx`, so their row scope, soft delete and hooks apply.
+  `withDeleted` reaches them too.
+- **A to-one relation holds its row or `null`, a to-many its rows or `[]`.** A
+  to-one that more than one related row points at throws.
+- **A many-to-many reads through its junction**, so register an entity for the
+  junction table in `forRoot()`. Startup fails if it is not registered.
+- **The related repository is the one registered for the related entity**,
+  wherever it lives. The application won't start if no registration, or more
+  than one, has that entity's name, if its columns differ from the ones the
+  relation declares, or if either side lacks the column the relation is read
+  by.
 
-| Strategy | When | Flow |
-| --- | --- | --- |
-| **ROOT_FIRST** | No relation filters or sorts | Query root → fetch relations in parallel → hydrate |
-| **RELATION_FIRST** | Has relation filters or sorts | Query relations → discover root IDs → fetch constrained roots → hydrate |
+### What is refused
 
-ROOT_FIRST is the common case: one root query plus one query per relation,
-all relations fetched in parallel.
+A query a federated relation cannot answer exactly is refused with a `400`
+`FederationException` naming the reason:
 
-RELATION_FIRST handles queries that filter or sort by relation fields. It
-iteratively queries the driving relation to discover matching root entity
-IDs, then fetches only those roots.
+| Query | Instead |
+| --- | --- |
+| A sort by a federated relation's column | Sort by a column of the entity you read |
+| `Where.isNull()` on a federated relation | Filter on a value the related row has: a join would also match a user with no related row at all, which reading the related rows cannot see |
+| An `OR` between a federated relation and any other condition | Combine them with `AND`, or keep the `OR` within the one relation |
+| A `select` without the column the relation is read by | Select it too: the entity's key, or its foreign key for a relation it holds |
+
+### `maxKeys`
+
+Every federated query carries at most `federation.maxKeys` keys (default
+`1000`):
+
+```ts
+RepositoryModule.forRoot({ federation: { maxKeys: 5000 }, drivers: [/* … */] });
+```
+
+- **A join** attaches its relation to rows holding up to `maxKeys` distinct
+  values of the column it is read by, the users' `id` here. Read a larger page
+  and it is refused.
+- **A many-to-many** also reaches at most `maxKeys` related rows from the rows
+  read, however they are shared among them. A user with more tags than that is
+  refused even on its own: raise `maxKeys` for it.
+- **A filter** needs the conditions on one side to match no more than
+  `maxKeys` rows. In the example, either company 7 has at most `maxKeys` users,
+  or there are at most `maxKeys` published posts. When both sides match more,
+  the read is refused: narrow the conditions on either side.
+
+What a read costs:
+
+| Read | Queries |
+| --- | --- |
+| A join | The read itself, plus one per federated relation (two for a many-to-many) |
+| A filter on federated relations | The join's queries, plus up to two for the entity's matching keys and up to two per filtered relation (four for a many-to-many) |
+
+The column a relation is read by must hold the same type of value on both
+sides, since keys are matched as they are read: a `1` from one database never
+matches a `'1'` from another.
+
+### Two reads, not one
+
+The entity's rows and the related rows are separate reads, possibly of separate
+databases, so they are not one snapshot. A related row changed between the two
+can show in its earlier state. Within one call the page and the total always
+agree.
 
 ### distinctFilter
 
-For many-cardinality federated relations that use sorts or filters, provide
-a `distinctFilter` to ensure one relation entity per root. Without it,
-sorting is non-deterministic and a filtered total counts matching relation
-rows rather than distinct roots (e.g. two matching posts for one user would
-report a total of 2 instead of 1). Missing it throws `FederationException`:
+`distinctFilter` narrows which related rows belong to the relation, on every
+join and filter. Below, each user's `posts` holds only their primary post:
 
 ```ts
 relations: {
@@ -2193,24 +2265,9 @@ relations: {
 },
 ```
 
-### Constants
-
-| Constant | Default | Description |
-| --- | --- | --- |
-| `FEDERATION_DEFAULT_LIMIT` | 10 | Default page size when none specified |
-| `FEDERATION_MAX_ITERATIONS` | 10 | Max iterations for relation-first constraint discovery |
-| `FEDERATION_MAX_BUFFER_SIZE` | 1000 | Max offset before aborting iterative discovery |
-
-### Limitations
-
-- OR conditions across federated relations are not supported (throws
-  `FederationException`)
-- Filtering or sorting by the owning side of a federated relation (the
-  side holding the foreign key, e.g. the many side of a many-to-one) is
-  not supported — only the non-owning side can drive relation-first
-  discovery (throws `FederationException`)
-- Only `findAndCount` is federated; `find`, `findOne`, and `count` use
-  the driver's own queries
+The application won't start if `distinctFilter` uses `Where.rel()`, names a
+column the related entity doesn't have, or is set on a relation that is not
+federated.
 
 ## Injecting Repositories
 
@@ -2257,7 +2314,7 @@ also exported for manual provider wiring.
 | `TransactionHeuristicCommitException` | A multi-datasource commit failed after at least one datasource had already committed |
 | `TransactionReadOnlyConflictException` | A joining `run()`/`runReadOnly()` call's `readOnly` option conflicts with the scope it's joining |
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |
-| `FederationException` | Unsupported federated query (e.g., OR across federated relations). A `RuntimeException` from a scoped peer repository passes through unwrapped, so a refusal keeps its own status hint |
+| `FederationException` | A federated read that cannot be answered exactly ([What is refused](#what-is-refused), [`maxKeys`](#maxkeys)), or a to-one that more than one related row points at. An error from the related repository reaches you as it threw it |
 | `RepositoryBootException` | One or more structural repository checks failed at startup, such as a foreign key with no column of its own; the message lists every failure. Also thrown for a `forFeature()` key `forRoot()` did not register |
 | `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |

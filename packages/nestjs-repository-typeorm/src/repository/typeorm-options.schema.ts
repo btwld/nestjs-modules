@@ -11,7 +11,6 @@ import {
   type OrderClause,
   type RepositoryColumnMetadataInterface,
   type RepositoryRelationMetadataInterface,
-  type RelationConfig,
 } from '@concepta/nestjs-repository';
 
 import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation-metadata.exception.js';
@@ -103,12 +102,10 @@ export function buildColumns<Entity extends PlainLiteralObject>(
  *
  * @param relations - TypeORM relation metadata array
  * @param database - the connection's database, for the relations' URNs
- * @param relationsConfig - optional per-relation config from forRoot()
  */
 export function buildRelations(
   relations: TypeOrmRelationMetadata[],
   database: string | undefined,
-  relationsConfig?: Record<string, RelationConfig>,
 ): RepositoryRelationMetadataInterface[] {
   return relations.map((rel) => {
     const relation = mapRelation(rel, database);
@@ -119,19 +116,11 @@ export function buildRelations(
       );
     }
 
-    const mapped = {
+    return {
       ...relation,
       targetUrn: buildUrn(rel.inverseEntityMetadata, database),
       targetColumns: buildColumns(rel.inverseEntityMetadata.columns),
     };
-    const cfg = relationsConfig?.[mapped.name];
-    return cfg
-      ? {
-          ...mapped,
-          federated: cfg.federated,
-          distinctFilter: cfg.distinctFilter,
-        }
-      : mapped;
   });
 }
 

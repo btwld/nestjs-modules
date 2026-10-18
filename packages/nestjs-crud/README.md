@@ -937,19 +937,10 @@ interface CrudResponsePaginatedInterface<T> {
   total: number;     // Total items across all pages
   page: number;      // Current page (1-indexed)
   pageCount: number; // Total number of pages
-  metrics?: CrudResponseMetrics; // Fetch metrics (federated responses only)
-}
-
-interface CrudResponseMetrics {
-  totalFetched: number; // Rows fetched
-  totalValid: number;   // Rows that passed post-fetch checks
-  fetchCalls: number;   // Fetch calls made
-  duration: number;     // Fetch duration in milliseconds
 }
 ```
 
-Both interfaces are exported from `@concepta/nestjs-crud`. `metrics` is only
-present on federated responses.
+It is exported from `@concepta/nestjs-crud`.
 
 ### Paginated Response Schema
 
@@ -967,8 +958,7 @@ export const photoPaginatedSchema = withNamedComponent(
 ```
 
 `paginatedSchema(itemSchema)` produces the `{ data, limit, count, total,
-page, pageCount }` envelope with `data: z.array(itemSchema)`. It
-intentionally omits `metrics`.
+page, pageCount }` envelope with `data: z.array(itemSchema)`.
 
 ### Batch Create Schema
 

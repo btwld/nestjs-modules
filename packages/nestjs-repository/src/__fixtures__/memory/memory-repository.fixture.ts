@@ -18,6 +18,8 @@ import {
 } from '../../repository/interfaces/where-clause.interface.js';
 import { RepositoryAdapter } from '../../repository/repository-adapter.js';
 import {
+  type OrderClause,
+  SortOrder,
   WhereCompoundOperator,
   WhereOperator,
 } from '../../repository/repository.types.js';
@@ -30,8 +32,9 @@ export interface MemoryRepositoryOptionsFixture {
  * A repository that keeps its rows in memory, so the abstraction's rules can
  * be tested against real reads and writes without a database.
  *
- * - Queries understand `eq`, `and`, `or` and `never`. Anything else throws, so
- *   a test cannot pass on a filter that was silently ignored.
+ * - Queries understand `eq`, `ne`, `in`, `isNull`, `notNull`, `and`, `or` and
+ *   `never`, plus `select`, `order`, `skip` and `take`. Anything else throws,
+ *   including a `join`, so a test cannot pass on a query silently ignored.
  * - A soft-deleted row is hidden unless `withDeleted` is set.
  * - A create whose primary key is already stored throws, as a database would.
  * - A missing single-column primary key is generated as `<key>-<n>`.
@@ -42,6 +45,9 @@ export class MemoryRepositoryFixture<
 > extends RepositoryAdapter<Entity> {
   private readonly rows: Entity[] = [];
   private generated = 0;
+
+  /** Every read query the adapter handed this driver, in order. */
+  readonly queries: RepositoryFindOptions<Entity>[] = [];
 
   constructor(
     key: string,
@@ -77,8 +83,8 @@ export class MemoryRepositoryFixture<
   protected async doFindAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
-    const found = this.select(options);
-    return [found, found.length];
+    const { skip: _skip, take: _take, ...all } = options;
+    return [this.select(options), this.select(all).length];
   }
 
   protected async doCreate(entity: DeepPartial<Entity>): Promise<Entity> {
@@ -144,18 +150,14 @@ export class MemoryRepositoryFixture<
     return Object.assign(new this.metadata.type(), entityLike);
   }
 
-  private select(options: RepositoryFindOneOptions<Entity>): Entity[] {
-    const unsupported = ['select', 'join', 'order', 'skip', 'take'].filter(
-      (option) => Reflect.get(options, option) !== undefined,
-    );
-    if (unsupported.length > 0) {
-      throw new Error(
-        `MemoryRepositoryFixture does not support ${unsupported.join(', ')}`,
-      );
+  private select(options: RepositoryFindOptions<Entity>): Entity[] {
+    this.queries.push(options);
+    if (options.join !== undefined) {
+      throw new Error('MemoryRepositoryFixture does not support join');
     }
 
     const deleteDate = this.getDeleteDateColumn();
-    return this.rows
+    const found = this.rows
       .filter(
         (row) =>
           options.withDeleted ||
@@ -163,7 +165,32 @@ export class MemoryRepositoryFixture<
           row[deleteDate] == null,
       )
       .filter((row) => this.matches(row, options.where))
-      .map((row) => this.copy(row));
+      .sort((a, b) => this.compare(a, b, options.order ?? []));
+
+    const skip = options.skip ?? 0;
+    const paged = found.slice(
+      skip,
+      options.take === undefined ? undefined : skip + options.take,
+    );
+
+    return paged.map((row) => this.copy(row, options.select?.map(String)));
+  }
+
+  /** Orders rows by `order`, with `null` before any value. */
+  private compare(a: Entity, b: Entity, order: OrderClause): number {
+    for (const { field, order: direction } of order) {
+      const left: unknown = a[field];
+      const right: unknown = b[field];
+      if (left === right) continue;
+      const before =
+        left == null ||
+        (right != null &&
+          (typeof left === 'number' && typeof right === 'number'
+            ? left < right
+            : String(left).localeCompare(String(right)) < 0));
+      return (before ? -1 : 1) * (direction === SortOrder.DESC ? -1 : 1);
+    }
+    return 0;
   }
 
   private matches(row: Entity, clause: WhereClause | undefined): boolean {
@@ -174,8 +201,23 @@ export class MemoryRepositoryFixture<
         ? clause.conditions.every((condition) => this.matches(row, condition))
         : clause.conditions.some((condition) => this.matches(row, condition));
     }
-    if (clause.operator === WhereOperator.EQ && clause.relation === undefined) {
-      return row[clause.field] === clause.value;
+    if (clause.relation !== undefined) {
+      throw new Error(
+        `MemoryRepositoryFixture does not join, so cannot filter on "${clause.relation}"`,
+      );
+    }
+    const value: unknown = row[clause.field];
+    switch (clause.operator) {
+      case WhereOperator.EQ:
+        return value === clause.value;
+      case WhereOperator.NE:
+        return value != null && value !== clause.value;
+      case WhereOperator.IN:
+        return clause.value.includes(value);
+      case WhereOperator.IS_NULL:
+        return value == null;
+      case WhereOperator.NOT_NULL:
+        return value != null;
     }
     throw new Error(
       `MemoryRepositoryFixture does not support the "${clause.operator}" operator`,
@@ -225,7 +267,14 @@ export class MemoryRepositoryFixture<
     return index;
   }
 
-  private copy(row: Entity): Entity {
-    return Object.assign(new this.metadata.type(), row);
+  /** A copy of `row`, holding only `columns` when given. */
+  private copy(row: Entity, columns?: string[]): Entity {
+    const values: PlainLiteralObject = row;
+    return Object.assign(
+      new this.metadata.type(),
+      columns
+        ? Object.fromEntries(columns.map((column) => [column, values[column]]))
+        : row,
+    );
   }
 }

@@ -3,7 +3,14 @@ import { type ModuleRef } from '@nestjs/core';
 
 import { HookBootException } from './exceptions/hook-boot.exception.js';
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
-import { type FederationOrchestrator } from './federation/federation-orchestrator.service.js';
+import {
+  checkFederatedRelations,
+  federatedRelationsOf,
+} from './federation/federation-boot-checks.js';
+import {
+  FEDERATION_DEFAULT_MAX_KEYS,
+  type FederationReader,
+} from './federation/federation-reader.service.js';
 import { checkHooksUsable } from './hooks/hook-boot-checks.js';
 import { type RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
 import { type RepositoryProviderOptions } from './interfaces/repository-provider-options.interface.js';
@@ -74,11 +81,10 @@ export function bindRepositories(params: {
   repos: unknown[];
   moduleOptions: RepositoryModuleOptionsInterface;
   registry: RepositoryRegistryService;
-  orchestrator: FederationOrchestrator;
+  reader: FederationReader;
   moduleRef: ModuleRef;
 }): RepositoryBinding {
-  const { entries, repos, moduleOptions, registry, orchestrator, moduleRef } =
-    params;
+  const { entries, repos, moduleOptions, registry, reader, moduleRef } = params;
 
   // Two forRoot() calls, identical or not, make two global registries, each
   // checking only its own entities.
@@ -126,17 +132,36 @@ export function bindRepositories(params: {
     ),
   );
 
+  const maxKeys =
+    moduleOptions.federation?.maxKeys ?? FEDERATION_DEFAULT_MAX_KEYS;
+  if (!Number.isInteger(maxKeys) || maxKeys < 1) {
+    throw new RepositoryBootException([
+      `federation.maxKeys must be a whole number of at least 1, not ${maxKeys}.`,
+    ]);
+  }
+
+  const federationFailures: string[] = [];
   entries.forEach(({ options }, index) => {
-    adapters[index].bind({
+    const adapter = adapters[index];
+    const federated = federatedRelationsOf(
+      options.key,
+      adapter.metadata,
+      options.relations,
+    );
+    federationFailures.push(...federated.failures);
+
+    adapter.bind({
       rowScope: options.rowScope,
       hooks: options.hooks,
       writePolicy: options.writePolicy,
       allowEagerRelations: options.allowEagerRelations,
       relationsIntoScoped: findRelationsIntoScoped(
-        adapters[index].metadata,
+        adapter.metadata,
         scopedUrns,
       ),
-      federationOrchestrator: orchestrator,
+      federation: federated.relations.size
+        ? { reader, relations: federated.relations, maxKeys }
+        : undefined,
     });
   });
 
@@ -144,6 +169,8 @@ export function bindRepositories(params: {
     ...checkColumnsAreNotRelations(adapters),
     ...checkForeignKeyColumns(adapters),
     ...checkNoAccessorKeys(adapters),
+    ...federationFailures,
+    ...checkFederatedRelations(adapters, registry),
   ];
   if (repositoryFailures.length > 0) {
     throw new RepositoryBootException(repositoryFailures);

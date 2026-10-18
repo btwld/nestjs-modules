@@ -26,6 +26,12 @@ import { RepositoryQueryException } from '../exceptions/repository-query.excepti
 import { RepositoryUnboundException } from '../exceptions/repository-unbound.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { UnknownColumnException } from '../exceptions/unknown-column.exception.js';
+import { FederationException } from '../federation/exceptions/federation.exception.js';
+import { splitFederatedWhere } from '../federation/federated-where.js';
+import {
+  type FederatedRelation,
+  type FederationRoot,
+} from '../federation/federation-reader.service.js';
 import { RepoPermeatorFactory } from '../hooks/repo-permeator-factory.js';
 import { RepoHook } from '../hooks/repository-hook.decorators.js';
 import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
@@ -74,6 +80,12 @@ import {
 } from './interfaces/where-clause.interface.js';
 import { SortOrder, WhereCompoundOperator } from './repository.types.js';
 import { Where } from './where.helpers.js';
+
+/** The `ctx` a read arrived with, and the row scope resolved from it. */
+interface FederatedCaller {
+  readonly ctx?: PlainLiteralObject;
+  readonly scope?: PlainLiteralObject;
+}
 
 // Module-scoped: the root cause (CoreModule not imported) is identical no
 // matter how many repositories/entities hit it, so warn once per process
@@ -243,6 +255,14 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * The relations read through their own repositories instead of a join, by
+   * name.
+   */
+  get federatedRelations(): ReadonlyMap<string, FederatedRelation> {
+    return this._binding?.federation?.relations ?? new Map();
+  }
+
+  /**
    * The bound hooks, for the boot checks to validate.
    */
   get boundHooks(): readonly HookWithSpec[] {
@@ -369,7 +389,7 @@ export abstract class RepositoryAdapter<
         })
       : options;
 
-    this.assertReadable(scoped);
+    this.assertReadable(scoped, operation);
 
     return scoped;
   }
@@ -391,7 +411,10 @@ export abstract class RepositoryAdapter<
    * - A sort direction is ascending or descending.
    * - A filter stays within the complexity every driver can translate.
    */
-  private assertReadable(options: RepositoryFindOneOptions<Entity>): void {
+  private assertReadable(
+    options: RepositoryFindOneOptions<Entity>,
+    operation: RowScopeQueryOperation,
+  ): void {
     const relations = new Set(
       (this.metadata.relations ?? []).map((relation) => relation.name),
     );
@@ -433,8 +456,12 @@ export abstract class RepositoryAdapter<
       });
     }
 
-    const intoScoped = joined.find((relation) =>
-      this.relationsIntoScoped.includes(relation),
+    // A federated relation is read through the related entity's own
+    // repository, under its row scope, so joining it bypasses nothing.
+    const intoScoped = joined.find(
+      (relation) =>
+        this.relationsIntoScoped.includes(relation) &&
+        !this.federatedRelations.has(relation),
     );
     if (intoScoped !== undefined) {
       throw new RuntimeException({
@@ -486,6 +513,8 @@ export abstract class RepositoryAdapter<
       }
     }
 
+    this.assertFederatedReadable(options, joined, operation);
+
     // Read untyped: the type admits only the two directions, a caller's
     // runtime value need not.
     const direction = order.find((key) => {
@@ -503,6 +532,177 @@ export abstract class RepositoryAdapter<
 
     // Refuses a filter too complex to translate here, whatever the driver.
     if (options.where) this.toDnf(options.where);
+  }
+
+  /**
+   * Refuse what a federated relation cannot answer exactly. It is read from
+   * its own repository, so the root's store cannot sort by it, and a filter on
+   * it must stand on its own (see `splitFederatedWhere`). Attaching it needs
+   * the root column it is read by, so a read that returns rows must select it.
+   */
+  private assertFederatedReadable(
+    options: RepositoryFindOneOptions<Entity>,
+    joined: string[],
+    operation: RowScopeQueryOperation,
+  ): void {
+    const federated = this.federatedRelations;
+    if (federated.size === 0) return;
+
+    const sorted = (options.order ?? [])
+      .map((key) => key.relation)
+      .find((relation) => relation !== undefined && federated.has(relation));
+    if (sorted !== undefined) {
+      throw new FederationException({
+        message:
+          'Cannot sort %s by federated relation "%s": it is read from its ' +
+          'own repository. Sort by a column of %s',
+        messageParams: [this.metadata.name, sorted, this.metadata.name],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+
+    const select =
+      operation === RowScopeOperation.COUNT
+        ? undefined
+        : options.select?.map(String);
+    const unselected = joined
+      .map((name) => federated.get(name)?.relation)
+      .find(
+        (relation) => relation && select && !select.includes(relation.on.from),
+      );
+    if (unselected) {
+      throw new FederationException({
+        message:
+          'Cannot join federated relation "%s" without selecting "%s", the ' +
+          'column of %s it is read by',
+        messageParams: [
+          unselected.name,
+          unselected.on.from,
+          this.metadata.name,
+        ],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+
+    splitFederatedWhere(options.where, new Set(federated.keys()));
+  }
+
+  /**
+   * The federated relations a read joins.
+   */
+  private federatedJoins(join: JoinClause[] = []): FederatedRelation[] {
+    const federated = this.federatedRelations;
+    return join
+      .map((clause) => federated.get(clause.relation))
+      .filter((relation) => relation !== undefined);
+  }
+
+  /**
+   * `query` as the driver runs it: without federated joins, and with each
+   * filter on a federated relation turned into a condition on this entity's
+   * own column. The driver then pages, sorts and counts the whole read.
+   *
+   * The related repositories are read under the `ctx` the call arrived with,
+   * for the reason `applyQueryScope` resolves the scope before hooks run: a
+   * hook must not choose which principal is enforced (see `callerCtx`).
+   */
+  private async toDriverQuery<Options extends RepositoryFindOneOptions<Entity>>(
+    query: Options,
+    caller: FederatedCaller,
+  ): Promise<Options> {
+    const federation = this.requireBinding().federation;
+    if (!federation || this.federatedJoins(query.join).length === 0) {
+      return query;
+    }
+
+    const join = (query.join ?? []).filter(
+      (clause) => !federation.relations.has(clause.relation),
+    );
+    const root: FederationRoot = {
+      rows: (columns, where, take) =>
+        this.doFind({
+          select: this.metadata.columns
+            .filter((column) => columns.includes(column.name))
+            .map((column) => column.name),
+          where,
+          join: join.length ? join : undefined,
+          withDeleted: query.withDeleted,
+          ctx: query.ctx,
+          take,
+        }),
+    };
+
+    const where = await federation.reader.rootWhere(
+      root,
+      splitFederatedWhere(query.where, new Set(federation.relations.keys())),
+      federation.relations,
+      {
+        ctx: () => this.callerCtx(caller),
+        withDeleted: query.withDeleted,
+        maxKeys: federation.maxKeys,
+      },
+    );
+
+    return { ...query, where, join: join.length ? join : undefined };
+  }
+
+  /**
+   * Attach the federated relations `query` joins to the rows its driver
+   * returned, read under the `ctx` the call arrived with (see
+   * `toDriverQuery`).
+   */
+  private async attachFederated(
+    rows: (Entity | null)[],
+    query: RepositoryFindOneOptions<Entity>,
+    caller: FederatedCaller,
+  ): Promise<void> {
+    const federation = this.requireBinding().federation;
+    const relations = this.federatedJoins(query.join);
+    if (!federation || relations.length === 0) return;
+
+    await federation.reader.hydrate(
+      rows.filter((row) => row !== null),
+      relations,
+      splitFederatedWhere(query.where, new Set(federation.relations.keys())),
+      {
+        ctx: () => this.callerCtx(caller),
+        withDeleted: query.withDeleted,
+        maxKeys: federation.maxKeys,
+      },
+    );
+  }
+
+  /**
+   * The `ctx` the call arrived with, refused when its row scope is no longer
+   * the one resolved before hooks ran. Returning another `ctx` from a hook
+   * never reaches here. Called before every related read, so this catches a
+   * hook, this entity's or a related one's, redefining a mutable
+   * `RowScopeCtx` on the caller's own `ctx`.
+   */
+  private callerCtx({
+    ctx,
+    scope,
+  }: FederatedCaller): PlainLiteralObject | undefined {
+    const now = this.resolveRowScopeContext(ctx);
+    const unchanged =
+      now === undefined || scope === undefined
+        ? now === scope
+        : Object.keys(now).length === Object.keys(scope).length &&
+          Object.keys(now).every((key) => now[key] === scope[key]);
+
+    if (!unchanged) {
+      throw new FederationException({
+        message:
+          'A hook changed the row scope on the ctx of a read of %s, so its ' +
+          'federated relations cannot be read under it. Define RowScopeCtx ' +
+          'with { immutable: true }',
+        messageParams: [this.metadata.name],
+        fault: 'usage',
+      });
+    }
+    return ctx;
   }
 
   /**
@@ -682,7 +882,10 @@ export abstract class RepositoryAdapter<
           scoped,
           scope,
         );
-        const rows = await this.doFind(query);
+        const rows = await this.doFind(
+          await this.toDriverQuery(query, { ctx: options.ctx, scope }),
+        );
+        await this.attachFederated(rows, query, { ctx: options.ctx, scope });
         this.assertRows(rows, query.join);
         return rows;
       },
@@ -708,7 +911,10 @@ export abstract class RepositoryAdapter<
           scoped,
           scope,
         );
-        const row = await this.doFindOne(query);
+        const row = await this.doFindOne(
+          await this.toDriverQuery(query, { ctx: options.ctx, scope }),
+        );
+        await this.attachFederated([row], query, { ctx: options.ctx, scope });
         this.assertRows([row], query.join);
         return row;
       },
@@ -727,10 +933,9 @@ export abstract class RepositoryAdapter<
     return this.permeator.count.permeate(
       options,
       async (scoped) => {
-        const { where, join, withDeleted, ctx } = await this.applyQueryScope(
-          RowScopeOperation.COUNT,
-          scoped,
-          scope,
+        const { where, join, withDeleted, ctx } = await this.toDriverQuery(
+          await this.applyQueryScope(RowScopeOperation.COUNT, scoped, scope),
+          { ctx: options.ctx, scope },
         );
         // Only these decide how many rows match. The rest shape or page the
         // rows, so the driver is never handed them to interpret.
@@ -744,19 +949,11 @@ export abstract class RepositoryAdapter<
 
   /**
    * Find entities and return with total count.
-   *
-   * When a federation orchestrator is set and the query includes
-   * joins targeting `federated: true` relations, delegates to the
-   * orchestrator for cross-entity query orchestration.
    */
   async findAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
-    const orchestrator = this.requireBinding().federationOrchestrator;
-    if (orchestrator && this.hasFederatedJoins(options?.join)) {
-      return orchestrator.findAndCount(this, options);
-    }
-
+    this.requireBinding();
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.findAndCount.permeate(
@@ -767,7 +964,10 @@ export abstract class RepositoryAdapter<
           scoped,
           scope,
         );
-        const [rows, total] = await this.doFindAndCount(query);
+        const [rows, total] = await this.doFindAndCount(
+          await this.toDriverQuery(query, { ctx: options.ctx, scope }),
+        );
+        await this.attachFederated(rows, query, { ctx: options.ctx, scope });
         this.assertRows(rows, query.join);
         return [rows, total];
       },
@@ -1598,17 +1798,6 @@ export abstract class RepositoryAdapter<
   // ═══════════════════════════════════════════════════════════════════════════
   // Federation helpers
   // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Check if any requested joins target federated relations.
-   */
-  private hasFederatedJoins(join?: JoinClause[]): boolean {
-    if (!join?.length || !this.metadata.relations?.length) return false;
-    const joinNames = new Set(join.map((j) => j.relation));
-    return this.metadata.relations.some(
-      (r) => r.federated && joinNames.has(r.name),
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // WhereClause AST helpers

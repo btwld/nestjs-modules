@@ -6,6 +6,24 @@ import { type RepositoryProviderOptions } from '../../interfaces/repository-prov
 import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-token.js';
 
 import {
+  ARCHIVED_POST_METADATA,
+  ArchivedPostEntityFixture,
+  AUTHOR_METADATA,
+  AUTHOR_TAG_METADATA,
+  AuthorEntityFixture,
+  AuthorTagEntityFixture,
+  COMPANY_METADATA,
+  CompanyEntityFixture,
+  DRIFTED_AUTHOR_METADATA,
+  DriftedAuthorEntityFixture,
+  POST_METADATA,
+  PostEntityFixture,
+  PROFILE_METADATA,
+  ProfileEntityFixture,
+  TAG_METADATA,
+  TagEntityFixture,
+} from './federation.fixture.js';
+import {
   MemoryRepositoryFixture,
   type MemoryRepositoryOptionsFixture,
 } from './memory-repository.fixture.js';
@@ -42,6 +60,44 @@ const ADAPTERS = new Map<
   [
     NoteEntityFixture,
     (key, options) => new MemoryRepositoryFixture(key, NOTE_METADATA, options),
+  ],
+  [
+    AuthorEntityFixture,
+    (key, options) =>
+      new MemoryRepositoryFixture(key, AUTHOR_METADATA, options),
+  ],
+  [
+    ArchivedPostEntityFixture,
+    (key, options) =>
+      new MemoryRepositoryFixture(key, ARCHIVED_POST_METADATA, options),
+  ],
+  [
+    DriftedAuthorEntityFixture,
+    (key, options) =>
+      new MemoryRepositoryFixture(key, DRIFTED_AUTHOR_METADATA, options),
+  ],
+  [
+    PostEntityFixture,
+    (key, options) => new MemoryRepositoryFixture(key, POST_METADATA, options),
+  ],
+  [
+    ProfileEntityFixture,
+    (key, options) =>
+      new MemoryRepositoryFixture(key, PROFILE_METADATA, options),
+  ],
+  [
+    CompanyEntityFixture,
+    (key, options) =>
+      new MemoryRepositoryFixture(key, COMPANY_METADATA, options),
+  ],
+  [
+    TagEntityFixture,
+    (key, options) => new MemoryRepositoryFixture(key, TAG_METADATA, options),
+  ],
+  [
+    AuthorTagEntityFixture,
+    (key, options) =>
+      new MemoryRepositoryFixture(key, AUTHOR_TAG_METADATA, options),
   ],
 ]);
 

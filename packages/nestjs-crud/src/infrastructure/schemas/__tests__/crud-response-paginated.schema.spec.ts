@@ -26,7 +26,7 @@ describe(paginatedSchema, () => {
     });
   });
 
-  it('strips unknown keys, including metrics (not part of the schema, matching the legacy DTO)', () => {
+  it('strips unknown keys', () => {
     const result = schema.parse({
       data: [],
       limit: 0,
@@ -34,10 +34,10 @@ describe(paginatedSchema, () => {
       total: 0,
       page: 0,
       pageCount: 0,
-      metrics: { totalFetched: 1, totalValid: 1, fetchCalls: 1, duration: 1 },
+      extra: 1,
     });
 
-    expect(result).not.toHaveProperty('metrics');
+    expect(result).not.toHaveProperty('extra');
   });
 
   it('rejects an item that does not match the item schema', () => {

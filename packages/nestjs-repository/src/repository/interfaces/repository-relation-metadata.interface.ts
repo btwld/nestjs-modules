@@ -1,7 +1,4 @@
-import { type PlainLiteralObject } from '@nestjs/common';
-
 import { type RepositoryColumnMetadataInterface } from './repository-column-metadata.interface.js';
-import { type WhereCondition } from './where-clause.interface.js';
 
 /**
  * A relation the driver reports for an entity.
@@ -35,14 +32,4 @@ export interface RepositoryRelationMetadataInterface {
     /** Junction FK column pointing to the target entity. */
     toKey: string;
   };
-  /** Use separate queries instead of DB joins for this relation (federation). */
-  federated?: boolean;
-  /**
-   * Required for many-cardinality federated relations with sorts/filters.
-   * Ensures exactly one relation entity per root for deterministic ordering.
-   *
-   * TODO: Evaluate applying distinctFilter to standard (non-federated) relation
-   * queries as well, where many-cardinality joins can produce duplicate rows.
-   */
-  distinctFilter?: WhereCondition<PlainLiteralObject>;
 }
