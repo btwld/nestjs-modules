@@ -1363,6 +1363,11 @@ This is exactly how the `@AuthUser()` decorator resolves the user, and it is
 useful in command/query handlers that need access to the authenticated user
 without taking it as a parameter.
 
+The overlay reads `request.user`, so it attaches on HTTP only. In RPC message
+handlers, define `AuthUserCtx` from your own overlay that reads the user from
+your transport. See the core README's RPC (preview) section. In a WebSocket
+gateway, `@AuthUser()` throws `AppContextUnavailableException`.
+
 ---
 
 ## Exports Reference

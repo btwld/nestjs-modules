@@ -2,6 +2,9 @@ import { mock } from 'vitest-mock-extended';
 
 import { type ArgumentsHost, type ExecutionContext } from '@nestjs/common';
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host.js';
+
+import { AppContextUnavailableException } from '@concepta/nestjs-core';
 
 type HttpArgumentsHost = ReturnType<ArgumentsHost['switchToHttp']>;
 
@@ -30,6 +33,7 @@ const buildExecutionContext = (request: object): ExecutionContext => {
   const httpArgsHost = mock<HttpArgumentsHost>();
   httpArgsHost.getRequest.mockReturnValue(request);
   const ctx = mock<ExecutionContext>();
+  ctx.getType.mockReturnValue('http');
   ctx.switchToHttp.mockReturnValue(httpArgsHost);
   return ctx;
 };
@@ -70,5 +74,17 @@ describe('AuthUser', () => {
     const result = factory(undefined, buildExecutionContext(request));
 
     expect(result).toEqual({ id: 'user-1' });
+  });
+
+  it('should refuse on WebSocket and leave the client untouched', () => {
+    const factory = getDecoratorFactory();
+    const client = {};
+    const context = new ExecutionContextHost([client, {}]);
+    context.setType('ws');
+
+    expect(() => factory(undefined, context)).toThrow(
+      AppContextUnavailableException,
+    );
+    expect(Reflect.ownKeys(client)).toEqual([]);
   });
 });

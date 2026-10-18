@@ -24,6 +24,7 @@ describe('OtpContextOverlay', () => {
     mockContext = {
       getHandler: () => handler,
       getClass: () => target,
+      getType: () => 'http',
       switchToHttp: () => ({
         getRequest: () => mockRequest,
       }),

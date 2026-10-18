@@ -106,6 +106,10 @@ export { HookOption, HookWithSpec } from './infrastructure/hook/hook.types.js';
 // Context host and decorators
 export { AppContextHost } from './infrastructure/context/app-context.host.js';
 export { getAppContext } from './infrastructure/context/get-app-context.util.js';
+export {
+  findAppContext,
+  requireAppContext,
+} from './infrastructure/context/resolve-app-context.util.js';
 export { Ctx } from './infrastructure/context/ctx.decorator.js';
 
 // Context primitives
@@ -114,6 +118,7 @@ export type { AppContextLike } from './domain/context/app-context-like.type.js';
 export { OverlayNotDefinedException } from './infrastructure/context/exceptions/overlay-not-defined.exception.js';
 export { OverlayImmutableException } from './infrastructure/context/exceptions/overlay-immutable.exception.js';
 export { OverlayAlreadyDefinedException } from './infrastructure/context/exceptions/overlay-already-defined.exception.js';
+export { AppContextUnavailableException } from './infrastructure/context/exceptions/app-context-unavailable.exception.js';
 export { OverlayDefineOptionsInterface } from './domain/context/interfaces/overlay-define-options.interface.js';
 
 // Context overlay utilities

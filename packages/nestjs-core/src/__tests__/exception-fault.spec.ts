@@ -7,6 +7,7 @@ import { CurrencyMismatchException } from '../domain/value-objects/money/excepti
 import { CurrencyUnknownException } from '../domain/value-objects/money/exceptions/currency-unknown.exception.js';
 import { MoneyColumnTypeException } from '../domain/value-objects/money/exceptions/money-column-type.exception.js';
 import { MoneyInvalidAmountException } from '../domain/value-objects/money/exceptions/money-invalid-amount.exception.js';
+import { AppContextUnavailableException } from '../infrastructure/context/exceptions/app-context-unavailable.exception.js';
 import { OverlayAlreadyDefinedException } from '../infrastructure/context/exceptions/overlay-already-defined.exception.js';
 import { OverlayImmutableException } from '../infrastructure/context/exceptions/overlay-immutable.exception.js';
 import { OverlayNotDefinedException } from '../infrastructure/context/exceptions/overlay-not-defined.exception.js';
@@ -45,6 +46,11 @@ const CASES: {
   {
     name: 'OverlayAlreadyDefinedException',
     build: () => new OverlayAlreadyDefinedException('SomeOverlay'),
+    fault: 'usage',
+  },
+  {
+    name: 'AppContextUnavailableException',
+    build: () => new AppContextUnavailableException('ws'),
     fault: 'usage',
   },
   {

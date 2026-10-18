@@ -1272,6 +1272,10 @@ interface TransactionalOptions {
 Method-level `@Transactional()` overrides class-level settings.
 Pass `false` to disable transactions for a specific method.
 
+`@Transactional()` also works on RPC message handlers (preview). In a
+WebSocket gateway it throws `AppContextUnavailableException`; open the
+transaction yourself with `TransactionScope.run(ctx, …)`.
+
 ### TransactionalRunner
 
 `TransactionalRunner` is used internally by `TransactionInterceptor` to
@@ -1454,9 +1458,10 @@ reaching the same entity twice runs once, and warns
 (`ROCKETS_HOOKS_DUPLICATE`). Registered hooks run before route-declared ones.
 
 The hook list lives on the request's `ctx`, which cuts both ways: it is absent
-outside HTTP, so the hook does not run for a queue consumer, a seeder or a
-test; and it is read by every repository call that receives that `ctx`, so an
-ungated hook also runs for other entities written during the request. See
+outside HTTP routes and RPC message handlers, so the hook does not run for a
+cron job, a seeder or a test; and it is read by every repository call that
+receives that `ctx`, so an ungated hook also runs for other entities written
+during the request. See
 [what a hook reaches](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#what-a-hook-reaches).
 
 Prefer registration unless the hook is genuinely cross-cutting or specific to
@@ -1930,7 +1935,7 @@ export class TenantScopeOverlay extends ContextOverlayInterceptor {
 
   attach(context: ExecutionContext): void {
     const request = context.switchToHttp().getRequest();
-    getAppContext(request).defineOverlay(
+    this.appContext(context).defineOverlay(
       RowScopeCtx,
       { tenantId: request.user?.tenantId },
       { immutable: true },

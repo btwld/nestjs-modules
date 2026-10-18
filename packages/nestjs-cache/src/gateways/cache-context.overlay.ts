@@ -1,11 +1,7 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
+import { ContextType, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import {
-  ContextOverlayInterceptor,
-  getAppContext,
-  OverlayRef,
-} from '@concepta/nestjs-core';
+import { ContextOverlayInterceptor, OverlayRef } from '@concepta/nestjs-core';
 
 import {
   CACHE_NAMESPACE_KEY,
@@ -20,16 +16,14 @@ export const CacheCtx = new OverlayRef<'withCache', CacheContextInterface>(
 @Injectable()
 export class CacheContextOverlay extends ContextOverlayInterceptor {
   readonly ref = CacheCtx;
+  readonly transports: readonly ContextType[] = ['http', 'rpc'];
 
   constructor(private readonly reflector: Reflector) {
     super();
   }
 
   attach(context: ExecutionContext): void {
-    const request = context.switchToHttp().getRequest();
-    const ctx = getAppContext(request);
-    const resolved = this.resolve(context);
-    ctx.defineOverlay(CacheCtx, resolved);
+    this.appContext(context).defineOverlay(CacheCtx, this.resolve(context));
   }
 
   private resolve(context: ExecutionContext): CacheContextInterface {

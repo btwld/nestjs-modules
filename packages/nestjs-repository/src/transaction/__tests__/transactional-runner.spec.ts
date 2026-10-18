@@ -1,14 +1,20 @@
 import { lastValueFrom, of, throwError } from 'rxjs';
 import { type Mocked } from 'vitest';
 
-import { ExecutionContext } from '@nestjs/common';
+import { type ContextType, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host.js';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { AppContextHost } from '@concepta/nestjs-core';
+import {
+  AppContextHost,
+  AppContextUnavailableException,
+  requireAppContext,
+} from '@concepta/nestjs-core';
 
 import { TransactionFactoryInterface } from '../../interfaces/transaction-factory.interface.js';
 import { REPOSITORY_MODULE_OPTIONS } from '../../repository.constants.js';
+import { TrxCtx } from '../interfaces/transaction-context.interface.js';
 import { TransactionInterface } from '../interfaces/transaction.interface.js';
 import {
   TransactionFactoryRegistry,
@@ -62,7 +68,7 @@ describe(TransactionalRunner.name, () => {
       getArgByIndex: vi.fn(),
       switchToRpc: vi.fn(),
       switchToWs: vi.fn(),
-      getType: vi.fn(),
+      getType: () => 'http',
     } as unknown as ExecutionContext;
   }
 
@@ -207,6 +213,48 @@ describe(TransactionalRunner.name, () => {
       await lastValueFrom(runner.run(context, operation));
       expect(rollbackAllSpy).toHaveBeenCalled();
       rollbackAllSpy.mockRestore();
+    });
+  });
+
+  describe('run outside HTTP', () => {
+    class MessageHandler {
+      @Transactional()
+      handle() {
+        return 'result';
+      }
+    }
+
+    const makeContext = (type: ContextType, args: unknown[]) => {
+      const host = new ExecutionContextHost(
+        args,
+        MessageHandler,
+        MessageHandler.prototype.handle,
+      );
+      host.setType(type);
+      return host;
+    };
+
+    it("should open the transaction on the RPC call's own context", async () => {
+      const context = makeContext('rpc', [0, {}]);
+      let inTransaction = false;
+
+      await lastValueFrom(
+        runner.run(context, () => {
+          inTransaction = requireAppContext(context).supports(TrxCtx);
+          return of('result');
+        }),
+      );
+
+      expect(inTransaction).toBe(true);
+    });
+
+    it('should refuse on WebSocket and leave the client untouched', () => {
+      const client = {};
+
+      expect(() =>
+        runner.run(makeContext('ws', [client, {}]), () => of('result')),
+      ).toThrow(AppContextUnavailableException);
+      expect(Reflect.ownKeys(client)).toEqual([]);
     });
   });
 });

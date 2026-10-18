@@ -15,6 +15,7 @@ const makeCtx = (request: object): ExecutionContext => {
   const httpArgsHost = mock<HttpArgumentsHost>();
   httpArgsHost.getRequest.mockReturnValue(request);
   const ctx = mock<ExecutionContext>();
+  ctx.getType.mockReturnValue('http');
   ctx.switchToHttp.mockReturnValue(httpArgsHost);
   return ctx;
 };

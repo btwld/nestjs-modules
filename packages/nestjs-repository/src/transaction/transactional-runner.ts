@@ -4,7 +4,7 @@ import { catchError } from 'rxjs/operators';
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { getAppContext } from '@concepta/nestjs-core';
+import { requireAppContext } from '@concepta/nestjs-core';
 
 import { TransactionScope } from './transaction-scope.js';
 import {
@@ -39,6 +39,8 @@ export class TransactionalRunner {
    *
    * Checks method-level metadata first, then class-level.
    * `@Transactional(false)` on a method disables the class-level transaction.
+   * Works on HTTP and, in preview, on RPC; throws
+   * `AppContextUnavailableException` on WebSocket.
    *
    * @param context - The NestJS execution context
    * @param operation - The operation to run
@@ -56,8 +58,7 @@ export class TransactionalRunner {
       return operation();
     }
 
-    const request = context.switchToHttp().getRequest();
-    const ctx = getAppContext(request);
+    const ctx = requireAppContext(context);
 
     return from(
       this.txScope.run(ctx, () => this.toPromise(operation()), {

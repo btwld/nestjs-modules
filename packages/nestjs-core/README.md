@@ -26,6 +26,7 @@ utilities**.
   - [Specification Guards](#specification-guards)
   - [Consuming Hooks](#consuming-hooks)
 - [Context System](#context-system)
+  - [RPC (preview)](#rpc-preview)
 - [Exceptions](#exceptions)
 - [Schemas & OpenAPI](#schemas--openapi)
 - [Event Context](#event-context)
@@ -301,7 +302,9 @@ adds a `with*()` method to the context, carrying a typed set of resolved
 values for that request.
 
 `getAppContext(request)` returns the `AppContextHost` for a request, creating
-one on first access.
+one on first access. In a guard, interceptor or custom parameter decorator,
+use `requireAppContext(context)` instead. It takes the `ExecutionContext` and
+works on every supported transport.
 
 Most overlays live for the whole request. For one whose lifetime is
 narrower — e.g. a single unit of work sharing a longer-lived context —
@@ -348,7 +351,6 @@ read.
 import {
   ContextOverlayInterceptor,
   OverlayRef,
-  getAppContext,
 } from '@concepta/nestjs-core';
 import { Injectable, ExecutionContext } from '@nestjs/common';
 
@@ -361,8 +363,9 @@ export class MyContextOverlay extends ContextOverlayInterceptor {
 
   attach(context: ExecutionContext): void {
     const request = context.switchToHttp().getRequest();
-    const ctx = getAppContext(request);
-    ctx.defineOverlay(MyCtx, { tenantId: request.headers['x-tenant-id'] });
+    this.appContext(context).defineOverlay(MyCtx, {
+      tenantId: request.headers['x-tenant-id'],
+    });
   }
 }
 
@@ -393,8 +396,12 @@ const { tenantId } = ctx.with(MyCtx);
 ```
 
 `ContextOverlayInterceptor` is the abstract base class for custom overlays.
-Subclasses implement `ref` (the `OverlayRef` token) and `attach()` (where
-`defineOverlay` is called). Register them as global `APP_INTERCEPTOR` providers.
+Subclasses implement `ref` (the `OverlayRef` token) and `attach()`, where they
+call `defineOverlay` on `this.appContext(context)`, the current call's
+context. Register them as global `APP_INTERCEPTOR` providers.
+
+An overlay attaches on HTTP only unless it lists more transports. See
+[RPC (preview)](#rpc-preview).
 
 ### Correlation Context
 
@@ -421,9 +428,59 @@ import { CoreModule } from '@concepta/nestjs-core';
 export class AppModule {}
 ```
 
-Like all overlays, `CorrelationContextOverlay.attach()` reads the request
-via `context.switchToHttp()` — on RPC/WS/GraphQL transports this yields a
-bogus request object, the same limitation every overlay in this system has.
+The correlation id comes from an HTTP header, so on other transports each
+event context starts a fresh pair.
+
+### RPC (preview)
+
+> RPC support is a preview and may change in a minor release.
+
+Message and event handlers take `@Ctx()` and `@UseHooks()` like controller
+routes do, and `@Transactional()` from `@concepta/nestjs-repository` works the
+same way:
+
+```ts
+@Controller()
+export class OrderMessages {
+  constructor(private readonly orders: OrderService) {}
+
+  @UseHooks(AuditHook)
+  @MessagePattern('orders.create')
+  create(@Payload() dto: CreateOrderDto, @Ctx() ctx: AppContextHost) {
+    return this.orders.create(ctx, dto);
+  }
+}
+```
+
+Every message gets its own context, so hooks and transactions never carry
+over from one message to the next.
+
+In a hybrid app (HTTP plus a connected microservice), pass
+`inheritAppConfig` so the overlays run for message handlers too. Without it,
+`@Ctx()` still works but `@UseHooks()` silently does nothing:
+
+```ts
+app.connectMicroservice(
+  { transport: Transport.TCP },
+  { inheritAppConfig: true },
+);
+```
+
+Your own overlays attach on HTTP only until you add `'rpc'`:
+
+```ts
+readonly transports: readonly ContextType[] = ['http', 'rpc'];
+```
+
+Correlation, the authenticated user and crud read the HTTP request, so they
+are absent in message handlers. To get the user there, write an overlay that
+reads it from your transport (for example gRPC metadata, from
+`context.switchToRpc().getContext()`) and defines `AuthUserCtx`.
+
+WebSocket gateways and gRPC call-stream handlers aren't supported yet. There,
+`@Ctx()` and `@Transactional()` throw `AppContextUnavailableException` and
+route hooks don't apply. Create a context with `new AppContextHost()` and pass
+it on yourself.
 
 ## Exceptions
 
@@ -1027,12 +1084,15 @@ exercise correlation behavior directly.
 | `AppContextHost` | Per-request overlay container. Use `defineOverlay`, `removeOverlay`, `with`, `require`, `supports`, `optional`. Static `from(value?)` coerces `AppContextLike` to a host — it throws on a non-empty plain object, so pass a real host rather than `{ tenantId }`. |
 | `OverlayDefineOptionsInterface` | Third argument to `defineOverlay`. `{ immutable: true }` protects the overlay from removal, redefinition, and shadowing. |
 | `getAppContext(request)` | Returns the `AppContextHost` for a request, creating one on first access. |
+| `requireAppContext(context)` | Returns the current call's `AppContextHost` from an `ExecutionContext`, on HTTP or RPC. Throws `AppContextUnavailableException` elsewhere. |
+| `findAppContext(context)` | Like `requireAppContext`, but returns `undefined` where there is no context. |
 | `Ctx` | Parameter decorator. Without args: injects the raw `AppContextHost`. With an `OverlayRef`: unwraps the overlay via `appCtx.with(ref)`. |
 | `OverlayRef` | Typed token for a named overlay. Construct with `new OverlayRef<Name, Props>('withName')`. |
-| `ContextOverlayInterceptor` | Abstract base for custom overlays. Subclasses implement `ref` and `attach()`. |
+| `ContextOverlayInterceptor` | Abstract base for custom overlays. Subclasses implement `ref` and `attach()`, and may set `transports` (default `['http']`). |
 | `OverlayNotDefinedException` | Thrown when `with(ref)` is called for an overlay that was not defined on the context. |
 | `OverlayImmutableException` | Thrown when an overlay defined `{ immutable: true }` is redefined or shadowed on a child. |
 | `OverlayAlreadyDefinedException` | Thrown when `{ immutable: true }` is requested but a mutable overlay of that name already exists. |
+| `AppContextUnavailableException` | Thrown by `@Ctx()`, `@AuthUser()`, `@Transactional()` and `requireAppContext` in a WebSocket gateway or gRPC call-stream handler. |
 | `AppContextInterface` | Interface implemented by `AppContextHost`. |
 | `AppContextLike` | Type accepted by `AppContextHost.from()` — either an `AppContextHost` or a nullish/empty plain object. |
 | `CorrelationCtx` | `OverlayRef` token for the correlation overlay. Use with `ctx.with(CorrelationCtx)` or `@Ctx(CorrelationCtx)`. |

@@ -81,7 +81,7 @@ export interface RepositoryProviderOptions<
    * queue consumer, a seeder, a test. `@UseHooks()` puts its list on the
    * request's `ctx` instead, which is read by whichever entity that `ctx`
    * reaches: so a route hook follows a forwarded `ctx` into other entities,
-   * and is absent entirely outside HTTP.
+   * and is absent entirely outside HTTP routes and RPC message handlers.
    *
    * Both paths apply per call. A class carried on the `ctx` that is also
    * registered here runs once; registering the same class twice here is

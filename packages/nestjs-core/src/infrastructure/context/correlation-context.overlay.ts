@@ -5,7 +5,6 @@ import { ExecutionContext, Injectable } from '@nestjs/common';
 import { OverlayRef } from '../../domain/context/overlay-ref.js';
 
 import { ContextOverlayInterceptor } from './context-overlay.interceptor.js';
-import { getAppContext } from './get-app-context.util.js';
 import { CorrelationContextInterface } from './interfaces/correlation-context.interface.js';
 
 export const CorrelationCtx = new OverlayRef<
@@ -27,7 +26,7 @@ export class CorrelationContextOverlay extends ContextOverlayInterceptor {
     const request = context
       .switchToHttp()
       .getRequest<{ headers: Record<string, string | string[] | undefined> }>();
-    const ctx = getAppContext(request);
+    const ctx = this.appContext(context);
 
     const header = request.headers['x-correlation-id'];
     const correlationId =

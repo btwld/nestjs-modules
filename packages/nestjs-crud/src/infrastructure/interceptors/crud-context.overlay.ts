@@ -12,7 +12,6 @@ import { ModuleRef } from '@nestjs/core';
 
 import {
   ContextOverlayInterceptor,
-  getAppContext,
   Operation,
   OverlayRef,
 } from '@concepta/nestjs-core';
@@ -188,10 +187,7 @@ export class CrudContextOverlay<
       return;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const ctx = getAppContext(request);
-    const resolved = this.resolve(context);
-    ctx.defineOverlay(CrudCtx, resolved);
+    this.appContext(context).defineOverlay(CrudCtx, this.resolve(context));
   }
 
   private getRouteOptions(
