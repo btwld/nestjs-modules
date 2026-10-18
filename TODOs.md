@@ -18,12 +18,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       Fix: skip non-HTTP contexts in the interceptor base and `Ctx`, matching the
       documented "route hooks absent outside HTTP".
 
-  2. **The TypeORM optimistic-lock version probe stamps `@UpdateDateColumn`** (S) —
-      `repo.increment(…, 0)` also sets the update-date column, a write the abstraction
-      didn't ask for. Probe with an update query that sets the version and update-date
-      columns to themselves instead.
-
-  3. **Federation gaps** (M) — **on hold, to revisit as a whole against the repository
+  2. **Federation gaps** (M) — **on hold, to revisit as a whole against the repository
       direction** (don't extend federation or use it to satisfy a guarantee). The
       orchestrator finds a related repository by entity class name, and that index
       keeps the last registration without complaint, so two distinct entities with
@@ -49,7 +44,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       - The TypeORM driver merges `relationsConfig` into the metadata it reports.
       - crud's paginated type carries the federation-only `metrics`.
 
-  4. **Row scope cannot see the tables a view reads** (S) — row scope compares
+  3. **Row scope cannot see the tables a view reads** (S) — row scope compares
       URNs, and a view entity's URN names the view, not the tables it selects
       from. `@ViewEntity({ name: 'open_orders', expression: 'SELECT … FROM
       orders …' })` is `urn:typeorm:shop:open_orders` while a scoped `Order` is
@@ -61,7 +56,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       would need the driver to know which tables a view expression reads, and
       to resolve SQLite paths.
 
-  5. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
+  4. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
       (S) — `UserCacheFactoryFixture` sets `key = faker.person.jobArea()`, drawn from roughly
       25 values, with constant `type` and `assigneeId`, and the spec calls `createMany(2)`
       against `@Unique(['key', 'type', 'assigneeId'])`. Two draws therefore collide about
@@ -71,10 +66,10 @@ done — see git history for what shipped. Reference notes that are not work liv
       account for its nestjs-cache `SQLITE_CONSTRAINT: UNIQUE` sightings, so fixing it
       first narrows that investigation.
 
-  6. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+  5. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
       — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`, and in
       crud's optimistic-locking e2e. Every one passes in isolation and on a re-run of the
-      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row (likely item 5)
+      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row (likely item 4)
       and as `TransactionScopeFailedException` after a timeout. The cost of leaving it is
       that a red suite goes green on retry, which trains everyone to re-run rather than
       look — so a genuine regression in a transactional path would be dismissed as this.
@@ -82,7 +77,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       file; suspect timeouts under CPU contention. Confirm by pinning a failing spec to a
       single worker.
 
-  7. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+  6. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
       `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
       hoisting in a way that breaks nestjs-crud's OpenAPI tests
@@ -91,7 +86,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  8. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
+  7. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
       driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
       tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
       deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`

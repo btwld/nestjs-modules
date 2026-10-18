@@ -585,24 +585,13 @@ export class TypeOrmRepository<
    * Run `op` guarded by an atomic optimistic-lock compare-and-swap on
    * `guard.column`, identifying the row by `entity`'s primary key.
    *
-   * `repo.increment(conditions, propertyPath, value)` is used for the guard
-   * itself — unlike `repo.createQueryBuilder().update().set(...)`, its
-   * `propertyPath` is a plain `string` rather than `QueryDeepPartialEntity<Entity>`,
-   * so it doesn't hit the generics wall that makes TypeORM's `.set()`
-   * impossible to satisfy for a library-level generic `Entity` type
-   * parameter. It performs a single atomic
-   * `UPDATE ... SET <column> = <column> + 0 WHERE <primary key> AND <column> = :expected`
-   * statement and reports 0 affected rows on a mismatch — exactly the
-   * compare-and-swap this needs. The `+ 0` is deliberate, not a typo: it's a
-   * pure atomic probe (verified against both this repo's supported drivers
-   * — Postgres's `rowCount` and TypeORM's own sqlite driver both report
-   * `affected` based on rows *matched* by WHERE, not rows whose value
-   * actually changed; MySQL's default `affectedRows` behaves the same only
-   * with `CLIENT_FOUND_ROWS` enabled, so on an entity with no other
-   * auto-updating column a plain MySQL connection can see a false
-   * conflict). It is not side-effect-free on every driver, though: TypeORM
-   * also stamps any `@UpdateDateColumn` on the same statement — a real
-   * write on a row `op` may be about to hard-delete.
+   * The check is `increment(…, 0)`: one `UPDATE` that matches the row only at
+   * the expected version and leaves the version as it is. No match means
+   * someone else wrote first, so it throws `OptimisticLockException`.
+   *
+   * TypeORM stamps the update date on that `UPDATE` and runs subscribers for
+   * it; the README's Optimistic Locking section tells implementers what they
+   * see, and its Expected Version section covers the MySQL caveat.
    *
    * That guard statement and `op` are two separate SQL statements, so —
    * unless both run inside one DB transaction — a third writer could still

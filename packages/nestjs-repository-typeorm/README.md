@@ -209,6 +209,13 @@ auto-incrementing column, ever determine the real version. This is
 distinct from `options.expectedVersion`, below, which the caller *does*
 control.
 
+Every guarded write stamps your `@UpdateDateColumn`, even an update whose
+`data` changes nothing (its version stays the same). Your subscribers'
+`beforeUpdate`/`afterUpdate` also run one extra time per guarded write,
+with only the version in `event.entity` and no `databaseEntity`.
+`@BeforeUpdate`/`@AfterUpdate` methods on the entity don't run that extra
+time.
+
 ### Expected Version (cross-request optimistic locking)
 
 The check above guards a read-then-write inside one request; it can't stop
