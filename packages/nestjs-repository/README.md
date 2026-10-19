@@ -554,6 +554,7 @@ RepositoryModule.forRoot({
         entity: UserEntity,
         relations: {
           posts: { federated: true }, // read through its own repository
+          addresses: { cascade: true }, // written with the user
         },
       }],
     },
@@ -562,7 +563,9 @@ RepositoryModule.forRoot({
 ```
 
 A relation marked `federated: true` is read through the related entity's own
-repository instead of a join. See [Federation](#federation).
+repository instead of a join. See [Federation](#federation). A relation marked
+`cascade: true` is written with the entity. See
+[Cascading writes](#cascading-writes).
 
 ### Writing relations
 
@@ -572,7 +575,8 @@ driver:
 | In the payload | Result |
 | --- | --- |
 | a foreign key column, e.g. `{ companyId: 7 }` | written; `null` clears it |
-| any relation, e.g. `{ company: { id: 7 } }` or `{ users: [...] }` | refused with `RelationWriteException` (`400`), naming the foreign key column to send instead where there is one |
+| a relation marked `cascade: true` | written through the related entity's own repository — see [Cascading writes](#cascading-writes) |
+| any other relation, e.g. `{ company: { id: 7 } }` or `{ users: [...] }` | refused with `RelationWriteException` (`400`), naming the foreign key column to send instead where there is one |
 | any other property that is not a column | refused with `UnknownColumnException` (`400`) |
 | a function in place of a column value, or an object in a key column | refused with `InvalidColumnValueException` (`400`) |
 | a property whose value is `undefined` | left out; it carries no value |
@@ -584,7 +588,8 @@ the row was read. A function value, or an object in a key column, is still
 refused there.
 
 To change related rows, write them through their own repository, so their row
-scope, write policy and hooks run. What happens to related rows on delete is
+scope, write policy and hooks run, or mark the relation `cascade: true` and let
+the entity's writes do it. Otherwise, what happens to related rows on delete is
 your database's foreign key action.
 
 Behaviour you declare on an entity for your driver to run on its own, such as
@@ -597,6 +602,87 @@ Two entity shapes are refused at startup with `RepositoryBootException`: a
 relation whose foreign key has no column of its own, since it could never be
 written, and a primary or foreign key column defined as a getter or setter on
 the entity class. Keys are plain properties.
+
+### Cascading writes
+
+Mark a relation `cascade: true`, and its rows are written with the entity:
+
+```ts
+entities: [
+  {
+    key: 'invoices',
+    entity: InvoiceEntity,
+    relations: { lines: { cascade: true } },
+  },
+  { key: 'invoice-lines', entity: InvoiceLineEntity },
+],
+```
+
+```ts
+const invoice = await invoices.create(
+  { number: 'A-1', lines: [{ sku: 'widget' }, { sku: 'gear' }] },
+  { ctx },
+);
+// invoice.lines holds both lines, each with invoiceId set to invoice.id
+```
+
+Each related row is written through its own repository, so its hooks, row
+scope and write policy run just as if you had called it yourself. Its foreign
+key is always set to the entity's key, whatever the payload holds.
+
+| Your call | What happens to the related rows |
+| --- | --- |
+| `create`, `createMany` | each one listed is created |
+| `update` | left alone if the payload leaves the relation out; otherwise each listed row that is already one of the entity's is updated, any other is created, and the rest are kept |
+| `replace`, `upsert` | as `update`, and the related rows a listed relation leaves out are deleted |
+| `delete`, `deleteMany` | deleted first, then the entity |
+| `softDelete` | soft deleted first, then the entity |
+| `restore` | every soft-deleted one is restored first, including any deleted on its own before the entity, then the entity |
+
+A to-one relation names the one row the entity has: its payload updates that
+row, or creates it if there is none, and `null` deletes it. A payload with a
+different key is refused by the related repository
+(`PrimaryKeyImmutableException`). A to-one with more than one stored row is
+refused with `CascadeWriteException` (`409`). A soft-deleted row is not the one
+the entity has, so a new one is created beside it.
+
+A `create`, `update`, `replace` or `upsert` returns the entity with the related
+rows that call wrote — for an `update`, only the rows the payload listed, not
+the ones it kept. Cascades nest: a related entity's own cascade relations are
+written the same way.
+
+Run a cascading write in a [transaction](#transaction-management) to make it
+all or nothing. Without one, a related row refused halfway leaves the rows
+written before it in place, and a delete whose `expectedVersion` no longer
+matches is refused only after its related rows are gone.
+
+A related row someone wrote directly with a foreign key to another tenant's
+row is invisible to that tenant's cascade, so your database's foreign key then
+refuses the delete. Check foreign keys in `scopeWrite` to prevent it (see
+[Checks this class cannot make](#checks-this-class-cannot-make)).
+
+A relation can cascade only where its rows hold the foreign key to the entity's
+primary key, a single column: a one-to-many, or the other side of a
+one-to-one. Startup refuses `cascade: true`, with `RepositoryBootException`, on:
+
+- a relation whose foreign key the entity holds — a write never changes the
+  row it points to;
+- a relation not joined on the entity's single primary key column, including
+  any relation of an entity with a composite primary key;
+- relations that lead back to an entity they started from, such as a category
+  cascading to its child categories — a cascading delete would never finish;
+- a many-to-many relation — write its junction rows through their own
+  repository;
+- a relation that is also `federated`;
+- a relation whose entity is not registered in `forRoot()`;
+- a relation from a soft-deleted entity to one without a delete date column.
+
+A cascade into append-only rows is refused with `WritePolicyBootException`,
+unless the entity is append-only too, so that only its creates cascade.
+
+A payload whose cascade relation holds the wrong shape — anything but a list of
+objects for a to-many relation, or an object or `null` for a to-one — is
+refused with `CascadeWriteException` (`400`).
 
 ### What a read may name
 
@@ -2307,7 +2393,8 @@ also exported for manual provider wiring.
 | `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
 | `PartialPrimaryKeyException` | A `create`/`createMany` supplied only part of a composite primary key. A partial key cannot be looked up, so nothing can tell whether it is taken. Supply every key column, or none for a generated key |
-| `RelationWriteException` | A write payload carried a relation. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
+| `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
+| `CascadeWriteException` | A cascade relation in a write payload held something other than its rows: a list of objects for a to-many relation, an object or `null` for a to-one — see [Cascading writes](#cascading-writes) |
 | `UnknownColumnException` | A write payload, or a read's `select`, `where` or `order`, named a property that is not a column of the entity; the message lists them — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
 | `InvalidColumnValueException` | A write payload carried a function in place of a column value, or an object in a primary or foreign key column; the message lists the columns |
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |

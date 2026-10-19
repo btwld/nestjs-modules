@@ -1,6 +1,11 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 
+import {
+  cascadeRelationsOf,
+  checkCascadeCycles,
+  checkCascadeTargets,
+} from './cascade/cascade-boot-checks.js';
 import { HookBootException } from './exceptions/hook-boot.exception.js';
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
 import {
@@ -140,7 +145,11 @@ export function bindRepositories(params: {
     ]);
   }
 
-  const federationFailures: string[] = [];
+  const adaptersByUrn = new Map(
+    adapters.map((adapter) => [adapter.metadata.urn, adapter]),
+  );
+
+  const relationFailures: string[] = [];
   entries.forEach(({ options }, index) => {
     const adapter = adapters[index];
     const federated = federatedRelationsOf(
@@ -148,7 +157,13 @@ export function bindRepositories(params: {
       adapter.metadata,
       options.relations,
     );
-    federationFailures.push(...federated.failures);
+    const cascade = cascadeRelationsOf(
+      options.key,
+      adapter.metadata,
+      options.relations,
+      adaptersByUrn,
+    );
+    relationFailures.push(...federated.failures, ...cascade.failures);
 
     adapter.bind({
       rowScope: options.rowScope,
@@ -162,6 +177,7 @@ export function bindRepositories(params: {
       federation: federated.relations.size
         ? { reader, relations: federated.relations, maxKeys }
         : undefined,
+      cascade: cascade.relations,
     });
   });
 
@@ -169,7 +185,8 @@ export function bindRepositories(params: {
     ...checkColumnsAreNotRelations(adapters),
     ...checkForeignKeyColumns(adapters),
     ...checkNoAccessorKeys(adapters),
-    ...federationFailures,
+    ...relationFailures,
+    ...checkCascadeCycles(adapters),
     ...checkFederatedRelations(adapters, registry),
   ];
   if (repositoryFailures.length > 0) {
@@ -189,6 +206,7 @@ export function bindRepositories(params: {
 
   const writePolicyFailures = [
     ...checkNoSoftDeleteOnAppendOnly(adapters),
+    ...checkCascadeTargets(adapters),
     ...(moduleOptions.requireWritePolicyDeclaration
       ? checkWritePolicyCompleteness(adapters)
       : []),

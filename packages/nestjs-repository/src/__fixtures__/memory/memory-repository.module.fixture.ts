@@ -1,10 +1,34 @@
-import { type DynamicModule, Module, type Type } from '@nestjs/common';
+import {
+  type DynamicModule,
+  Module,
+  type PlainLiteralObject,
+  type Type,
+} from '@nestjs/common';
 
 import { HookResolverService } from '@concepta/nestjs-core';
 
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
+import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-token.js';
 
+import {
+  BUNDLE_METADATA,
+  BundleEntityFixture,
+  CATEGORY_METADATA,
+  CategoryEntityFixture,
+  INVOICE_LINE_METADATA,
+  INVOICE_METADATA,
+  InvoiceEntityFixture,
+  InvoiceLineEntityFixture,
+  LINE_NOTE_METADATA,
+  LineNoteEntityFixture,
+  PAYMENT_METADATA,
+  PaymentEntityFixture,
+  RECEIPT_METADATA,
+  ReceiptEntityFixture,
+  REFUND_METADATA,
+  RefundEntityFixture,
+} from './cascade.fixture.js';
 import {
   ARCHIVED_POST_METADATA,
   ArchivedPostEntityFixture,
@@ -40,10 +64,25 @@ import {
   PetEntityFixture,
 } from './pet-note.fixture.js';
 
+const memory =
+  <Entity extends PlainLiteralObject>(
+    metadata: RepositoryMetadataInterface<Entity>,
+  ) =>
+  (key: string, options: MemoryRepositoryOptionsFixture) =>
+    new MemoryRepositoryFixture(key, metadata, options);
+
 const ADAPTERS = new Map<
   Type,
   (key: string, options: MemoryRepositoryOptionsFixture) => object
 >([
+  [InvoiceEntityFixture, memory(INVOICE_METADATA)],
+  [InvoiceLineEntityFixture, memory(INVOICE_LINE_METADATA)],
+  [LineNoteEntityFixture, memory(LINE_NOTE_METADATA)],
+  [ReceiptEntityFixture, memory(RECEIPT_METADATA)],
+  [PaymentEntityFixture, memory(PAYMENT_METADATA)],
+  [RefundEntityFixture, memory(REFUND_METADATA)],
+  [BundleEntityFixture, memory(BUNDLE_METADATA)],
+  [CategoryEntityFixture, memory(CATEGORY_METADATA)],
   [
     OrderEntityFixture,
     (key, options) => new MemoryRepositoryFixture(key, ORDER_METADATA, options),

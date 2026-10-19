@@ -6,6 +6,7 @@ import {
 } from '@concepta/nestjs-core';
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
+import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
@@ -95,6 +96,12 @@ const CASES: {
   {
     name: 'RelationWriteException',
     build: () => new RelationWriteException('SomeEntity', 'children', []),
+    fault: 'client',
+  },
+  {
+    name: 'CascadeWriteException',
+    build: () =>
+      new CascadeWriteException('SomeEntity', 'children', 'a list of objects'),
     fault: 'client',
   },
   {

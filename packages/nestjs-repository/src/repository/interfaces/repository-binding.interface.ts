@@ -1,5 +1,6 @@
 import { type HookOption } from '@concepta/nestjs-core';
 
+import { type CascadeRelation } from '../../cascade/cascade-writer.js';
 import {
   type FederatedRelation,
   type FederationReader,
@@ -35,6 +36,12 @@ export interface RepositoryBindingInterface {
 
   /** The entity's federated relations, and how they are read. */
   readonly federation?: RepositoryFederationBinding;
+
+  /**
+   * The relations whose rows are written with the entity, through their own
+   * repositories, by name.
+   */
+  readonly cascade?: ReadonlyMap<string, CascadeRelation>;
 }
 
 /**

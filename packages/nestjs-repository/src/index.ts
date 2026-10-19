@@ -86,6 +86,7 @@ export { EntityAlreadyExistsException } from './exceptions/entity-already-exists
 export { PartialPrimaryKeyException } from './exceptions/partial-primary-key.exception.js';
 export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
 export { RelationWriteException } from './exceptions/relation-write.exception.js';
+export { CascadeWriteException } from './exceptions/cascade-write.exception.js';
 export { UnknownColumnException } from './exceptions/unknown-column.exception.js';
 export { InvalidColumnValueException } from './exceptions/invalid-column-value.exception.js';
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';

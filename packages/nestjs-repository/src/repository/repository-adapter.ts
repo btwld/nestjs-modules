@@ -13,6 +13,10 @@ import {
   normalizeHookOption,
 } from '@concepta/nestjs-core';
 
+import {
+  type CascadeRelation,
+  CascadeWriter,
+} from '../cascade/cascade-writer.js';
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
@@ -126,6 +130,7 @@ export abstract class RepositoryAdapter<
   private _binding?: RepositoryBindingInterface;
   private _hooks: HookWithSpec[] = [];
   private _rowScope?: RowScopeInterface;
+  private _cascade?: CascadeWriter;
   private readonly _warnedDuplicates = new Set<Type>();
 
   constructor(
@@ -260,6 +265,22 @@ export abstract class RepositoryAdapter<
    */
   get federatedRelations(): ReadonlyMap<string, FederatedRelation> {
     return this._binding?.federation?.relations ?? new Map();
+  }
+
+  /**
+   * The relations whose rows are written with this entity, through their own
+   * repositories, by name.
+   */
+  get cascadeRelations(): ReadonlyMap<string, CascadeRelation> {
+    return this._binding?.cascade ?? new Map();
+  }
+
+  private get cascade(): CascadeWriter {
+    this._cascade ??= new CascadeWriter(
+      this.metadata.name,
+      this.cascadeRelations,
+    );
+    return this._cascade;
   }
 
   /**
@@ -787,6 +808,14 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * The driver's `row` with the related rows a cascade wrote, each already
+   * checked by its own repository.
+   */
+  private withRelated(row: Entity, related: PlainLiteralObject): Entity {
+    return Object.assign<Entity, PlainLiteralObject>(row, related);
+  }
+
+  /**
    * Every condition in a where clause, at any depth.
    */
   private whereConditions(clause: WhereClause): WhereCondition[] {
@@ -990,17 +1019,22 @@ export abstract class RepositoryAdapter<
     return this.permeator.create.permeate(
       entity,
       async (scoped) => {
+        const { own, children } = this.cascade.peel(scoped);
         const value = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.CREATE,
-            this.toOwnColumns(scoped),
+            this.toOwnColumns(own),
             undefined,
             options?.ctx,
           ),
         );
         this.assertKeyNotPartial(value);
         await this.assertNotExisting(value, options?.ctx);
-        return this.checkedRow(await this.doCreate(value, options));
+        const row = this.checkedRow(await this.doCreate(value, options));
+        return this.withRelated(
+          row,
+          await this.cascade.create(row, children, options?.ctx),
+        );
       },
       this.entityCtx(options?.ctx),
     );
@@ -1019,10 +1053,11 @@ export abstract class RepositoryAdapter<
     return this.permeator.createMany.permeate(
       entities,
       async (scoped) => {
+        const peeled = scoped.map((entity) => this.cascade.peel(entity));
         const values = (
           await this.applyWriteScopeMany(
             RowScopeOperation.CREATE_MANY,
-            scoped.map((entity) => this.toOwnColumns(entity)),
+            peeled.map(({ own }) => this.toOwnColumns(own)),
             [],
             options?.ctx,
           )
@@ -1033,7 +1068,20 @@ export abstract class RepositoryAdapter<
         }
         const rows = await this.doCreateMany(values, options);
         this.assertRows(rows);
-        return rows;
+        const written: Entity[] = [];
+        for (const [index, row] of rows.entries()) {
+          written.push(
+            this.withRelated(
+              row,
+              await this.cascade.create(
+                row,
+                peeled[index]?.children ?? new Map(),
+                options?.ctx,
+              ),
+            ),
+          );
+        }
+        return written;
       },
       this.entityCtx(options?.ctx),
     );
@@ -1059,9 +1107,10 @@ export abstract class RepositoryAdapter<
     return this.permeator.update.permeate(
       data,
       async (scoped) => {
+        const { own, children } = this.cascade.peel(scoped);
         // Checked on the hooks' output and again on the resolver's, since
         // either could move the write to another row.
-        const values = this.toOwnColumns(scoped);
+        const values = this.toOwnColumns(own);
         this.assertKeyUnchanged(stored, values);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
@@ -1072,8 +1121,12 @@ export abstract class RepositoryAdapter<
           ),
         );
         this.assertKeyUnchanged(stored, written);
-        return this.checkedRow(
+        const row = this.checkedRow(
           await this.doUpdate(stored, written, { ...options, versionGuard }),
+        );
+        return this.withRelated(
+          row,
+          await this.cascade.sync(row, children, 'merge', options?.ctx),
         );
       },
       this.entityCtx(options?.ctx),
@@ -1095,7 +1148,8 @@ export abstract class RepositoryAdapter<
     return this.permeator.upsert.permeate(
       entity,
       async (scoped) => {
-        const reduced = this.toOwnColumns(scoped);
+        const { own, children } = this.cascade.peel(scoped);
+        const reduced = this.toOwnColumns(own);
         // After hooks, so the row found is the row the payload now names.
         const stored = await this.findByKey(reduced, options?.ctx);
         const written = this.toOwnColumns(
@@ -1110,7 +1164,11 @@ export abstract class RepositoryAdapter<
         // rather than reported as soft-deleted.
         if (stored) this.assertMutable(stored);
         this.assertKeyUnchanged(reduced, written);
-        return this.checkedRow(await this.doUpsert(written, options));
+        const row = this.checkedRow(await this.doUpsert(written, options));
+        return this.withRelated(
+          row,
+          await this.cascade.sync(row, children, 'replace', options?.ctx),
+        );
       },
       this.entityCtx(options?.ctx),
     );
@@ -1134,7 +1192,8 @@ export abstract class RepositoryAdapter<
     return this.permeator.replace.permeate(
       data,
       async (scoped) => {
-        const values = this.toOwnColumns(scoped);
+        const { own, children } = this.cascade.peel(scoped);
+        const values = this.toOwnColumns(own);
         this.assertKeyUnchanged(stored, values);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
@@ -1145,8 +1204,12 @@ export abstract class RepositoryAdapter<
           ),
         );
         this.assertKeyUnchanged(stored, written);
-        return this.checkedRow(
+        const row = this.checkedRow(
           await this.doReplace(stored, written, { ...options, versionGuard }),
+        );
+        return this.withRelated(
+          row,
+          await this.cascade.sync(row, children, 'replace', options?.ctx),
         );
       },
       this.entityCtx(options?.ctx),
@@ -1172,18 +1235,17 @@ export abstract class RepositoryAdapter<
       entity,
       async (scoped) => {
         const stored = this.toStoredRow(scoped);
-        return this.checkedRow(
-          await this.doDelete(
-            this.toStoredRow(
-              await this.applyWriteScope(
-                RowScopeOperation.DELETE,
-                stored,
-                stored,
-                options?.ctx,
-              ),
-            ),
-            { ...options, versionGuard },
+        const value = this.toStoredRow(
+          await this.applyWriteScope(
+            RowScopeOperation.DELETE,
+            stored,
+            stored,
+            options?.ctx,
           ),
+        );
+        await this.cascade.remove(value, 'delete', options?.ctx);
+        return this.checkedRow(
+          await this.doDelete(value, { ...options, versionGuard }),
         );
       },
       this.entityCtx(options?.ctx),
@@ -1206,16 +1268,18 @@ export abstract class RepositoryAdapter<
       entities,
       async (scoped) => {
         const stored = scoped.map((entity) => this.toStoredRow(entity));
-        const values = await this.applyWriteScopeMany(
-          RowScopeOperation.DELETE_MANY,
-          stored,
-          stored,
-          options?.ctx,
-        );
-        const rows = await this.doDeleteMany(
-          values.map((entity) => this.toStoredRow(entity)),
-          options,
-        );
+        const values = (
+          await this.applyWriteScopeMany(
+            RowScopeOperation.DELETE_MANY,
+            stored,
+            stored,
+            options?.ctx,
+          )
+        ).map((entity) => this.toStoredRow(entity));
+        for (const value of values) {
+          await this.cascade.remove(value, 'delete', options?.ctx);
+        }
+        const rows = await this.doDeleteMany(values, options);
         this.assertRows(rows);
         return rows;
       },
@@ -1262,18 +1326,17 @@ export abstract class RepositoryAdapter<
       entity,
       async (scoped) => {
         const stored = this.toStoredRow(scoped);
-        return this.checkedRow(
-          await this.doSoftDelete(
-            this.toStoredRow(
-              await this.applyWriteScope(
-                RowScopeOperation.SOFT_DELETE,
-                stored,
-                stored,
-                options?.ctx,
-              ),
-            ),
-            { ...options, versionGuard },
+        const value = this.toStoredRow(
+          await this.applyWriteScope(
+            RowScopeOperation.SOFT_DELETE,
+            stored,
+            stored,
+            options?.ctx,
           ),
+        );
+        await this.cascade.remove(value, 'softDelete', options?.ctx);
+        return this.checkedRow(
+          await this.doSoftDelete(value, { ...options, versionGuard }),
         );
       },
       this.entityCtx(options?.ctx),
@@ -1298,18 +1361,17 @@ export abstract class RepositoryAdapter<
       entity,
       async (scoped) => {
         const stored = this.toStoredRow(scoped);
-        return this.checkedRow(
-          await this.doRestore(
-            this.toStoredRow(
-              await this.applyWriteScope(
-                RowScopeOperation.RESTORE,
-                stored,
-                stored,
-                options?.ctx,
-              ),
-            ),
-            { ...options, versionGuard },
+        const value = this.toStoredRow(
+          await this.applyWriteScope(
+            RowScopeOperation.RESTORE,
+            stored,
+            stored,
+            options?.ctx,
           ),
+        );
+        await this.cascade.remove(value, 'restore', options?.ctx);
+        return this.checkedRow(
+          await this.doRestore(value, { ...options, versionGuard }),
         );
       },
       this.entityCtx(options?.ctx),

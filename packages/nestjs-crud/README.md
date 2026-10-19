@@ -382,6 +382,14 @@ foreign scope column in the body is a `403`. This package contains no
 row-scope code — do not add a filter expecting to need one. See the Row Scope
 section of `@concepta/nestjs-repository`.
 
+**Nested rows in a body.** A body may carry the rows of a relation marked
+`cascade: true` in `RepositoryModule.forRoot()`, and they are written with the
+entity: `PATCH` (`update`) creates and updates the rows it lists, `PUT`
+(`replace`) also deletes the ones it leaves out, and `DELETE` deletes them
+first. Any other relation in a body is a `400`. Add the relation to your
+request schema to accept it. See Cascading writes in
+`@concepta/nestjs-repository`.
+
 **Update / Replace and optimistic locking.** When the entity carries a
 version column (`CommonPostgresEntity`/`CommonSqliteEntity`), `update`/
 `replace` are guarded by an atomic version compare-and-swap in the

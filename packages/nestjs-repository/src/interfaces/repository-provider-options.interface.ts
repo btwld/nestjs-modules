@@ -7,9 +7,16 @@ import { type RowScopeRegistration } from '../row-scope/interfaces/row-scope-reg
 import { type WritePolicyRegistration } from '../write-policy/interfaces/write-policy-registration.interface.js';
 
 /**
- * Per-relation federation settings for forRoot() registration.
+ * Per-relation settings for forRoot() registration.
  */
 export interface RelationConfig {
+  /**
+   * Write this relation's rows through the related entity's own repository
+   * when this entity is written: created, updated, deleted, soft deleted and
+   * restored with it. Only for a relation whose rows hold the foreign key to
+   * this entity's primary key.
+   */
+  cascade?: boolean;
   /**
    * Read this relation through the related entity's own repository instead
    * of a join, so it can live in another database.
@@ -42,8 +49,7 @@ export interface RepositoryProviderOptions<
   entity: Type<Entity>;
 
   /**
-   * Per-relation federation settings.
-   * Keyed by relation property name on the entity.
+   * Per-relation settings, keyed by relation property name on the entity.
    */
   relations?: Record<string, RelationConfig>;
 
