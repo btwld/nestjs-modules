@@ -661,6 +661,12 @@ row is invisible to that tenant's cascade, so your database's foreign key then
 refuses the delete. Check foreign keys in `scopeWrite` to prevent it (see
 [Checks this class cannot make](#checks-this-class-cannot-make)).
 
+A cascade finds the related rows it keeps, updates or deletes by reading them
+as the caller, so a caller whose reads are
+[relaxed](#reading-more-broadly-than-you-write) reaches rows they may not
+write. A tenant admin deleting a project that holds a colleague's drafts is
+refused with a `404` rather than leaving those drafts behind.
+
 A relation can cascade only where its rows hold the foreign key to the entity's
 primary key, a single column: a one-to-many, or the other side of a
 one-to-one. Startup refuses `cascade: true`, with `RepositoryBootException`, on:
@@ -694,7 +700,7 @@ A read reaches another table only through a relation it names in `join`:
 | a relation in `join`, and a `Where.rel()` filter or relation sort on a joined relation | passed to the driver |
 | a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`) |
 | a relation that is not declared | refused (`400`) |
-| a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable` on the same columns and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
+| a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable`, this one holds the caller to every scope column the other does, and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
 | a `Where.rel()` filter or relation sort on a relation missing from `join` | refused (`400`); add it to `join` |
 | a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
 | a sort direction other than `ASC` or `DESC` | refused (`400`) |
@@ -1728,10 +1734,11 @@ later. Undeclared is allowed unless the deployment sets
 ### The resolver
 
 ```ts
-// Whatever your overlay carries. Snippets further down read `role` and
-// `region` off it, so they are declared here too.
+// Whatever your overlay carries. Snippets further down read `userId`, `role`
+// and `region` off it, so they are declared here too.
 interface TenantScope {
-  tenantId: string;
+  tenantId?: string;
+  userId?: string;
   role?: string;
   region?: string;
 }
@@ -1816,11 +1823,12 @@ entities: [
 
 It implements four rules and nothing else:
 
-1. **Reads inject the scope columns into the `WHERE`.**
+1. **Reads inject the scope columns into the `WHERE`** — those the caller is
+   held to, when some are [relaxed](#reading-more-broadly-than-you-write).
 2. **Writes naming an existing row pre-check** with the primary key *and* the
    scope columns in the `WHERE`. The pre-check's own clause decides, so a miss
-   is a `404` — including a row the caller can read through a widened
-   `scopeQuery` but may not write.
+   is a `404` — including a row the caller can read through `relax` but may not
+   write.
 3. **`create` is new data** — the scope columns are stamped onto it. There is no
    pre-check: a create names no existing row, and the adapter
    [already refuses](#create-inserts-it-never-updates) one whose key is taken,
@@ -1855,31 +1863,75 @@ A caller missing any of the values is refused with a `403`. An empty `scope` is
 treated as a misconfiguration rather than as a superuser: the resolver reads
 nothing (`Where.never()`) and writes nothing.
 
-Scope that is not equality on columns — a set of tenants, a rule that varies by
-caller — is not this class's job; implement
-[`RowScopeInterface`](#when-not-to-use-it) directly.
+Scope that is not equality on columns — a set of tenants, say — is not this
+class's job; implement [`RowScopeInterface`](#when-not-to-use-it) directly.
 
 #### Reading more broadly than you write
 
-A principal that reads every scope but writes only its own — an internal
-dashboard — is a `scopeQuery` override:
+Some callers read more than they write: an administrator sees a whole tenant,
+or every tenant, but writes only as themselves. That is the `relax` option.
+
+`relax` is called with the caller's scope — the `RowScopeCtx` overlay your
+interceptor attaches from the authenticated user (see
+[`scope` versus `ctx`](#scope-versus-ctx)) — and returns the scope columns that
+caller is not held to on reads:
 
 ```ts
-override scopeQuery<Options extends { where?: WhereClause }>(
-  params: RowScopeQueryParams<Options, TenantScope>,
-): Options {
-  if (params.scope?.role === 'admin') return params.options;
-
-  return super.scopeQuery(params);
+@Injectable()
+export class DraftRowScope extends RowScopeBase<TenantScope> {
+  constructor() {
+    super({
+      scope: ['tenantId', 'userId'],
+      joinable: true,
+      relax: (scope: TenantScope) => {
+        switch (scope.role) {
+          case 'global-admin':
+            return ['tenantId', 'userId'];
+          case 'tenant-admin':
+            return ['userId'];
+          default:
+            return [];
+        }
+      },
+    });
+  }
 }
 ```
 
-That cannot widen a write. The write pre-check carries the scope columns in its
-own `WHERE`, so the override leaves every write confined to the caller's own
-scope, and a `create` is still stamped with it.
+A caller's reads are filtered by the columns `relax` leaves:
 
-It does widen reads, so leave `joinable` off such a resolver — see
-[Relations and row scope](#relations-and-row-scope).
+| `relax` returns | Reads | Example |
+| --- | --- | --- |
+| nothing | the caller's own rows | a user |
+| some columns | rows matching the rest | a tenant admin: `['userId']` reads the whole tenant |
+| every column | every row | a global admin |
+
+Writes are never relaxed. Every write is pre-checked and stamped with the
+caller's full scope, so a tenant admin can read a colleague's draft but
+updating it is a `404`, and a global admin's `create` lands in their own
+tenant, as themselves. A relaxed column needs no value on the overlay for a
+read; a write without it is a `403`.
+
+What `relax` decides on is up to you. Reading a user's own rows across every
+tenant they work in is the same tool, keyed on whether the overlay has a tenant
+selected:
+
+```ts
+relax: (scope: TenantScope) =>
+  scope.tenantId === undefined ? ['tenantId'] : [],
+```
+
+That reads the user's rows in every tenant — including any they have since
+left. If membership has to be checked, the scope is a set of tenants:
+implement [`RowScopeInterface`](#when-not-to-use-it) directly.
+
+Keep `relax` a pure function of the scope: it is asked once for the filter and
+again when the read [joins](#relations-and-row-scope). It is not called when no
+overlay is attached, and a column it returns that is not in `scope` is ignored.
+
+A resolver using `relax` stays `joinable`: what a caller may join follows the
+columns it is held to. A `scopeQuery` override that reads more broadly is still
+possible, but leave `joinable` off it.
 
 #### Checks this class cannot make
 
@@ -1926,6 +1978,11 @@ The value a resolver receives holds only the entity's own columns — a write
 carrying a relation is refused before it runs — so read columns straight off
 the value.
 
+Finding the order is not enough on its own when the orders resolver uses
+[`relax`](#reading-more-broadly-than-you-write): an admin can read orders they
+may not write to. Compare every scope column the line must share with it, as
+the `tenantId` check above does.
+
 #### Relations and row scope
 
 A `join`, a `Where.rel()` filter or a sort on a relation runs in the database,
@@ -1934,7 +1991,7 @@ on which side has a row scope:
 
 | From → to | A relation |
 | --- | --- |
-| scoped → scoped, both `joinable` on the same columns | allowed, **joinable when the join includes those columns**: see below |
+| scoped → scoped, both `joinable` | allowed, **joinable when the join includes the columns the related resolver holds the caller to**: see below |
 | any other scoped → scoped | allowed, but **never joined**: see below |
 | unscoped → unscoped | allowed |
 | unscoped → scoped | **refused at startup**: reading it would return rows the caller is not allowed to see |
@@ -1954,15 +2011,15 @@ many-to-many whose junction rows are scoped.
 
 Rows are registered once ([forRoot](#forroot)), so they have one row
 scope. For access that must see every scope, such as a back-office report or a
-seeder, go through the scoped repository with a `ctx` your resolver recognises
-and leaves unnarrowed.
+seeder, go through the scoped repository with a scope your resolver
+[relaxes](#reading-more-broadly-than-you-write).
 
 **Joining between scoped entities.** A read can join a relation between two
 scoped entities when:
 
 - both resolvers are `joinable` — the same class or not;
-- each scope column of the related entity's resolver is also one of this
-  entity's, read from the same `RowScopeCtx` key;
+- each scope column the related entity's resolver holds this caller to is
+  also held by this entity's, read from the same `RowScopeCtx` key;
 - the join matches each of those columns to itself — that is, the foreign key
   includes it: `(tenantId, orderId)` pointing at the order's `(tenantId, id)`.
 
@@ -1977,11 +2034,25 @@ The joined rows carry the caller's `tenantId` already, so the related
 resolver's check is satisfied by construction. How to declare the foreign key
 is your driver's business; see its README.
 
-`joinable` is your statement that the resolver reads exactly by its scope
-columns, for every caller. Leave it off one whose `scopeQuery` reads more for
-some callers or rows — every tenant for an admin, shared public rows — or less,
-such as only a caller's own rows: a join would hand out rows the related
-resolver would not.
+The check is made per caller, on the columns each resolver holds that caller
+to after [`relax`](#reading-more-broadly-than-you-write). With projects scoped
+by `tenantId` and drafts by `tenantId` and `userId`:
+
+| Caller | drafts → project | project → drafts |
+| --- | --- | --- |
+| a user | joins | refused: drafts hold them to `userId`, projects don't |
+| a tenant admin (drafts relax `userId`) | joins | joins |
+| a global admin (both relax everything) | joins | joins |
+
+A caller held to nothing on one side joins only into rows that hold them to
+nothing either: a global admin joining into a resolver that still scopes them
+by tenant is refused.
+
+`joinable` is your statement that the resolver reads exactly by the scope
+columns it holds each caller to. `relax` keeps that true. Leave it off a
+resolver whose `scopeQuery` reads more for some callers or rows — shared public
+rows, say — or less: a join would hand out rows the related resolver would
+not.
 
 A composite foreign key also settles which order a line may point at, when the
 database enforces it and its columns are not nullable: the database refuses a

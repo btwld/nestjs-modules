@@ -1,7 +1,5 @@
 import { Injectable, type PlainLiteralObject } from '@nestjs/common';
 
-import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
-import { type RowScopeQueryParams } from '../../row-scope/interfaces/row-scope.interface.js';
 import { RowScopeBase } from '../../row-scope/row-scope-base.js';
 
 /** The scope shape these fixtures put on `RowScopeCtx`. */
@@ -11,22 +9,17 @@ export interface TenantScopeFixture extends PlainLiteralObject {
 }
 
 /**
- * Tenant scoping, with every tenant's rows readable by an admin. The bypass
- * overrides `scopeQuery` only, so it never widens a write — but it does widen
- * reads, so the resolver is not joinable.
+ * Tenant scoping, with every tenant's rows readable by an admin. `relax` widens
+ * reads only, never a write.
  */
 @Injectable()
 export class OrderRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
   constructor() {
-    super({ scope: ['tenantId'] });
-  }
-
-  override scopeQuery<Options extends { where?: WhereClause }>(
-    params: RowScopeQueryParams<Options, TenantScopeFixture>,
-  ): Options {
-    if (params.scope?.role === 'admin') return params.options;
-
-    return super.scopeQuery(params);
+    super({
+      scope: ['tenantId'],
+      joinable: true,
+      relax: (scope) => (scope.role === 'admin' ? ['tenantId'] : []),
+    });
   }
 }
 
@@ -43,6 +36,14 @@ export class JoinableTenantRowScopeFixture extends RowScopeBase<TenantScopeFixtu
 export class OtherJoinableTenantRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
   constructor() {
     super({ scope: ['tenantId'], joinable: true });
+  }
+}
+
+/** Joinable, but with no scope columns, so it reads nothing. */
+@Injectable()
+export class NoColumnsRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
+  constructor() {
+    super({ scope: [], joinable: true });
   }
 }
 

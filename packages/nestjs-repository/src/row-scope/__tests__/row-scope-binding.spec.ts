@@ -16,6 +16,7 @@ import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-
 import { OrderLineRowScopeFixture } from '../../__fixtures__/memory/order-line-row-scope.fixture.js';
 import {
   JoinableTenantRowScopeFixture,
+  NoColumnsRowScopeFixture,
   OrderRowScopeFixture,
   OrgRowScopeFixture,
   OtherJoinableTenantRowScopeFixture,
@@ -30,6 +31,18 @@ import {
   type OrderLineFixture,
   TenantOrderLineEntityFixture,
 } from '../../__fixtures__/memory/order.fixture.js';
+import {
+  DRAFT_TOKEN,
+  DraftEntityFixture,
+  type DraftFixture,
+  DraftRowScopeFixture,
+  PROJECT_TOKEN,
+  ProjectEntityFixture,
+  type ProjectFixture,
+  ProjectRowScopeFixture,
+  StrictProjectRowScopeFixture,
+  type UserScopeFixture,
+} from '../../__fixtures__/memory/project-draft.fixture.js';
 import { RelationWriteException } from '../../exceptions/relation-write.exception.js';
 import { RepositoryBootException } from '../../exceptions/repository-boot.exception.js';
 import { RepositoryUnboundException } from '../../exceptions/repository-unbound.exception.js';
@@ -397,18 +410,18 @@ describe('a join between entities scoped on the same terms', () => {
   @Module({
     imports: [RepositoryModule.forFeature([ORDER_TOKEN])],
     providers: [
-      OrderRowScopeFixture,
       OrderLineRowScopeFixture,
       JoinableTenantRowScopeFixture,
       OtherJoinableTenantRowScopeFixture,
       OrgRowScopeFixture,
+      NoColumnsRowScopeFixture,
     ],
     exports: [
-      OrderRowScopeFixture,
       OrderLineRowScopeFixture,
       JoinableTenantRowScopeFixture,
       OtherJoinableTenantRowScopeFixture,
       OrgRowScopeFixture,
+      NoColumnsRowScopeFixture,
     ],
   })
   class JoinResolverModule {}
@@ -481,7 +494,7 @@ describe('a join between entities scoped on the same terms', () => {
   it.each([
     [
       'the root resolver is not joinable',
-      OrderRowScopeFixture,
+      OrderLineRowScopeFixture,
       JoinableTenantRowScopeFixture,
     ],
     [
@@ -494,8 +507,244 @@ describe('a join between entities scoped on the same terms', () => {
       JoinableTenantRowScopeFixture,
       OrgRowScopeFixture,
     ],
+    [
+      'the target has no scope columns, so reads nothing',
+      JoinableTenantRowScopeFixture,
+      NoColumnsRowScopeFixture,
+    ],
   ])('is refused when %s', async (_case, root, target) => {
     await expect(findLines(target, root)).rejects.toMatchObject(REFUSED);
+  });
+});
+
+describe('a caller relaxed on reads', () => {
+  const userCtx = (scope: UserScopeFixture): AppContextHost => {
+    const ctx = new AppContextHost();
+    ctx.defineOverlay(RowScopeCtx, scope, { immutable: true });
+    return ctx;
+  };
+
+  const ALICE = userCtx({ tenantId: 'acme', userId: 'alice' });
+  const BOB = userCtx({ tenantId: 'acme', userId: 'bob' });
+  const CAROL = userCtx({ tenantId: 'globex', userId: 'carol' });
+  const TENANT_ADMIN = userCtx({
+    tenantId: 'acme',
+    userId: 'dana',
+    role: 'tenant-admin',
+  });
+  const GLOBAL_ADMIN = userCtx({
+    tenantId: 'acme',
+    userId: 'erin',
+    role: 'global-admin',
+  });
+
+  @Module({
+    imports: [RepositoryModule.forFeature([PROJECT_TOKEN, DRAFT_TOKEN])],
+    providers: [
+      ProjectRowScopeFixture,
+      StrictProjectRowScopeFixture,
+      DraftRowScopeFixture,
+    ],
+    exports: [
+      ProjectRowScopeFixture,
+      StrictProjectRowScopeFixture,
+      DraftRowScopeFixture,
+    ],
+  })
+  class DraftResolverModule {}
+
+  let moduleRef: TestingModule;
+  let projects: MemoryRepositoryFixture<ProjectFixture>;
+  let drafts: MemoryRepositoryFixture<DraftFixture>;
+  let bobsDraft: DraftFixture;
+
+  async function start(
+    projectResolver: Type<RowScopeInterface> = ProjectRowScopeFixture,
+    cascade = false,
+  ): Promise<void> {
+    moduleRef = await compile(
+      [
+        {
+          key: PROJECT_TOKEN,
+          entity: ProjectEntityFixture,
+          rowScope: { access: 'scoped', resolver: projectResolver },
+          relations: { drafts: { cascade } },
+        },
+        {
+          key: DRAFT_TOKEN,
+          entity: DraftEntityFixture,
+          rowScope: { access: 'scoped', resolver: DraftRowScopeFixture },
+        },
+      ],
+      {},
+      [DraftResolverModule],
+    );
+    await moduleRef.init();
+
+    projects = moduleRef.get(getDynamicRepositoryToken(PROJECT_TOKEN));
+    drafts = moduleRef.get(getDynamicRepositoryToken(DRAFT_TOKEN));
+
+    const acme = await projects.create({ name: 'acme' }, { ctx: ALICE });
+    const globex = await projects.create({ name: 'globex' }, { ctx: CAROL });
+    await drafts.create({ title: 'alice', projectId: acme.id }, { ctx: ALICE });
+    bobsDraft = await drafts.create(
+      { title: 'bob', projectId: acme.id },
+      { ctx: BOB },
+    );
+    await drafts.create(
+      { title: 'carol', projectId: globex.id },
+      { ctx: CAROL },
+    );
+  }
+
+  afterEach(async () => {
+    await moduleRef.close();
+  });
+
+  const titles = async (ctx: AppContextHost) =>
+    (await drafts.find({ ctx })).map(({ title }) => title);
+
+  describe('reads', () => {
+    beforeEach(() => start());
+
+    it.each([
+      ['a user reads its own rows', ALICE, ['alice']],
+      ['a tenant admin reads its whole tenant', TENANT_ADMIN, ['alice', 'bob']],
+      [
+        'a global admin reads every tenant',
+        GLOBAL_ADMIN,
+        ['alice', 'bob', 'carol'],
+      ],
+    ])('%s', async (_case, ctx, expected) => {
+      expect(await titles(ctx)).toEqual(expected);
+    });
+  });
+
+  describe('writes', () => {
+    beforeEach(() => start());
+
+    type Write = (ctx: AppContextHost) => Promise<unknown>;
+    const WRITES: [string, Write][] = [
+      ['update', (ctx) => drafts.update(bobsDraft, { title: 'x' }, { ctx })],
+      ['replace', (ctx) => drafts.replace(bobsDraft, { title: 'x' }, { ctx })],
+      [
+        'upsert',
+        (ctx) => drafts.upsert({ id: bobsDraft.id, title: 'x' }, { ctx }),
+      ],
+      ['delete', (ctx) => drafts.delete(bobsDraft, { ctx })],
+      ['deleteMany', (ctx) => drafts.deleteMany([bobsDraft], { ctx })],
+    ];
+
+    describe.each([
+      ['a tenant admin', TENANT_ADMIN],
+      ['a global admin', GLOBAL_ADMIN],
+    ])('%s, on a row it can read but does not own', (_caller, ctx) => {
+      it.each(WRITES)('is refused %s', async (_operation, run) => {
+        const before = structuredClone(drafts.stored);
+
+        await expect(run(ctx)).rejects.toMatchObject({
+          httpStatus: HttpStatus.NOT_FOUND,
+        });
+
+        expect(drafts.stored).toEqual(before);
+      });
+    });
+
+    it("stamps an admin's create with its full scope", async () => {
+      const draft = await drafts.create(
+        { title: 'erin', projectId: 'p' },
+        { ctx: GLOBAL_ADMIN },
+      );
+
+      expect({ tenantId: draft.tenantId, userId: draft.userId }).toEqual({
+        tenantId: 'acme',
+        userId: 'erin',
+      });
+    });
+  });
+
+  describe('a cascade', () => {
+    beforeEach(() => start(ProjectRowScopeFixture, true));
+
+    it("deletes a user's own drafts with their project", async () => {
+      const project = await projects.create(
+        { name: 'mine', drafts: [{ title: 'mine' }] },
+        { ctx: ALICE },
+      );
+
+      await projects.delete(project, { ctx: ALICE });
+
+      expect(await titles(ALICE)).toEqual(['alice']);
+    });
+
+    // The cascade reads the drafts as the caller, so it reaches a colleague's
+    // draft the tenant admin may read but not delete.
+    it("refuses a tenant admin deleting a project holding a colleague's draft", async () => {
+      const [project] = await projects.find({ ctx: ALICE });
+      const before = structuredClone(drafts.stored);
+
+      await expect(
+        projects.delete(project, { ctx: TENANT_ADMIN }),
+      ).rejects.toMatchObject({ httpStatus: HttpStatus.NOT_FOUND });
+
+      expect(drafts.stored).toEqual(before);
+      expect(projects.stored).toHaveLength(2);
+    });
+  });
+
+  // The memory driver refuses every join, so reaching it is the pass.
+  describe('joins, judged per caller on the columns each enforces', () => {
+    const REACHED = 'Error while trying to query the %s repository';
+    const reached = (key: string) => REACHED.replace('%s', key);
+    const refused = (relation: string, entity: string) => ({
+      httpStatus: HttpStatus.BAD_REQUEST,
+      fault: 'client',
+      message:
+        `Cannot join "${relation}" of ${entity}: the rows it reads have a ` +
+        'row scope, which a join would bypass. Read them through their own ' +
+        'repository.',
+    });
+
+    const draftsWithProject = (ctx: AppContextHost) =>
+      drafts.find({ join: [{ relation: 'project' }], ctx });
+    const projectsWithDrafts = (ctx: AppContextHost) =>
+      projects.find({ join: [{ relation: 'drafts' }], ctx });
+
+    it('lets a user join its drafts to their project', async () => {
+      await start();
+      await expect(draftsWithProject(ALICE)).rejects.toThrow(reached('drafts'));
+    });
+
+    it("refuses a user joining a project to every user's drafts", async () => {
+      await start();
+      await expect(projectsWithDrafts(ALICE)).rejects.toMatchObject(
+        refused('drafts', 'Project'),
+      );
+    });
+
+    it("lets a tenant admin join a project to its tenant's drafts", async () => {
+      await start();
+      await expect(projectsWithDrafts(TENANT_ADMIN)).rejects.toThrow(
+        reached('projects'),
+      );
+    });
+
+    it('lets a global admin join either way', async () => {
+      await start();
+      await expect(projectsWithDrafts(GLOBAL_ADMIN)).rejects.toThrow(
+        reached('projects'),
+      );
+      await expect(draftsWithProject(GLOBAL_ADMIN)).rejects.toThrow(
+        reached('drafts'),
+      );
+    });
+
+    it('refuses a global admin joining into rows still scoped for it', async () => {
+      await start(StrictProjectRowScopeFixture);
+      await expect(draftsWithProject(GLOBAL_ADMIN)).rejects.toMatchObject(
+        refused('project', 'Draft'),
+      );
+    });
   });
 });
 

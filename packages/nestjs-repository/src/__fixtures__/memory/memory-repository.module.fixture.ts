@@ -65,6 +65,12 @@ import {
   PET_METADATA,
   PetEntityFixture,
 } from './pet-note.fixture.js';
+import {
+  DRAFT_METADATA,
+  DraftEntityFixture,
+  PROJECT_METADATA,
+  ProjectEntityFixture,
+} from './project-draft.fixture.js';
 
 const memory =
   <Entity extends PlainLiteralObject>(
@@ -86,6 +92,8 @@ const ADAPTERS = new Map<
   [BundleEntityFixture, memory(BUNDLE_METADATA)],
   [CategoryEntityFixture, memory(CATEGORY_METADATA)],
   [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
+  [ProjectEntityFixture, memory(PROJECT_METADATA)],
+  [DraftEntityFixture, memory(DRAFT_METADATA)],
   [
     OrderEntityFixture,
     (key, options) => new MemoryRepositoryFixture(key, ORDER_METADATA, options),

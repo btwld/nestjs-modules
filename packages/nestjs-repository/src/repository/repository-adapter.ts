@@ -47,6 +47,7 @@ import {
 } from '../row-scope/interfaces/row-scope-registration.interface.js';
 import { type RowScopeInterface } from '../row-scope/interfaces/row-scope.interface.js';
 import {
+  enforcedScopeColumns,
   RowScopeOperation,
   type RowScopeQueryOperation,
   type RowScopeWriteOperation,
@@ -335,30 +336,39 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * A join of `name` whose rows are scoped on the same terms as this entity's:
-   * both resolvers are `joinable`, and each of the target's scope columns is
-   * one of this entity's, read from the same key. Returns the target's scope
-   * columns the join does not match to themselves, and the columns it does
-   * join on. `undefined` for any other relation — including a many-to-many.
+   * A join of `name` whose rows are scoped, for this caller, on the same terms
+   * as this entity's: both resolvers are `joinable`, and each scope column the
+   * target enforces is enforced here too, read from the same key. Returns the
+   * target's enforced columns the join does not match to themselves, and the
+   * columns it does join on. `undefined` for any other relation — including a
+   * many-to-many.
    */
   private sharedScopeJoin(
     name: string,
+    scope: PlainLiteralObject | undefined,
   ): { missing: string[]; columns: string[] } | undefined {
     const relation = this.metadata.relations?.find(
       (each) => each.name === name,
     );
     const own = this._rowScope;
     const theirs = this.relationsIntoScoped.get(name)?._rowScope;
-    const theirColumns = theirs?.scopeColumns ?? [];
 
     if (
       !relation ||
       relation.through ||
       !own?.joinable ||
       !theirs?.joinable ||
-      theirColumns.length === 0 ||
+      !theirs.scopeColumns?.length
+    ) {
+      return undefined;
+    }
+
+    const ours = enforcedScopeColumns(own, scope);
+    const theirColumns = enforcedScopeColumns(theirs, scope);
+
+    if (
       !theirColumns.every((their) =>
-        own.scopeColumns?.some(
+        ours.some(
           ({ column, key }) => column === their.column && key === their.key,
         ),
       )
@@ -486,7 +496,7 @@ export abstract class RepositoryAdapter<
         })
       : options;
 
-    this.assertReadable(scoped, operation);
+    this.assertReadable(scoped, operation, scope);
 
     return scoped;
   }
@@ -501,9 +511,9 @@ export abstract class RepositoryAdapter<
    *   never sees.
    * - A relation joined, or tagged on a filter or sort, must be declared.
    * - A relation whose rows have a row scope cannot be joined: the joined
-   *   rows would come back unscoped. Unless both resolvers are joinable on
-   *   the same scope columns and the join matches each — see
-   *   `sharedScopeJoin`.
+   *   rows would come back unscoped. Unless both resolvers are joinable, this
+   *   one enforces for the caller every column the target does, and the join
+   *   matches each — see `sharedScopeJoin`.
    * - A relation tagged on a filter or sort must also be joined, so a read
    *   only ever reaches the relations it names in `join`, and its field must
    *   be one of that relation's own columns.
@@ -513,6 +523,7 @@ export abstract class RepositoryAdapter<
   private assertReadable(
     options: RepositoryFindOneOptions<Entity>,
     operation: RowScopeQueryOperation,
+    scope: PlainLiteralObject | undefined,
   ): void {
     const relations = new Set(
       (this.metadata.relations ?? []).map((relation) => relation.name),
@@ -562,10 +573,12 @@ export abstract class RepositoryAdapter<
       (relation) =>
         this.relationsIntoScoped.has(relation) &&
         !this.federatedRelations.has(relation) &&
-        this.sharedScopeJoin(relation)?.missing.length !== 0,
+        this.sharedScopeJoin(relation, scope)?.missing.length !== 0,
     );
     const shared =
-      intoScoped === undefined ? undefined : this.sharedScopeJoin(intoScoped);
+      intoScoped === undefined
+        ? undefined
+        : this.sharedScopeJoin(intoScoped, scope);
     if (intoScoped !== undefined && shared !== undefined) {
       throw new RuntimeException({
         message:

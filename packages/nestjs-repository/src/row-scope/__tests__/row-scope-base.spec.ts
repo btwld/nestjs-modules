@@ -88,7 +88,9 @@ const repoOf = (...rows: RowFixture[]) => repoWith(SINGLE_KEY, rows);
 
 /** Scoped by `tenantId` unless the test configures otherwise. */
 class TestRowScope extends RowScopeBase<TenantScope> {
-  constructor(options: RowScopeBaseOptions = { scope: ['tenantId'] }) {
+  constructor(
+    options: RowScopeBaseOptions<TenantScope> = { scope: ['tenantId'] },
+  ) {
     super(options);
   }
 }
@@ -530,46 +532,100 @@ describe('RowScopeBase', () => {
     );
   });
 
-  describe('a principal that reads more broadly than it writes', () => {
-    /** The documented cross-tenant reader: a `scopeQuery` override. */
-    class AdminReadableScope extends TestRowScope {
-      override scopeQuery<Options extends { where?: WhereClause }>(
-        params: Parameters<TestRowScope['scopeQuery']>[0] & {
-          options: Options;
+  describe('relax — a caller that reads more broadly than it writes', () => {
+    /** Scoped by tenant and region; `role` names the columns relaxed. */
+    const relaxing = () =>
+      new TestRowScope({
+        scope: ['tenantId', 'region'],
+        relax: (scope) => {
+          switch (scope.role) {
+            case 'global':
+              return ['tenantId', 'region'];
+            case 'tenant':
+              return ['region'];
+            case 'regional':
+              return ['tenantId'];
+            default:
+              return [];
+          }
         },
-      ): Options {
-        if (params.scope?.role === 'admin') return params.options;
-        return super.scopeQuery(params);
-      }
-    }
+      });
 
-    const ADMIN = { tenantId: 'acme', role: 'admin' };
+    const caller = (role?: string) => ({
+      tenantId: 'acme',
+      region: 'eu',
+      role,
+    });
+    const tenantEq = { field: 'tenantId', operator: 'eq', value: 'acme' };
+    const regionEq = { field: 'region', operator: 'eq', value: 'eu' };
 
-    it('reads without a scope predicate', () => {
-      expect(read(new AdminReadableScope(), {}, ADMIN)).toEqual({});
+    it.each([
+      ['every column', 'global', {}],
+      ['one column', 'tenant', { where: tenantEq }],
+      ['the other column', 'regional', { where: regionEq }],
+      [
+        'no column',
+        undefined,
+        { where: { operator: 'and', conditions: [tenantEq, regionEq] } },
+      ],
+    ])(
+      'reads by the columns left when relaxing %s',
+      (_case, role, expected) => {
+        expect(read(relaxing(), {}, caller(role))).toEqual(expected);
+      },
+    );
+
+    it("leaves the caller's clause alone when every column is relaxed", () => {
+      const where: WhereClause = {
+        field: 'status',
+        operator: 'eq',
+        value: 'x',
+      };
+
+      expect(read(relaxing(), { where }, caller('global'))).toEqual({ where });
+    });
+
+    it('relaxes nothing without a scope', () => {
+      expect(relaxing().relaxedColumns(undefined)).toEqual([]);
+    });
+
+    it('needs no value for a relaxed column on a read, but does on a write', async () => {
+      const resolver = relaxing();
+      const noRegion = { tenantId: 'acme', role: 'tenant' };
+
+      expect(read(resolver, {}, noRegion)).toEqual({ where: tenantEq });
+      expect(
+        await statusOf(() =>
+          write(scoped(repoOf().repo, resolver), {
+            operation: RowScopeOperation.CREATE,
+            target: undefined,
+            scope: noRegion,
+          }),
+        ),
+      ).toBe(HttpStatus.FORBIDDEN);
     });
 
     it('still cannot write outside its own scope', async () => {
-      const scope = scoped(repoOf(FOREIGN_ROW).repo, new AdminReadableScope());
+      const scope = scoped(repoOf(FOREIGN_ROW).repo, relaxing());
 
       expect(
         await statusOf(() =>
-          write(scope, { target: FOREIGN_ROW, scope: ADMIN }),
+          write(scope, { target: FOREIGN_ROW, scope: caller('global') }),
         ),
       ).toBe(HttpStatus.NOT_FOUND);
     });
 
-    it('still stamps its own scope on a create', async () => {
-      const scope = scoped(repoOf().repo, new AdminReadableScope());
+    it('still stamps its full scope on a create', async () => {
+      const scope = scoped(repoOf().repo, relaxing());
 
       await expect(
         write(scope, {
           operation: RowScopeOperation.CREATE,
           value: { name: 'x' },
           target: undefined,
-          scope: ADMIN,
+          scope: caller('global'),
         }),
-      ).resolves.toEqual({ name: 'x', tenantId: 'acme' });
+      ).resolves.toEqual({ name: 'x', tenantId: 'acme', region: 'eu' });
     });
   });
 

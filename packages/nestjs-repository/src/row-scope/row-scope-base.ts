@@ -12,6 +12,7 @@ import {
   type RowScopeWriteParams,
 } from './interfaces/row-scope.interface.js';
 import {
+  enforcedScopeColumns,
   isScalarValue,
   RowScopeOperation,
   type RowScopeValues,
@@ -21,7 +22,9 @@ import {
 /**
  * Configuration for {@link RowScopeBase}.
  */
-export interface RowScopeBaseOptions {
+export interface RowScopeBaseOptions<
+  Scope extends PlainLiteralObject = PlainLiteralObject,
+> {
   /**
    * The columns carrying the caller's scope, e.g. a tenant ID column, on every
    * entity the resolver serves. A name reads the caller's value from the
@@ -30,10 +33,19 @@ export interface RowScopeBaseOptions {
   readonly scope: readonly (string | RowScopeColumn)[];
 
   /**
+   * The scope columns a caller is not held to on reads — every column for a
+   * caller who reads everything. Writes are never relaxed: a caller writes
+   * only inside its full scope. Not called without a scope.
+   *
+   * Must be a pure function of `scope`: it is asked again when a read joins.
+   */
+  readonly relax?: (scope: Scope) => readonly string[];
+
+  /**
    * Let reads join between entities scoped by joinable resolvers on the same
    * columns. See {@link RowScopeInterface.joinable} for what this states —
    * leave it off a subclass whose `scopeQuery` reads more broadly or more
-   * narrowly for any caller.
+   * narrowly than its enforced columns, for any caller.
    */
   readonly joinable?: boolean;
 }
@@ -57,12 +69,14 @@ export interface RowScopeBaseOptions {
  * entity registered with it in `forRoot()`; each must have a primary key and
  * the scope columns, checked at startup.
  *
+ * A caller that reads more broadly than it writes — an administrator reading
+ * every tenant — is the `relax` option: rule 1 then enforces only the columns
+ * it leaves, and rules 2 to 4 still hold the caller to every scope column.
+ *
  * Two extension points, both ordinary overrides:
  *
- * - `scopeQuery` for a principal that reads more broadly than it writes — an
- *   internal dashboard reading every tenant returns `params.options` unchanged.
- *   That cannot widen a write: the pre-check carries the scope columns in its
- *   own `WHERE`. Such a resolver is not `joinable`.
+ * - `scopeQuery` for a read `relax` cannot express. Such a resolver is not
+ *   `joinable`.
  * - `scopeWrite` for a check this class cannot make, such as a foreign key that
  *   must point inside the caller's scope. Call `super.scopeWrite(params)` first.
  *
@@ -81,16 +95,22 @@ export abstract class RowScopeBase<
 > implements RowScopeInterface<Scope> {
   readonly scopeColumns: readonly RowScopeColumn[];
   readonly joinable: boolean;
+  private readonly relax?: (scope: Scope) => readonly string[];
 
-  constructor(options: RowScopeBaseOptions) {
+  constructor(options: RowScopeBaseOptions<Scope>) {
     this.scopeColumns = options.scope.map((entry) =>
       typeof entry === 'string' ? { column: entry, key: entry } : entry,
     );
     this.joinable = options.joinable === true;
+    this.relax = options.relax;
+  }
+
+  relaxedColumns(scope: Scope | undefined): readonly string[] {
+    return scope === undefined || !this.relax ? [] : this.relax(scope);
   }
 
   /**
-   * The caller's scope, as the columns it is confined to and their values.
+   * The caller's values for `columns`.
    *
    * A pure function of `scope`: a write calls it more than once, re-entrantly,
    * because the pre-check passes back through `scopeQuery`. A value needing a
@@ -100,10 +120,13 @@ export abstract class RowScopeBase<
    * No scope columns at all is a misconfiguration, not a superuser: such a
    * resolver reads nothing and writes nothing.
    */
-  private resolveScope(scope: Scope | undefined): RowScopeValues {
+  private resolveScope(
+    scope: Scope | undefined,
+    columns: readonly RowScopeColumn[],
+  ): RowScopeValues {
     const values: Record<string, ScalarValue> = {};
 
-    for (const { column, key } of this.scopeColumns) {
+    for (const { column, key } of columns) {
       const value: unknown = scope?.[key];
 
       if (!isScalarValue(value)) {
@@ -122,7 +145,16 @@ export abstract class RowScopeBase<
   scopeQuery<Options extends { where?: WhereClause }>(
     params: RowScopeQueryParams<Options, Scope>,
   ): Options {
-    const predicates = this.predicatesOf(this.resolveScope(params.scope));
+    const enforced = enforcedScopeColumns(this, params.scope);
+
+    // Every column relaxed reads everything; no columns at all reads nothing.
+    if (enforced.length === 0 && this.scopeColumns.length > 0) {
+      return params.options;
+    }
+
+    const predicates = this.predicatesOf(
+      this.resolveScope(params.scope, enforced),
+    );
 
     const scoped =
       predicates.length === 1 ? predicates[0] : Where.and(...predicates);
@@ -138,7 +170,7 @@ export abstract class RowScopeBase<
   async scopeWrite<Value extends PlainLiteralObject>(
     params: RowScopeWriteParams<Value, Scope>,
   ): Promise<Value> {
-    const values = this.resolveScope(params.scope);
+    const values = this.resolveScope(params.scope, this.scopeColumns);
 
     switch (params.operation) {
       case RowScopeOperation.DELETE:
@@ -253,7 +285,7 @@ export abstract class RowScopeBase<
    * Rule 2. One query: the primary key **and** the scope columns.
    *
    * This query's own `WHERE` decides, so a miss is always a 404 — including a
-   * row the caller can read through a widened `scopeQuery` but may not write.
+   * row the caller can read through `relax` but may not write.
    *
    * Check-then-write: the write identifies its row by primary key alone, so
    * this read has to be authoritative. See "Natural keys need a serializable

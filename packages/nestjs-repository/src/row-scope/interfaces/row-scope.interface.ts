@@ -122,7 +122,8 @@ export interface RowScopeWriteParams<
  *
  * One resolver may serve any number of entities: register the same class for
  * each in `forRoot()`. Reads join between entities only when both resolvers
- * are `joinable` on the same columns.
+ * are `joinable` and the root holds the caller to every column the target
+ * does.
  *
  * When scope is equality on entity columns, extend `RowScopeBase` rather than
  * implementing this directly. See the Row Scope section of the README for
@@ -139,16 +140,26 @@ export interface RowScopeInterface<
   readonly scopeColumns?: readonly RowScopeColumn[];
 
   /**
-   * States that every row `scopeQuery` lets any caller read is confined by
-   * exactly equality on `scopeColumns`, to the values under their keys — no
-   * row admitted more broadly, none held back more narrowly.
+   * The scope columns this caller is not held to on reads; every other scope
+   * column is enforced. Writes are never relaxed. Absent, every scope column
+   * is enforced.
+   *
+   * Must be a pure function of `scope`: it is asked again when a read joins.
+   */
+  relaxedColumns?(scope: Scope | undefined): readonly string[];
+
+  /**
+   * States that every row `scopeQuery` lets a caller read is confined by
+   * exactly equality on the scope columns enforced for that caller, to the
+   * values under their keys — no row admitted more broadly, none held back
+   * more narrowly.
    *
    * That lets a read join a relation into rows another joinable resolver
-   * scopes, when each of that resolver's scope columns is also one of this
-   * resolver's, read from the same key, and the join matches it to itself: the
-   * joined rows then carry the values the other resolver would require.
-   * Leave unset and no read joins between this resolver's rows and any other
-   * scoped rows.
+   * scopes, when each column that resolver enforces for the caller is also
+   * enforced by this one, read from the same key, and the join matches it to
+   * itself: the joined rows then carry the values the other resolver would
+   * require. Leave unset and no read joins between this resolver's rows and
+   * any other scoped rows.
    */
   readonly joinable?: boolean;
 

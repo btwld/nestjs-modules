@@ -14,9 +14,9 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  * Reading such a relation would return related rows the caller is not allowed
  * to see: the related entity's resolver never sees a relation read through
  * another entity. Between two scoped entities the relation is allowed, but a
- * read can join it only when both resolvers are joinable on the same scope
- * columns and the join matches them; otherwise its rows are only ever read
- * through their own repository.
+ * read can join it only when both resolvers are joinable, the root holds the
+ * caller to every scope column the target does, and the join matches them;
+ * otherwise its rows are only ever read through their own repository.
  *
  * Rows are matched by URN, not entity name, so this also covers a relation
  * into rows a scoped entity reads under another name, and a many-to-many whose

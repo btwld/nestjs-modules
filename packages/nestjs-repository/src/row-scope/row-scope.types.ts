@@ -1,3 +1,10 @@
+import { type PlainLiteralObject } from '@nestjs/common';
+
+import {
+  type RowScopeColumn,
+  type RowScopeInterface,
+} from './interfaces/row-scope.interface.js';
+
 /**
  * A scope value, or a primary key value, as `RowScopeBase` accepts them.
  */
@@ -14,6 +21,20 @@ export const isScalarValue = (value: unknown): value is ScalarValue =>
  * The columns a principal is confined to, and its value for each.
  */
 export type RowScopeValues = Readonly<Record<string, ScalarValue>>;
+
+/**
+ * The scope columns `resolver` holds this caller to on reads: its scope
+ * columns less those it relaxes for `scope`.
+ */
+export const enforcedScopeColumns = <Scope extends PlainLiteralObject>(
+  resolver: RowScopeInterface<Scope>,
+  scope: Scope | undefined,
+): readonly RowScopeColumn[] => {
+  const relaxed = resolver.relaxedColumns?.(scope) ?? [];
+  return (resolver.scopeColumns ?? []).filter(
+    ({ column }) => !relaxed.includes(column),
+  );
+};
 
 /**
  * Canonical operation constants for row scope callbacks.
