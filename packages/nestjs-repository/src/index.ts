@@ -42,20 +42,20 @@ export {
 export {
   RowScopeOperation,
   RowScopeQueryOperation,
-  RowScopeValues,
   RowScopeWriteOperation,
   ScalarValue,
 } from './row-scope/row-scope.types.js';
 export {
+  RowScopeColumn,
   RowScopeInterface,
   RowScopeQueryParams,
+  RowScopeRepository,
   RowScopeWriteParams,
 } from './row-scope/interfaces/row-scope.interface.js';
 export { RowScopeCtx } from './row-scope/interfaces/row-scope-context.interface.js';
 export {
   RowScopeBase,
   RowScopeBaseOptions,
-  RowScopeBaseRepository,
 } from './row-scope/row-scope-base.js';
 export {
   RowScopeRegistration,

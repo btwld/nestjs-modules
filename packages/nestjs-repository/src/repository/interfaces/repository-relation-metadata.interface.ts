@@ -19,8 +19,17 @@ export interface RepositoryRelationMetadataInterface {
   targetColumns: RepositoryColumnMetadataInterface[];
   /** 'one' for 1:1/N:1, 'many' for 1:N/M:N */
   cardinality: 'one' | 'many';
-  /** Column mapping: from = source entity column, to = target entity column */
+  /**
+   * The column pair rows are matched by — the one onto the primary key, when
+   * there is one: from = source entity column, to = target entity column.
+   */
   on: { from: string; to: string };
+  /**
+   * Every column pair a join of this relation matches, `on` among them — more
+   * than one when the foreign key is composite, e.g. `(tenantId, orderId)`.
+   * Absent means `[on]`. On the owning side it equals `foreignKey`.
+   */
+  joinOn?: { from: string; to: string }[];
   /** Foreign key columns this entity holds; owning side of a to-one relation only. */
   foreignKey?: { from: string; to: string }[];
   /** M:N junction info */

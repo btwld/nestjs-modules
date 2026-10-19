@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { InjectDynamicRepository } from '../../decorators/inject-dynamic-repository.decorator.js';
 import { type RepositoryColumnMetadataInterface } from '../../repository/interfaces/repository-column-metadata.interface.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
-import { type RepositoryInterface } from '../../repository/interfaces/repository.interface.js';
 import { RowScopeBase } from '../../row-scope/row-scope-base.js';
 
 import { type TenantScopeFixture } from './order-row-scope.fixture.js';
@@ -332,56 +330,10 @@ export const CATEGORY_METADATA: RepositoryMetadataInterface<CategoryFixture> = {
   ],
 };
 
-const TENANT = { scopeKey: 'tenantId', column: 'tenantId' } as const;
-
+/** One resolver for every scoped entity in this fixture. */
 @Injectable()
-export class InvoiceRowScopeFixture extends RowScopeBase<
-  InvoiceFixture,
-  TenantScopeFixture
-> {
-  constructor(
-    @InjectDynamicRepository(INVOICE_TOKEN)
-    repo: RepositoryInterface<InvoiceFixture>,
-  ) {
-    super(repo, { ...TENANT, label: 'Invoice' });
-  }
-}
-
-@Injectable()
-export class InvoiceLineRowScopeFixture extends RowScopeBase<
-  InvoiceLineFixture,
-  TenantScopeFixture
-> {
-  constructor(
-    @InjectDynamicRepository(INVOICE_LINE_TOKEN)
-    repo: RepositoryInterface<InvoiceLineFixture>,
-  ) {
-    super(repo, { ...TENANT, label: 'Line' });
-  }
-}
-
-@Injectable()
-export class LineNoteRowScopeFixture extends RowScopeBase<
-  LineNoteFixture,
-  TenantScopeFixture
-> {
-  constructor(
-    @InjectDynamicRepository(LINE_NOTE_TOKEN)
-    repo: RepositoryInterface<LineNoteFixture>,
-  ) {
-    super(repo, { ...TENANT, label: 'Note' });
-  }
-}
-
-@Injectable()
-export class ReceiptRowScopeFixture extends RowScopeBase<
-  ReceiptFixture,
-  TenantScopeFixture
-> {
-  constructor(
-    @InjectDynamicRepository(RECEIPT_TOKEN)
-    repo: RepositoryInterface<ReceiptFixture>,
-  ) {
-    super(repo, { ...TENANT, label: 'Receipt' });
+export class TenantRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
+  constructor() {
+    super({ scope: ['tenantId'] });
   }
 }

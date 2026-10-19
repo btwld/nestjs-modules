@@ -1,10 +1,37 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
+import { type RepositoryInterface } from '../../repository/interfaces/repository.interface.js';
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import {
   type RowScopeQueryOperation,
   type RowScopeWriteOperation,
 } from '../row-scope.types.js';
+
+/**
+ * A scope column, and the `RowScopeCtx` key the caller's value for it is read
+ * from.
+ */
+export interface RowScopeColumn {
+  readonly column: string;
+  readonly key: string;
+}
+
+/**
+ * The repository a write is scoped for, as a resolver sees it: its public
+ * `findOne`, its name and its columns.
+ */
+export interface RowScopeRepository extends Pick<
+  RepositoryInterface<PlainLiteralObject>,
+  'findOne'
+> {
+  readonly metadata: {
+    readonly name: string;
+    readonly columns: readonly {
+      readonly name: string;
+      readonly isPrimary: boolean;
+    }[];
+  };
+}
 
 /**
  * Input handed to `scopeQuery` for a read operation.
@@ -52,6 +79,13 @@ export interface RowScopeWriteParams<
   readonly target: PlainLiteralObject | undefined;
 
   /**
+   * The repository being written, for a pre-check read through its public
+   * `findOne` and for its metadata. One resolver may serve many entities, so
+   * this is how it knows which one.
+   */
+  readonly repository: RowScopeRepository;
+
+  /**
    * The context the driver will run this operation under. See
    * {@link RowScopeQueryParams.ctx}.
    */
@@ -86,6 +120,10 @@ export interface RowScopeWriteParams<
  * The `Scope` type parameter is a convenience for reading the overlay, not a
  * runtime guarantee — validate what you read.
  *
+ * One resolver may serve any number of entities: register the same class for
+ * each in `forRoot()`. Reads join between entities only when both resolvers
+ * are `joinable` on the same columns.
+ *
  * When scope is equality on entity columns, extend `RowScopeBase` rather than
  * implementing this directly. See the Row Scope section of the README for
  * both, and for where scope comes from.
@@ -93,6 +131,27 @@ export interface RowScopeWriteParams<
 export interface RowScopeInterface<
   Scope extends PlainLiteralObject = PlainLiteralObject,
 > {
+  /**
+   * The columns every entity this resolver serves is confined by, each with
+   * the `RowScopeCtx` key its value is read from. Each must be a column of
+   * every entity the resolver is registered for, checked at startup.
+   */
+  readonly scopeColumns?: readonly RowScopeColumn[];
+
+  /**
+   * States that every row `scopeQuery` lets any caller read is confined by
+   * exactly equality on `scopeColumns`, to the values under their keys — no
+   * row admitted more broadly, none held back more narrowly.
+   *
+   * That lets a read join a relation into rows another joinable resolver
+   * scopes, when each of that resolver's scope columns is also one of this
+   * resolver's, read from the same key, and the join matches it to itself: the
+   * joined rows then carry the values the other resolver would require.
+   * Leave unset and no read joins between this resolver's rows and any other
+   * scoped rows.
+   */
+  readonly joinable?: boolean;
+
   /**
    * Return the options the driver should run, scoped to the caller.
    *

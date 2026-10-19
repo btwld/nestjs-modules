@@ -34,6 +34,15 @@ export class OrderLineEntityFixture implements OrderLineFixture {
   declare order?: OrderFixture;
 }
 
+/** A line whose `order` relation joins on `(tenantId, orderId)`. */
+export class TenantOrderLineEntityFixture implements OrderLineFixture {
+  declare id: string;
+  declare tenantId: string;
+  declare sku: string;
+  declare orderId: string;
+  declare order?: OrderFixture;
+}
+
 const column = (
   name: string,
   flags: Partial<RepositoryColumnMetadataInterface> = {},
@@ -81,6 +90,33 @@ export const ORDER_LINE_METADATA: RepositoryMetadataInterface<OrderLineFixture> 
         cardinality: 'one',
         on: { from: 'orderId', to: 'id' },
         foreignKey: [{ from: 'orderId', to: 'id' }],
+      },
+    ],
+  };
+
+/** {@link ORDER_LINE_METADATA}, with the tenant column in the join. */
+export const TENANT_ORDER_LINE_METADATA: RepositoryMetadataInterface<OrderLineFixture> =
+  {
+    ...ORDER_LINE_METADATA,
+    name: 'TenantOrderLine',
+    type: TenantOrderLineEntityFixture,
+    urn: 'urn:memory:TenantOrderLine',
+    relations: [
+      {
+        name: 'order',
+        targetEntity: 'Order',
+        targetUrn: 'urn:memory:Order',
+        targetColumns: ORDER_COLUMNS,
+        cardinality: 'one',
+        on: { from: 'orderId', to: 'id' },
+        joinOn: [
+          { from: 'tenantId', to: 'tenantId' },
+          { from: 'orderId', to: 'id' },
+        ],
+        foreignKey: [
+          { from: 'tenantId', to: 'tenantId' },
+          { from: 'orderId', to: 'id' },
+        ],
       },
     ],
   };

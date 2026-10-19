@@ -2,13 +2,11 @@ import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
 
 import { RuntimeException } from '@concepta/nestjs-core';
 
-import { type RepositoryInterface } from '../repository/interfaces/repository.interface.js';
 import { type WhereClause } from '../repository/interfaces/where-clause.interface.js';
-import { type EntityColumn } from '../repository/repository.types.js';
 import { Where } from '../repository/where.helpers.js';
 
-import { RowScopeBootException } from './exceptions/row-scope-boot.exception.js';
 import {
+  type RowScopeColumn,
   type RowScopeInterface,
   type RowScopeQueryParams,
   type RowScopeWriteParams,
@@ -21,49 +19,24 @@ import {
 } from './row-scope.types.js';
 
 /**
- * The slice of a repository {@link RowScopeBase} needs.
- *
- * `findOne` for the pre-check and `metadata` to discover the primary key
- * columns. Both are public repository methods — row scope is not a repository
- * function, so the adapter interface does not grow to serve it.
- */
-export type RowScopeBaseRepository<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
-> = Pick<RepositoryInterface<Entity>, 'findOne' | 'metadata'>;
-
-/**
  * Configuration for {@link RowScopeBase}.
  */
-export interface RowScopeBaseOptions<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
-> {
+export interface RowScopeBaseOptions {
   /**
-   * Property read off the `RowScopeCtx` values to get the caller's scope value.
-   * Configures the default `resolveScope`; omit only when overriding it.
+   * The columns carrying the caller's scope, e.g. a tenant ID column, on every
+   * entity the resolver serves. A name reads the caller's value from the
+   * `RowScopeCtx` key of the same name; `{ column, key }` names the key.
    */
-  readonly scopeKey?: string;
+  readonly scope: readonly (string | RowScopeColumn)[];
 
   /**
-   * The column carrying the scope value, e.g. a tenant ID column. Configures
-   * the default `resolveScope`; omit only when overriding it.
+   * Let reads join between entities scoped by joinable resolvers on the same
+   * columns. See {@link RowScopeInterface.joinable} for what this states —
+   * leave it off a subclass whose `scopeQuery` reads more broadly or more
+   * narrowly for any caller.
    */
-  readonly column?: EntityColumn<Entity>;
-
-  /** Entity name used in refusal messages. Defaults to `Row`. */
-  readonly label?: string;
+  readonly joinable?: boolean;
 }
-
-/**
- * Required of `RowScopeBase`'s options when `Entity` accepts any property name
- * — `PlainLiteralObject`, the default, or a type extending it — so a resolver
- * that leaves `column` unchecked does not compile. Nothing can supply it; the
- * fix is to name a real entity type.
- */
-export type RowScopeNamedEntity<Entity> = string extends keyof Entity
-  ? {
-      readonly 'Name the entity type, e.g. RowScopeBase<Order, Scope>': never;
-    }
-  : unknown;
 
 /**
  * A ready-to-extend row scope for scope expressed as columns on the entity.
@@ -79,116 +52,69 @@ export type RowScopeNamedEntity<Entity> = string extends keyof Entity
  * 4. The scope columns take precedence over any same-named value in the
  *    payload, and a mismatch is refused.
  *
- * It assumes every scoped entity carries its own scope column, so scope is
- * decided per row without following a relation.
+ * It assumes every scoped entity carries its own scope columns, so scope is
+ * decided per row without following a relation. One resolver serves every
+ * entity registered with it in `forRoot()`; each must have a primary key and
+ * the scope columns, checked at startup.
  *
- * Three extension points, all ordinary overrides:
+ * Two extension points, both ordinary overrides:
  *
- * - `resolveScope` for composite scope, or any mapping from the request's scope
- *   to columns other than the configured one.
  * - `scopeQuery` for a principal that reads more broadly than it writes — an
  *   internal dashboard reading every tenant returns `params.options` unchanged.
  *   That cannot widen a write: the pre-check carries the scope columns in its
- *   own `WHERE`.
+ *   own `WHERE`. Such a resolver is not `joinable`.
  * - `scopeWrite` for a check this class cannot make, such as a foreign key that
  *   must point inside the caller's scope. Call `super.scopeWrite(params)` first.
- *
- * Name the entity type: `column` is then checked against the entity's own
- * columns, so a misspelled scope column is a compile error rather than a boot
- * failure. An entity type that accepts any property name, `PlainLiteralObject`
- * included, does not compile — and neither does a subclass generic over its
- * entity, which cannot know its columns either.
  *
  * @example
  * ```typescript
  * @Injectable()
- * export class OrdersRowScope extends RowScopeBase<Order, TenantScope> {
- *   constructor(
- *     @InjectDynamicRepository(ORDER_TOKEN)
- *     orders: RepositoryInterface<Order>,
- *   ) {
- *     super(orders, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
+ * export class TenantRowScope extends RowScopeBase<TenantScope> {
+ *   constructor() {
+ *     super({ scope: ['tenantId'], joinable: true });
  *   }
  * }
  * ```
  */
 export abstract class RowScopeBase<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
   Scope extends PlainLiteralObject = PlainLiteralObject,
 > implements RowScopeInterface<Scope> {
-  private readonly primaryColumns: EntityColumn<Entity>[];
-  private readonly label: string;
+  readonly scopeColumns: readonly RowScopeColumn[];
+  readonly joinable: boolean;
 
-  constructor(
-    private readonly repo: RowScopeBaseRepository<Entity>,
-    private readonly options: RowScopeBaseOptions<Entity> &
-      RowScopeNamedEntity<Entity>,
-  ) {
-    this.label = options.label ?? 'Row';
-
-    this.primaryColumns = repo.metadata.columns
-      .filter((column) => column.isPrimary)
-      .map((column) => column.name);
-
-    // With no primary key nothing can be identified, so the pre-check would
-    // reduce to the scope columns alone — matching any row in scope rather than
-    // the one named. Fail at boot rather than serve that.
-    if (this.primaryColumns.length === 0) {
-      throw new RowScopeBootException([
-        `${repo.metadata.name} has no primary key column, so ${this.constructor.name} cannot identify a row`,
-      ]);
-    }
-
-    // A column that does not exist would silently scope nothing: the predicate
-    // would filter on a column the driver has never heard of. Only checkable
-    // for the configured path — a subclass overriding `resolveScope` produces
-    // its columns per request, and supplies no configuration to check.
-    const columns = new Set(repo.metadata.columns.map((column) => column.name));
-    if (options.column !== undefined && !columns.has(options.column)) {
-      throw new RowScopeBootException([
-        `${this.constructor.name} declares scope column "${String(options.column)}", ` +
-          `which is not a column on ${repo.metadata.name}`,
-      ]);
-    }
+  constructor(options: RowScopeBaseOptions) {
+    this.scopeColumns = options.scope.map((entry) =>
+      typeof entry === 'string' ? { column: entry, key: entry } : entry,
+    );
+    this.joinable = options.joinable === true;
   }
 
   /**
    * The caller's scope, as the columns it is confined to and their values.
    *
-   * Override for composite scope, or to map the request's scope onto different
-   * columns. **Must be a pure, synchronous function of `scope`** — a write
-   * calls it more than once, re-entrantly, because the pre-check passes back
-   * through `scopeQuery`, and those calls must agree. A value
-   * needing a lookup belongs on the `RowScopeCtx` overlay, attached by an
-   * interceptor before the request reaches a repository.
+   * A pure function of `scope`: a write calls it more than once, re-entrantly,
+   * because the pre-check passes back through `scopeQuery`. A value needing a
+   * lookup belongs on the `RowScopeCtx` overlay, attached by an interceptor
+   * before the request reaches a repository.
    *
-   * Returning no columns means "no scope at all" and is treated as a
-   * misconfiguration: such a principal reads nothing and writes nothing.
+   * No scope columns at all is a misconfiguration, not a superuser: such a
+   * resolver reads nothing and writes nothing.
    */
-  protected resolveScope(scope: Scope | undefined): RowScopeValues<Entity> {
-    const { scopeKey, column } = this.options;
+  private resolveScope(scope: Scope | undefined): RowScopeValues {
+    const values: Record<string, ScalarValue> = {};
 
-    // Unreachable for a configured subclass; guards one that overrides neither
-    // `resolveScope` nor supplies the configuration it reads.
-    if (scopeKey === undefined || column === undefined) {
-      throw new RuntimeException({
-        message:
-          'No scopeKey/column configured for the default row scope resolver',
-        fault: 'usage',
-      });
+    for (const { column, key } of this.scopeColumns) {
+      const value: unknown = scope?.[key];
+
+      if (!isScalarValue(value)) {
+        this.refuse(
+          HttpStatus.FORBIDDEN,
+          'No scope value on the request context',
+        );
+      }
+
+      values[column] = value;
     }
-
-    const value = scope?.[scopeKey];
-
-    if (!isScalarValue(value)) {
-      this.refuse(
-        HttpStatus.FORBIDDEN,
-        'No scope value on the request context',
-      );
-    }
-
-    const values: Partial<Record<EntityColumn<Entity>, ScalarValue>> = {};
-    values[column] = value;
 
     return values;
   }
@@ -220,40 +146,48 @@ export abstract class RowScopeBase<
       case RowScopeOperation.SOFT_DELETE:
       case RowScopeOperation.RESTORE:
         // `value`, not `target`: `value` is what the driver acts on.
-        await this.precheck(this.resolveKey(params.value), values, params.ctx);
+        await this.precheck(
+          params,
+          this.resolveKey(params, params.value),
+          values,
+        );
         return params.value;
 
       case RowScopeOperation.UPDATE:
       case RowScopeOperation.REPLACE:
-        await this.precheck(this.resolveKey(params.target), values, params.ctx);
-        return this.stampOrRefuse(params.value, values);
+        await this.precheck(
+          params,
+          this.resolveKey(params, params.target),
+          values,
+        );
+        return this.stampOrRefuse(params, values);
 
       case RowScopeOperation.UPSERT: {
         // An absent or partial key is refused rather than assumed to be an
         // insert: it cannot be looked up, and a column the caller omitted may
         // be filled by a database default and still land on an existing row.
-        const key = this.resolveKey(params.value);
+        const key = this.resolveKey(params, params.value);
 
         if (key === undefined) {
           this.refuse(
             HttpStatus.BAD_REQUEST,
-            `Upsert requires a complete ${this.label.toLowerCase()} key`,
+            `Upsert requires a complete ${params.repository.metadata.name} key`,
           );
         }
 
         // No target means the key names no row, so the write inserts.
         if (params.target !== undefined) {
-          await this.precheck(key, values, params.ctx);
+          await this.precheck(params, key, values);
         }
 
-        return this.stampOrRefuse(params.value, values);
+        return this.stampOrRefuse(params, values);
       }
 
       case RowScopeOperation.CREATE:
       case RowScopeOperation.CREATE_MANY:
         // No pre-check: a create names no existing row, and the adapter already
         // refuses one whose key is taken, whatever scope owns it.
-        return this.stampOrRefuse(params.value, values);
+        return this.stampOrRefuse(params, values);
     }
   }
 
@@ -267,11 +201,10 @@ export abstract class RowScopeBase<
   /**
    * Rule 1. One `eq` per scope column.
    *
-   * No columns is a misconfiguration, not a superuser: `return {}` is the
-   * natural way to write "this principal has no scope", and it must read
-   * nothing rather than everything.
+   * No columns is a misconfiguration, not a superuser: it must read nothing
+   * rather than everything.
    */
-  private predicatesOf(values: RowScopeValues<Entity>): WhereClause[] {
+  private predicatesOf(values: RowScopeValues): WhereClause[] {
     const columns = Object.keys(values);
 
     if (columns.length === 0) {
@@ -285,16 +218,18 @@ export abstract class RowScopeBase<
    * The primary key `source` names, or `undefined` if any column is missing.
    *
    * The repository hands a resolver only the entity's own columns, so the key
-   * is read off `source`.
+   * is read off `source`. The repository refuses at startup to scope an
+   * entity with no primary key.
    */
   private resolveKey(
+    params: RowScopeWriteParams<PlainLiteralObject, Scope>,
     source: PlainLiteralObject | undefined,
   ): PlainLiteralObject | undefined {
     if (!source) return undefined;
 
     const key: PlainLiteralObject = {};
 
-    for (const column of this.primaryColumns) {
+    for (const column of this.primaryColumnsOf(params)) {
       const value: unknown = source[column];
 
       if (value === undefined) return undefined;
@@ -304,7 +239,7 @@ export abstract class RowScopeBase<
         // 404 that deliberately does not reveal whether a row exists.
         this.refuse(
           HttpStatus.BAD_REQUEST,
-          `Unusable ${this.label.toLowerCase()} key`,
+          `Unusable ${params.repository.metadata.name} key`,
         );
       }
 
@@ -328,27 +263,32 @@ export abstract class RowScopeBase<
    * deleted?" — a restore's target is soft-deleted by definition.
    */
   private async precheck(
+    params: RowScopeWriteParams<PlainLiteralObject, Scope>,
     key: PlainLiteralObject | undefined,
-    values: RowScopeValues<Entity>,
-    ctx: PlainLiteralObject | undefined,
+    values: RowScopeValues,
   ): Promise<void> {
+    const { repository, ctx } = params;
+    const notFound = `${repository.metadata.name} not found`;
+
     if (key === undefined) {
-      this.refuse(HttpStatus.NOT_FOUND, `${this.label} not found`);
+      this.refuse(HttpStatus.NOT_FOUND, notFound);
     }
 
     const conditions = [
-      ...this.primaryColumns.map((column) => Where.eq(column, key[column])),
+      ...this.primaryColumnsOf(params).map((column) =>
+        Where.eq(column, key[column]),
+      ),
       ...this.predicatesOf(values),
     ];
 
-    const found = await this.repo.findOne({
+    const found = await repository.findOne({
       where: conditions.length === 1 ? conditions[0] : Where.and(...conditions),
       withDeleted: true,
       ctx,
     });
 
     if (!found) {
-      this.refuse(HttpStatus.NOT_FOUND, `${this.label} not found`);
+      this.refuse(HttpStatus.NOT_FOUND, notFound);
     }
   }
 
@@ -358,9 +298,11 @@ export abstract class RowScopeBase<
    * Returns a copy rather than stamping the caller's object.
    */
   private stampOrRefuse<Value extends PlainLiteralObject>(
-    value: Value,
-    values: RowScopeValues<Entity>,
+    params: RowScopeWriteParams<Value, Scope>,
+    values: RowScopeValues,
   ): Value {
+    const { value } = params;
+
     if (Object.keys(values).length === 0) {
       this.refuse(HttpStatus.FORBIDDEN, 'Not permitted to write in this scope');
     }
@@ -372,11 +314,19 @@ export abstract class RowScopeBase<
         // Deliberately does not name the column — that leaks scope structure.
         this.refuse(
           HttpStatus.FORBIDDEN,
-          `Refusing to write a ${this.label.toLowerCase()} scoped elsewhere`,
+          `Refusing to write a ${params.repository.metadata.name} scoped elsewhere`,
         );
       }
     }
 
     return Object.assign({ ...value }, values);
+  }
+
+  private primaryColumnsOf(
+    params: RowScopeWriteParams<PlainLiteralObject, Scope>,
+  ): string[] {
+    return params.repository.metadata.columns
+      .filter((column) => column.isPrimary)
+      .map((column) => column.name);
   }
 }

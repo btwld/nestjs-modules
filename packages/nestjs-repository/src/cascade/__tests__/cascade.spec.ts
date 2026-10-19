@@ -14,21 +14,18 @@ import {
   type InvoiceFixture,
   InvoiceLineEntityFixture,
   type InvoiceLineFixture,
-  InvoiceLineRowScopeFixture,
-  InvoiceRowScopeFixture,
   LINE_NOTE_TOKEN,
   LineNoteEntityFixture,
   type LineNoteFixture,
-  LineNoteRowScopeFixture,
   PAYMENT_TOKEN,
   PaymentEntityFixture,
   type PaymentFixture,
   RECEIPT_TOKEN,
   ReceiptEntityFixture,
   type ReceiptFixture,
-  ReceiptRowScopeFixture,
   REFUND_TOKEN,
   RefundEntityFixture,
+  TenantRowScopeFixture,
 } from '../../__fixtures__/memory/cascade.fixture.js';
 import {
   AUTHOR_TAG_TOKEN,
@@ -60,53 +57,40 @@ const ACME = ctxFor({ tenantId: 'acme' });
 const GLOBEX = ctxFor({ tenantId: 'globex' });
 
 @Module({
-  imports: [
-    RepositoryModule.forFeature([
-      INVOICE_TOKEN,
-      INVOICE_LINE_TOKEN,
-      LINE_NOTE_TOKEN,
-      RECEIPT_TOKEN,
-    ]),
-  ],
-  providers: [
-    InvoiceRowScopeFixture,
-    InvoiceLineRowScopeFixture,
-    LineNoteRowScopeFixture,
-    ReceiptRowScopeFixture,
-  ],
-  exports: [
-    InvoiceRowScopeFixture,
-    InvoiceLineRowScopeFixture,
-    LineNoteRowScopeFixture,
-    ReceiptRowScopeFixture,
-  ],
+  providers: [TenantRowScopeFixture],
+  exports: [TenantRowScopeFixture],
 })
 class ResolverModule {}
+
+const TENANT_SCOPED = {
+  access: 'scoped',
+  resolver: TenantRowScopeFixture,
+} as const;
 
 const INVOICES: RepositoryProviderOptions = {
   key: INVOICE_TOKEN,
   entity: InvoiceEntityFixture,
-  rowScope: { access: 'scoped', resolver: InvoiceRowScopeFixture },
+  rowScope: TENANT_SCOPED,
   relations: { lines: { cascade: true }, receipt: { cascade: true } },
 };
 
 const LINES: RepositoryProviderOptions = {
   key: INVOICE_LINE_TOKEN,
   entity: InvoiceLineEntityFixture,
-  rowScope: { access: 'scoped', resolver: InvoiceLineRowScopeFixture },
+  rowScope: TENANT_SCOPED,
   relations: { notes: { cascade: true } },
 };
 
 const NOTES: RepositoryProviderOptions = {
   key: LINE_NOTE_TOKEN,
   entity: LineNoteEntityFixture,
-  rowScope: { access: 'scoped', resolver: LineNoteRowScopeFixture },
+  rowScope: TENANT_SCOPED,
 };
 
 const RECEIPTS: RepositoryProviderOptions = {
   key: RECEIPT_TOKEN,
   entity: ReceiptEntityFixture,
-  rowScope: { access: 'scoped', resolver: ReceiptRowScopeFixture },
+  rowScope: TENANT_SCOPED,
 };
 
 function compile(

@@ -1,3 +1,5 @@
+import { type PlainLiteralObject } from '@nestjs/common';
+
 import { type HookOption } from '@concepta/nestjs-core';
 
 import { type CascadeRelation } from '../../cascade/cascade-writer.js';
@@ -7,6 +9,7 @@ import {
 } from '../../federation/federation-reader.service.js';
 import { type RowScopeRegistration } from '../../row-scope/interfaces/row-scope-registration.interface.js';
 import { type WritePolicyRegistration } from '../../write-policy/interfaces/write-policy-registration.interface.js';
+import { type RepositoryAdapter } from '../repository-adapter.js';
 
 /**
  * What `RepositoryModule.forRoot()` binds to a repository, from its entry.
@@ -28,11 +31,16 @@ export interface RepositoryBindingInterface {
   readonly allowEagerRelations?: boolean;
 
   /**
-   * The relations whose rows, or whose junction rows, have a row scope. A
-   * read cannot join them, since a join would bypass that row scope, unless
-   * they are federated; and the entity cannot allow eager relations.
+   * The relations whose rows, or whose junction rows, have a row scope, each
+   * with the repository of its rows when those are the scoped ones. A read
+   * cannot join them, since a join would bypass that row scope, unless they
+   * are federated or the join stays inside a resolver both entities share;
+   * and the entity cannot allow eager relations.
    */
-  readonly relationsIntoScoped?: readonly string[];
+  readonly relationsIntoScoped?: ReadonlyMap<
+    string,
+    RepositoryAdapter<PlainLiteralObject> | undefined
+  >;
 
   /** The entity's federated relations, and how they are read. */
   readonly federation?: RepositoryFederationBinding;

@@ -15,12 +15,7 @@ import {
 import { RowScopeBase } from '../../row-scope/row-scope-base.js';
 
 import { type TenantScopeFixture } from './order-row-scope.fixture.js';
-import {
-  ORDER_LINE_TOKEN,
-  ORDER_TOKEN,
-  type OrderFixture,
-  type OrderLineFixture,
-} from './order.fixture.js';
+import { ORDER_TOKEN, type OrderFixture } from './order.fixture.js';
 
 /**
  * The README's foreign-key resolver: a line's `orderId` must point at an order
@@ -29,21 +24,12 @@ import {
  * refuses them.
  */
 @Injectable()
-export class OrderLineRowScopeFixture extends RowScopeBase<
-  OrderLineFixture,
-  TenantScopeFixture
-> {
+export class OrderLineRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
   constructor(
-    @InjectDynamicRepository(ORDER_LINE_TOKEN)
-    orderLines: RepositoryInterface<OrderLineFixture>,
     @InjectDynamicRepository(ORDER_TOKEN)
     private readonly orders: RepositoryInterface<OrderFixture>,
   ) {
-    super(orderLines, {
-      scopeKey: 'tenantId',
-      column: 'tenantId',
-      label: 'Order line',
-    });
+    super({ scope: ['tenantId'] });
   }
 
   override scopeQuery<Options extends { where?: WhereClause }>(

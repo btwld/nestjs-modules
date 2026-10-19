@@ -329,6 +329,40 @@ when the table is scoped:
 - a SQLite file reached through two different paths (`./app.sqlite` and an
   absolute path to the same file).
 
+### Joining Scoped Entities
+
+Two entities scoped by `joinable` resolvers on the same columns can be joined
+when the foreign key includes those columns. Declare the relation with a
+composite foreign key, and make the referenced columns unique together:
+
+```ts
+@Entity()
+@Unique(['tenantId', 'id'])
+export class Order {
+  @PrimaryGeneratedColumn() id!: number;
+  @Column() tenantId!: string;
+  @OneToMany(() => OrderLine, (line) => line.order) lines?: OrderLine[];
+}
+
+@Entity()
+export class OrderLine {
+  @PrimaryGeneratedColumn() id!: number;
+  @Column() tenantId!: string;
+  @Column() orderId!: number;
+
+  @ManyToOne(() => Order, (order) => order.lines)
+  @JoinColumn([
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+    { name: 'orderId', referencedColumnName: 'id' },
+  ])
+  order?: Order;
+}
+```
+
+Both `order` and `lines` then report both column pairs, so either side can be
+joined. See "Relations and row scope" in the `@concepta/nestjs-repository`
+README.
+
 ### Transaction Awareness
 
 When a `PlainLiteralObject` context with an active `trx` is provided,

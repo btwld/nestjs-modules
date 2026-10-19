@@ -202,9 +202,13 @@ export abstract class RepositoryAdapter<
    * Separate from `bind()` because the instance comes from DI, through a
    * provider of its own. Until it is attached, the entity refuses every
    * operation rather than run unscoped. Attaches once.
+   *
+   * Refuses an entity without a primary key or without one of the resolver's
+   * `scopeColumns` — checked per entity, since one resolver may serve many.
    */
   setRowScopeResolver(rowScope: RowScopeInterface): void {
-    if (!isRowScopeScoped(this._binding?.rowScope)) {
+    const binding = this._binding;
+    if (!isRowScopeScoped(binding?.rowScope)) {
       throw new RowScopeBootException([
         `"${this.entityKey}" is not bound as scoped, so it takes no row ` +
           'scope resolver.',
@@ -216,6 +220,30 @@ export abstract class RepositoryAdapter<
           'Resolvers are bound once, at startup, and cannot be replaced.',
       ]);
     }
+
+    const resolver = binding.rowScope.resolver.name;
+    const columns = new Set(this.metadata.columns.map(({ name }) => name));
+    const failures = [
+      ...(this.metadata.columns.some(({ isPrimary }) => isPrimary)
+        ? []
+        : [
+            `"${this.entityKey}" has a row scope but no primary key column, ` +
+              'so a write cannot be checked against the one row it names.',
+          ]),
+      ...(rowScope.scopeColumns ?? [])
+        .map(({ column }) => column)
+        .filter((column) => !columns.has(column))
+        .map(
+          (column) =>
+            `${resolver} scopes by "${column}", which is not a column of ` +
+            `"${this.entityKey}". Add it to the entity, or give ` +
+            `"${this.entityKey}" a resolver of its own.`,
+        ),
+    ];
+    if (failures.length > 0) {
+      throw new RowScopeBootException(failures);
+    }
+
     this._rowScope = rowScope;
   }
 
@@ -252,11 +280,15 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * The relations whose rows, or whose junction rows, have a row scope. Read
-   * by the join refusal and the boot checks.
+   * The relations whose rows, or whose junction rows, have a row scope, each
+   * with the repository of its rows when those are the scoped ones. Read by
+   * the join refusal and the boot checks.
    */
-  get relationsIntoScoped(): readonly string[] {
-    return this._binding?.relationsIntoScoped ?? [];
+  get relationsIntoScoped(): ReadonlyMap<
+    string,
+    RepositoryAdapter<PlainLiteralObject> | undefined
+  > {
+    return this._binding?.relationsIntoScoped ?? new Map();
   }
 
   /**
@@ -300,6 +332,50 @@ export abstract class RepositoryAdapter<
       throw new RepositoryUnboundException(this.entityKey);
     }
     return this._binding;
+  }
+
+  /**
+   * A join of `name` whose rows are scoped on the same terms as this entity's:
+   * both resolvers are `joinable`, and each of the target's scope columns is
+   * one of this entity's, read from the same key. Returns the target's scope
+   * columns the join does not match to themselves, and the columns it does
+   * join on. `undefined` for any other relation — including a many-to-many.
+   */
+  private sharedScopeJoin(
+    name: string,
+  ): { missing: string[]; columns: string[] } | undefined {
+    const relation = this.metadata.relations?.find(
+      (each) => each.name === name,
+    );
+    const own = this._rowScope;
+    const theirs = this.relationsIntoScoped.get(name)?._rowScope;
+    const theirColumns = theirs?.scopeColumns ?? [];
+
+    if (
+      !relation ||
+      relation.through ||
+      !own?.joinable ||
+      !theirs?.joinable ||
+      theirColumns.length === 0 ||
+      !theirColumns.every((their) =>
+        own.scopeColumns?.some(
+          ({ column, key }) => column === their.column && key === their.key,
+        ),
+      )
+    ) {
+      return undefined;
+    }
+
+    const pairs = relation.joinOn ?? [relation.on];
+    return {
+      missing: theirColumns
+        .map(({ column }) => column)
+        .filter(
+          (column) =>
+            !pairs.some(({ from, to }) => from === column && to === column),
+        ),
+      columns: pairs.map(({ from }) => from),
+    };
   }
 
   /**
@@ -425,7 +501,9 @@ export abstract class RepositoryAdapter<
    *   never sees.
    * - A relation joined, or tagged on a filter or sort, must be declared.
    * - A relation whose rows have a row scope cannot be joined: the joined
-   *   rows would come back unscoped.
+   *   rows would come back unscoped. Unless both resolvers are joinable on
+   *   the same scope columns and the join matches each — see
+   *   `sharedScopeJoin`.
    * - A relation tagged on a filter or sort must also be joined, so a read
    *   only ever reaches the relations it names in `join`, and its field must
    *   be one of that relation's own columns.
@@ -478,16 +556,36 @@ export abstract class RepositoryAdapter<
     }
 
     // A federated relation is read through the related entity's own
-    // repository, under its row scope, so joining it bypasses nothing.
+    // repository, under its row scope, so joining it bypasses nothing. Nor
+    // does a join between rows scoped on the same terms.
     const intoScoped = joined.find(
       (relation) =>
-        this.relationsIntoScoped.includes(relation) &&
-        !this.federatedRelations.has(relation),
+        this.relationsIntoScoped.has(relation) &&
+        !this.federatedRelations.has(relation) &&
+        this.sharedScopeJoin(relation)?.missing.length !== 0,
     );
+    const shared =
+      intoScoped === undefined ? undefined : this.sharedScopeJoin(intoScoped);
+    if (intoScoped !== undefined && shared !== undefined) {
+      throw new RuntimeException({
+        message:
+          'Cannot join "%s" of %s: the rows it reads are scoped on the same ' +
+          'terms, but the join leaves out %s, so it could reach rows outside ' +
+          'that scope. Make the relation join on (%s).',
+        messageParams: [
+          intoScoped,
+          this.metadata.name,
+          shared.missing.join(', '),
+          [...new Set([...shared.missing, ...shared.columns])].join(', '),
+        ],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
     if (intoScoped !== undefined) {
       throw new RuntimeException({
         message:
-          'Cannot join "%s" on %s: the rows it reads have a row scope, which ' +
+          'Cannot join "%s" of %s: the rows it reads have a row scope, which ' +
           'a join would bypass. Read them through their own repository.',
         messageParams: [intoScoped, this.metadata.name],
         httpStatus: HttpStatus.BAD_REQUEST,
@@ -873,6 +971,7 @@ export abstract class RepositoryAdapter<
       operation,
       value,
       target,
+      repository: this,
       ctx,
       scope: this.resolveRowScopeContext(ctx),
     });

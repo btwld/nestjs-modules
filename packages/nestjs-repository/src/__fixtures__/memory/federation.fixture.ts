@@ -1,10 +1,8 @@
 import { Injectable, type PlainLiteralObject } from '@nestjs/common';
 
-import { InjectDynamicRepository } from '../../decorators/inject-dynamic-repository.decorator.js';
 import { type RepositoryColumnMetadataInterface } from '../../repository/interfaces/repository-column-metadata.interface.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import { type RepositoryRelationMetadataInterface } from '../../repository/interfaces/repository-relation-metadata.interface.js';
-import { type RepositoryInterface } from '../../repository/interfaces/repository.interface.js';
 import { RowScopeBase } from '../../row-scope/row-scope-base.js';
 
 import { type TenantScopeFixture } from './order-row-scope.fixture.js';
@@ -286,32 +284,16 @@ export const DRIFTED_AUTHOR_METADATA: RepositoryMetadataInterface<AuthorFixture>
 
 /** Tenant scoping for authors. */
 @Injectable()
-export class AuthorRowScopeFixture extends RowScopeBase<
-  AuthorFixture,
-  TenantScopeFixture
-> {
-  constructor(
-    @InjectDynamicRepository(AUTHOR_TOKEN)
-    authors: RepositoryInterface<AuthorFixture>,
-  ) {
-    super(authors, {
-      scopeKey: 'tenantId',
-      column: 'tenantId',
-      label: 'Author',
-    });
+export class AuthorRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
+  constructor() {
+    super({ scope: ['tenantId'] });
   }
 }
 
 /** Tenant scoping for posts. */
 @Injectable()
-export class PostRowScopeFixture extends RowScopeBase<
-  PostFixture,
-  TenantScopeFixture
-> {
-  constructor(
-    @InjectDynamicRepository(POST_TOKEN)
-    posts: RepositoryInterface<PostFixture>,
-  ) {
-    super(posts, { scopeKey: 'tenantId', column: 'tenantId', label: 'Post' });
+export class PostRowScopeFixture extends RowScopeBase<TenantScopeFixture> {
+  constructor() {
+    super({ scope: ['tenantId'] });
   }
 }

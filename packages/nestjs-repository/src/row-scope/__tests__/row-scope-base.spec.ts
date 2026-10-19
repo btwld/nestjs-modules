@@ -5,12 +5,12 @@ import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
 import { RuntimeException } from '@concepta/nestjs-core';
 
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
-import { type RowScopeWriteParams } from '../interfaces/row-scope.interface.js';
 import {
-  RowScopeBase,
-  type RowScopeBaseRepository,
-} from '../row-scope-base.js';
-import { RowScopeOperation, type RowScopeValues } from '../row-scope.types.js';
+  type RowScopeRepository,
+  type RowScopeWriteParams,
+} from '../interfaces/row-scope.interface.js';
+import { RowScopeBase, type RowScopeBaseOptions } from '../row-scope-base.js';
+import { RowScopeOperation } from '../row-scope.types.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -80,57 +80,55 @@ const repoWith = (
     );
   });
 
-  const repo: RowScopeBaseRepository<RowFixture> = { findOne, metadata };
+  const repo: RowScopeRepository = { findOne, metadata };
   return { repo, findOne };
 };
 
 const repoOf = (...rows: RowFixture[]) => repoWith(SINGLE_KEY, rows);
 
-/** The default: one column, one value, straight from the options. */
-class TestRowScope extends RowScopeBase<RowFixture, TenantScope> {
-  constructor(repo: RowScopeBaseRepository<RowFixture>) {
-    super(repo, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
+/** Scoped by `tenantId` unless the test configures otherwise. */
+class TestRowScope extends RowScopeBase<TenantScope> {
+  constructor(options: RowScopeBaseOptions = { scope: ['tenantId'] }) {
+    super(options);
   }
 }
 
-/** Returns whatever the test supplies, so any scope shape can be exercised. */
-class BoundRowScope extends RowScopeBase<RowFixture, TenantScope> {
-  constructor(
-    repo: RowScopeBaseRepository<RowFixture>,
-    private readonly values: RowScopeValues<RowFixture>,
-  ) {
-    super(repo, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
-  }
-
-  protected override resolveScope(): RowScopeValues<RowFixture> {
-    return this.values;
-  }
+/** A resolver and the repository it is scoping a write for. */
+interface Scoped {
+  resolver: RowScopeBase<TenantScope>;
+  repository: RowScopeRepository;
 }
 
-const scopeOf = (...rows: RowFixture[]) =>
-  new TestRowScope(repoOf(...rows).repo);
+const scoped = (
+  repository: RowScopeRepository,
+  resolver: RowScopeBase<TenantScope> = new TestRowScope(),
+): Scoped => ({ resolver, repository });
+
+const scopeOf = (...rows: RowFixture[]): Scoped => scoped(repoOf(...rows).repo);
 
 const write = (
-  scope: RowScopeBase<RowFixture, TenantScope>,
+  { resolver, repository }: Scoped,
   overrides: Partial<RowScopeWriteParams<PlainLiteralObject, TenantScope>>,
 ) =>
-  scope.scopeWrite({
+  resolver.scopeWrite({
     operation: RowScopeOperation.UPDATE,
     value: {},
     target: OWN_ROW,
+    repository,
     scope: MINE,
     ctx: undefined,
     ...overrides,
   });
 
 const read = (
-  scope: RowScopeBase<RowFixture, TenantScope>,
+  resolver: RowScopeBase<TenantScope>,
   options: { where?: WhereClause } = {},
+  scope: TenantScope = MINE,
 ) =>
-  scope.scopeQuery({
+  resolver.scopeQuery({
     operation: RowScopeOperation.FIND,
     options,
-    scope: MINE,
+    scope,
     ctx: undefined,
   });
 
@@ -147,55 +145,70 @@ const statusOf = async (run: () => Promise<unknown>): Promise<unknown> => {
 
 describe('RowScopeBase', () => {
   describe('construction', () => {
-    it('refuses an entity with no primary key column', () => {
-      const { repo } = repoWith([column('tenantId')]);
+    it('reports each scope column with the key its value is read from', () => {
+      const resolver = new TestRowScope({
+        scope: ['tenantId', { column: 'region', key: 'area' }],
+      });
 
-      expect(() => new TestRowScope(repo)).toThrow(/has no primary key column/);
+      expect(resolver.scopeColumns).toEqual([
+        { column: 'tenantId', key: 'tenantId' },
+        { column: 'region', key: 'area' },
+      ]);
     });
 
-    it('refuses a scope column that is not on the entity', () => {
-      const { repo } = repoWith([column('id', true)]);
-
-      expect(() => new TestRowScope(repo)).toThrow(/is not a column on Order/);
+    it('is joinable only when configured to be', () => {
+      // Joinable states every read is exactly equality on the scope columns,
+      // which a scopeQuery override may not keep — so never by default.
+      expect(new TestRowScope().joinable).toBe(false);
+      expect(
+        new TestRowScope({ scope: ['tenantId'], joinable: true }).joinable,
+      ).toBe(true);
     });
 
-    it('accepts a scope column that is not a key', () => {
-      // Existence is required; being a key is not. Every scope column in the
-      // fixtures is an ordinary column.
-      expect(() => scopeOf()).not.toThrow();
+    it("reads a column's value from its configured key", () => {
+      const resolver = new TestRowScope({
+        scope: [{ column: 'region', key: 'area' }],
+      });
+
+      expect(read(resolver, {}, { area: 'eu' })).toEqual({
+        where: { field: 'region', operator: 'eq', value: 'eu' },
+      });
+    });
+  });
+
+  describe('one resolver, many entities', () => {
+    it('pre-checks each write against the repository it is for', async () => {
+      const resolver = new TestRowScope();
+      const orders = repoOf(OWN_ROW);
+      const lines = repoOf();
+
+      await write({ resolver, repository: orders.repo }, { target: OWN_ROW });
+      expect(
+        await statusOf(() =>
+          write({ resolver, repository: lines.repo }, { target: OWN_ROW }),
+        ),
+      ).toBe(HttpStatus.NOT_FOUND);
+
+      expect(orders.findOne).toHaveBeenCalledTimes(1);
+      expect(lines.findOne).toHaveBeenCalledTimes(1);
     });
 
-    it('accepts a subclass that overrides resolveScope and configures nothing', () => {
-      // Composite scope supplies its columns per request, so there is no
-      // configuration to validate — and none should be demanded.
-      class Overriding extends RowScopeBase<RowFixture, TenantScope> {
-        protected override resolveScope(): RowScopeValues<RowFixture> {
-          return { tenantId: 'acme' };
-        }
-      }
-
-      expect(() => new Overriding(repoOf().repo, {})).not.toThrow();
-    });
-
-    it('faults as a usage error when the default resolver has no configuration', async () => {
-      class Unconfigured extends RowScopeBase<RowFixture, TenantScope> {}
-      const scope = new Unconfigured(repoOf().repo, {});
+    it('names the entity in its refusals', async () => {
+      const lines = repoWith(SINGLE_KEY);
+      const repository = {
+        ...lines.repo,
+        metadata: { ...lines.repo.metadata, name: 'OrderLine' },
+      };
 
       await expect(
-        scope.scopeWrite({
-          operation: RowScopeOperation.CREATE,
-          value: {},
-          target: undefined,
-          scope: MINE,
-          ctx: undefined,
-        }),
-      ).rejects.toThrow(/No scopeKey\/column configured/);
+        write({ resolver: new TestRowScope(), repository }, {}),
+      ).rejects.toThrow('OrderLine not found');
     });
   });
 
   describe('rule 1 — reads inject the scope columns', () => {
     it('adds an eq predicate for the scope column', () => {
-      expect(read(scopeOf())).toEqual({
+      expect(read(new TestRowScope())).toEqual({
         where: { field: 'tenantId', operator: 'eq', value: 'acme' },
       });
     });
@@ -207,7 +220,7 @@ describe('RowScopeBase', () => {
         value: 'open',
       };
 
-      expect(read(scopeOf(), { where: caller })).toEqual({
+      expect(read(new TestRowScope(), { where: caller })).toEqual({
         where: {
           operator: 'and',
           conditions: [
@@ -221,29 +234,15 @@ describe('RowScopeBase', () => {
     it('reads nothing when the scope resolves to no columns', () => {
       // `return {}` is the natural way to write "this principal has no scope".
       // It must read nothing rather than everything.
-      const scope = new BoundRowScope(repoOf().repo, {});
-
-      expect(
-        scope.scopeQuery({
-          operation: RowScopeOperation.FIND,
-          options: {},
-          scope: MINE,
-          ctx: undefined,
-        }),
-      ).toEqual({ where: { never: true } });
+      expect(read(new TestRowScope({ scope: [] }))).toEqual({
+        where: { never: true },
+      });
     });
 
     it('refuses a non-scalar scope value', async () => {
-      const scope = scopeOf();
-
       expect(
         await statusOf(async () =>
-          scope.scopeQuery({
-            operation: RowScopeOperation.FIND,
-            options: {},
-            scope: { tenantId: null },
-            ctx: undefined,
-          }),
+          read(new TestRowScope(), {}, { tenantId: null }),
         ),
       ).toBe(HttpStatus.FORBIDDEN);
     });
@@ -252,7 +251,7 @@ describe('RowScopeBase', () => {
   describe('rule 2 — the write pre-check', () => {
     it('queries on the primary key and the scope column together', async () => {
       const { repo, findOne } = repoOf(OWN_ROW);
-      await write(new TestRowScope(repo), { target: OWN_ROW });
+      await write(scoped(repo), { target: OWN_ROW });
 
       expect(findOne).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -288,7 +287,7 @@ describe('RowScopeBase', () => {
       const { repo, findOne } = repoOf(OWN_ROW);
       const ctx = { marker: 'trx' };
 
-      await write(new TestRowScope(repo), { target: OWN_ROW, ctx });
+      await write(scoped(repo), { target: OWN_ROW, ctx });
 
       expect(findOne).toHaveBeenCalledWith(expect.objectContaining({ ctx }));
     });
@@ -297,7 +296,7 @@ describe('RowScopeBase', () => {
       const { repo, findOne } = repoWith(COMPOSITE_KEY, [
         { slug: 'a', locale: 'en', tenantId: 'acme' },
       ]);
-      const scope = new TestRowScope(repo);
+      const scope = scoped(repo);
 
       await write(scope, { target: { slug: 'a', locale: 'en' } });
 
@@ -321,9 +320,7 @@ describe('RowScopeBase', () => {
       ]);
 
       expect(
-        await statusOf(() =>
-          write(new TestRowScope(repo), { target: { slug: 'a' } }),
-        ),
+        await statusOf(() => write(scoped(repo), { target: { slug: 'a' } })),
       ).toBe(HttpStatus.NOT_FOUND);
       expect(findOne).not.toHaveBeenCalled();
     });
@@ -344,7 +341,7 @@ describe('RowScopeBase', () => {
         const { repo, findOne } = repoOf();
 
         await expect(
-          write(new TestRowScope(repo), { operation, value: { name: 'x' } }),
+          write(scoped(repo), { operation, value: { name: 'x' } }),
         ).resolves.toEqual({ name: 'x', tenantId: 'acme' });
         expect(findOne).not.toHaveBeenCalled();
       },
@@ -382,16 +379,16 @@ describe('RowScopeBase', () => {
     });
 
     it('refuses every write when the scope resolves to no columns', async () => {
-      const scope = new BoundRowScope(repoOf(OWN_ROW).repo, {});
+      const scope = scoped(
+        repoOf(OWN_ROW).repo,
+        new TestRowScope({ scope: [] }),
+      );
 
       expect(
         await statusOf(() =>
-          scope.scopeWrite({
+          write(scope, {
             operation: RowScopeOperation.CREATE,
-            value: {},
             target: undefined,
-            scope: MINE,
-            ctx: undefined,
           }),
         ),
       ).toBe(HttpStatus.FORBIDDEN);
@@ -402,7 +399,7 @@ describe('RowScopeBase', () => {
     it('takes its key from the value and pre-checks it', async () => {
       const { repo, findOne } = repoOf(OWN_ROW);
 
-      await write(new TestRowScope(repo), {
+      await write(scoped(repo), {
         operation: RowScopeOperation.UPSERT,
         value: { id: 'row-1' },
         // The adapter found a row for this key, so the conflict clause can
@@ -430,7 +427,7 @@ describe('RowScopeBase', () => {
       const { repo, findOne } = repoOf();
 
       await expect(
-        write(new TestRowScope(repo), {
+        write(scoped(repo), {
           operation: RowScopeOperation.UPSERT,
           value: { id: 'row-new', name: 'x' },
           target: undefined,
@@ -472,7 +469,7 @@ describe('RowScopeBase', () => {
 
       expect(
         await statusOf(() =>
-          write(new TestRowScope(repo), {
+          write(scoped(repo), {
             operation: RowScopeOperation.UPSERT,
             value: { slug: 'a' },
             target: undefined,
@@ -549,44 +546,28 @@ describe('RowScopeBase', () => {
     const ADMIN = { tenantId: 'acme', role: 'admin' };
 
     it('reads without a scope predicate', () => {
-      const scope = new AdminReadableScope(repoOf(OWN_ROW, FOREIGN_ROW).repo);
-
-      expect(
-        scope.scopeQuery({
-          operation: RowScopeOperation.FIND,
-          options: {},
-          scope: ADMIN,
-          ctx: undefined,
-        }),
-      ).toEqual({});
+      expect(read(new AdminReadableScope(), {}, ADMIN)).toEqual({});
     });
 
     it('still cannot write outside its own scope', async () => {
-      const scope = new AdminReadableScope(repoOf(FOREIGN_ROW).repo);
+      const scope = scoped(repoOf(FOREIGN_ROW).repo, new AdminReadableScope());
 
       expect(
         await statusOf(() =>
-          scope.scopeWrite({
-            operation: RowScopeOperation.UPDATE,
-            value: {},
-            target: FOREIGN_ROW,
-            scope: ADMIN,
-            ctx: undefined,
-          }),
+          write(scope, { target: FOREIGN_ROW, scope: ADMIN }),
         ),
       ).toBe(HttpStatus.NOT_FOUND);
     });
 
     it('still stamps its own scope on a create', async () => {
-      const scope = new AdminReadableScope(repoOf().repo);
+      const scope = scoped(repoOf().repo, new AdminReadableScope());
 
       await expect(
-        scope.scopeWrite({
+        write(scope, {
           operation: RowScopeOperation.CREATE,
           value: { name: 'x' },
           target: undefined,
           scope: ADMIN,
-          ctx: undefined,
         }),
       ).resolves.toEqual({ name: 'x', tenantId: 'acme' });
     });
@@ -597,28 +578,22 @@ describe('RowScopeBase', () => {
       const { repo, findOne } = repoWith(SINGLE_KEY, [
         { id: 'row-1', tenantId: 'acme', region: 'eu' },
       ]);
-      const scope = new BoundRowScope(repo, {
-        tenantId: 'acme',
-        region: 'eu',
-      });
+      const scope = scoped(
+        repo,
+        new TestRowScope({ scope: ['tenantId', 'region'] }),
+      );
+      const caller = { tenantId: 'acme', region: 'eu' };
 
       await expect(
-        scope.scopeWrite({
+        write(scope, {
           operation: RowScopeOperation.CREATE,
           value: { name: 'x' },
           target: undefined,
-          scope: MINE,
-          ctx: undefined,
+          scope: caller,
         }),
       ).resolves.toEqual({ name: 'x', tenantId: 'acme', region: 'eu' });
 
-      await scope.scopeWrite({
-        operation: RowScopeOperation.UPDATE,
-        value: {},
-        target: { id: 'row-1' },
-        scope: MINE,
-        ctx: undefined,
-      });
+      await write(scope, { target: { id: 'row-1' }, scope: caller });
 
       expect(findOne).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -641,16 +616,8 @@ describe('RowScopeBase', () => {
         [column('id', true), column('tenantId')],
         [{ id: 7, tenantId: 42 }],
       );
-      const scope = new BoundRowScope(repo, { tenantId: 42 });
-
       await expect(
-        scope.scopeWrite({
-          operation: RowScopeOperation.UPDATE,
-          value: {},
-          target: { id: 7 },
-          scope: MINE,
-          ctx: undefined,
-        }),
+        write(scoped(repo), { target: { id: 7 }, scope: { tenantId: 42 } }),
       ).resolves.toEqual({ tenantId: 42 });
     });
   });

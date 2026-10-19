@@ -694,7 +694,7 @@ A read reaches another table only through a relation it names in `join`:
 | a relation in `join`, and a `Where.rel()` filter or relation sort on a joined relation | passed to the driver |
 | a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`) |
 | a relation that is not declared | refused (`400`) |
-| a relation into rows that have a row scope, in `join` | refused (`400`); see [Relations and row scope](#relations-and-row-scope) |
+| a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable` on the same columns and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
 | a `Where.rel()` filter or relation sort on a relation missing from `join` | refused (`400`); add it to `join` |
 | a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
 | a sort direction other than `ASC` or `DESC` | refused (`400`) |
@@ -1717,7 +1717,7 @@ the request's `ctx`.
 Every entity is scoped, public, or undeclared:
 
 ```ts
-rowScope: { access: 'scoped', resolver: OrdersRowScope }
+rowScope: { access: 'scoped', resolver: TenantRowScope }
 rowScope: { access: 'public', reason: 'shared reference data, not tenant-owned' }
 ```
 
@@ -1738,11 +1738,6 @@ interface TenantScope {
 
 @Injectable()
 export class OrdersRowScope implements RowScopeInterface<TenantScope> {
-  constructor(
-    @InjectDynamicRepository('orders')
-    private readonly orders: RepositoryInterface<Order>,
-  ) {}
-
   scopeQuery<Options extends { where?: WhereClause }>(
     params: RowScopeQueryParams<Options, TenantScope>,
   ): Options {
@@ -1769,14 +1764,14 @@ export class OrdersRowScope implements RowScopeInterface<TenantScope> {
 }
 ```
 
-A resolver may read back through the repository it scopes — that nested read
-is itself scoped, which is the point. Its module imports the repository like
-any other, and that is not a circular dependency, because a repository never
-depends on its resolver:
+A write also hands the resolver `params.repository`, the repository being
+written, so one resolver serving several entities can read back the row a write
+names. That read is itself scoped.
+
+Provide the resolver from a module that `forRoot()` imports:
 
 ```ts
 @Module({
-  imports: [RepositoryModule.forFeature(['orders'])],
   providers: [OrdersRowScope],
   exports: [OrdersRowScope],
 })
@@ -1790,14 +1785,33 @@ Most resolvers are the same shape: one or more columns carry the scope value.
 
 ```ts
 @Injectable()
-export class OrdersRowScope extends RowScopeBase<Order, TenantScope> {
-  constructor(
-    @InjectDynamicRepository('orders')
-    orders: RepositoryInterface<Order>,
-  ) {
-    super(orders, { scopeKey: 'tenantId', column: 'tenantId', label: 'Order' });
+export class TenantRowScope extends RowScopeBase<TenantScope> {
+  constructor() {
+    super({ scope: ['tenantId'], joinable: true });
   }
 }
+```
+
+`scope` names the columns carrying the caller's scope. Each column's value is
+read from the `RowScopeCtx` key of the same name; when the key is named
+differently, write `{ column: 'tenantId', key: 'tenant' }`. `joinable` lets
+reads [join](#relations-and-row-scope) between scoped entities.
+
+Register it for every tenant-owned entity:
+
+```ts
+entities: [
+  {
+    key: 'orders',
+    entity: Order,
+    rowScope: { access: 'scoped', resolver: TenantRowScope },
+  },
+  {
+    key: 'order-lines',
+    entity: OrderLine,
+    rowScope: { access: 'scoped', resolver: TenantRowScope },
+  },
+],
 ```
 
 It implements four rules and nothing else:
@@ -1816,15 +1830,13 @@ It implements four rules and nothing else:
 4. **The scope columns take precedence** over any same-named value in the
    payload, and a mismatch is refused rather than rewritten.
 
-Name your entity type, as `RowScopeBase<Order, TenantScope>` does: `column` is
-then checked against `Order`'s columns, so a misspelling is a compile error. An
-entity type that accepts any property name, such as `PlainLiteralObject`, does
-not compile, and neither does a subclass that is generic over its entity.
+Each write is pre-checked against the repository it is for, and refusals name
+that entity. Every entity registered with the resolver must have each `scope`
+column; startup refuses one that doesn't.
 
-`label` defaults to `Row`. Scope values and primary keys may be strings or
-numbers. Primary key columns are read from the entity's own metadata, so
-composite primary keys work too — a key counts as naming a row only when every
-primary column is present.
+Scope values and primary keys may be strings or numbers. Primary key columns
+are read from the entity's own metadata, so composite primary keys work too — a
+key counts as naming a row only when every primary column is present.
 
 It assumes **every scoped entity carries its own scope column**, so scope is
 decided per row without following a relation. That assumption is what makes the
@@ -1832,29 +1844,20 @@ rest simple (see [Relations and row scope](#relations-and-row-scope)).
 
 #### Composite scope
 
-Override `resolveScope` to return more than one column. The same values are used
-for the read predicate, the write pre-check and the stamp, so they cannot drift
-apart:
+List more than one column. The same values are used for the read predicate,
+the write pre-check and the stamp, so they cannot drift apart:
 
 ```ts
-protected override resolveScope(
-  scope: TenantScope | undefined,
-): RowScopeValues<Order> {
-  const { tenantId, region } = scope ?? {};
-
-  if (typeof tenantId !== 'string' || typeof region !== 'string') {
-    this.refuse(HttpStatus.FORBIDDEN, 'No scope on the request context');
-  }
-
-  return { tenantId, region };
-}
+super({ scope: ['tenantId', 'region'], joinable: true });
 ```
 
-Returning no columns is treated as a misconfiguration rather than as a
-superuser: such a principal reads nothing (`Where.never()`) and writes nothing.
+A caller missing any of the values is refused with a `403`. An empty `scope` is
+treated as a misconfiguration rather than as a superuser: the resolver reads
+nothing (`Where.never()`) and writes nothing.
 
-A subclass overriding `resolveScope` supplies no `scopeKey`/`column`, and none is
-required of it.
+Scope that is not equality on columns — a set of tenants, a rule that varies by
+caller — is not this class's job; implement
+[`RowScopeInterface`](#when-not-to-use-it) directly.
 
 #### Reading more broadly than you write
 
@@ -1875,28 +1878,26 @@ That cannot widen a write. The write pre-check carries the scope columns in its
 own `WHERE`, so the override leaves every write confined to the caller's own
 scope, and a `create` is still stamped with it.
 
+It does widen reads, so leave `joinable` off such a resolver — see
+[Relations and row scope](#relations-and-row-scope).
+
 #### Checks this class cannot make
 
 A foreign key that must point inside the caller's scope is the common case:
 nothing about a scoped read on the child says which parent a child points at.
-Override `scopeWrite`, calling `super` first. Note the constructor: `RowScopeBase`
-keeps the repository it was given private, so a subclass that needs to read —
-either its own rows or another entity's — injects what it needs itself:
+Give the child its own resolver, override `scopeWrite` (call `super` first), and
+inject the repository to read. Its module imports that repository with
+`RepositoryModule.forFeature(['orders'])` — not a circular dependency, since a
+repository never depends on its resolver:
 
 ```ts
 @Injectable()
-export class OrderLinesRowScope extends RowScopeBase<OrderLine, TenantScope> {
+export class OrderLinesRowScope extends RowScopeBase<TenantScope> {
   constructor(
-    @InjectDynamicRepository('order-lines')
-    orderLines: RepositoryInterface<OrderLine>,
     @InjectDynamicRepository('orders')
     private readonly orders: RepositoryInterface<Order>,
   ) {
-    super(orderLines, {
-      scopeKey: 'tenantId',
-      column: 'tenantId',
-      label: 'Order line',
-    });
+    super({ scope: ['tenantId'], joinable: true });
   }
 
   override async scopeWrite<Value extends PlainLiteralObject>(
@@ -1933,7 +1934,8 @@ on which side has a row scope:
 
 | From → to | A relation |
 | --- | --- |
-| scoped → scoped | allowed, but **never joined**: see below |
+| scoped → scoped, both `joinable` on the same columns | allowed, **joinable when the join includes those columns**: see below |
+| any other scoped → scoped | allowed, but **never joined**: see below |
 | unscoped → unscoped | allowed |
 | unscoped → scoped | **refused at startup**: reading it would return rows the caller is not allowed to see |
 
@@ -1955,12 +1957,44 @@ scope. For access that must see every scope, such as a back-office report or a
 seeder, go through the scoped repository with a `ctx` your resolver recognises
 and leaves unnarrowed.
 
-A relation between two scoped entities stays declared, but no read can join
-it: a `join` naming it is refused with a `400`, and the entity cannot set
-`allowEagerRelations` (startup refuses it). That includes a scoped entity's
-relation to its own rows, such as an employee's `manager` or `reports`. Read
-the related rows through their own repository, with the caller's `ctx`, so
-their resolver runs:
+**Joining between scoped entities.** A read can join a relation between two
+scoped entities when:
+
+- both resolvers are `joinable` — the same class or not;
+- each scope column of the related entity's resolver is also one of this
+  entity's, read from the same `RowScopeCtx` key;
+- the join matches each of those columns to itself — that is, the foreign key
+  includes it: `(tenantId, orderId)` pointing at the order's `(tenantId, id)`.
+
+If the join leaves a scope column out, it is refused with a `400` that names
+the columns to join on.
+
+```ts
+const lines = await orderLines.find({ join: [{ relation: 'order' }], ctx });
+```
+
+The joined rows carry the caller's `tenantId` already, so the related
+resolver's check is satisfied by construction. How to declare the foreign key
+is your driver's business; see its README.
+
+`joinable` is your statement that the resolver reads exactly by its scope
+columns, for every caller. Leave it off one whose `scopeQuery` reads more for
+some callers or rows — every tenant for an admin, shared public rows — or less,
+such as only a caller's own rows: a join would hand out rows the related
+resolver would not.
+
+A composite foreign key also settles which order a line may point at, when the
+database enforces it and its columns are not nullable: the database refuses a
+line whose `orderId` names another tenant's order, so the line needs no foreign
+key check of [its own](#checks-this-class-cannot-make).
+
+**Every other relation between two scoped entities** stays declared, but no
+read can join it: a `join` naming it is refused with a `400`. That covers a
+resolver that is not `joinable`, rows scoped on other columns — tenant-scoped
+orders joining notes scoped by their owner — a many-to-many,
+and a scoped entity's relation to its own rows without the scope column in the
+join, such as an employee's `manager` or `reports`. Read the related rows
+through their own repository, with the caller's `ctx`, so their resolver runs:
 
 ```ts
 const line = await orderLines.findOne({ where: Where.eq('id', id), ctx });
@@ -1969,10 +2003,14 @@ const order =
   (await orders.findOne({ where: Where.eq('id', line.orderId), ctx }));
 ```
 
-Keep each resolver checking the foreign keys it owns on write
-([above](#checks-this-class-cannot-make)). `RowScopeBase` does not do this for
-you, so without that override a line can name another scope's order. Reading
-through `orders` still returns nothing for it, but the line points there.
+No entity with a relation into scoped rows can set `allowEagerRelations`, even
+a joinable one (startup refuses it): eager loading is a join no read asked for.
+
+Without a composite foreign key, keep each resolver checking the foreign keys
+it owns on write ([above](#checks-this-class-cannot-make)). `RowScopeBase` does
+not do this for you, so without that override a line can name another scope's
+order. Reading through `orders` still returns nothing for it, but the line
+points there.
 
 Writes never cross a relation on their own: a relation in a write payload is
 refused unless it is marked [`cascade`](#cascading-writes), and a cascade
@@ -2105,13 +2143,11 @@ Structural only — nothing probes what a resolver decides:
   ([Relations and row scope](#relations-and-row-scope));
 - no entity that sets `allowEagerRelations` has a relation into rows with a
   row scope, its own included;
-- with `requireRowScopeDeclaration`, every entity carries a declaration.
-
-A `RowScopeBase` subclass adds two of its own, at construction: the entity must
-declare a primary key column (with none, the write pre-check would reduce to the
-scope columns alone and match any row in scope), and a configured `column` must
-actually exist on the entity. A subclass overriding `resolveScope` configures no
-column, so only the first applies to it.
+- with `requireRowScopeDeclaration`, every entity carries a declaration;
+- every scoped entity has a primary key column (with none, a write pre-check
+  would reduce to the scope columns alone and match any row in scope), and each
+  of its resolver's scope columns (`scope` on `RowScopeBase`). A resolver
+  serving several entities is checked against each.
 
 ## Write Policy
 

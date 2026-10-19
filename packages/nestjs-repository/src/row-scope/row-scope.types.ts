@@ -1,7 +1,3 @@
-import { type PlainLiteralObject } from '@nestjs/common';
-
-import { type EntityColumn } from '../repository/repository.types.js';
-
 /**
  * A scope value, or a primary key value, as `RowScopeBase` accepts them.
  */
@@ -16,14 +12,8 @@ export const isScalarValue = (value: unknown): value is ScalarValue =>
 
 /**
  * The columns a principal is confined to, and its value for each.
- *
- * Returned by `RowScopeBase.resolveScope`. The class derives the read
- * predicate, the write pre-check and the stamp from it — one value per column,
- * used for all three, so they cannot drift apart.
  */
-export type RowScopeValues<
-  Entity extends PlainLiteralObject = PlainLiteralObject,
-> = Readonly<Partial<Record<EntityColumn<Entity>, ScalarValue>>>;
+export type RowScopeValues = Readonly<Record<string, ScalarValue>>;
 
 /**
  * Canonical operation constants for row scope callbacks.

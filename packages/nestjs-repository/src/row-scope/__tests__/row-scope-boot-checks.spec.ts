@@ -58,7 +58,9 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
       name: entityName,
       type: EntityClass as Type<PlainLiteralObject>,
       urn,
-      columns: [],
+      columns: [
+        { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
+      ],
       relations,
     };
   }
@@ -285,19 +287,60 @@ describe('row scope boot checks', () => {
       }),
     });
 
-    it('names a relation into scoped rows, or through scoped junction rows', () => {
+    it('names a relation into scoped rows, or through scoped junction rows, with the repository of scoped rows', () => {
       const adapter = new StubAdapter('users', 'User', scoped, [
         relation('orders', 'urn:memory:Order'),
         relation('roles', 'urn:memory:Role', 'urn:memory:Assignment'),
         relation('tags', 'urn:memory:Tag', 'urn:memory:UserTag'),
       ]);
+      const orders = new StubAdapter('orders', 'Order', scoped);
 
       expect(
         findRelationsIntoScoped(
           adapter.metadata,
           new Set(['urn:memory:Order', 'urn:memory:Assignment']),
+          new Map([['urn:memory:Order', orders]]),
         ),
-      ).toEqual(['orders', 'roles']);
+      ).toEqual(
+        new Map([
+          ['orders', orders],
+          ['roles', undefined],
+        ]),
+      );
+    });
+  });
+
+  describe('attaching a resolver', () => {
+    // The stub reports one column, its primary key `id`.
+    class TenantResolver extends Resolver {
+      readonly scopeColumns = [{ column: 'tenantId', key: 'tenantId' }];
+    }
+
+    class KeylessAdapter extends StubAdapter {
+      override readonly metadata: RepositoryMetadataInterface<PlainLiteralObject> =
+        { ...this.metadata, columns: [] };
+    }
+
+    it('refuses an entity with no primary key, naming it', () => {
+      expect(() =>
+        new KeylessAdapter('orders', 'Order', scoped).setRowScopeResolver(
+          new Resolver(),
+        ),
+      ).toThrow(
+        '"orders" has a row scope but no primary key column, so a write ' +
+          'cannot be checked against the one row it names.',
+      );
+    });
+
+    it('refuses a scope column the entity does not have, naming it', () => {
+      expect(() =>
+        new StubAdapter('orders', 'Order', scoped).setRowScopeResolver(
+          new TenantResolver(),
+        ),
+      ).toThrow(
+        'Resolver scopes by "tenantId", which is not a column of "orders". ' +
+          'Add it to the entity, or give "orders" a resolver of its own.',
+      );
     });
   });
 

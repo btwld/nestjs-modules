@@ -13,9 +13,10 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  *
  * Reading such a relation would return related rows the caller is not allowed
  * to see: the related entity's resolver never sees a relation read through
- * another entity. Between two scoped entities the relation is allowed, but no
- * read can join it, so its rows are only ever read through their own
- * repository.
+ * another entity. Between two scoped entities the relation is allowed, but a
+ * read can join it only when both resolvers are joinable on the same scope
+ * columns and the join matches them; otherwise its rows are only ever read
+ * through their own repository.
  *
  * Rows are matched by URN, not entity name, so this also covers a relation
  * into rows a scoped entity reads under another name, and a many-to-many whose
@@ -58,19 +59,25 @@ export function checkRelationsIntoScoped(adapters: AnyAdapter[]): string[] {
 
 /**
  * The relations in `metadata` whose rows, or whose junction rows, are among
- * `scopedUrns`.
+ * `scopedUrns`, each with the repository of its rows when those are scoped.
  */
 export function findRelationsIntoScoped(
   metadata: RepositoryMetadataInterface<PlainLiteralObject>,
   scopedUrns: ReadonlySet<string>,
-): string[] {
-  return (metadata.relations ?? [])
-    .filter(
-      ({ targetUrn, through }) =>
-        scopedUrns.has(targetUrn) ||
-        (through !== undefined && scopedUrns.has(through.urn)),
-    )
-    .map(({ name }) => name);
+  adaptersByUrn: ReadonlyMap<string, AnyAdapter>,
+): Map<string, AnyAdapter | undefined> {
+  return new Map(
+    (metadata.relations ?? [])
+      .filter(
+        ({ targetUrn, through }) =>
+          scopedUrns.has(targetUrn) ||
+          (through !== undefined && scopedUrns.has(through.urn)),
+      )
+      .map(({ name, targetUrn }) => [
+        name,
+        scopedUrns.has(targetUrn) ? adaptersByUrn.get(targetUrn) : undefined,
+      ]),
+  );
 }
 
 /**
@@ -84,7 +91,7 @@ export function checkEagerRelationsIntoScoped(
   return adapters
     .filter(
       (adapter) =>
-        adapter.allowsEagerRelations && adapter.relationsIntoScoped.length > 0,
+        adapter.allowsEagerRelations && adapter.relationsIntoScoped.size > 0,
     )
     .map((adapter) => {
       const targets = new Map(
@@ -93,7 +100,7 @@ export function checkEagerRelationsIntoScoped(
           targetEntity,
         ]),
       );
-      const relations = adapter.relationsIntoScoped
+      const relations = [...adapter.relationsIntoScoped.keys()]
         .map((name) => `"${name}" (${targets.get(name)} rows)`)
         .join(', ');
 

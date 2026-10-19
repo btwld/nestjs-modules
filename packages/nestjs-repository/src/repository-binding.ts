@@ -173,6 +173,7 @@ export function bindRepositories(params: {
       relationsIntoScoped: findRelationsIntoScoped(
         adapter.metadata,
         scopedUrns,
+        adaptersByUrn,
       ),
       federation: federated.relations.size
         ? { reader, relations: federated.relations, maxKeys }

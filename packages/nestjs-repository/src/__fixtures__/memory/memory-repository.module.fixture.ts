@@ -56,6 +56,8 @@ import {
   ORDER_METADATA,
   OrderEntityFixture,
   OrderLineEntityFixture,
+  TENANT_ORDER_LINE_METADATA,
+  TenantOrderLineEntityFixture,
 } from './order.fixture.js';
 import {
   NOTE_METADATA,
@@ -83,6 +85,7 @@ const ADAPTERS = new Map<
   [RefundEntityFixture, memory(REFUND_METADATA)],
   [BundleEntityFixture, memory(BUNDLE_METADATA)],
   [CategoryEntityFixture, memory(CATEGORY_METADATA)],
+  [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
   [
     OrderEntityFixture,
     (key, options) => new MemoryRepositoryFixture(key, ORDER_METADATA, options),

@@ -5,6 +5,7 @@ import {
   Module,
   type ModuleMetadata,
   Scope,
+  type Type,
 } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
@@ -14,7 +15,10 @@ import { type MemoryRepositoryFixture } from '../../__fixtures__/memory/memory-r
 import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-repository.module.fixture.js';
 import { OrderLineRowScopeFixture } from '../../__fixtures__/memory/order-line-row-scope.fixture.js';
 import {
+  JoinableTenantRowScopeFixture,
   OrderRowScopeFixture,
+  OrgRowScopeFixture,
+  OtherJoinableTenantRowScopeFixture,
   type TenantScopeFixture,
 } from '../../__fixtures__/memory/order-row-scope.fixture.js';
 import {
@@ -24,8 +28,8 @@ import {
   type OrderFixture,
   OrderLineEntityFixture,
   type OrderLineFixture,
+  TenantOrderLineEntityFixture,
 } from '../../__fixtures__/memory/order.fixture.js';
-import { InjectDynamicRepository } from '../../decorators/inject-dynamic-repository.decorator.js';
 import { RelationWriteException } from '../../exceptions/relation-write.exception.js';
 import { RepositoryBootException } from '../../exceptions/repository-boot.exception.js';
 import { RepositoryUnboundException } from '../../exceptions/repository-unbound.exception.js';
@@ -36,14 +40,16 @@ import {
 import { type RepositoryModuleOptionsInterface } from '../../interfaces/repository-module-options.interface.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
 import { type RepositoryFindOptions } from '../../repository/interfaces/repository-options.interface.js';
-import { type RepositoryInterface } from '../../repository/interfaces/repository.interface.js';
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import { Where } from '../../repository/where.helpers.js';
 import { RepositoryModule } from '../../repository.module.js';
 import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-token.js';
 import { RowScopeBootException } from '../exceptions/row-scope-boot.exception.js';
 import { RowScopeCtx } from '../interfaces/row-scope-context.interface.js';
-import { type RowScopeQueryParams } from '../interfaces/row-scope.interface.js';
+import {
+  type RowScopeInterface,
+  type RowScopeQueryParams,
+} from '../interfaces/row-scope.interface.js';
 
 const ctxFor = (scope: TenantScopeFixture): AppContextHost => {
   const ctx = new AppContextHost();
@@ -56,7 +62,7 @@ const JOIN_REFUSAL = {
   httpStatus: HttpStatus.BAD_REQUEST,
   fault: 'client',
   message:
-    'Cannot join "order" on OrderLine: the rows it reads have a row scope, ' +
+    'Cannot join "order" of OrderLine: the rows it reads have a row scope, ' +
     'which a join would bypass. Read them through their own repository.',
 };
 
@@ -379,6 +385,120 @@ describe('a join into another scoped entity added after the caller', () => {
   });
 });
 
+describe('a join between entities scoped on the same terms', () => {
+  const join = [{ relation: 'order' }];
+  // The memory driver refuses every join, so reaching it is the pass.
+  const REACHED = 'Error while trying to query the order-lines repository';
+  const REFUSED = {
+    ...JOIN_REFUSAL,
+    message: JOIN_REFUSAL.message.replace('OrderLine', 'TenantOrderLine'),
+  };
+
+  @Module({
+    imports: [RepositoryModule.forFeature([ORDER_TOKEN])],
+    providers: [
+      OrderRowScopeFixture,
+      OrderLineRowScopeFixture,
+      JoinableTenantRowScopeFixture,
+      OtherJoinableTenantRowScopeFixture,
+      OrgRowScopeFixture,
+    ],
+    exports: [
+      OrderRowScopeFixture,
+      OrderLineRowScopeFixture,
+      JoinableTenantRowScopeFixture,
+      OtherJoinableTenantRowScopeFixture,
+      OrgRowScopeFixture,
+    ],
+  })
+  class JoinResolverModule {}
+
+  async function findLines(
+    orders: Type<RowScopeInterface>,
+    lines: Type<RowScopeInterface>,
+    entity: Type = TenantOrderLineEntityFixture,
+  ): Promise<unknown> {
+    const moduleRef = await compile(
+      [
+        {
+          ...SCOPED[0],
+          rowScope: { access: 'scoped', resolver: orders },
+        },
+        {
+          key: ORDER_LINE_TOKEN,
+          entity,
+          rowScope: { access: 'scoped', resolver: lines },
+        },
+      ],
+      {},
+      [JoinResolverModule],
+    );
+    await moduleRef.init();
+    const orderLines: MemoryRepositoryFixture<OrderLineFixture> = moduleRef.get(
+      getDynamicRepositoryToken(ORDER_LINE_TOKEN),
+    );
+
+    try {
+      return await orderLines.find({ join, ctx: ACME });
+    } finally {
+      await moduleRef.close();
+    }
+  }
+
+  it('reaches the driver when both share a joinable resolver and the join matches its column', async () => {
+    await expect(
+      findLines(JoinableTenantRowScopeFixture, JoinableTenantRowScopeFixture),
+    ).rejects.toThrow(REACHED);
+  });
+
+  it('reaches the driver between two joinable classes on the same column and key', async () => {
+    await expect(
+      findLines(
+        OtherJoinableTenantRowScopeFixture,
+        JoinableTenantRowScopeFixture,
+      ),
+    ).rejects.toThrow(REACHED);
+  });
+
+  it('is refused, with the fix, when the join leaves out the scope column', async () => {
+    await expect(
+      findLines(
+        JoinableTenantRowScopeFixture,
+        JoinableTenantRowScopeFixture,
+        OrderLineEntityFixture,
+      ),
+    ).rejects.toMatchObject({
+      httpStatus: HttpStatus.BAD_REQUEST,
+      fault: 'client',
+      message:
+        'Cannot join "order" of OrderLine: the rows it reads are scoped on ' +
+        'the same terms, but the join leaves out tenantId, so it could reach ' +
+        'rows outside that scope. Make the relation join on (tenantId, orderId).',
+    });
+  });
+
+  // The line is the root, the order the target. Each pair is (root, target).
+  it.each([
+    [
+      'the root resolver is not joinable',
+      OrderRowScopeFixture,
+      JoinableTenantRowScopeFixture,
+    ],
+    [
+      'the target resolver is not joinable',
+      JoinableTenantRowScopeFixture,
+      OrderLineRowScopeFixture,
+    ],
+    [
+      'the target reads its column from another key',
+      JoinableTenantRowScopeFixture,
+      OrgRowScopeFixture,
+    ],
+  ])('is refused when %s', async (_case, root, target) => {
+    await expect(findLines(target, root)).rejects.toMatchObject(REFUSED);
+  });
+});
+
 describe('row scope declared through a driver that rewrites its entries', () => {
   @Module({})
   class RewritingDriver {
@@ -480,12 +600,8 @@ describe('row scope startup checks', () => {
 
     @Injectable()
     class TenantAwareRowScope extends OrderRowScopeFixture {
-      constructor(
-        @InjectDynamicRepository(ORDER_TOKEN)
-        orders: RepositoryInterface<OrderFixture>,
-        readonly tenant: TenantContext,
-      ) {
-        super(orders);
+      constructor(readonly tenant: TenantContext) {
+        super();
       }
     }
 

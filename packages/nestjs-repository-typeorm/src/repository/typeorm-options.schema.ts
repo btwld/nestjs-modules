@@ -17,6 +17,7 @@ import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation
 
 import {
   type TypeOrmColumnMetadata,
+  type TypeOrmJoinColumnMetadata,
   type TypeOrmRelationMetadata,
   type TypeOrmTableMetadata,
 } from './typeorm-metadata.types.js';
@@ -166,25 +167,16 @@ function mapOwning(
   targetEntity: string,
   cardinality: 'one' | 'many',
 ): MappedRelation | undefined {
-  const foreignKey: { from: string; to: string }[] = [];
-  for (const joinCol of rel.joinColumns) {
-    const referencedCol = joinCol.referencedColumn;
-    if (!referencedCol) return undefined;
-    foreignKey.push({
-      from: joinCol.propertyName,
-      to: referencedCol.propertyName,
-    });
-  }
-
-  const [first] = foreignKey;
-  if (!first) return undefined;
+  const join = joinPairsOf(rel.joinColumns);
+  if (!join) return undefined;
 
   return {
     name,
     targetEntity,
     cardinality,
-    on: first,
-    foreignKey,
+    on: join.key,
+    ...(join.pairs.length > 1 && { joinOn: join.pairs }),
+    foreignKey: join.pairs,
   };
 }
 
@@ -201,22 +193,50 @@ function mapNonOwning(
   const inverse = rel.inverseRelation;
   if (!inverse) return undefined;
 
-  const inverseJoinCol = inverse.joinColumns[0];
-  if (!inverseJoinCol) return undefined;
+  const join = joinPairsOf(inverse.joinColumns);
+  if (!join) return undefined;
 
-  const referencedCol = inverseJoinCol.referencedColumn;
-  if (!referencedCol) return undefined;
+  // Swapped: our columns are what they reference, theirs are the join columns
+  const swap = ({ from, to }: JoinPair): JoinPair => ({ from: to, to: from });
+  const pairs = join.pairs.map(swap);
 
-  // Swapped: our PK is what they reference, their FK is the join column
   return {
     name,
     targetEntity,
     cardinality,
-    on: {
-      from: referencedCol.propertyName,
-      to: inverseJoinCol.propertyName,
-    },
+    on: swap(join.key),
+    ...(pairs.length > 1 && { joinOn: pairs }),
   };
+}
+
+interface JoinPair {
+  from: string;
+  to: string;
+}
+
+/**
+ * Each join column paired with the column it references, from the owning
+ * side; `undefined` if there are none or a reference is missing.
+ *
+ * `key` is the first pair. TypeORM lists the columns referencing the primary
+ * key first, so for a composite foreign key such as `(tenantId, orderId)` onto
+ * a primary key `id`, it is `orderId`. Onto a composite primary key or another
+ * unique key, it is whichever TypeORM lists first.
+ */
+function joinPairsOf(
+  joinColumns: readonly TypeOrmJoinColumnMetadata[],
+): { pairs: JoinPair[]; key: JoinPair } | undefined {
+  const pairs: JoinPair[] = [];
+
+  for (const joinCol of joinColumns) {
+    const referencedCol = joinCol.referencedColumn;
+    if (!referencedCol) return undefined;
+
+    pairs.push({ from: joinCol.propertyName, to: referencedCol.propertyName });
+  }
+
+  const [key] = pairs;
+  return key && { pairs, key };
 }
 
 /**
