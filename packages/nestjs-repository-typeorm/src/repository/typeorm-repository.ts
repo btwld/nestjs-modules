@@ -1,6 +1,7 @@
 import {
   And,
   Between,
+  type DataSource,
   Equal,
   type FindOperator,
   type FindOptionsWhere,
@@ -69,6 +70,17 @@ import {
 } from './typeorm-options.schema.js';
 
 /**
+ * The data source behind an entity manager: `dataSource` in TypeORM 1.x,
+ * `connection` in 0.3.
+ */
+function dataSourceOf(
+  manager:
+    { readonly dataSource: DataSource } | { readonly connection: DataSource },
+): DataSource {
+  return 'dataSource' in manager ? manager.dataSource : manager.connection;
+}
+
+/**
  * Options for constructing a TypeOrmRepository.
  */
 export interface TypeOrmRepositoryOptions {
@@ -104,7 +116,7 @@ export class TypeOrmRepository<
 
     // TypeORM hands a MongoDB find its options as a native filter, with no
     // find operators or joins, so nothing this driver builds would translate.
-    const { options: dataSourceOptions, driver } = repo.manager.dataSource;
+    const { options: dataSourceOptions, driver } = dataSourceOf(repo.manager);
     if (dataSourceOptions.type === 'mongodb') {
       throw new TypeOrmUnsupportedDatabaseException(
         entityName,
@@ -147,7 +159,7 @@ export class TypeOrmRepository<
           ? reported.errno
           : undefined;
     return {
-      database: this.repo.manager.dataSource.options.type,
+      database: dataSourceOf(this.repo.manager).options.type,
       code,
       message: reported.message,
     };
