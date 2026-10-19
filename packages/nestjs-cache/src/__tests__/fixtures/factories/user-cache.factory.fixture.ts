@@ -1,4 +1,4 @@
-import { faker } from '@faker-js/faker';
+import { randomUUID } from 'crypto';
 
 import { Factory } from '@concepta/typeorm-seeding';
 
@@ -12,7 +12,7 @@ export class UserCacheFactoryFixture extends Factory<UserCacheEntityFixture> {
   protected async entity(
     userCache: UserCacheEntityFixture,
   ): Promise<UserCacheEntityFixture> {
-    userCache.key = faker.person.jobArea();
+    userCache.key = randomUUID();
     userCache.type = 'filter';
     userCache.data = JSON.stringify({ sortBy: 'name' });
     userCache.expirationDate = new Date();
