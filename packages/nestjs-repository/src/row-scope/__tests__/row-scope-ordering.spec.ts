@@ -372,6 +372,13 @@ describe('row scope ordering guarantees', () => {
       expect(rowScope.writes[0]?.scope).toEqual({ tenantId: 'acme' });
     });
 
+    it("holds only the overlay's own values, nothing else on the context", async () => {
+      await repo.find({ ctx: callerCtx('acme') });
+
+      const scope = rowScope.queries[0]?.scope;
+      expect(scope && 'withRowScope' in scope).toBe(false);
+    });
+
     it('is undefined when no overlay was attached, leaving the resolver to fail closed', async () => {
       await repo.find({ ctx: new AppContextHost() });
 

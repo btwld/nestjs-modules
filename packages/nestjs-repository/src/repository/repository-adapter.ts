@@ -839,7 +839,11 @@ export abstract class RepositoryAdapter<
     if (!ctx) return undefined;
 
     const appCtx = AppContextHost.from(ctx);
-    return appCtx.supports(RowScopeCtx) ? appCtx.with(RowScopeCtx) : undefined;
+    // A plain copy: the overlay's own values inherit from the context, so a
+    // key the overlay lacks would otherwise read whatever the context holds.
+    return appCtx.supports(RowScopeCtx)
+      ? { ...appCtx.with(RowScopeCtx) }
+      : undefined;
   }
 
   /**

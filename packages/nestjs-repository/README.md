@@ -1436,52 +1436,50 @@ import {
   Where,
 } from '@concepta/nestjs-repository';
 
-// Typed token for the tenant id — attached to the request context by a
+// Typed token for the signed-in user — attached to the request context by a
 // ContextOverlayInterceptor registered as an APP_INTERCEPTOR (see nestjs-core's
 // Context System docs for the interceptor that populates this).
-export const TenantCtx = new OverlayRef<'withTenant', { tenantId: string }>(
-  'withTenant',
+export const ActorCtx = new OverlayRef<'withActor', { userId: string }>(
+  'withActor',
 );
 
 @RepoHook()
 @Injectable()
-export class TenantScopeHook {
-  // Scoped reads: hook output replaces the query options wholesale, so a
-  // caller's own `where` clause is ANDed with the tenant filter, never
-  // dropped — the two combine rather than one overriding the other.
+export class OrderDefaultsHook {
+  // Hook output replaces the query options wholesale, so a caller's own
+  // `where` is ANDed with this filter, never dropped.
   @BeforeFind()
-  async addTenantFilter(
+  async hideArchived(
     options: RepositoryFindOptions<OrderEntity>,
-    ctx: AppContextInterface,
   ): Promise<RepositoryFindOptions<OrderEntity>> {
-    // `require()` throws when the overlay is absent, so a call that cannot
-    // identify a tenant is refused rather than reading across all of them.
-    const tenant = ctx.require(TenantCtx).withTenant();
-
-    const condition = Where.eq('tenantId', tenant.tenantId);
+    const condition = Where.eq('archived', false);
     return {
       ...options,
       where: options.where ? Where.and(options.where, condition) : condition,
     };
   }
 
-  // Authoritative write: { replace: true } makes this hook's output win over
-  // whatever the caller supplied — a caller-provided `tenantId` in the
-  // request body cannot override the stamp. Without { replace: true }, the
-  // default merge semantics would let a caller's own tenantId win instead —
-  // see "Hook Pipeline" below. This is the isolation-relevant half; the
-  // read-side filter alone is not enough to keep tenants apart.
+  // { replace: true } makes this hook's output win over the caller's, so a
+  // `createdBy` in the request body cannot override the stamp. Without it,
+  // the default merge would let the caller's value win — see "Hook Pipeline"
+  // below.
   @BeforeCreate({ replace: true })
-  async stampTenant(
+  async stampCreator(
     data: DeepPartial<OrderEntity>,
     ctx: AppContextInterface,
   ): Promise<DeepPartial<OrderEntity>> {
-    const tenant = ctx.require(TenantCtx).withTenant();
+    // `require()` throws when the overlay is absent.
+    const actor = ctx.require(ActorCtx).withActor();
 
-    return { ...data, tenantId: tenant.tenantId };
+    return { ...data, createdBy: actor.userId };
   }
 }
 ```
+
+**Don't isolate tenants with hooks.** A hook runs only on the operations it
+decorates, so a read filter and a create stamp leave `update`, `replace`,
+`upsert` and the delete family reaching every tenant's rows. Use
+[Row Scope](#row-scope), which the repository applies to every operation.
 
 ### Wiring Hooks
 
@@ -1508,13 +1506,13 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
         {
           driver: TypeOrmRepositoryModule,
           entities: [
-            { key: 'orders', entity: Order, hooks: [TenantScopeHook] },
+            { key: 'orders', entity: Order, hooks: [OrderDefaultsHook] },
           ],
         },
       ],
     }),
   ],
-  providers: [TenantScopeHook], // 2. required so DI can resolve it
+  providers: [OrderDefaultsHook], // 2. required so DI can resolve it
 })
 export class AppModule {}
 ```
@@ -1976,9 +1974,14 @@ Keep each resolver checking the foreign keys it owns on write
 you, so without that override a line can name another scope's order. Reading
 through `orders` still returns nothing for it, but the line points there.
 
-Writes never cross a relation: a relation in a write payload is refused
-([Writing relations](#writing-relations)), so a related entity is only written
-through its own repository, where its resolver runs.
+Writes never cross a relation on their own: a relation in a write payload is
+refused unless it is marked [`cascade`](#cascading-writes), and a cascade
+writes each related row through its own repository, where its resolver runs.
+
+Anything that writes rows without going through a repository, such as a
+seeding library writing through your ORM, bypasses row scope entirely: it
+stamps no scope columns and checks nothing. Set the scope columns yourself
+there, or seed through the repository with a `ctx` carrying the scope.
 
 #### Natural keys need a serializable transaction
 
