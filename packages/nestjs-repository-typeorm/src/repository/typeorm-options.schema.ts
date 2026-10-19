@@ -216,25 +216,28 @@ interface JoinPair {
 
 /**
  * Each join column paired with the column it references, from the owning
- * side; `undefined` if there are none or a reference is missing.
+ * side, `key` first; `undefined` if there are none or a reference is missing.
  *
- * `key` is the first pair. TypeORM lists the columns referencing the primary
- * key first, so for a composite foreign key such as `(tenantId, orderId)` onto
- * a primary key `id`, it is `orderId`. Onto a composite primary key or another
- * unique key, it is whichever TypeORM lists first.
+ * `key` is the first pair that references a primary key column, so for a
+ * composite foreign key such as `(tenantId, orderId)` onto a primary key `id`,
+ * it is `orderId` whatever order the columns are declared in. Onto another
+ * unique key, it is the first pair listed.
  */
 function joinPairsOf(
   joinColumns: readonly TypeOrmJoinColumnMetadata[],
 ): { pairs: JoinPair[]; key: JoinPair } | undefined {
-  const pairs: JoinPair[] = [];
+  const primary: JoinPair[] = [];
+  const others: JoinPair[] = [];
 
   for (const joinCol of joinColumns) {
     const referencedCol = joinCol.referencedColumn;
     if (!referencedCol) return undefined;
 
-    pairs.push({ from: joinCol.propertyName, to: referencedCol.propertyName });
+    const pair = { from: joinCol.propertyName, to: referencedCol.propertyName };
+    (referencedCol.isPrimary ? primary : others).push(pair);
   }
 
+  const pairs = [...primary, ...others];
   const [key] = pairs;
   return key && { pairs, key };
 }

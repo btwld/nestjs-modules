@@ -12,7 +12,10 @@
  */
 export interface TypeOrmJoinColumnMetadata {
   readonly propertyName: string;
-  readonly referencedColumn?: { readonly propertyName: string };
+  readonly referencedColumn?: {
+    readonly propertyName: string;
+    readonly isPrimary?: boolean;
+  };
 }
 
 /**

@@ -123,6 +123,54 @@ describe('buildRelations', () => {
     ]);
   });
 
+  describe('a composite foreign key listing the primary key column last', () => {
+    const joinColumns = [
+      {
+        propertyName: 'tenantId',
+        referencedColumn: { propertyName: 'tenantId', isPrimary: false },
+      },
+      {
+        propertyName: 'orderId',
+        referencedColumn: { propertyName: 'id', isPrimary: true },
+      },
+    ];
+
+    it('should match the owning side by the primary key pair', () => {
+      const rel = mockRelationMetadata({
+        propertyName: 'order',
+        inverseEntityMetadata: { name: 'OrderEntity' },
+        isOwning: true,
+        joinColumns,
+      });
+
+      const [relation] = buildRelations([rel], SOURCE);
+
+      expect(relation?.on).toEqual({ from: 'orderId', to: 'id' });
+      expect(relation?.joinOn).toEqual([
+        { from: 'orderId', to: 'id' },
+        { from: 'tenantId', to: 'tenantId' },
+      ]);
+    });
+
+    it('should match the inverse side by the primary key pair, swapped', () => {
+      const rel = mockRelationMetadata({
+        propertyName: 'lines',
+        inverseEntityMetadata: { name: 'OrderLineEntity' },
+        isOneToMany: true,
+        isOwning: false,
+        inverseRelation: { joinColumns },
+      });
+
+      const [relation] = buildRelations([rel], SOURCE);
+
+      expect(relation?.on).toEqual({ from: 'id', to: 'orderId' });
+      expect(relation?.joinOn).toEqual([
+        { from: 'id', to: 'orderId' },
+        { from: 'tenantId', to: 'tenantId' },
+      ]);
+    });
+  });
+
   it('should map non-owning OneToMany relation with swapped on', () => {
     const rel = mockRelationMetadata({
       propertyName: 'posts',
