@@ -817,8 +817,9 @@ export abstract class RepositoryAdapter<
    * Invoke the bound scope resolver for a write, and hand the driver what it
    * returns. A resolver refuses by throwing.
    *
-   * `target` is the existing row the call is aimed at, where there is one —
-   * the pre-hook argument, not the post-hook payload.
+   * `target` is the existing row the call is aimed at, where there is one:
+   * the stored row `update`/`replace` were given, or the row an `upsert`'s
+   * payload names after hooks.
    *
    * The row is pinned before this runs — see `toStoredRow` and, for
    * `update`/`replace`, `assertKeyUnchanged`.
@@ -1058,11 +1059,8 @@ export abstract class RepositoryAdapter<
     return this.permeator.update.permeate(
       data,
       async (scoped) => {
-        // Before row scope: moving the write is a repository-level error
-        // whatever the scope, and reporting it as such is clearer than the
-        // scope refusal it would otherwise surface as. Still after hooks, so
-        // a hook cannot redirect the write either. Checked again on what the
-        // resolver returns, since that is what is written.
+        // Checked on the hooks' output and again on the resolver's, since
+        // either could move the write to another row.
         const values = this.toOwnColumns(scoped);
         this.assertKeyUnchanged(stored, values);
         const written = this.toOwnColumns(
@@ -1098,22 +1096,19 @@ export abstract class RepositoryAdapter<
       entity,
       async (scoped) => {
         const reduced = this.toOwnColumns(scoped);
-        // After hooks, so the row checked is the row the payload now names.
-        await this.assertUpsertMutable(reduced, options?.ctx);
+        // After hooks, so the row found is the row the payload now names.
+        const stored = await this.findByKey(reduced, options?.ctx);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.UPSERT,
             reduced,
-            // Upsert names its row by the key in its own payload, so the row
-            // it aims at has to be looked up rather than passed in. Absent
-            // means the conflict clause cannot fire, which is the difference
-            // between an insert and an update a resolver has to police.
-            await this.findByKey(reduced, options?.ctx),
+            stored,
             options?.ctx,
           ),
         );
-        // The resolver checked the row `reduced` names; its output must not
-        // name another.
+        // After row scope, so a soft-deleted row in another scope is not found
+        // rather than reported as soft-deleted.
+        if (stored) this.assertMutable(stored);
         this.assertKeyUnchanged(reduced, written);
         return this.checkedRow(await this.doUpsert(written, options));
       },
@@ -1423,68 +1418,13 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * Same guard as `assertMutable`, but for `upsert()` — the caller only
-   * supplies a partial entity, not an existing row, so whether the target is
-   * soft-deleted has to be read first. Uses `withDeleted: true` since the row
-   * being checked is expected to be soft-deleted.
+   * Enforce that a create inserts rather than updates, whatever the driver's
+   * write primitive does with a key that names a row.
    *
-   * Reads via the protected `doFindOne` rather than the public `findOne`, so
-   * the find permeator is bypassed and a `beforeFindOne` hook cannot decide
-   * this guard — but row scope is applied explicitly, because it must. An
-   * unscoped read here would answer "is there a soft-deleted row with this
-   * key" across every scope at once, letting the immutability exception
-   * report the existence of a row the caller cannot see.
-   *
-   * Nothing is lost by bypassing the permeator: the scope this read enforces
-   * comes from the context overlay, not from anything hooks produce.
-   */
-  private async assertUpsertMutable(
-    entity: DeepPartial<Entity>,
-    ctx?: PlainLiteralObject,
-  ): Promise<void> {
-    const deleteDateColumn = this.getDeleteDateColumn();
-    if (!deleteDateColumn) return;
-
-    // No complete primary key supplied — this is a fresh insert, not a write
-    // against an existing (possibly soft-deleted) row.
-    const where = this.keyClause(entity);
-    if (!where) return;
-
-    const existing = await this.doFindOne(
-      await this.applyQueryScope(
-        RowScopeOperation.FIND_ONE,
-        { where, withDeleted: true, ctx },
-        this.resolveRowScopeContext(ctx),
-      ),
-    );
-
-    if (existing && this.isSoftDeleted(existing, deleteDateColumn)) {
-      throw new SoftDeletedImmutableException(this.metadata.name);
-    }
-  }
-
-  /**
-   * Enforce that a create inserts rather than updates.
-   *
-   * A driver is free to implement create with a save-by-primary-key primitive,
-   * which would silently overwrite the row a supplied key names. That is
-   * invisible to every permission check above this layer, because on the way in
-   * it looks like an insert — so the guard lives here, once, rather than in
-   * each driver.
-   *
-   * Reads via the protected `doFindOne` so it bypasses both the hook permeator
-   * and row scope. Bypassing scope is the point: the question is whether the
-   * key is taken, not whether the caller may see the row that took it. The
-   * alternative — a scoped read — cannot tell "does not exist yet" from
-   * "belongs to another scope", and guessing wrong either refuses every
-   * caller-supplied key or permits a cross-scope overwrite.
-   *
-   * A key is only checkable when every primary column is present; a partial one
-   * cannot identify a row, so it is left to the database. `withDeleted` because
-   * a soft-deleted row still occupies its primary key.
-   *
-   * **This is a check-then-write with a real race**, unreachable for generated
-   * keys and narrow for caller-supplied ones. See "Create Inserts, It Never
+   * Reads via `doFindOne`, bypassing hooks and row scope: the question is
+   * whether the key is taken, not whether the caller may see the row. A key is
+   * only checkable when every primary column is present. `withDeleted` because
+   * a soft-deleted row still occupies its key. See "Create Inserts, It Never
    * Updates" in the README.
    */
   private async assertNotExisting(
@@ -1562,18 +1502,19 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * The stored row a write names, found by primary key alone.
+   * The stored row an upsert names, found by primary key alone.
    *
-   * Deliberately unscoped — a resolver's own reads carry its scope predicate
-   * and so cannot tell "no such row" from "not yours". Handed over as `target`
-   * for the resolver to check, never as something to trust. Only read when a
-   * resolver is bound, so an unscoped repository pays nothing.
+   * Unscoped, so it tells "no such row" from "not yours": handed to the
+   * resolver as `target` to check, never trusted. Only read when the entity is
+   * scoped or soft-deletable, the two things that need it.
    */
   private async findByKey(
     entity: DeepPartial<Entity>,
     ctx?: PlainLiteralObject,
   ): Promise<Entity | undefined> {
-    if (!this.requireRowScope()) return undefined;
+    if (!this.requireRowScope() && !this.getDeleteDateColumn()) {
+      return undefined;
+    }
 
     const where = this.keyClause(entity);
     if (!where) return undefined;
@@ -1771,10 +1712,8 @@ export abstract class RepositoryAdapter<
    * Resolve the descriptor a driver needs to compare-and-swap on the
    * version column — the driver executes it, it never decides whether one
    * applies. `update`/`replace` pass `'guard'`: a versioned entity is
-   * guarded there whether or not the caller stated a version, matching the
-   * in-request behavior shipped with #469. The delete paths pass `'skip'`,
-   * so they only take on a driver-side transaction requirement for callers
-   * who actually asked for one.
+   * guarded whether or not the caller stated a version. The delete paths
+   * pass `'skip'`: guarded only when the caller states a version.
    */
   private resolveVersionGuard(
     entity: Entity,

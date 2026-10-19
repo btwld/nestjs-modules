@@ -126,9 +126,6 @@ export abstract class RowScopeBase<
   ) {
     this.label = options.label ?? 'Row';
 
-    // Read from the entity rather than configured: the entity already declares
-    // its keys, and a configured column that did not match would make every key
-    // check inspect the wrong property.
     this.primaryColumns = repo.metadata.columns
       .filter((column) => column.isPrimary)
       .map((column) => column.name);
@@ -190,8 +187,6 @@ export abstract class RowScopeBase<
       );
     }
 
-    // Assigned rather than returned as a computed-key literal, whose key type
-    // widens to `string` and would need a cast to narrow back.
     const values: Partial<Record<EntityColumn<Entity>, ScalarValue>> = {};
     values[column] = value;
 
@@ -246,11 +241,7 @@ export abstract class RowScopeBase<
           );
         }
 
-        // `target` answers whether the key names a row at all — a question
-        // this class cannot ask, because its own reads carry the scope
-        // predicate and so cannot tell "no such row" from "not yours". No
-        // target means the conflict clause has nothing to fire on, so the
-        // write inserts and only needs stamping.
+        // No target means the key names no row, so the write inserts.
         if (params.target !== undefined) {
           await this.precheck(key, values, params.ctx);
         }
@@ -263,16 +254,6 @@ export abstract class RowScopeBase<
         // No pre-check: a create names no existing row, and the adapter already
         // refuses one whose key is taken, whatever scope owns it.
         return this.stampOrRefuse(params.value, values);
-
-      default:
-        // Only reachable if a new operation is added without a case here, so
-        // this is a framework defect rather than anything the caller did. It
-        // still fails closed: an unrecognized write is refused, not passed on.
-        throw new RuntimeException({
-          message: 'Unhandled row scope write operation "%s"',
-          messageParams: [params.operation],
-          fault: 'usage',
-        });
     }
   }
 
@@ -368,16 +349,6 @@ export abstract class RowScopeBase<
 
     if (!found) {
       this.refuse(HttpStatus.NOT_FOUND, `${this.label} not found`);
-    }
-
-    // The query above goes through the public `findOne`, so a hook or a
-    // `scopeQuery` override sits between this and the driver. Comparing the row
-    // that came back closes a substituted result, a rewritten `where`, and an
-    // override that drops the predicate.
-    for (const column of Object.keys(values)) {
-      if (found[column] !== values[column]) {
-        this.refuse(HttpStatus.NOT_FOUND, `${this.label} not found`);
-      }
     }
   }
 

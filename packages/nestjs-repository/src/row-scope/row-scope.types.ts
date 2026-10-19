@@ -8,9 +8,7 @@ import { type EntityColumn } from '../repository/repository.types.js';
 export type ScalarValue = string | number;
 
 /**
- * `NaN` is excluded deliberately: it is never equal to itself, so a scope value
- * of `NaN` would make every comparison in `RowScopeBase` refuse for reasons no
- * reader could diagnose.
+ * `NaN` is excluded: it is never equal to itself, so it could match no row.
  */
 export const isScalarValue = (value: unknown): value is ScalarValue =>
   typeof value === 'string' ||
@@ -30,9 +28,7 @@ export type RowScopeValues<
 /**
  * Canonical operation constants for row scope callbacks.
  *
- * String values match the public repository method names, so a resolver can
- * switch on `params.operation` against named members and a boot check can
- * compare the set against the adapter's own prototype.
+ * String values match the public repository method names.
  */
 export const RowScopeOperation = {
   // Query operations
@@ -68,9 +64,6 @@ export type RowScopeQueryOperation =
 
 /**
  * Operations that scope a value being written.
- *
- * Derived by exclusion so a new member added to `RowScopeOperation` lands on
- * the write side by default — the direction that fails closed.
  */
 export type RowScopeWriteOperation = Exclude<
   RowScopeOperation,

@@ -116,13 +116,9 @@ function scopedKeysByUrn(adapters: AnyAdapter[]): Map<string, string> {
 }
 
 /**
- * Check that every registered entity carries a declaration.
- *
- * Opt-in per deployment, deliberately: whether an undeclared entity is a
- * mistake is a property of the deployment, not of the framework. An
- * application that scopes everything wants this on; one that uses row scope
- * for a handful of entities among many does not. The default stays
- * non-breaking for anyone already registering entities.
+ * Check that every registered entity carries a declaration. Opt-in: an
+ * application that scopes everything wants it; one that scopes a handful of
+ * entities does not.
  */
 export function checkDeclarationCompleteness(adapters: AnyAdapter[]): string[] {
   return adapters.flatMap((adapter) => {

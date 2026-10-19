@@ -287,6 +287,11 @@ see the row that took it. A scoped read cannot tell "does not exist yet" from
 "belongs to another scope", and either answer is wrong: one refuses every
 caller-supplied key, the other permits a cross-scope overwrite.
 
+If your clients choose their own keys, they can find out that a key is in use
+even when another tenant holds it: `create` refuses it, and under a
+[row scope](#row-scope) `upsert` answers `404`. Where that matters, let the
+database generate the key.
+
 Caller-supplied primary keys are otherwise fine. A key is only checked when
 every primary column is present. A *partial* composite key is refused with
 `PartialPrimaryKeyException` (HTTP 400) naming the missing columns: it cannot
@@ -1737,11 +1742,6 @@ numbers. Primary key columns are read from the entity's own metadata, so
 composite primary keys work too — a key counts as naming a row only when every
 primary column is present.
 
-Resolve each scope value with the same type as its column. If every read works
-but every write is a `404`, that is the usual cause: a string `'42'` against an
-integer `tenantId` column matches in the database, but not in `RowScopeBase`'s
-own strict comparison.
-
 It assumes **every scoped entity carries its own scope column**, so scope is
 decided per row without following a relation. That assumption is what makes the
 rest simple (see [Relations and row scope](#relations-and-row-scope)).
@@ -1967,7 +1967,8 @@ export class AppModule {}
 Define it unconditionally rather than only when a tenant is present: where no
 overlay exists, something later in the request could define one. An overlay
 that is always present and immutable cannot be supplied after the fact, and a
-missing tenant then surfaces as a refusal from your resolver.
+missing tenant then surfaces as a refusal from your resolver. Keep its values
+flat: `{ immutable: true }` freezes one level deep.
 
 ### What a resolver has to check
 

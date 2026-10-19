@@ -1,6 +1,10 @@
 import { type PlainLiteralObject, type Type } from '@nestjs/common';
 
-import { AppContextHost, type DeepPartial } from '@concepta/nestjs-core';
+import {
+  AppContextHost,
+  type DeepPartial,
+  RuntimeException,
+} from '@concepta/nestjs-core';
 
 import {
   columnFixture,
@@ -265,48 +269,33 @@ describe('row scope ordering guarantees', () => {
     });
   });
 
-  describe("upsert's soft-delete pre-read", () => {
-    it('is scoped', async () => {
-      await repo.upsert({ id: 'row-1', name: 'next' });
-
-      const preRead = rowScope.queries.find(
-        (query) => query.operation === RowScopeOperation.FIND_ONE,
-      );
-
-      expect(preRead?.options.withDeleted).toBe(true);
-    });
-
-    it('reaches the driver carrying what the resolver returned', async () => {
-      // The pre-read asks for withDeleted: true; a resolver that overrides it
-      // proves the driver ran the resolver's options, not the original ones.
-      class Narrowing extends PassthroughRowScope {
-        scopeQuery<Options extends { where?: WhereClause }>(
-          params: RowScopeQueryParams<Options>,
-        ): Options {
-          return { ...params.options, withDeleted: false };
-        }
-      }
-      const narrowingRepo = new TestAdapter('rows');
-      narrowingRepo.bind({ rowScope: scopedTo(Narrowing) });
-      narrowingRepo.setRowScopeResolver(new Narrowing());
-
-      await narrowingRepo.upsert({ id: 'row-1', name: 'next' });
-
-      expect(narrowingRepo.findOneCalls[0]?.withDeleted).toBe(false);
-    });
-
-    it('only reports a soft-deleted row the scoped read actually returned', async () => {
+  describe('upsert onto a soft-deleted row', () => {
+    it('is refused once the resolver lets it through', async () => {
       repo.existing = row({ dateDeleted: new Date() });
+
       await expect(repo.upsert({ id: 'row-1', name: 'next' })).rejects.toThrow(
         SoftDeletedImmutableException,
       );
+      expect(repo.driverCalls).toEqual([]);
+    });
 
-      // A resolver whose predicate excludes the row makes the same upsert
-      // succeed — the exception cannot report rows the caller cannot see.
-      repo.existing = null;
+    it("lets the resolver refuse first, so it can't reveal a foreign row", async () => {
+      class NotFound extends PassthroughRowScope {
+        scopeWrite<Value extends PlainLiteralObject>(): Value {
+          throw new RuntimeException({
+            message: 'Row not found',
+            httpStatus: 404,
+          });
+        }
+      }
+      const scopedRepo = new TestAdapter('rows');
+      scopedRepo.bind({ rowScope: scopedTo(NotFound) });
+      scopedRepo.setRowScopeResolver(new NotFound());
+      scopedRepo.existing = row({ dateDeleted: new Date() });
+
       await expect(
-        repo.upsert({ id: 'row-1', name: 'next' }),
-      ).resolves.toBeDefined();
+        scopedRepo.upsert({ id: 'row-1', name: 'next' }),
+      ).rejects.toMatchObject({ httpStatus: 404 });
     });
   });
 
@@ -328,33 +317,13 @@ describe('row scope ordering guarantees', () => {
       expect(rowScope.writes[0]?.target).toBeUndefined();
     });
 
-    it('finds the row unscoped, so a resolver can tell absent from foreign', async () => {
-      // The whole point of the lookup: a resolver's own reads carry its scope
-      // predicate, so they cannot distinguish "no such row" from "not yours".
-      // Two driver reads happen — the soft-delete pre-read, which is public
-      // and so scoped, and this one — but only the first reaches `scopeQuery`.
+    it('reads the row once, unscoped, so a resolver can tell absent from foreign', async () => {
       repo.existing = row();
 
       await repo.upsert({ id: 'row-1', name: 'next' });
 
-      expect(repo.findOneCalls).toHaveLength(2);
-      expect(
-        rowScope.queries.filter(
-          (query) => query.operation === RowScopeOperation.FIND_ONE,
-        ),
-      ).toHaveLength(1);
-    });
-
-    it('is skipped when no resolver is bound', async () => {
-      // An unscoped repository must not pay for a read it has no use for, so
-      // only the soft-delete pre-read remains.
-      const unbound = new TestAdapter('rows');
-      unbound.bind({});
-      unbound.existing = row();
-
-      await unbound.upsert({ id: 'row-1', name: 'next' });
-
-      expect(unbound.findOneCalls).toHaveLength(1);
+      expect(repo.findOneCalls).toHaveLength(1);
+      expect(rowScope.queries).toEqual([]);
     });
   });
 

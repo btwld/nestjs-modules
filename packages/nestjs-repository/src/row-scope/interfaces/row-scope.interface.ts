@@ -38,25 +38,10 @@ export interface RowScopeQueryParams<
 /**
  * Input handed to `scopeWrite` for a write operation.
  *
- * `target` is the existing row the call is aimed at, for the operations that
- * have one (`update`, `replace`, `delete`, `deleteMany`, `softDelete`,
- * `restore`, and `upsert` when its key names a stored row). It is `undefined`
- * for `create` and `createMany`, which name no existing row, and for an
- * `upsert` whose key matches none.
- *
- * On an `upsert` it is found by primary key alone and deliberately unscoped, so
- * it is **not** a row to trust: it answers "can the conflict clause fire?" and
- * the resolver still has to establish ownership. See "What a resolver has to
- * check" in the README.
- *
- * `target` is what the caller aimed at; `value` is what will be written. Both
- * name the same row, so a resolver does not have to reconcile them. For the
- * delete family `value` is what the driver acts on, so check that one.
- *
- * There is no `index` field: for `createMany` / `deleteMany` the callback is
- * invoked once per element, and the framework cannot attribute a refusal to a
- * particular element on the implementer's behalf. A resolver wanting
- * attribution puts an identifying value in the refusal itself.
+ * `target` is the existing row the call is aimed at, or `undefined` when it
+ * names none (`create`, `createMany`, an `upsert` whose key matches no row);
+ * `value` is what will be written. `createMany` and `deleteMany` call this once
+ * per element. See "What a resolver has to check" in the README.
  */
 export interface RowScopeWriteParams<
   Value extends PlainLiteralObject = PlainLiteralObject,

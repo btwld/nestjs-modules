@@ -203,6 +203,14 @@ describe('row scope bound through RepositoryModule.forRoot', () => {
     expect(storedOrders()).toHaveLength(2);
   });
 
+  it("answers 404 to an upsert onto another tenant's soft-deleted row", async () => {
+    await orders.softDelete(globexOrder, { ctx: GLOBEX });
+
+    await expect(
+      orders.upsert({ id: globexOrder.id, description: 'x' }, { ctx: ACME }),
+    ).rejects.toMatchObject({ httpStatus: HttpStatus.NOT_FOUND });
+  });
+
   describe('a resolver checking a foreign key against a peer repository', () => {
     it("allows a line on the caller's own order", async () => {
       const line = await orderLines.create(

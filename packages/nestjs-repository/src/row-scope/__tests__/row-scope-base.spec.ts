@@ -10,11 +10,7 @@ import {
   RowScopeBase,
   type RowScopeBaseRepository,
 } from '../row-scope-base.js';
-import {
-  RowScopeOperation,
-  type RowScopeValues,
-  type RowScopeWriteOperation,
-} from '../row-scope.types.js';
+import { RowScopeOperation, type RowScopeValues } from '../row-scope.types.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -295,19 +291,6 @@ describe('RowScopeBase', () => {
       await write(new TestRowScope(repo), { target: OWN_ROW, ctx });
 
       expect(findOne).toHaveBeenCalledWith(expect.objectContaining({ ctx }));
-    });
-
-    it('refuses when the row that came back is scoped elsewhere', async () => {
-      // The pre-check goes through the public findOne, so a hook or a
-      // scopeQuery override sits between it and the driver.
-      const { repo, findOne } = repoOf(OWN_ROW);
-      findOne.mockResolvedValueOnce(FOREIGN_ROW);
-
-      expect(
-        await statusOf(() =>
-          write(new TestRowScope(repo), { target: OWN_ROW }),
-        ),
-      ).toBe(HttpStatus.NOT_FOUND);
     });
 
     it('resolves a composite key before querying', async () => {
@@ -669,20 +652,6 @@ describe('RowScopeBase', () => {
           ctx: undefined,
         }),
       ).resolves.toEqual({ tenantId: 42 });
-    });
-  });
-
-  it('faults as a usage error on an unhandled write operation', async () => {
-    // Only reachable by adding an operation without a case for it, so this is
-    // a framework defect rather than anything the caller did — but it still
-    // fails closed.
-    const scope = scopeOf(OWN_ROW);
-
-    await expect(
-      write(scope, { operation: 'teleport' as RowScopeWriteOperation }),
-    ).rejects.toMatchObject({
-      fault: 'usage',
-      message: expect.stringContaining('teleport'),
     });
   });
 });

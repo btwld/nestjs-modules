@@ -24,9 +24,6 @@ export interface RowScopePublicRegistration {
 /**
  * A row scope declaration, written inline in the `forRoot()` entities
  * array.
- *
- * Discriminated on an explicit `access` tag rather than on shape, so adding a
- * field to either variant cannot silently change which one a declaration is.
  */
 export type RowScopeRegistration =
   RowScopeScopedRegistration | RowScopePublicRegistration;
