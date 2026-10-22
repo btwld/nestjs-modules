@@ -1,6 +1,18 @@
 {
   "extends": "./tsconfig.json",
   "include": [
-    "packages/*/src/**/*.ts"
+    "packages/nestjs-core/src/**/*.ts",
+    "packages/nestjs-repository/src/**/*.ts",
+    "packages/nestjs-repository-typeorm/src/**/*.ts",
+    "packages/nestjs-crud/src/**/*.ts",
+    "packages/nestjs-cache/src/**/*.ts",
+    "packages/nestjs-otp/src/**/*.ts",
+    "packages/nestjs-role/src/**/*.ts",
+    "packages/nestjs-password/src/**/*.ts",
+    "packages/nestjs-user/src/**/*.ts",
+    "packages/nestjs-invitation/src/**/*.ts",
+    "packages/nestjs-federated/src/**/*.ts",
+    "packages/nestjs-authentication/src/**/*.ts",
+    "packages/nestjs-access-control/src/**/*.ts"
   ]
 }

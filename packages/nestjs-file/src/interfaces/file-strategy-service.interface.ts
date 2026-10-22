@@ -1,6 +1,6 @@
-import { FileCreatableInterface } from '@concepta/nestjs-common';
+import { type FileCreatableInterface } from '@concepta/nestjs-common';
 
-import { FileStorageServiceInterface } from './file-storage-service.interface';
+import { type FileStorageServiceInterface } from './file-storage-service.interface';
 
 export interface FileStrategyServiceInterface {
   getUploadUrl(file: FileCreatableInterface): Promise<string>;

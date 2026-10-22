@@ -1,10 +1,10 @@
-import { ValidationError } from 'class-validator';
+import { type ValidationError } from 'class-validator';
 
-import { RuntimeExceptionOptions } from '../../exceptions/interfaces/runtime-exception-options.interface';
+import { type RuntimeExceptionOptions } from '../../exceptions/interfaces/runtime-exception-options.interface';
 import { RuntimeException } from '../../exceptions/runtime.exception';
 
 export class ModelValidationException extends RuntimeException {
-  context: RuntimeException['context'] & {
+  declare context: RuntimeException['context'] & {
     entityName: string;
     validationErrors: ValidationError[];
   };
@@ -21,7 +21,7 @@ export class ModelValidationException extends RuntimeException {
     });
 
     this.context = {
-      ...super.context,
+      ...this.context,
       entityName,
       validationErrors,
     };

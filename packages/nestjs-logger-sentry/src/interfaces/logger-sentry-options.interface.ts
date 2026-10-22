@@ -1,4 +1,4 @@
-import { LoggerSentrySettingsInterface } from './logger-sentry-settings.interface';
+import { type LoggerSentrySettingsInterface } from './logger-sentry-settings.interface';
 
 /**
  * LoggerSentry options interface.

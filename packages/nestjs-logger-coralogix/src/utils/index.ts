@@ -1,8 +1,8 @@
 import { Severity } from 'coralogix-logger';
 
-import { LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
 
-import { LoggerMessageInterface } from '@concepta/nestjs-logger';
+import { type LoggerMessageInterface } from '@concepta/nestjs-logger';
 
 export const logLevelMap = (logLevel: LogLevel): Severity => {
   switch (logLevel) {

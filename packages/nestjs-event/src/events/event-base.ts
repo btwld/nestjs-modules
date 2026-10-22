@@ -1,7 +1,7 @@
 import { EVENT_MODULE_EVENT_KEY_PREFIX } from '../event-constants';
-import { EventPayload } from '../event-types';
+import { type EventPayload } from '../event-types';
 
-import { EventBaseInterface } from './interfaces/event-base.interface';
+import { type EventBaseInterface } from './interfaces/event-base.interface';
 
 /**
  * Abstract event class.
@@ -29,9 +29,10 @@ import { EventBaseInterface } from './interfaces/event-base.interface';
  * const myEvent = new MyEvent({id: 1234, active: true});
  * ```
  */
-export abstract class EventBase<P = undefined, R = P>
-  implements EventBaseInterface<P, R>
-{
+export abstract class EventBase<
+  P = undefined,
+  R = P,
+> implements EventBaseInterface<P, R> {
   /**
    * Expects return of payload
    *

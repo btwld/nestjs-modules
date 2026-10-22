@@ -1,4 +1,4 @@
-import { ReferenceActive } from './reference.types';
+import { type ReferenceActive } from './reference.types';
 
 /**
  * Identifiable by active.

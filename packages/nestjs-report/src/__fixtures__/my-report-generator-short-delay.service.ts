@@ -12,9 +12,7 @@ import {
   REPORT_SHORT_DELAY_KEY_FIXTURE,
 } from './constants.fixture';
 
-export class MyReportGeneratorShortDelayService
-  implements ReportGeneratorServiceInterface
-{
+export class MyReportGeneratorShortDelayService implements ReportGeneratorServiceInterface {
   constructor(
     @Inject(FileService)
     private readonly fileService: FileService,

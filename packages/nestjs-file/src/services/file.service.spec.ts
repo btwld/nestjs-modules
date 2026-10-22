@@ -1,18 +1,18 @@
 import { randomUUID } from 'crypto';
 
-import { mock, MockProxy } from 'jest-mock-extended';
+import { mock, type MockProxy } from 'jest-mock-extended';
 
 import {
-  FileCreatableInterface,
-  RepositoryInterface,
-  FileEntityInterface,
+  type FileCreatableInterface,
+  type RepositoryInterface,
+  type FileEntityInterface,
 } from '@concepta/nestjs-common';
 
-import { FileCreateDto } from '../dto/file-create.dto';
+import { type FileCreateDto } from '../dto/file-create.dto';
 import { FileQueryException } from '../exceptions/file-query.exception';
 
 import { FileModelService } from './file-model.service';
-import { FileStrategyService } from './file-strategy.service';
+import { type FileStrategyService } from './file-strategy.service';
 import { FileService } from './file.service';
 
 describe(FileService.name, () => {

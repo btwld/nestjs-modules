@@ -1,7 +1,7 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -11,9 +11,9 @@ import {
   LOGGER_CORALOGIX_MODULE_SETTINGS_TOKEN,
   coralogixConfig,
 } from './config/logger-coralogix.config';
-import { CoralogixOptionsExtrasInterface } from './interfaces/logger-coralogix-options-extras.interface';
-import { CoralogixOptionsInterface } from './interfaces/logger-coralogix-options.interface';
-import { LoggerCoralogixSettingsInterface } from './interfaces/logger-coralogix-settings.interface';
+import { type CoralogixOptionsExtrasInterface } from './interfaces/logger-coralogix-options-extras.interface';
+import { type CoralogixOptionsInterface } from './interfaces/logger-coralogix-options.interface';
+import { type LoggerCoralogixSettingsInterface } from './interfaces/logger-coralogix-settings.interface';
 import { LoggerCoralogixTransport } from './transports/logger-coralogix.transport';
 
 const RAW_OPTIONS_TOKEN = Symbol(
