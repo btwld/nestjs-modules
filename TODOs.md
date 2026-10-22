@@ -18,28 +18,20 @@ done — see git history for what shipped. Reference notes that are not work liv
       would need the driver to know which tables a view expression reads, and
       to resolve SQLite paths.
 
-  2. **`nestjs-cache`'s `GET /cache/user` e2e collides on a unique constraint, ~4% of runs**
-      (S) — `UserCacheFactoryFixture` sets `key = faker.person.jobArea()`, drawn from roughly
-      25 values, with constant `type` and `assigneeId`, and the spec calls `createMany(2)`
-      against `@Unique(['key', 'type', 'assigneeId'])`. Two draws therefore collide about
-      1 time in 25, independently of TypeORM version or worker concurrency — confirmed by
-      8 consecutive passes after one failure, with no other change. Make `key` unique per
-      iteration. This is a **different cause** from the parallel-load item below and may
-      account for its nestjs-cache `SQLITE_CONSTRAINT: UNIQUE` sightings, so fixing it
-      first narrows that investigation.
-
-  3. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+  2. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
       — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`, and in
       crud's optimistic-locking e2e. Every one passes in isolation and on a re-run of the
-      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row (likely item 2)
-      and as `TransactionScopeFailedException` after a timeout. The cost of leaving it is
+      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row and as
+      `TransactionScopeFailedException` after a timeout. The cache fixture's key collision
+      was one cause of the UNIQUE sightings and is fixed (`db40e66e`); see whether any
+      remain before chasing them here. The cost of leaving it is
       that a red suite goes green on retry, which trains everyone to re-run rather than
       look — so a genuine regression in a transactional path would be dismissed as this.
       Every spec opens its own `:memory:` SQLite database, so workers share no database
       file; suspect timeouts under CPU contention. Confirm by pinning a failing spec to a
       single worker.
 
-  4. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+  3. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
       `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
       hoisting in a way that breaks nestjs-crud's OpenAPI tests
@@ -48,7 +40,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  5. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
+  4. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
       driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
       tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
       deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
@@ -68,11 +60,36 @@ done — see git history for what shipped. Reference notes that are not work liv
       so the exposure is a consumer who runs it against an untrusted schema. Landing the
       count fix above is what clears it.
 
+  5. **Audit composite key support across the codebase, and drop it** (M) — no v8 package
+      declares a composite primary key outside test fixtures; every shipped entity uses a
+      single generated key, and activity refuses anything else (as does cascade). Find each
+      place that handles several key columns, and decide what to remove:
+      - `PartialPrimaryKeyException` / `assertKeyNotPartial` and `keyClause` in the adapter;
+      - relation metadata's `joinOn` (several pairs) beside `on`, and the TypeORM driver's
+        `joinPairsOf` primary-first ordering;
+      - the memory fixture's composite relations (`TENANT_ORDER_LINE_METADATA`).
+
+      Weigh one consumer first: a joinable row-scope join relies on a composite foreign key
+      (`tenantId, orderId`), which `sharedScopeJoin` checks pair by pair. Its target's primary
+      key is still the single column `id`, so dropping composite primary keys leaves it
+      intact; dropping composite foreign keys would not.
+
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.
 
   * `@concepta/nestjs-common` is deprecated — reverted to v7 line (`7.0.0-alpha.10`) and excluded from the v8 workspace. Its remaining v8-only symbols were merged into nestjs-core. Run `npm deprecate @concepta/nestjs-common@8.0.0-alpha.6` at publish time.
+  * **Logger family is deprecated, not migrated** — `@concepta/nestjs-logger`,
+      `nestjs-logger-sentry` and `nestjs-logger-coralogix` stay on the v7 line and are
+      excluded from the "migrate to NestJS 12" checklist below. Replacement: `nestjs-pino`
+      (Nest 12 supported), with pino transports as the plugins: `pino-sentry-transport`,
+      `pino-opentelemetry-transport` (Coralogix's own SDK `coralogix-logger` is deprecated
+      upstream), or a custom `pino-abstract-transport` sink for a local database. v8
+      packages log through Nest's `Logger`, so they need no change. Remaining work:
+      1. Run `npm deprecate` on all three packages, with a message pointing to `nestjs-pino`.
+      2. Replace the `nestjs-samples` `02-logger` sample with a `nestjs-pino` recipe:
+         `LoggerModule.forRoot({ pinoHttp })`, `bufferLogs: true`,
+         `app.useLogger(app.get(Logger))`.
   * Non-v8 packages (everything under `packages/` not listed under the v8 block in `pnpm-workspace.yaml`) are install-only workspace members until migrated to the DDD pattern and NestJS 12 — see the install-only block in `pnpm-workspace.yaml` for the full list. Also removed `@concepta/nestjs-email` from devDependencies in nestjs-invitation and nestjs-authentication (only used in e2e tests — restore when nestjs-email is migrated).
   * **Request context on WebSocket** — HTTP and (preview) RPC are supported; on
       WebSocket, overlays skip and `@Ctx()`/`@Transactional()` throw. Design when
