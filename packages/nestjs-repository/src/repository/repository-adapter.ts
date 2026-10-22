@@ -13,6 +13,7 @@ import {
   normalizeHookOption,
 } from '@concepta/nestjs-core';
 
+import { ActivityWriter } from '../activity/activity-writer.js';
 import {
   type CascadeRelation,
   CascadeWriter,
@@ -132,6 +133,7 @@ export abstract class RepositoryAdapter<
   private _hooks: HookWithSpec[] = [];
   private _rowScope?: RowScopeInterface;
   private _cascade?: CascadeWriter;
+  private _activity?: ActivityWriter;
   private readonly _warnedDuplicates = new Set<Type>();
 
   constructor(
@@ -314,6 +316,23 @@ export abstract class RepositoryAdapter<
       this.cascadeRelations,
     );
     return this._cascade;
+  }
+
+  /** Records this entity's writes, when its entry declares `activity`. */
+  private get activity(): ActivityWriter | undefined {
+    const binding = this._binding?.activity;
+    if (!binding) return undefined;
+    this._activity ??= new ActivityWriter(
+      {
+        key: this.entityKey,
+        name: this.metadata.name,
+        urn: this.metadata.urn,
+        columns: this.metadata.columns.map((column) => column.name),
+        deleteDateColumn: this.getDeleteDateColumn(),
+      },
+      binding,
+    );
+    return this._activity;
   }
 
   /**
@@ -919,6 +938,28 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * Throw when a batch write returned other than one row per input: every
+   * row after it would be paired with the wrong input.
+   */
+  private assertRowCount(
+    operation: string,
+    rows: readonly unknown[],
+    inputs: readonly unknown[],
+  ): void {
+    if (rows.length === inputs.length) return;
+
+    throw new RepositoryQueryException(this.metadata.name, {
+      message: 'The driver returned %d rows for %d %s %s inputs',
+      messageParams: [
+        rows.length,
+        inputs.length,
+        this.metadata.name,
+        operation,
+      ],
+    });
+  }
+
+  /**
    * The driver's `row` with the related rows a cascade wrote, each already
    * checked by its own repository.
    */
@@ -1147,6 +1188,7 @@ export abstract class RepositoryAdapter<
         this.assertKeyNotPartial(value);
         await this.assertNotExisting(value, options?.ctx);
         const row = this.checkedRow(await this.doCreate(value, options));
+        await this.activity?.record('create', [row], options?.ctx);
         return this.withRelated(
           row,
           await this.cascade.create(row, children, options?.ctx),
@@ -1184,6 +1226,8 @@ export abstract class RepositoryAdapter<
         }
         const rows = await this.doCreateMany(values, options);
         this.assertRows(rows);
+        this.assertRowCount('createMany', rows, values);
+        await this.activity?.record('create', rows, options?.ctx);
         const written: Entity[] = [];
         for (const [index, row] of rows.entries()) {
           written.push(
@@ -1240,6 +1284,7 @@ export abstract class RepositoryAdapter<
         const row = this.checkedRow(
           await this.doUpdate(stored, written, { ...options, versionGuard }),
         );
+        await this.activity?.record('update', [row], options?.ctx, written);
         return this.withRelated(
           row,
           await this.cascade.sync(row, children, 'merge', options?.ctx),
@@ -1281,6 +1326,7 @@ export abstract class RepositoryAdapter<
         if (stored) this.assertMutable(stored);
         this.assertKeyUnchanged(reduced, written);
         const row = this.checkedRow(await this.doUpsert(written, options));
+        await this.activity?.record('upsert', [row], options?.ctx, written);
         return this.withRelated(
           row,
           await this.cascade.sync(row, children, 'replace', options?.ctx),
@@ -1323,6 +1369,7 @@ export abstract class RepositoryAdapter<
         const row = this.checkedRow(
           await this.doReplace(stored, written, { ...options, versionGuard }),
         );
+        await this.activity?.record('replace', [row], options?.ctx);
         return this.withRelated(
           row,
           await this.cascade.sync(row, children, 'replace', options?.ctx),
@@ -1360,9 +1407,11 @@ export abstract class RepositoryAdapter<
           ),
         );
         await this.cascade.remove(value, 'delete', options?.ctx);
-        return this.checkedRow(
+        const row = this.checkedRow(
           await this.doDelete(value, { ...options, versionGuard }),
         );
+        await this.activity?.record('delete', [value], options?.ctx);
+        return row;
       },
       this.entityCtx(options?.ctx),
     );
@@ -1397,6 +1446,8 @@ export abstract class RepositoryAdapter<
         }
         const rows = await this.doDeleteMany(values, options);
         this.assertRows(rows);
+        this.assertRowCount('deleteMany', rows, values);
+        await this.activity?.record('delete', values, options?.ctx);
         return rows;
       },
       this.entityCtx(options?.ctx),
@@ -1451,9 +1502,11 @@ export abstract class RepositoryAdapter<
           ),
         );
         await this.cascade.remove(value, 'softDelete', options?.ctx);
-        return this.checkedRow(
+        const row = this.checkedRow(
           await this.doSoftDelete(value, { ...options, versionGuard }),
         );
+        await this.activity?.record('softDelete', [row], options?.ctx);
+        return row;
       },
       this.entityCtx(options?.ctx),
     );
@@ -1486,9 +1539,11 @@ export abstract class RepositoryAdapter<
           ),
         );
         await this.cascade.remove(value, 'restore', options?.ctx);
-        return this.checkedRow(
+        const row = this.checkedRow(
           await this.doRestore(value, { ...options, versionGuard }),
         );
+        await this.activity?.record('restore', [row], options?.ctx);
+        return row;
       },
       this.entityCtx(options?.ctx),
     );

@@ -2,6 +2,7 @@ import { type Type, type PlainLiteralObject } from '@nestjs/common';
 
 import { type HookOption } from '@concepta/nestjs-core';
 
+import { type ActivityRegistration } from '../activity/interfaces/activity-registration.interface.js';
 import { type WhereCondition } from '../repository/interfaces/where-clause.interface.js';
 import { type RowScopeRegistration } from '../row-scope/interfaces/row-scope-registration.interface.js';
 import { type WritePolicyRegistration } from '../write-policy/interfaces/write-policy-registration.interface.js';
@@ -71,6 +72,13 @@ export interface RepositoryProviderOptions<
    * that references it.
    */
   writePolicy?: WritePolicyRegistration;
+
+  /**
+   * Record every write to this entity in an activity store: one record per
+   * stored row altered, written through the store's own repository with the
+   * caller's `ctx`, so it joins whatever transaction the caller opened.
+   */
+  activity?: ActivityRegistration;
 
   /**
    * Accept results holding declared relations nobody joined.

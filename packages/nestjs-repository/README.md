@@ -26,6 +26,7 @@ nesting, and a two-level repository hook system.
 - [Repository Hooks](#repository-hooks)
 - [Row Scope](#row-scope)
 - [Write Policy](#write-policy)
+- [Activity Log](#activity-log)
 - [Repository Registry](#repository-registry)
 - [Federation](#federation)
 - [Injecting Repositories](#injecting-repositories)
@@ -102,12 +103,13 @@ exception naming it. A second registration that reads the same rows, under
 any key or entity class, fails with `RepositoryDuplicateUrnException`, because
 its row scope, write policy and hooks could otherwise disagree with the first.
 
-Further options for scoped or append-only entities:
+Further options for scoped, append-only or recorded entities:
 
 | Option | Description |
 | --- | --- |
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
+| `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
 | `imports` | Modules exporting the row scope resolvers your entities declare |
 
 ```ts
@@ -2322,6 +2324,163 @@ routes bypass it:
 | No soft-delete column on an append-only entity | yes | The entity has a soft-delete column, e.g. it extends an audited base entity. Use your driver's append-only base instead |
 | Every entity declares a policy | `requireWritePolicyDeclaration` | An entity nobody decided about |
 
+## Activity Log
+
+Add `activity` to an entity to record who changed which of its rows, when, and
+which columns:
+
+```ts
+@Entity()
+export class Activity extends ActivityPostgresEntity {}
+
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [
+        { key: 'invoices', entity: Invoice, activity: { store: 'activity' } },
+        {
+          key: 'users',
+          entity: User,
+          activity: { store: 'activity', values: true, omit: ['passwordHash'] },
+        },
+        {
+          key: 'activity',
+          entity: Activity,
+          writePolicy: { access: 'append-only', reason: 'activity log' },
+          hooks: [ActivityActorHook],
+        },
+      ],
+    },
+  ],
+});
+```
+
+Every write then adds one record per row it changes. The store is an
+append-only entity extending your driver's activity base entity; several
+entities can share one.
+
+| `activity` option | Description |
+| --- | --- |
+| `store` | The `forRoot()` key of the store |
+| `values` | Also record each changed column's new value. Off by default |
+| `omit` | Columns whose values are never recorded. Only with `values` |
+
+The entity needs a single-column primary key.
+
+### What a record holds
+
+| Column | Holds |
+| --- | --- |
+| `entityKey` | The written entity's `forRoot()` key |
+| `urn` | The written entity's storage identity |
+| `operation` | `create`, `update`, `replace`, `upsert`, `delete`, `softDelete` or `restore` |
+| `recordId` | The written row's primary key, as a string |
+| `changed` | The columns the write changed (below) |
+| `values` | With `values: true`, each changed column's new value, less `omit`; otherwise `null` |
+| `occurredAt` | When the write happened |
+| `correlationId` | The request's `x-correlation-id` header, unchecked, or a generated id; `null` outside a request |
+
+| Operation | `changed` |
+| --- | --- |
+| `create`, `createMany`, `replace` | Every column of the stored row |
+| `update`, `upsert` | The columns you sent, plus any your hooks or row scope added, less the primary key |
+| `delete`, `deleteMany` | None |
+| `softDelete`, `restore` | The soft-delete column |
+
+On a create or replace, `changed` includes the columns the database set, such
+as the version and dates. On an update or upsert, it doesn't, unless you sent
+them. An
+`upsert` doesn't say whether it inserted or updated. A column's old value is in
+the row's previous record.
+
+### Adding the actor
+
+Set the actor, and any column you add to the store, in a hook on the store:
+
+```ts
+@RepoHook()
+export class ActivityActorHook {
+  @BeforeCreateMany()
+  async stampActor(
+    records: DeepPartial<Activity>[],
+    ctx?: PlainLiteralObject,
+  ): Promise<DeepPartial<Activity>[]> {
+    const actorId = principalOf(ctx)?.id ?? null; // null: a job or seeder
+    return records.map((record) => ({ ...record, actorId }));
+  }
+}
+```
+
+Classify records the same way, for example a `category` column set from
+`record.entityKey`.
+
+Your `@UseHooks()` route hooks run on store writes too. A route hook that adds
+a column of your entity must skip the store, or the store write fails: limit it
+to your entity as in [Scoped Hooks](#scoped-hooks).
+
+### Scoped entities
+
+A scoped entity's records copy its rows, so its store must declare `rowScope`
+too. Scope the store, and each record is stamped with the caller's scope, such
+as their `tenantId`, and read back only by that scope. Or declare it
+`{ access: 'public', reason }` if every reader of the store may see every
+scope's records.
+
+### Transactions
+
+- **Inside your transaction**, the change and its record commit or roll back
+  together.
+- **Without one**, if the record can't be stored the call throws
+  `ActivityWriteException`, and the change stays stored, unrecorded.
+- **With the store on another datasource**, they commit separately even inside
+  a transaction.
+
+To record every change, write inside a transaction and keep the store on the
+entity's datasource.
+
+### Reading a row's history
+
+```ts
+const history = await activity.find({
+  where: Where.and(
+    Where.eq('entityKey', 'invoices'),
+    Where.eq('recordId', invoice.id),
+  ),
+  ...OrderBy.order(OrderBy.asc<Activity>('occurredAt')),
+});
+```
+
+The activity base entity indexes `(entityKey, recordId)` for this lookup. The
+store's row scope and hooks apply as for any entity.
+
+### What is not recorded
+
+- Refused or failed writes, and reads.
+- A `softDelete` of a row that is already soft-deleted. A `restore` is always
+  recorded, even of a row that wasn't deleted.
+- Writes outside the repository: migrations, raw SQL, a direct
+  `@InjectRepository` handle. They leave gaps in a row's history.
+
+### Personal data and retention
+
+Records can't be deleted through the repository. Leave `values` off or `omit`
+personal columns, or pseudonymize them in a store hook. Expire old records with
+a scheduled job outside the repository.
+
+### Activity startup checks
+
+| Check | What it catches |
+| --- | --- |
+| Single-column primary key | The recorded entity's key has several columns, or none |
+| Registered store | `store` names no `forRoot()` entry |
+| Not its own store | The entity names itself as the store |
+| Unrecorded store | The store declares `activity` too |
+| Append-only store | The store isn't `{ access: 'append-only' }` |
+| Scoped entity, declared store | The entity is scoped and its store declares no `rowScope` |
+| Store columns | The store lacks an `ActivityInterface` column. Extend your driver's activity base entity |
+| `omit` | `omit` without `values`, or a column the entity doesn't have |
+
 ## Repository Registry
 
 `forRoot()` refuses two entries with the same key
@@ -2496,7 +2655,7 @@ also exported for manual provider wiring.
 
 | Exception | Description |
 | --- | --- |
-| `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline, and is thrown when a driver returns a property the call did not ask for — see [What a result holds](#what-a-result-holds). `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
+| `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline, and is thrown when a driver returns a property the call did not ask for — see [What a result holds](#what-a-result-holds) — or a `createMany`/`deleteMany` result without one row per input. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
 | `RepositoryDatabaseException` | A `RepositoryQueryException` for an error the database raised, such as a foreign key or unique constraint it refused. `context.database` and `context.code` name the database and its own error code, for logs and diagnosis |
 | `OptimisticLockException` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — the row was modified by another request since it was read |
 | `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
@@ -2519,6 +2678,8 @@ also exported for manual provider wiring.
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
 | `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. Append a correcting record instead |
 | `WritePolicyBootException` | One or more structural write-policy checks failed at startup; the message lists every failure |
+| `ActivityWriteException` | A write's activity record couldn't be stored. A refusal by the store, such as its row scope, keeps its status (a `403` stays a `403`); anything else is a `500`. Without a transaction, the write itself is already stored — see [Transactions](#transactions) |
+| `ActivityBootException` | One or more activity checks failed at startup; the message lists every failure — see [Activity startup checks](#activity-startup-checks) |
 | `CorrectionChainDepthException` | `resolveCorrectionChain` found more corrections than `maxDepth` (default 100); raise `maxDepth` if the chain is genuinely that long |
 
 ## Entry Points

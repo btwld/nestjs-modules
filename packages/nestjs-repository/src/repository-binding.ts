@@ -1,6 +1,8 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 
+import { activityBindingOf } from './activity/activity-boot-checks.js';
+import { ActivityBootException } from './activity/exceptions/activity-boot.exception.js';
 import {
   cascadeRelationsOf,
   checkCascadeCycles,
@@ -149,9 +151,19 @@ export function bindRepositories(params: {
     adapters.map((adapter) => [adapter.metadata.urn, adapter]),
   );
 
+  const registered = new Map(
+    entries.map(({ options }, index) => [
+      options.key,
+      { options, adapter: adapters[index] },
+    ]),
+  );
+
   const relationFailures: string[] = [];
+  const activityFailures: string[] = [];
   entries.forEach(({ options }, index) => {
     const adapter = adapters[index];
+    const activity = activityBindingOf(options, adapter, registered);
+    activityFailures.push(...activity.failures);
     const federated = federatedRelationsOf(
       options.key,
       adapter.metadata,
@@ -179,6 +191,7 @@ export function bindRepositories(params: {
         ? { reader, relations: federated.relations, maxKeys }
         : undefined,
       cascade: cascade.relations,
+      activity: activity.binding,
     });
   });
 
@@ -214,6 +227,10 @@ export function bindRepositories(params: {
   ];
   if (writePolicyFailures.length > 0) {
     throw new WritePolicyBootException(writePolicyFailures);
+  }
+
+  if (activityFailures.length > 0) {
+    throw new ActivityBootException(activityFailures);
   }
 
   const hookFailures = [...checkHooksUsable(adapters, moduleRef)];

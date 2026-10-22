@@ -67,6 +67,10 @@ export function createRepositoryRootModule(params: {
           rowScope: options.rowScope && { ...options.rowScope },
           hooks: options.hooks && [...options.hooks],
           writePolicy: options.writePolicy && { ...options.writePolicy },
+          activity: options.activity && {
+            ...options.activity,
+            omit: options.activity.omit && [...options.activity.omit],
+          },
         },
       })),
   );

@@ -654,6 +654,31 @@ export class StatementItem extends AppendOnlyPostgresEntity {
 `NULL`s are distinct in a unique index on Postgres and SQLite, so originals
 coexist while a second correction of one record is refused.
 
+### Activity Base Entities
+
+For an activity store (see
+[Activity Log](../nestjs-repository/README.md#activity-log)), extend
+`ActivityPostgresEntity` or `ActivitySqliteEntity` and register it append-only:
+
+```ts
+import { Column, Entity } from 'typeorm';
+import { ActivityPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+
+@Entity()
+export class Activity extends ActivityPostgresEntity {
+  @Column({ type: 'varchar', nullable: true })
+  category!: string | null; // your own column, set in a store hook
+}
+```
+
+Each has every activity column, a nullable `actorId` for your store hook to
+fill, and an index on `(entityKey, recordId)` for reading a row's history.
+
+`changed` and `values` are JSON (`jsonb` on Postgres, `simple-json` on SQLite),
+so `values` reads back as JSON: a date comes back as an ISO string, a `Buffer`
+comes back as an object of bytes, and a JavaScript `bigint` fails the write.
+`omit` binary and `bigint` columns.
+
 ## Exceptions
 
 | Exception | Package | Description |
@@ -670,4 +695,4 @@ coexist while a second correction of one record is refused.
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity` |
+| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity`, `ActivityPostgresEntity`, `ActivitySqliteEntity` |

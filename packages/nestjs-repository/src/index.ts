@@ -78,6 +78,16 @@ export {
 } from './write-policy/interfaces/write-policy-registration.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
+// Activity
+// ═══════════════════════════════════════════════════════════════════
+export {
+  ActivityInterface,
+  ActivityOperation,
+  ACTIVITY_COLUMNS,
+} from './activity/interfaces/activity.interface.js';
+export { ActivityRegistration } from './activity/interfaces/activity-registration.interface.js';
+
+// ═══════════════════════════════════════════════════════════════════
 // Exceptions
 // ═══════════════════════════════════════════════════════════════════
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
@@ -94,6 +104,8 @@ export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exc
 export { AppendOnlyViolationException } from './write-policy/exceptions/append-only-violation.exception.js';
 export { WritePolicyBootException } from './write-policy/exceptions/write-policy-boot.exception.js';
 export { CorrectionChainDepthException } from './write-policy/exceptions/correction-chain-depth.exception.js';
+export { ActivityBootException } from './activity/exceptions/activity-boot.exception.js';
+export { ActivityWriteException } from './activity/exceptions/activity-write.exception.js';
 export { HookBootException } from './exceptions/hook-boot.exception.js';
 export { RepositoryBootException } from './exceptions/repository-boot.exception.js';
 export { RepositoryUnboundException } from './exceptions/repository-unbound.exception.js';

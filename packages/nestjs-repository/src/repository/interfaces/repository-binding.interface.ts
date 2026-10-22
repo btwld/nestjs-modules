@@ -2,6 +2,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 
 import { type HookOption } from '@concepta/nestjs-core';
 
+import { type ActivityBinding } from '../../activity/interfaces/activity-binding.interface.js';
 import { type CascadeRelation } from '../../cascade/cascade-writer.js';
 import {
   type FederatedRelation,
@@ -50,6 +51,9 @@ export interface RepositoryBindingInterface {
    * repositories, by name.
    */
   readonly cascade?: ReadonlyMap<string, CascadeRelation>;
+
+  /** Where the entity's writes are recorded, if they are. */
+  readonly activity?: ActivityBinding;
 }
 
 /**

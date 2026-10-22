@@ -6,6 +6,8 @@ import {
 } from '@concepta/nestjs-core';
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
+import { ActivityBootException } from '../activity/exceptions/activity-boot.exception.js';
+import { ActivityWriteException } from '../activity/exceptions/activity-write.exception.js';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
@@ -175,6 +177,18 @@ const CASES: {
     name: 'WritePolicyBootException',
     build: () => new WritePolicyBootException(['failure']),
     fault: 'usage',
+  },
+  {
+    name: 'ActivityBootException',
+    build: () => new ActivityBootException(['failure']),
+    fault: 'usage',
+  },
+  {
+    // Without a store refusal to carry over, the record write failed on the
+    // server's side.
+    name: 'ActivityWriteException',
+    build: () => new ActivityWriteException('SomeEntity', 'Activity'),
+    fault: 'internal',
   },
   {
     name: 'RepositoryBootException',

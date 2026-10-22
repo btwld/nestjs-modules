@@ -12,6 +12,16 @@ import { type RepositoryMetadataInterface } from '../../repository/interfaces/re
 import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-token.js';
 
 import {
+  ACTIVITY_METADATA,
+  ActivityEntityFixture,
+  PAIR_METADATA,
+  PairEntityFixture,
+  TENANT_ACTIVITY_METADATA,
+  TenantActivityEntityFixture,
+  WIDGET_METADATA,
+  WidgetEntityFixture,
+} from './activity.fixture.js';
+import {
   BUNDLE_METADATA,
   BundleEntityFixture,
   CATEGORY_METADATA,
@@ -83,6 +93,10 @@ const ADAPTERS = new Map<
   Type,
   (key: string, options: MemoryRepositoryOptionsFixture) => object
 >([
+  [WidgetEntityFixture, memory(WIDGET_METADATA)],
+  [ActivityEntityFixture, memory(ACTIVITY_METADATA)],
+  [TenantActivityEntityFixture, memory(TENANT_ACTIVITY_METADATA)],
+  [PairEntityFixture, memory(PAIR_METADATA)],
   [InvoiceEntityFixture, memory(INVOICE_METADATA)],
   [InvoiceLineEntityFixture, memory(INVOICE_LINE_METADATA)],
   [LineNoteEntityFixture, memory(LINE_NOTE_METADATA)],
