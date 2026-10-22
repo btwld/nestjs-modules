@@ -90,7 +90,20 @@ Not ranked: reference notes, and work waiting on something else.
       2. Replace the `nestjs-samples` `02-logger` sample with a `nestjs-pino` recipe:
          `LoggerModule.forRoot({ pinoHttp })`, `bufferLogs: true`,
          `app.useLogger(app.get(Logger))`.
-  * Non-v8 packages (everything under `packages/` not listed under the v8 block in `pnpm-workspace.yaml`) are install-only workspace members until migrated to the DDD pattern and NestJS 12 — see the install-only block in `pnpm-workspace.yaml` for the full list. Also removed `@concepta/nestjs-email` from devDependencies in nestjs-invitation and nestjs-authentication (only used in e2e tests — restore when nestjs-email is migrated).
+  * **`@concepta/nestjs-email` is deprecated, not migrated** — it stays on the v7 line and
+      is excluded from the "migrate to NestJS 12" checklist below. It only forwards
+      `sendMail` to an injected mailer and wraps the error; v8 packages already send through
+      notification ports (`InvitationNotificationPort`, `VerifyNotificationPort`, the
+      recovery port), whose command handlers the implementer writes for any channel.
+      Replacement: `@nestjs-modules/mailer` (3.x, Nest 12 accepted; templates and an
+      optional BullMQ queue) or `nodemailer` directly, called from those handlers.
+      Remaining work:
+      1. Run `npm deprecate` on `@concepta/nestjs-email`, with a message pointing to the
+         notification ports and `@nestjs-modules/mailer`.
+      2. Replace the `nestjs-samples` `04-email` sample with a recipe: a command handler
+         for the invitation port that sends through `@nestjs-modules/mailer`'s
+         `MailerService`.
+  * Non-v8 packages (everything under `packages/` not listed under the v8 block in `pnpm-workspace.yaml`) are install-only workspace members until migrated to the DDD pattern and NestJS 12 — see the install-only block in `pnpm-workspace.yaml` for the full list.
   * **Request context on WebSocket** — HTTP and (preview) RPC are supported; on
       WebSocket, overlays skip and `@Ctx()`/`@Transactional()` throw. Design when
       wanted: a connection context on the socket client (identity, attached once)
@@ -119,5 +132,3 @@ Not ranked: reference notes, and work waiting on something else.
          solution-file-driven)
       3. `vitest.config.ts` `test.include` — add `"packages/<pkg>/**/*.spec.ts"`
       4. `vitest.config-e2e.ts` `test.include` — add `"packages/<pkg>/**/*.e2e-spec.ts"`
-      5. Restore `@concepta/nestjs-email` to nestjs-authentication and nestjs-invitation
-         devDependencies once nestjs-email is migrated.
