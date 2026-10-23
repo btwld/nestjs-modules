@@ -20,7 +20,6 @@ import { RevokeInvitationsHandler } from './application/commands/handlers/revoke
 import { SendInvitationHandler } from './application/commands/handlers/send-invitation.handler.js';
 import { InvitationAcceptedListener } from './application/listeners/invitation-accepted.listener.js';
 import { InvitationDispatchedListener } from './application/listeners/invitation-dispatched.listener.js';
-import { InvitationRevokedListener } from './application/listeners/invitation-revoked.listener.js';
 import { FindInvitationByCodeHandler } from './application/queries/handlers/find-invitation-by-code.handler.js';
 import { GetInvitationHandler } from './application/queries/handlers/get-invitation.handler.js';
 import { invitationDefaultConfig } from './config/invitation-default.config.js';
@@ -140,7 +139,6 @@ export function createInvitationProviders(options: {
     FindInvitationByCodeHandler,
     // event listeners
     InvitationDispatchedListener,
-    InvitationRevokedListener,
     InvitationAcceptedListener,
   ];
 }
