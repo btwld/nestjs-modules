@@ -27,6 +27,7 @@ nesting, and a two-level repository hook system.
 - [Row Scope](#row-scope)
 - [Write Policy](#write-policy)
 - [Activity Log](#activity-log)
+- [Durable Messaging](#durable-messaging)
 - [Repository Registry](#repository-registry)
 - [Federation](#federation)
 - [Injecting Repositories](#injecting-repositories)
@@ -2481,6 +2482,69 @@ a scheduled job outside the repository.
 | Store columns | The store lacks an `ActivityInterface` column. Extend your driver's activity base entity |
 | `omit` | `omit` without `values`, or a column the entity doesn't have |
 
+## Durable Messaging
+
+`@concepta/nestjs-repository/optional/outbox` publishes
+[`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) messages,
+and records inbox deliveries, in the same transaction as your repository
+writes. A message commits or rolls back with the writes beside it, and a
+redelivered message runs its work once. Install `@nestjs/outbox`, and use a
+driver that provides durable support from its own `optional/outbox` entry
+point.
+
+```ts
+import { DurableMessagingModule } from '@concepta/nestjs-repository/optional/outbox';
+
+@Module({
+  imports: [
+    RepositoryModule.forRoot({ /* ... the 'orders' registration ... */ }),
+    DurableMessagingModule.forRoot({
+      key: 'orders',              // the registration whose datasource holds the outbox
+      driver: YourDriverDurable,  // from your driver's optional/outbox
+      outbox: { retry: 10 },      // passed to OutboxModule.forRoot()
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Publish next to your writes, inside a transaction scope:
+
+```ts
+await this.txScope.run(ctx, async (txCtx) => {
+  await this.orders.create(order, { ctx: txCtx });
+  await this.durable.publish(txCtx, [
+    { topic: 'order.placed', key: order.id, payload: { orderId: order.id } },
+  ]);
+});
+```
+
+Run a delivery's work once:
+
+```ts
+const result = await this.durable.once(ctx, 'billing', message.id, async (txCtx) => {
+  // repository writes here join the same transaction as the inbox record
+});
+// result is { duplicate: true } when this consumer already processed the message
+```
+
+What to know:
+
+- `publish` needs a transaction scope; outside one it throws. The relay is
+  woken when the scope commits.
+- `once` opens a scope, or joins the one `ctx` is in. If `work` throws, the
+  whole scope rolls back, including a joined caller's earlier writes, and the
+  caller's own `run()` throws `TransactionScopeFailedException`.
+- Startup refuses, with `UnsupportedDurableDriverException`, a key nothing is
+  registered under and a registration its driver cannot carry: no
+  transactions, or a database `@nestjs/outbox` has no store for.
+- Import `DurableMessagingModule.forRoot()` once per application. A second
+  one fails startup.
+- Delivery is at least once: a handler that does not use `once` must be
+  idempotent.
+- `OutboxInbox`, `OutboxDeadLetters` and `OutboxRelay` from `@nestjs/outbox`
+  are injectable as they are, for retention, dead letters and stats.
+
 ## Repository Registry
 
 `forRoot()` refuses two entries with the same key
@@ -2687,4 +2751,5 @@ also exported for manual provider wiring.
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
+| `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle` |

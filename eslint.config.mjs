@@ -50,6 +50,7 @@ const optionalDepAllowedFiles = optionalDepRestrictedPackages.flatMap(
     `packages/${name}/src/infrastructure/schemas/*-paginated.schema.ts`,
     `packages/${name}/src/infrastructure/schemas/*-create-batch.schema.ts`,
     `packages/${name}/src/domain/value-objects/money/**/*.ts`,
+    `packages/${name}/src/durable/**/*.ts`,
     `packages/${name}/src/**/__tests__/**/*.ts`,
     `packages/${name}/src/**/__fixtures__/**/*.ts`,
     `packages/${name}/src/**/*.spec.ts`,
@@ -92,6 +93,10 @@ const OPTIONAL_DEP_RESTRICTED_PATTERNS = [
   optionalDepPattern(
     'decimal.js',
     "Only the optional/money entry point may import this (src/domain/value-objects/money/**) — see the root README's Entry Points section.",
+  ),
+  optionalDepPattern(
+    '@nestjs/outbox',
+    "Only the optional/outbox entry point may import this (src/durable/**) — see the root README's Entry Points section.",
   ),
 ];
 
