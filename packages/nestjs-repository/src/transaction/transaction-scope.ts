@@ -85,9 +85,11 @@ export class TransactionScope implements OnApplicationBootstrap {
    * (registration happens in provider factories, instantiated during DI —
    * see `RepositoryModule.forFeature`), so the count is final here. An
    * empty registry means every `run()` in this app executes without a
-   * transaction: writes are not atomic and `onRollback` callbacks never
-   * fire, silently, since nothing else in this class distinguishes that
-   * case from a real commit.
+   * transaction: writes are not atomic. Callbacks still follow the
+   * operation's outcome — `onCommit` after success, `onRollback` after a
+   * throw — but on a throw the writes made before it stay, so an
+   * `onRollback` callback runs although nothing was rolled back. Nothing
+   * else in this class distinguishes that case from a real transaction.
    */
   onApplicationBootstrap(): void {
     this.warnEmptyRegistryOnce();
@@ -107,9 +109,10 @@ export class TransactionScope implements OnApplicationBootstrap {
     this.warnedEmptyRegistry = true;
     Logger.warn(
       'No transaction factory is registered. TransactionScope.run() will ' +
-        'execute without a transaction: writes are not atomic and ' +
-        'onRollback callbacks never fire. Register entities with a driver ' +
-        'that provides one in RepositoryModule.forRoot().',
+        'execute without a transaction: writes are not atomic, and when an ' +
+        'operation throws, the writes made before it stay although ' +
+        'onRollback callbacks run. Register entities with a driver that ' +
+        'provides one in RepositoryModule.forRoot().',
       TransactionScope.name,
     );
   }
