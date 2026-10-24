@@ -720,6 +720,12 @@ import { TypeOrmDurable } from '@concepta/nestjs-repository-typeorm/optional/out
 export class AppModule {}
 ```
 
+`outbox` takes the `OutboxModule.forRoot()` options (relay, retry,
+transports): see the [outbox docs](https://docs.nestjs.com/reliability/outbox)
+or the [`nestjs/outbox` repository](https://github.com/nestjs/outbox).
+`DurableMessagingModule` imports `OutboxModule` for you; don't import it
+yourself.
+
 Publish next to your writes:
 
 ```ts
@@ -764,9 +770,12 @@ await this.txScope.run(ctx, async (txCtx) => {
 
 Operating it:
 
-- **Migrations.** Outside production the store creates its tables at
+- **Migrations.** The store owns its tables: you declare no entity and write
+  no migration for them. Outside production the store creates them at
   startup. In production, startup fails until you run
-  `npx nest-outbox migrate --url <database url>` in your deploy.
+  `npx nest-outbox migrate --url <database url>` in your deploy, or run
+  `PostgresOutboxStore.migrationSql()` or
+  `MySqlOutboxStore.migrationStatements()` from one of your own migrations.
 - **Retention.** Nothing is pruned for you. Schedule
   `OutboxInbox.prune('30d')` and `OutboxDeadLetters.purge({ failedBefore })`;
   both are injectable from `@nestjs/outbox`.
