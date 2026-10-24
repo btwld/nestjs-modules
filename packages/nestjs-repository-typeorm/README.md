@@ -22,6 +22,7 @@ database-specific base entities for Postgres and SQLite.
 - [Transaction Support](#transaction-support)
 - [Repository Hooks](#repository-hooks)
 - [Base Entities](#base-entities)
+- [Durable Messaging](#durable-messaging)
 - [Exceptions](#exceptions)
 - [Entry Points](#entry-points)
 
@@ -679,6 +680,109 @@ so `values` reads back as JSON: a date comes back as an ISO string, a `Buffer`
 comes back as an object of bytes, and a JavaScript `bigint` fails the write.
 `omit` binary and `bigint` columns.
 
+## Durable Messaging
+
+`TypeOrmDurable`, from `@concepta/nestjs-repository-typeorm/optional/outbox`,
+gives a TypeORM registration durable messaging through
+`DurableMessagingModule` (see the `nestjs-repository` README). It builds the
+[`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) store on the
+registration's own data source: `PostgresOutboxStore` for `postgres`,
+`MySqlOutboxStore` for `mysql`. Any other database, MariaDB included, fails
+startup with `UnsupportedDurableDriverException`. You never build the store
+or touch the data source.
+
+```bash
+npm install @nestjs/outbox
+```
+
+```ts
+import { DurableMessagingModule } from '@concepta/nestjs-repository/optional/outbox';
+import { TypeOrmDurable } from '@concepta/nestjs-repository-typeorm/optional/outbox';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({ type: 'postgres' /* ... */ }),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'orders', entity: OrderEntity }],
+        },
+      ],
+    }),
+    DurableMessagingModule.forRoot({
+      key: 'orders',
+      driver: TypeOrmDurable,
+      outbox: { retry: 10 },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Publish next to your writes:
+
+```ts
+await this.txScope.run(ctx, async (txCtx) => {
+  await this.orders.create(order, { ctx: txCtx });
+  await this.durable.publish(txCtx, [
+    { topic: 'order.placed', key: order.id, payload: { orderId: order.id } },
+  ]);
+});
+```
+
+Handle a message once. Declare the handler with `inbox: false`: `once`
+records the inbox row in the handler's transaction, so the dispatcher's own
+inbox check would only repeat it:
+
+```ts
+@Injectable()
+export class OrderPlacedHandler {
+  constructor(private readonly durable: DurableMessaging) {}
+
+  @OnOutboxMessage('order.placed', { consumer: 'billing', inbox: false })
+  async handle(payload: { orderId: string }, { message }: OutboxHandlerContext) {
+    await this.durable.once(new AppContextHost(), 'billing', message.id, async (txCtx) => {
+      // repository writes here commit with the inbox record
+    });
+  }
+}
+```
+
+An inbound webhook works the same way: call `durable.once` with the
+provider's delivery id as the message id.
+
+To make a Rockets package's own write durable, wrap the package call in your
+own scope and publish beside it; the package's `run()` joins your scope:
+
+```ts
+await this.txScope.run(ctx, async (txCtx) => {
+  await this.invitationService.accept(txCtx, code, passcode, payload);
+  await this.durable.publish(txCtx, [{ topic: 'invitation.accepted', payload: { code } }]);
+});
+```
+
+Operating it:
+
+- **Migrations.** Outside production the store creates its tables at
+  startup. In production, startup fails until you run
+  `npx nest-outbox migrate --url <database url>` in your deploy.
+- **Retention.** Nothing is pruned for you. Schedule
+  `OutboxInbox.prune('30d')` and `OutboxDeadLetters.purge({ failedBefore })`;
+  both are injectable from `@nestjs/outbox`.
+- **Alerting.** `OutboxRelay.stats()` reports `pending`, `deadLetters` and
+  `oldestDueAt`; the package also publishes relay events on
+  `node:diagnostics_channel`.
+
+Requirements and limits:
+
+- Postgres or MySQL, through the registration's TypeORM data source. The
+  outbox lives on that data source, so publish from scopes that write to it.
+- One `DurableMessagingModule.forRoot()` per application.
+- Delivery is at least once: a handler that does not use `once` must be
+  idempotent.
+- Payloads are stored as JSON, so a `Date` arrives as a string.
+
 ## Exceptions
 
 | Exception | Package | Description |
@@ -696,3 +800,4 @@ comes back as an object of bytes, and a JavaScript `bigint` fails the write.
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity`, `ActivityPostgresEntity`, `ActivitySqliteEntity` |
+| `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

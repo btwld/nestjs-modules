@@ -98,6 +98,7 @@ export function createTypeOrmRepository<E extends PlainLiteralObject>(
   return new TypeOrmRepository(repo, {
     entityKey,
     transactionKey: resolveTransactionKey(dataSource),
+    dataSourceName: resolveDataSourceName(dataSource),
     hookResolver,
     transactionScope,
   });

@@ -100,6 +100,23 @@ const OPTIONAL_DEP_RESTRICTED_PATTERNS = [
   ),
 ];
 
+// The optional-dep-free packages are exempt only from the deps they exist
+// for: `@nestjs/outbox` is optional for them too, so their main entry must
+// not reach it either.
+const OUTBOX_RESTRICTED_PATTERNS = OPTIONAL_DEP_RESTRICTED_PATTERNS.filter(
+  ({ regex }) => regex.startsWith('^@nestjs/outbox'),
+);
+const outboxRestrictedFiles = optionalDepFreePackages.map(
+  (name) => `packages/${name}/src/**/*.ts`,
+);
+const outboxAllowedFiles = optionalDepFreePackages.flatMap((name) => [
+  `packages/${name}/src/durable/**/*.ts`,
+  `packages/${name}/src/**/__tests__/**/*.ts`,
+  `packages/${name}/src/**/__fixtures__/**/*.ts`,
+  `packages/${name}/src/**/*.spec.ts`,
+  `packages/${name}/src/**/*.fixture.ts`,
+]);
+
 export default tseslint.config(
   // Ignore patterns
   {
@@ -209,6 +226,18 @@ export default tseslint.config(
   },
   {
     files: optionalDepAllowedFiles,
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+  {
+    files: outboxRestrictedFiles,
+    rules: {
+      'no-restricted-imports': ['error', { patterns: OUTBOX_RESTRICTED_PATTERNS }],
+    },
+  },
+  {
+    files: outboxAllowedFiles,
     rules: {
       'no-restricted-imports': 'off',
     },
