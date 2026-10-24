@@ -2528,6 +2528,51 @@ const result = await this.durable.once(ctx, 'billing', message.id, async (txCtx)
 // result is { duplicate: true } when this consumer already processed the message
 ```
 
+A handler that throws is retried for you, with backoff. When you know a
+retry cannot help, throw `NonRetryableMessageError` from `@nestjs/outbox`
+and the message goes straight to the dead letters for review:
+
+```ts
+@OnOutboxMessage('provider.callback', { consumer: 'billing', inbox: false })
+async handle(payload: CallbackPayload, { message }: OutboxHandlerContext) {
+  await this.durable.once(new AppContextHost(), 'billing', message.id, async (txCtx) => {
+    const invoice = await this.invoices.findOne({
+      where: Where.eq('id', payload.invoiceId),
+      ctx: txCtx,
+    });
+    if (invoice?.status === 'void') {
+      // a callback for a voided invoice will not succeed on a retry
+      throw new NonRetryableMessageError(`invoice ${payload.invoiceId} is void`);
+    }
+    // ...apply the callback
+  });
+}
+```
+
+Set `inbox: false` on handlers that use `once`; `once` already records the
+delivery.
+
+Leave a lost optimistic lock, or a record that has not arrived yet, to be
+retried: those usually succeed on a later attempt. To decide by exception
+type instead, set `retryIf` and the number of attempts:
+
+```ts
+DurableMessagingModule.forRoot({
+  key: 'orders',
+  driver: YourDriverDurable,
+  outbox: {
+    retry: {
+      attempts: 10,
+      retryIf: (error) => !(error instanceof InvoiceVoidedException),
+    },
+  },
+});
+```
+
+Once you have fixed the cause, `requeue` the dead letter with
+`OutboxDeadLetters`. Consumers that already handled it are not repeated;
+only the work that failed runs again.
+
 What to know:
 
 - `publish` needs a transaction scope; outside one it throws. The relay is
