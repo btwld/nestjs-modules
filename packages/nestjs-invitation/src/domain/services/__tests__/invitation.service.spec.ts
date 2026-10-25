@@ -314,12 +314,32 @@ describe(InvitationService.name, () => {
       expect(trxHandle.onRollback).toHaveBeenCalledTimes(2);
     });
 
+    it("should clear the user's OTPs once, inside the revoke's transaction", async () => {
+      const inv1 = toInvitationDomain(
+        createMockInvitationEntity({ id: 'inv-1' }),
+      );
+      const inv2 = toInvitationDomain(
+        createMockInvitationEntity({ id: 'inv-2' }),
+      );
+      mockRepo.findAllByUserAndCategory.mockResolvedValue([inv1, inv2]);
+
+      await service.revokeByUserId(ctx, 'test-user-id', 'user');
+
+      expect(mockOtpPort.clear).toHaveBeenCalledTimes(1);
+      const [clearCtx, clearCategory, clearUserId] =
+        mockOtpPort.clear.mock.calls[0];
+      expect(clearCtx).toBe(mockRepo.findAllByUserAndCategory.mock.calls[0][0]);
+      expect(clearCategory).toBe('user');
+      expect(clearUserId).toBe('test-user-id');
+    });
+
     it('should return early when no active invitations', async () => {
       mockRepo.findAllByUserAndCategory.mockResolvedValue([]);
 
       await service.revokeByUserId(ctx, 'test-user-id', 'user');
 
       expect(mockRepo.save).not.toHaveBeenCalled();
+      expect(mockOtpPort.clear).not.toHaveBeenCalled();
     });
 
     it('should not require a user lookup', async () => {

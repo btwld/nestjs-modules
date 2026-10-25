@@ -251,6 +251,11 @@ export class InvitationService {
       const eventContext = createEventContext(txCtx, {}, {});
 
       await this.revokeActive(txCtx, eventContext, activeInvitations);
+
+      // In the revoke's own transaction: a revoked invitation's passcode
+      // must stop working when the revoke commits, not when an event
+      // listener gets to it.
+      await this.otpPort.clear(txCtx, category, userId);
     });
   }
 

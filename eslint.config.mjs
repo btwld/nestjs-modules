@@ -50,6 +50,7 @@ const optionalDepAllowedFiles = optionalDepRestrictedPackages.flatMap(
     `packages/${name}/src/infrastructure/schemas/*-paginated.schema.ts`,
     `packages/${name}/src/infrastructure/schemas/*-create-batch.schema.ts`,
     `packages/${name}/src/domain/value-objects/money/**/*.ts`,
+    `packages/${name}/src/durable/**/*.ts`,
     `packages/${name}/src/**/__tests__/**/*.ts`,
     `packages/${name}/src/**/__fixtures__/**/*.ts`,
     `packages/${name}/src/**/*.spec.ts`,
@@ -93,7 +94,28 @@ const OPTIONAL_DEP_RESTRICTED_PATTERNS = [
     'decimal.js',
     "Only the optional/money entry point may import this (src/domain/value-objects/money/**) — see the root README's Entry Points section.",
   ),
+  optionalDepPattern(
+    '@nestjs/outbox',
+    "Only the optional/outbox entry point may import this (src/durable/**) — see the root README's Entry Points section.",
+  ),
 ];
+
+// The optional-dep-free packages are exempt only from the deps they exist
+// for: `@nestjs/outbox` is optional for them too, so their main entry must
+// not reach it either.
+const OUTBOX_RESTRICTED_PATTERNS = OPTIONAL_DEP_RESTRICTED_PATTERNS.filter(
+  ({ regex }) => regex.startsWith('^@nestjs/outbox'),
+);
+const outboxRestrictedFiles = optionalDepFreePackages.map(
+  (name) => `packages/${name}/src/**/*.ts`,
+);
+const outboxAllowedFiles = optionalDepFreePackages.flatMap((name) => [
+  `packages/${name}/src/durable/**/*.ts`,
+  `packages/${name}/src/**/__tests__/**/*.ts`,
+  `packages/${name}/src/**/__fixtures__/**/*.ts`,
+  `packages/${name}/src/**/*.spec.ts`,
+  `packages/${name}/src/**/*.fixture.ts`,
+]);
 
 export default tseslint.config(
   // Ignore patterns
@@ -204,6 +226,18 @@ export default tseslint.config(
   },
   {
     files: optionalDepAllowedFiles,
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+  {
+    files: outboxRestrictedFiles,
+    rules: {
+      'no-restricted-imports': ['error', { patterns: OUTBOX_RESTRICTED_PATTERNS }],
+    },
+  },
+  {
+    files: outboxAllowedFiles,
     rules: {
       'no-restricted-imports': 'off',
     },

@@ -198,6 +198,41 @@ describe(TransactionScope.name, () => {
 
       warnSpy.mockRestore();
     });
+
+    it('should still fire onRollback without a factory when the operation throws, though nothing was rolled back', async () => {
+      const emptyRegistry = new TransactionFactoryRegistry();
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          TransactionScope,
+          {
+            provide: TRANSACTION_FACTORY_REGISTRY,
+            useValue: emptyRegistry,
+          },
+          {
+            provide: REPOSITORY_MODULE_OPTIONS,
+            useValue: { defaultTimeout: 30000 },
+          },
+        ],
+      }).compile();
+
+      const txScope = moduleRef.get<TransactionScope>(TransactionScope);
+      const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+      const onRollback = vi.fn();
+      const onCommit = vi.fn();
+
+      await expect(
+        txScope.run(new AppContextHost(), async (txCtx) => {
+          txCtx.trx.onCommit(onCommit);
+          txCtx.trx.onRollback(onRollback);
+          throw new Error('operation failed');
+        }),
+      ).rejects.toThrow('operation failed');
+
+      expect(onRollback).toHaveBeenCalledTimes(1);
+      expect(onCommit).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe('commit and rollback lifecycle', () => {

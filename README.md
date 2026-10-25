@@ -63,6 +63,7 @@ to install the dependency.
 | `optional/seeding` | `@concepta/typeorm-seeding` + `@faker-js/faker` |
 | `optional/crud` | `@concepta/nestjs-crud` |
 | `optional/money` | `decimal.js` |
+| `optional/outbox` | `@nestjs/outbox` |
 
 Rules for maintaining this boundary:
 
@@ -80,7 +81,8 @@ Rules for maintaining this boundary:
    `src/infrastructure/persistence/typeorm/`, seed factories and seeders in
    `src/infrastructure/seeding/`, CRUD request/handler classes in
    `src/gateways/http/{commands,queries}/{impl,handlers}/`, money value
-   objects in `src/domain/value-objects/money/`.
+   objects in `src/domain/value-objects/money/`, durable messaging in
+   `src/durable/`.
 
 `@concepta/nestjs-core/aggregate`, `@concepta/nestjs-core/testing` and
 `@concepta/nestjs-repository/testing` are deliberate exceptions — they gate

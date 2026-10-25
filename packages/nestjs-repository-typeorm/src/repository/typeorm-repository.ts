@@ -86,6 +86,8 @@ function dataSourceOf(
 export interface TypeOrmRepositoryOptions {
   entityKey: string;
   transactionKey?: string;
+  /** The name of the data source this repository writes through. */
+  dataSourceName?: string;
   hookResolver?: HookResolverService;
   transactionScope?: TransactionScope;
 }
@@ -138,6 +140,19 @@ export class TypeOrmRepository<
       columns,
       relations,
     };
+  }
+
+  /**
+   * The key of the transaction this repository's writes join, or undefined
+   * for a repository built without one.
+   */
+  get transactionKey(): string | undefined {
+    return this.options.transactionKey;
+  }
+
+  /** The name of the data source this repository writes through. */
+  get dataSourceName(): string | undefined {
+    return this.options.dataSourceName;
   }
 
   /**

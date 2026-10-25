@@ -79,7 +79,8 @@ consumer-supplied ports, and event-driven lifecycle management.
   command via the notification port
 - `InvitationAcceptedListener` dispatches the acceptance confirmation
   command via the notification port
-- Auto-clear OTPs on revocation via `InvitationRevokedListener`
+- Revoking clears the user's OTPs for that category in the same transaction,
+  so a revoked passcode stops working when the revoke commits
 
 ### Auto-Revocation
 
@@ -453,7 +454,7 @@ snapshot.
 | `InvitationCreatedEvent` | `Invitation.create()` | -- |
 | `InvitationDispatchedEvent` | `Invitation.dispatch()` | `InvitationDispatchedListener` -- dispatches invitation notification command via notification port |
 | `InvitationAcceptedEvent` | `Invitation.accept()` | `InvitationAcceptedListener` -- dispatches acceptance notification command via notification port |
-| `InvitationRevokedEvent` | `Invitation.revoke()` | `InvitationRevokedListener` -- clears OTPs |
+| `InvitationRevokedEvent` | `Invitation.revoke()` | -- (OTPs are cleared in the revoke's transaction, not by a listener) |
 | `InvitationRemovedEvent` | `Invitation.remove()` | -- |
 
 `InvitationDispatchedEvent` carries OTP metadata (`passcode`, `tokenExp`)

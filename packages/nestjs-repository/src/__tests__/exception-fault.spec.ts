@@ -8,6 +8,7 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 
 import { ActivityBootException } from '../activity/exceptions/activity-boot.exception.js';
 import { ActivityWriteException } from '../activity/exceptions/activity-write.exception.js';
+import { UnsupportedDurableDriverException } from '../durable/exceptions/unsupported-durable-driver.exception.js';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
@@ -206,6 +207,12 @@ const CASES: {
     name: 'CorrectionChainDepthException',
     build: () => new CorrectionChainDepthException('some-id', 100),
     fault: 'internal',
+  },
+  {
+    name: 'UnsupportedDurableDriverException',
+    build: () =>
+      new UnsupportedDurableDriverException('orders', 'no transactions'),
+    fault: 'usage',
   },
 ];
 
