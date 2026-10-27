@@ -6,7 +6,39 @@ Effort tags: S/M/L. Completed items are removed from this list rather than marke
 done — see git history for what shipped. Reference notes that are not work live under
 "Parked" at the end.
 
-  1. **Row scope cannot see the tables a view reads** (S) — row scope compares
+  1. **`ArchiveCacheCommand` never persists the soft delete** (S) — `CacheRepository.softRemove`
+      calls `cache.stampDeleted()` before `repository.softDelete(...)`. The adapter treats a
+      row that already has a delete date as soft-deleted and returns without writing,
+      so the stored row keeps `dateDeleted: null` and stays visible to every read. Confirmed
+      with a temporary e2e: archive, then `find({ withDeleted: true })` returns the row with
+      `dateDeleted` null. No cache e2e covers archiving, which is why the suite is green.
+      Fix: hand `softDelete` the row as read (drop the `stampDeleted()` call, or call it
+      after), and add an e2e that soft-deletes and then reads with and without
+      `withDeleted`. No other module stamps before `softDelete`.
+      In the same change, name the operation after the repository's: "archive" is an
+      implementer's concept, not a synonym for soft delete, and the DDD reference no longer
+      uses it. Rename `ArchiveCacheCommand` → `SoftDeleteCacheCommand`, `ArchiveCacheHandler`
+      → `SoftDeleteCacheHandler` and `CacheRepository.softRemove` → `softDelete`, across
+      `application/commands/{impl,handlers}/archive-cache.*`, `cache-core.module-definition.ts`,
+      `index.ts`, `gateways/http/commands/handlers/delete-cache-request.handler.ts`, their
+      specs and the README command table. Breaking: `BREAKING CHANGE` footer.
+
+  2. **nestjs-user custom repositories never get the registered repository** (S) —
+      `repositories.user` / `repositories.userCredentials` take `Type<…RepositoryInterface>`
+      and are registered with `useClass`, while the entity key is dropped from
+      `RepositoryModule.forFeature`. So a class that extends `UserRepository` receives
+      neither the driver repository nor the mapper (both `protected`, meant for subclasses).
+      Fix, as the DDD reference's fixed style and `nestjs-file` do: take a
+      `UserRepositoryConstructor` (`new (...args: ConstructorParameters<typeof
+      UserRepository>) => UserRepositoryInterface`), build it in the provider factory with
+      `new (custom ?? UserRepository)(repository, mapper)`, always register the entity keys,
+      and export `UserMapper` / `UserCredentialsMapper`. Files:
+      `infrastructure/config/interfaces/user-extras.interface.ts`,
+      `infrastructure/utils/create-user{,-credentials}-repository-provider.ts`,
+      `user.module-definition.ts`, `index.ts`, the module spec and README. Breaking for a
+      consumer passing a standalone class: `BREAKING CHANGE` footer.
+
+  3. **Row scope cannot see the tables a view reads** (S) — row scope compares
       URNs, and a view entity's URN names the view, not the tables it selects
       from. `@ViewEntity({ name: 'open_orders', expression: 'SELECT … FROM
       orders …' })` is `urn:typeorm:shop:open_orders` while a scoped `Order` is
@@ -18,7 +50,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       would need the driver to know which tables a view expression reads, and
       to resolve SQLite paths.
 
-  2. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
+  4. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
       — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`, and in
       crud's optimistic-locking e2e. Every one passes in isolation and on a re-run of the
       same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row and as
@@ -31,7 +63,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       file; suspect timeouts under CPU contention. Confirm by pinning a failing spec to a
       single worker.
 
-  3. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+  5. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
       `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
       hoisting in a way that breaks nestjs-crud's OpenAPI tests
@@ -40,7 +72,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  4. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
+  6. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
       driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
       tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
       deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
@@ -60,7 +92,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       so the exposure is a consumer who runs it against an untrusted schema. Landing the
       count fix above is what clears it.
 
-  5. **Audit composite key support across the codebase, and drop it** (M) — no v8 package
+  7. **Audit composite key support across the codebase, and drop it** (M) — no v8 package
       declares a composite primary key outside test fixtures; every shipped entity uses a
       single generated key, and activity refuses anything else (as does cascade). Find each
       place that handles several key columns, and decide what to remove:
@@ -77,6 +109,21 @@ done — see git history for what shipped. Reference notes that are not work liv
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.
+
+  * **Map common database errors to useful exceptions** — a failed query surfaces as
+      `RepositoryDatabaseException`, which carries the raw `context.database` (the
+      driver's data-source type) and `context.code`, but nothing classifies them. So a
+      unique-key race in `CreateFileCommand` (two creates pass the duplicate check; the
+      second fails on the unique constraint) reaches the caller as a generic database error
+      instead of `FileAlreadyExistsException`; the file README documents this. Idea: the
+      driver reports a driver-neutral classification next to the code
+      (`violation?: 'unique' | 'foreign-key' | ...`), and the abstraction throws a
+      dedicated exception a module can catch without knowing database codes. Unique-violation
+      codes: Postgres/CockroachDB `'23505'`, SQLite `'SQLITE_CONSTRAINT_UNIQUE'`
+      (`'SQLITE_CONSTRAINT_PRIMARYKEY'` for a primary key), MySQL/MariaDB `'ER_DUP_ENTRY'` /
+      errno `1062`, SQL Server `2627`/`2601` (on `number`, which `describeDatabaseError`
+      doesn't read yet). Only SQLite is testable locally. Waiting on a second module that
+      needs it.
 
   * `@concepta/nestjs-common` is deprecated — reverted to v7 line (`7.0.0-alpha.10`) and excluded from the v8 workspace. Its remaining v8-only symbols were merged into nestjs-core. Run `npm deprecate @concepta/nestjs-common@8.0.0-alpha.6` at publish time.
   * **Logger family is deprecated, not migrated** — `@concepta/nestjs-logger`,
