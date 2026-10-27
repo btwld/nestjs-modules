@@ -1,7 +1,7 @@
 import { Module, DynamicModule, Provider } from '@nestjs/common';
 
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
-import { RepositoryProviderOptions } from './interfaces/repository-provider-options.interface.js';
+import { RepositoryDriverInterface } from './interfaces/repository-module.interface.js';
 import {
   RepositoryRootAsyncOptions,
   RepositoryRootOptions,
@@ -55,8 +55,8 @@ export class RepositoryModule {
    * Binds each repository to its declarations and runs the startup checks
    * while the application is created; a failure stops it there.
    */
-  static forRoot<const Options extends readonly RepositoryProviderOptions[]>(
-    options: RepositoryRootOptions<Options>,
+  static forRoot<const Drivers extends readonly RepositoryDriverInterface[]>(
+    options: RepositoryRootOptions<Drivers>,
   ): DynamicModule {
     const { drivers = [], imports = [], ...moduleOptions } = options;
 
@@ -76,8 +76,8 @@ export class RepositoryModule {
    * factory. Entities stay static.
    */
   static forRootAsync<
-    const Options extends readonly RepositoryProviderOptions[],
-  >(options: RepositoryRootAsyncOptions<Options>): DynamicModule {
+    const Drivers extends readonly RepositoryDriverInterface[],
+  >(options: RepositoryRootAsyncOptions<Drivers>): DynamicModule {
     const { drivers = [], imports = [], inject = [], useFactory } = options;
 
     return createRepositoryRootModule({

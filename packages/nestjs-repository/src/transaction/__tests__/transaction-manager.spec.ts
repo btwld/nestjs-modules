@@ -1,5 +1,7 @@
 import { type Mock } from 'vitest';
 
+import { AppContextHost } from '@concepta/nestjs-core';
+
 import { TransactionClosedException } from '../../exceptions/transaction-closed.exception.js';
 import { TransactionHeuristicCommitException } from '../../exceptions/transaction-heuristic-commit.exception.js';
 import { type TransactionInterface } from '../interfaces/transaction.interface.js';
@@ -62,6 +64,21 @@ describe(TransactionManager.name, () => {
 
       expect(second).toBe(newTx);
       expect(newTx.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create each transaction with the scope host', async () => {
+      const host = new AppContextHost();
+      const scoped = new TransactionManager(registry, false, host);
+      const create = vi.fn((_ctx: AppContextHost) => createMockTransaction());
+      registry.register('typeorm:default', { create });
+      registry.register('typeorm:other', { create });
+
+      await scoped.getOrStart('typeorm:default');
+      await scoped.getOrStart('typeorm:other');
+
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(create.mock.calls[0][0]).toBe(host);
+      expect(create.mock.calls[1][0]).toBe(host);
     });
 
     it('should throw when no factory registered for key', async () => {

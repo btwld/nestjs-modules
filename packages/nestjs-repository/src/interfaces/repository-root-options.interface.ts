@@ -2,36 +2,54 @@ import { type InjectionToken, type ModuleMetadata } from '@nestjs/common';
 
 import { type RepositoryModuleOptionsInterface } from './repository-module-options.interface.js';
 import { type RepositoryDriverInterface } from './repository-module.interface.js';
-import { type RepositoryProviderOptions } from './repository-provider-options.interface.js';
 
 /**
- * One driver and the entities it serves.
+ * One driver, the entities it serves, and its own options.
  *
- * `entities` is checked against the driver's own options, so a misspelled
- * option, or one only another driver understands, does not compile.
+ * `entities` and `options` are checked against the driver's own types, so a
+ * misspelled option, or one only another driver understands, does not
+ * compile.
  */
 export interface RepositoryDriverRegistration<
-  Options extends RepositoryProviderOptions = RepositoryProviderOptions,
+  Driver extends RepositoryDriverInterface = RepositoryDriverInterface,
 > {
   /**
    * The driver's module class.
    */
-  driver: RepositoryDriverInterface<Options>;
+  driver: Driver;
 
   /**
    * Entity registrations served by this driver.
    */
-  entities: NoInfer<Options>[];
+  entities: NoInfer<RepositoryDriverEntityOptions<Driver>>[];
+
+  /**
+   * The driver's own options, for everything it serves.
+   */
+  options?: NoInfer<RepositoryDriverOptions<Driver>>;
 }
 
 /**
- * One {@link RepositoryDriverRegistration} per element of `Options`, each typed
+ * The entity options a driver accepts.
+ */
+export type RepositoryDriverEntityOptions<
+  Driver extends RepositoryDriverInterface,
+> = Parameters<Driver['register']>[0][number];
+
+/**
+ * The driver-level options a driver accepts; `undefined` when it takes none.
+ */
+export type RepositoryDriverOptions<Driver extends RepositoryDriverInterface> =
+  Parameters<Driver['register']>[1];
+
+/**
+ * One {@link RepositoryDriverRegistration} per element of `Drivers`, each typed
  * by its own driver.
  */
 export type RepositoryDriverRegistrations<
-  Options extends readonly RepositoryProviderOptions[],
+  Drivers extends readonly RepositoryDriverInterface[],
 > = {
-  [K in keyof Options]: RepositoryDriverRegistration<Options[K]>;
+  [K in keyof Drivers]: RepositoryDriverRegistration<Drivers[K]>;
 };
 
 /**
@@ -40,12 +58,12 @@ export type RepositoryDriverRegistrations<
  * from.
  */
 export interface RepositoryRootRegistrationOptions<
-  Options extends readonly RepositoryProviderOptions[],
+  Drivers extends readonly RepositoryDriverInterface[],
 > {
   /**
    * Every entity in the application, grouped by the driver that serves it.
    */
-  drivers?: [...RepositoryDriverRegistrations<Options>];
+  drivers?: [...RepositoryDriverRegistrations<Drivers>];
 
   /**
    * Modules exporting the row scope resolvers that entities declare, and,
@@ -58,8 +76,8 @@ export interface RepositoryRootRegistrationOptions<
  * Options for `RepositoryModule.forRoot()`.
  */
 export type RepositoryRootOptions<
-  Options extends readonly RepositoryProviderOptions[],
-> = RepositoryRootRegistrationOptions<Options> &
+  Drivers extends readonly RepositoryDriverInterface[],
+> = RepositoryRootRegistrationOptions<Drivers> &
   RepositoryModuleOptionsInterface;
 
 /**
@@ -69,8 +87,8 @@ export type RepositoryRootOptions<
  * runs. Only the module options come from `useFactory`.
  */
 export interface RepositoryRootAsyncOptions<
-  Options extends readonly RepositoryProviderOptions[],
-> extends RepositoryRootRegistrationOptions<Options> {
+  Drivers extends readonly RepositoryDriverInterface[],
+> extends RepositoryRootRegistrationOptions<Drivers> {
   /**
    * Tokens injected into `useFactory`.
    */

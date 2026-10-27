@@ -127,7 +127,7 @@ describe('RepositoryRegistryService', () => {
 
     @Module({})
     class SharedRowsModule {
-      static register(entities: { key: string }[]): DynamicModule {
+      static register(entities: RepositoryProviderOptions[]): DynamicModule {
         return {
           module: SharedRowsModule,
           providers: entities.map(({ key }) => ({
@@ -392,12 +392,62 @@ describe('RepositoryModule.forRoot entity options', () => {
     collection?: string;
   }
 
+  interface CollectionDriverOptions {
+    shard?: string;
+  }
+
   @Module({})
   class CollectionDriver {
-    static register(_entities: CollectionOptions[]): DynamicModule {
+    static received?: CollectionDriverOptions;
+
+    static register(
+      _entities: CollectionOptions[],
+      options?: CollectionDriverOptions,
+    ): DynamicModule {
+      CollectionDriver.received = options;
       return { module: CollectionDriver };
     }
   }
+
+  it('hands the driver its own options', () => {
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: CollectionDriver,
+          entities: [{ key: 'pets', entity: PetEntityFixture }],
+          options: { shard: 'a' },
+        },
+      ],
+    });
+
+    expect(CollectionDriver.received).toEqual({ shard: 'a' });
+  });
+
+  it('refuses a misspelled driver option at compile time', () => {
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: CollectionDriver,
+          entities: [{ key: 'pets', entity: PetEntityFixture }],
+          // @ts-expect-error `shrd` is not a CollectionDriver option
+          options: { shrd: 'a' },
+        },
+      ],
+    });
+  });
+
+  it('refuses options for a driver that takes none at compile time', () => {
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: MemoryRepositoryModuleFixture,
+          entities: [{ key: 'pets', entity: PetEntityFixture }],
+          // @ts-expect-error MemoryRepositoryModuleFixture takes no options
+          options: { shard: 'a' },
+        },
+      ],
+    });
+  });
 
   it("accepts each driver's own options", () => {
     expect(() =>

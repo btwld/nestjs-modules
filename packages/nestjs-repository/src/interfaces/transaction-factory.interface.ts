@@ -1,3 +1,5 @@
+import { type AppContextHost } from '@concepta/nestjs-core';
+
 import { type TransactionInterface } from '../transaction/interfaces/transaction.interface.js';
 
 /**
@@ -5,7 +7,11 @@ import { type TransactionInterface } from '../transaction/interfaces/transaction
  * Each driver/datasource provides its own factory implementation.
  */
 export interface TransactionFactoryInterface {
-  create(): TransactionInterface;
+  /**
+   * Create a transaction for a scope. `ctx` is the context the scope runs
+   * under; read overlays from it, never define them.
+   */
+  create(ctx: AppContextHost): TransactionInterface;
 
   /**
    * Whether this factory's underlying connection can have more than one

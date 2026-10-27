@@ -1,4 +1,8 @@
-import { type DynamicModule, type InjectionToken } from '@nestjs/common';
+import {
+  type DynamicModule,
+  type InjectionToken,
+  type PlainLiteralObject,
+} from '@nestjs/common';
 
 import { type RepositoryProviderOptions } from './repository-provider-options.interface.js';
 import { type TransactionFactoryInterface } from './transaction-factory.interface.js';
@@ -50,6 +54,7 @@ export interface DynamicRepositoryModule extends Pick<
  */
 export interface RepositoryDriverInterface<
   Options extends RepositoryProviderOptions = RepositoryProviderOptions,
+  DriverOptions extends PlainLiteralObject = PlainLiteralObject,
 > {
   /**
    * The class name of the driver's module (inherited from
@@ -60,7 +65,11 @@ export interface RepositoryDriverInterface<
 
   /**
    * Build one repository provider per entity, each under
-   * `getDynamicRepositoryToken(key)`.
+   * `getDynamicRepositoryToken(key)`. `options` are the driver's own, as
+   * given on its registration.
    */
-  register(entities: Options[]): DynamicRepositoryModule;
+  register(
+    entities: Options[],
+    options?: DriverOptions,
+  ): DynamicRepositoryModule;
 }

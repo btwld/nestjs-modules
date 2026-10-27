@@ -47,7 +47,7 @@ class AppendableAdapter extends TestRepositoryAdapter {
  */
 @Module({})
 class PolicyUnawareDriverModule {
-  static register(entities: { key: string }[]): DynamicModule {
+  static register(entities: RepositoryProviderOptions[]): DynamicModule {
     return {
       module: PolicyUnawareDriverModule,
       providers: entities.map(({ key }) => ({

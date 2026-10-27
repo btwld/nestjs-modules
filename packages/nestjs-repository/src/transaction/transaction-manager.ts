@@ -148,7 +148,7 @@ export class TransactionManager implements TransactionManagerInterface {
     }
 
     try {
-      const tx = factory.create();
+      const tx = factory.create(this.scopeHost);
       await tx.start();
       return tx;
     } catch (error) {

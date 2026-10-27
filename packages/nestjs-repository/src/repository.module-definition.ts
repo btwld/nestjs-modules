@@ -79,8 +79,8 @@ export function createRepositoryRootModule(params: {
   assertDistinctKeys(entries);
   assertResolversNotRequestScoped(entries);
 
-  const driverModules = drivers.map(({ driver, entities }) =>
-    driver.register(entities),
+  const driverModules = drivers.map(({ driver, entities, options }) =>
+    driver.register(entities, options),
   );
   const transactionFactories = driverModules.flatMap(
     ({ transactionFactories: factories = [] }) => factories,

@@ -111,6 +111,7 @@ Further options for scoped, append-only or recorded entities:
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
+| `options` | The driver's own options, such as the TypeORM driver's `transactionSettings`; type-checked against the driver |
 | `imports` | Modules exporting the row scope resolvers your entities declare |
 
 ```ts
@@ -386,7 +387,10 @@ pass: `forRoot()` binds them to every repository you return, from the
 application's entry, and a repository that was never bound refuses every call
 (`RepositoryUnboundException`). Applications never call `register`. Extend
 `RepositoryProviderOptions` with your driver's own entity options, and
-`forRoot()` type-checks each entry against them.
+`forRoot()` type-checks each entry against them. Take options for the driver
+as a whole as `register`'s second parameter, `register(entities, options?)`:
+applications pass them as the registration's `options`, type-checked the
+same way.
 
 ### Soft-Deleted Immutability
 
@@ -1302,7 +1306,7 @@ Each driver/datasource provides a `TransactionFactoryInterface`:
 
 ```ts
 interface TransactionFactoryInterface {
-  create(): TransactionInterface;
+  create(ctx: AppContextHost): TransactionInterface;
   readonly supportsConcurrentTransactions?: boolean;
 }
 ```
@@ -1310,6 +1314,10 @@ interface TransactionFactoryInterface {
 Factories are registered automatically by `RepositoryModule.forRoot()` from
 each driver that returns `transactionFactories` in its
 `DynamicRepositoryModule`.
+
+`create` is called once per scope and data source, with the context the
+scope runs under. Read the caller's overlays from it, row scope included, to
+prepare the transaction; never define overlays on it.
 
 `supportsConcurrentTransactions` defaults to `true` when omitted — the normal
 case for a pooled/multi-connection backend, where each transaction gets its
@@ -2222,6 +2230,16 @@ Structural only — nothing probes what a resolver decides:
   would reduce to the scope columns alone and match any row in scope), and each
   of its resolver's scope columns (`scope` on `RowScopeBase`). A resolver
   serving several entities is checked against each.
+
+### Database row-level security
+
+Row scope protects every repository call. To have the database hide other
+tenants' rows too, even from SQL that bypasses the repository, add row-level
+security behind it. This needs a driver and database that support it — today,
+`nestjs-repository-typeorm` on Postgres, which sets the caller's tenant on
+every transaction from the same `RowScopeCtx` overlay. See its
+[Row-Level Security](../nestjs-repository-typeorm/README.md#row-level-security-postgres)
+section.
 
 ## Write Policy
 

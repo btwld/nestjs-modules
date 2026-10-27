@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { AppContextHost } from '@concepta/nestjs-core';
+import { AppContextHost, OverlayRef } from '@concepta/nestjs-core';
 
 import { TransactionClosedException } from '../../exceptions/transaction-closed.exception.js';
 import { TransactionReadOnlyConflictException } from '../../exceptions/transaction-read-only-conflict.exception.js';
@@ -101,6 +101,31 @@ describe(TransactionScope.name, () => {
         expect(innerResult).toBe('inner');
         return 'outer';
       });
+    });
+
+    it('should create the driver transaction once, with the context the scope runs under', async () => {
+      const TenantCtx = new OverlayRef<'withTenant', { tenantId: string }>(
+        'withTenant',
+      );
+      const ctx = new AppContextHost();
+      ctx.defineOverlay(TenantCtx, { tenantId: 't-1' });
+      const seen: string[] = [];
+      const create = vi.fn((host: AppContextHost) => {
+        seen.push(host.with(TenantCtx).tenantId);
+        return createMockTransaction();
+      });
+      mockRegistry.register('typeorm:default', { create });
+
+      await transaction.run(ctx, async (txCtx) => {
+        await txCtx.trx.getOrStart('typeorm:default');
+        await transaction.run(ctx, (inner) =>
+          inner.trx.getOrStart('typeorm:default'),
+        );
+      });
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(create.mock.calls[0][0]).toBe(ctx);
+      expect(seen).toEqual(['t-1']);
     });
 
     it('should run lifecycle even without factories registered', async () => {
