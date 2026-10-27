@@ -10,6 +10,8 @@ export { UserRepository } from './infrastructure/persistence/user.repository.js'
 export { UserCredentialsRepository } from './infrastructure/persistence/user-credentials.repository.js';
 export { UserRepositoryInterface } from './domain/repositories/user-repository.interface.js';
 export { UserCredentialsRepositoryInterface } from './domain/repositories/user-credentials-repository.interface.js';
+export { UserMapper } from './infrastructure/persistence/user.mapper.js';
+export { UserCredentialsMapper } from './infrastructure/persistence/user-credentials.mapper.js';
 
 // schemas (Zod / Standard Schema)
 export { userSchema } from './infrastructure/schemas/user.schema.js';
@@ -81,7 +83,11 @@ export { UserCredentialCreatableInterface } from './domain/interfaces/user-crede
 
 // config interfaces
 export { UserOptionsInterface } from './infrastructure/config/interfaces/user-options.interface.js';
-export { UserExtrasInterface } from './infrastructure/config/interfaces/user-extras.interface.js';
+export {
+  UserExtrasInterface,
+  UserRepositoryConstructor,
+  UserCredentialsRepositoryConstructor,
+} from './infrastructure/config/interfaces/user-extras.interface.js';
 export { UserSettingsInterface } from './infrastructure/config/interfaces/user-settings.interface.js';
 export { UserCredentialsEventPayloadInterface } from './domain/events/interfaces/user-credentials-event-payload.interface.js';
 export { PasswordPolicySettings } from './domain/policies/user-password.policy.js';

@@ -153,8 +153,8 @@ interface UserExtrasInterface {
     credentials?: string;      // Entity key for credentials (omit to disable credentials)
   };
   repositories?: {
-    user?: Type<UserRepositoryInterface>;
-    userCredentials?: Type<UserCredentialsRepositoryInterface>;
+    user?: UserRepositoryConstructor;                       // a UserRepository subclass
+    userCredentials?: UserCredentialsRepositoryConstructor; // a UserCredentialsRepository subclass
   };
 }
 
@@ -195,6 +195,28 @@ are not registered. When `entities.credentials` IS configured,
 `ports.password` is required — the module throws at bootstrap
 (`UserModule: ports.password is required when credentials entity is
 configured`) if it is missing.
+
+To change how users or credentials are read or written, extend
+`UserRepository` or `UserCredentialsRepository` and pass the class as
+`repositories.user` or `repositories.userCredentials`. The module builds it
+with the repository registered for that entity key and the matching mapper
+(`UserMapper`, `UserCredentialsMapper`), so `this.repository` and
+`this.mapper` are there for you. The entity keys still have to be registered,
+and `repositories.userCredentials` applies only when `entities.credentials` is
+set:
+
+```ts
+import { UserModule, UserRepository } from '@concepta/nestjs-user';
+
+export class MyUserRepository extends UserRepository {
+  // override any method, following the contract on UserRepositoryInterface
+}
+
+UserModule.forRoot({
+  entities: { user: 'user' },
+  repositories: { user: MyUserRepository },
+});
+```
 
 ## Architecture Overview
 

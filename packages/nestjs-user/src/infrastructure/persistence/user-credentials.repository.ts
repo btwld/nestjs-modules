@@ -16,7 +16,7 @@ import { type UserCredentialsMapper } from './user-credentials.mapper.js';
 export class UserCredentialsRepository implements UserCredentialsRepositoryInterface {
   constructor(
     protected readonly repository: RepositoryInterface<UserCredentialEntityInterface>,
-    private readonly mapper: UserCredentialsMapper,
+    protected readonly mapper: UserCredentialsMapper,
   ) {}
 
   async findActiveByUserId(

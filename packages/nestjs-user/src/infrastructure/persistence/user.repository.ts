@@ -16,7 +16,7 @@ import { type UserMapper } from './user.mapper.js';
 export class UserRepository implements UserRepositoryInterface {
   constructor(
     protected readonly repository: RepositoryInterface<UserEntityInterface>,
-    private readonly mapper: UserMapper,
+    protected readonly mapper: UserMapper,
   ) {}
 
   async get(ctx: PlainLiteralObject, id: ReferenceId): Promise<User | null> {

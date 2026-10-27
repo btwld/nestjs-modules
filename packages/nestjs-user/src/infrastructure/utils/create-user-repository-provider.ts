@@ -1,4 +1,4 @@
-import { type Provider, type Type } from '@nestjs/common';
+import { type Provider } from '@nestjs/common';
 
 import {
   getDynamicRepositoryToken,
@@ -6,29 +6,24 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type UserEntityInterface } from '../../domain/interfaces/user-entity.interface.js';
-import { type UserRepositoryInterface } from '../../domain/repositories/user-repository.interface.js';
 import { USER_REPOSITORY_TOKEN } from '../../user.constants.js';
+import { type UserRepositoryConstructor } from '../config/interfaces/user-extras.interface.js';
 import { UserMapper } from '../persistence/user.mapper.js';
 import { UserRepository } from '../persistence/user.repository.js';
 
 export function createUserRepositoryProvider(
   entityKey: string,
-  customRepository?: Type<UserRepositoryInterface>,
-): Provider[] {
-  if (customRepository) {
-    return [{ provide: USER_REPOSITORY_TOKEN, useClass: customRepository }];
-  }
-
-  return [
-    {
-      provide: USER_REPOSITORY_TOKEN,
-      inject: [getDynamicRepositoryToken(entityKey), UserMapper],
-      useFactory: (
-        repository: RepositoryInterface<UserEntityInterface>,
-        mapper: UserMapper,
-      ) => {
-        return new UserRepository(repository, mapper);
-      },
+  customRepository?: UserRepositoryConstructor,
+): Provider {
+  return {
+    provide: USER_REPOSITORY_TOKEN,
+    inject: [getDynamicRepositoryToken(entityKey), UserMapper],
+    useFactory: (
+      repository: RepositoryInterface<UserEntityInterface>,
+      mapper: UserMapper,
+    ) => {
+      const RepoClass = customRepository ?? UserRepository;
+      return new RepoClass(repository, mapper);
     },
-  ];
+  };
 }

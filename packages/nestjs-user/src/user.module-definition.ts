@@ -2,7 +2,6 @@ import {
   ConfigurableModuleBuilder,
   type DynamicModule,
   type Provider,
-  type Type,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CommandBus, CqrsModule } from '@nestjs/cqrs';
@@ -22,9 +21,11 @@ import { GetUserBySubjectHandler } from './application/queries/handlers/get-user
 import { GetUserByUsernameHandler } from './application/queries/handlers/get-user-by-username.handler.js';
 import { GetUserHandler } from './application/queries/handlers/get-user.handler.js';
 import { UserPasswordPort } from './domain/ports/user-password.port.js';
-import { type UserCredentialsRepositoryInterface } from './domain/repositories/user-credentials-repository.interface.js';
 import { UserCredentialsService } from './domain/services/user-credentials.service.js';
-import { type UserExtrasInterface } from './infrastructure/config/interfaces/user-extras.interface.js';
+import {
+  type UserCredentialsRepositoryConstructor,
+  type UserExtrasInterface,
+} from './infrastructure/config/interfaces/user-extras.interface.js';
 import { type UserOptionsInterface } from './infrastructure/config/interfaces/user-options.interface.js';
 import { type UserSettingsInterface } from './infrastructure/config/interfaces/user-settings.interface.js';
 import { userDefaultConfig } from './infrastructure/config/user-default.config.js';
@@ -68,7 +69,7 @@ function definitionTransform(
   return {
     ...definition,
     global,
-    imports: createUserImports({ imports, entities, repositories }),
+    imports: createUserImports({ imports, entities }),
     providers: createUserProviders({
       providers: [...providers, ...(overrideProviders ?? [])],
       entities,
@@ -81,16 +82,11 @@ function definitionTransform(
 export function createUserImports(options: {
   imports: DynamicModule['imports'];
   entities: UserExtrasInterface['entities'];
-  repositories?: UserExtrasInterface['repositories'];
 }): DynamicModule['imports'] {
-  const { entities, repositories } = options;
-  // Only the keys a provider below injects: a custom repository replaces its
-  // entity's, and credentials are optional.
+  const { entities } = options;
   const keys = [
-    ...(repositories?.user ? [] : [entities.user]),
-    ...(entities.credentials && !repositories?.userCredentials
-      ? [entities.credentials]
-      : []),
+    entities.user,
+    ...(entities.credentials ? [entities.credentials] : []),
   ];
 
   return [
@@ -111,7 +107,7 @@ export function createUserProviders(options: {
     createUserSettingsProvider(options.overrides),
     UserMapper,
     // User repository
-    ...createUserRepositoryProvider(
+    createUserRepositoryProvider(
       options.entities.user,
       options.repositories?.user,
     ),
@@ -139,9 +135,9 @@ export function createUserProviders(options: {
 
 function createUserCredentialProviders(
   entityKey?: string,
-  customRepository?: Type<UserCredentialsRepositoryInterface>,
+  customRepository?: UserCredentialsRepositoryConstructor,
 ): Provider[] {
-  if (!entityKey && !customRepository) {
+  if (!entityKey) {
     return [];
   }
 
@@ -149,7 +145,7 @@ function createUserCredentialProviders(
     createPasswordPolicyProvider(),
     createUserPasswordPortProvider(),
     UserCredentialsMapper,
-    ...createUserCredentialsRepositoryProvider(entityKey, customRepository),
+    createUserCredentialsRepositoryProvider(entityKey, customRepository),
     CreateUserCredentialHandler,
     UpdateUserCredentialHandler,
     UserCredentialsService,
