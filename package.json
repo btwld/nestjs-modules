@@ -70,6 +70,8 @@
     "pretest:e2e": "tsc -b",
     "test:e2e": "vitest run --config ./vitest.config-e2e.ts",
     "test:all": "pnpm test && pnpm test:e2e",
+    "pretest:docker": "tsc -b",
+    "test:docker": "node ./scripts/test-docker.mjs",
     "smoke": "node ./scripts/smoke-test.mjs",
     "doc": "rimraf ./docs && typedoc",
     "doc:cov": "pnpm doc --coverageOutputType all",

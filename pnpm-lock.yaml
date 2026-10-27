@@ -1355,6 +1355,9 @@ importers:
       '@nestjs/testing':
         specifier: ^12.0.1
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
+      '@types/supertest':
+        specifier: ^6.0.3
+        version: 6.0.3
       better-sqlite3:
         specifier: ^12.0.0
         version: 12.11.1
@@ -1364,6 +1367,9 @@ importers:
       pg:
         specifier: 8.23.1
         version: 8.23.1
+      supertest:
+        specifier: ^6.3.4
+        version: 6.3.4(supports-color@7.2.0)
       typeorm:
         specifier: ~1.0.0
         version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0)
