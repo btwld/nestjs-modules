@@ -26,6 +26,7 @@ import {
 import { type TypeOrmProviderOptionsInterface } from './repository/typeorm-provider-options.interface.js';
 import { TypeOrmRepository } from './repository/typeorm-repository.js';
 import { TypeOrmTransactionFactory } from './transaction/typeorm-transaction.factory.js';
+import { type TypeOrmDriverOptionsInterface } from './typeorm-driver-options.interface.js';
 import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from './typeorm-repository.constants.js';
 import { type TypeOrmDataSourceToken } from './typeorm-repository.types.js';
 
@@ -218,9 +219,13 @@ export function getTypeOrmImports(
  * RepositoryModule handles the actual registration.
  *
  * @param dataSource - Optional data source name
+ * @param options - The driver's options
  * @returns Transaction factory descriptor
  */
-export function createTransactionFactoryDescriptor(dataSource?: string): {
+export function createTransactionFactoryDescriptor(
+  dataSource?: string,
+  options?: TypeOrmDriverOptionsInterface,
+): {
   key: string;
   inject: ReturnType<typeof getDataSourceToken>[];
   useFactory: (ds: DataSource) => TypeOrmTransactionFactory;
@@ -231,6 +236,7 @@ export function createTransactionFactoryDescriptor(dataSource?: string): {
   return {
     key: resolveTransactionKey(dataSource),
     inject: [getDataSourceToken(dsToken)],
-    useFactory: (ds: DataSource) => new TypeOrmTransactionFactory(ds),
+    useFactory: (ds: DataSource) =>
+      new TypeOrmTransactionFactory(ds, dsName, options?.transactionSettings),
   };
 }

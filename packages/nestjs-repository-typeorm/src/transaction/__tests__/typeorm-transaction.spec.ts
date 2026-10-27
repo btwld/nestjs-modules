@@ -7,6 +7,9 @@ import {
 import { type Mock } from 'vitest';
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
+import { AppContextHost } from '@concepta/nestjs-core';
+
+import { TypeOrmTransactionSettingsUnsupportedException } from '../../exceptions/typeorm-transaction-settings-unsupported.exception.js';
 import { TypeOrmTransactionFactory } from '../typeorm-transaction.factory.js';
 import { TypeOrmTransaction } from '../typeorm-transaction.js';
 
@@ -16,6 +19,7 @@ interface MockQueryRunner {
   commitTransaction: Mock;
   rollbackTransaction: Mock;
   release: Mock;
+  query: Mock;
   isTransactionActive: boolean;
   manager: EntityManager | undefined;
 }
@@ -35,6 +39,7 @@ describe(TypeOrmTransaction.name, () => {
       commitTransaction: vi.fn().mockResolvedValue(undefined),
       rollbackTransaction: vi.fn().mockResolvedValue(undefined),
       release: vi.fn().mockResolvedValue(undefined),
+      query: vi.fn().mockResolvedValue(undefined),
       isTransactionActive: false,
       manager: mockEntityManager,
     };
@@ -78,6 +83,26 @@ describe(TypeOrmTransaction.name, () => {
       expect(transaction.isActive).toBe(false);
     });
 
+    it('should roll back before releasing when startTransaction() rejects with a transaction open', async () => {
+      const startError = new Error('afterTransactionStart subscriber failed');
+      const calls: string[] = [];
+      // BEGIN went through; a later step inside startTransaction() threw.
+      mockQueryRunner.startTransaction.mockImplementationOnce(async () => {
+        mockQueryRunner.isTransactionActive = true;
+        throw startError;
+      });
+      mockQueryRunner.rollbackTransaction.mockImplementationOnce(async () => {
+        calls.push('rollback');
+      });
+      mockQueryRunner.release.mockImplementationOnce(async () => {
+        calls.push('release');
+      });
+
+      await expect(transaction.start()).rejects.toBe(startError);
+
+      expect(calls).toEqual(['rollback', 'release']);
+    });
+
     it('should release the query runner and rethrow when connect() rejects', async () => {
       const connectError = new Error('connection pool exhausted');
       mockQueryRunner.connect.mockRejectedValueOnce(connectError);
@@ -109,6 +134,82 @@ describe(TypeOrmTransaction.name, () => {
       expect(() => transaction.getClient()).toThrow(
         'No active transaction - cannot get client',
       );
+    });
+
+    it('should run no statements of its own without settings', async () => {
+      await transaction.start();
+
+      expect(mockQueryRunner.query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('start with settings', () => {
+    const calls: string[] = [];
+
+    beforeEach(() => {
+      calls.length = 0;
+      mockQueryRunner.startTransaction.mockImplementation(async () => {
+        calls.push('begin');
+        mockQueryRunner.isTransactionActive = true;
+      });
+      mockQueryRunner.query.mockImplementation(
+        async (_sql: string, params: string[]) => {
+          calls.push(params.join('='));
+        },
+      );
+      mockQueryRunner.rollbackTransaction.mockImplementation(async () => {
+        calls.push('rollback');
+        mockQueryRunner.isTransactionActive = false;
+      });
+      mockQueryRunner.release.mockImplementation(async () => {
+        calls.push('release');
+      });
+    });
+
+    it('should apply each setting after BEGIN, in order, skipping undefined values', async () => {
+      await new TypeOrmTransaction(mockDataSource, {
+        'app.tenant_id': 't-1',
+        'app.user_id': undefined,
+        'app.region': 'eu',
+      }).start();
+
+      expect(calls).toEqual(['begin', 'app.tenant_id=t-1', 'app.region=eu']);
+      expect(mockQueryRunner.query).toHaveBeenCalledWith(
+        'select set_config($1, $2, true)',
+        ['app.tenant_id', 't-1'],
+      );
+    });
+
+    it('should roll back, release and rethrow when a setting fails', async () => {
+      const settingError = new Error('invalid configuration parameter name');
+      mockQueryRunner.query.mockRejectedValueOnce(settingError);
+      const tx = new TypeOrmTransaction(mockDataSource, {
+        'app.tenant_id': 't-1',
+      });
+
+      await expect(tx.start()).rejects.toBe(settingError);
+
+      expect(calls).toEqual(['begin', 'rollback', 'release']);
+      expect(tx.isActive).toBe(false);
+      expect(() => tx.getClient()).toThrow(
+        'No active transaction - cannot get client',
+      );
+    });
+
+    it('should still release and rethrow the setting error when the rollback fails', async () => {
+      const settingError = new Error('invalid configuration parameter name');
+      mockQueryRunner.query.mockRejectedValueOnce(settingError);
+      mockQueryRunner.rollbackTransaction.mockRejectedValueOnce(
+        new Error('connection lost'),
+      );
+
+      await expect(
+        new TypeOrmTransaction(mockDataSource, {
+          'app.tenant_id': 't-1',
+        }).start(),
+      ).rejects.toBe(settingError);
+
+      expect(calls).toEqual(['begin', 'release']);
     });
   });
 
@@ -240,14 +341,59 @@ describe(TypeOrmTransactionFactory.name, () => {
 
   describe('create', () => {
     it('should create a TypeOrmTransaction instance', () => {
-      const transaction = factory.create();
+      const transaction = factory.create(new AppContextHost());
       expect(transaction).toBeInstanceOf(TypeOrmTransaction);
     });
 
     it('should create new transaction on each call', () => {
-      const tx1 = factory.create();
-      const tx2 = factory.create();
+      const tx1 = factory.create(new AppContextHost());
+      const tx2 = factory.create(new AppContextHost());
       expect(tx1).not.toBe(tx2);
+    });
+
+    it("should resolve the settings from the scope's context and apply them on start", async () => {
+      const query = vi.fn().mockResolvedValue(undefined);
+      mockDataSource.createQueryRunner.mockReturnValue(
+        mockDeep<QueryRunner>({ query }),
+      );
+      const ctx = new AppContextHost();
+      const transactionSettings = vi.fn().mockReturnValue({
+        'app.tenant_id': 't-1',
+      });
+
+      await new TypeOrmTransactionFactory(
+        mockDataSource,
+        'primary',
+        transactionSettings,
+      )
+        .create(ctx)
+        .start();
+
+      expect(transactionSettings).toHaveBeenCalledWith(ctx, 'primary');
+      expect(query).toHaveBeenCalledWith('select set_config($1, $2, true)', [
+        'app.tenant_id',
+        't-1',
+      ]);
+    });
+  });
+
+  describe('transactionSettings', () => {
+    it.each(['better-sqlite3', 'mysql'] as const)(
+      'should be refused at construction for %s',
+      (type) => {
+        setDataSourceOptions(mockDataSource, { type });
+
+        expect(
+          () =>
+            new TypeOrmTransactionFactory(mockDataSource, 'primary', vi.fn()),
+        ).toThrow(TypeOrmTransactionSettingsUnsupportedException);
+      },
+    );
+
+    it('should not be required for another database', () => {
+      setDataSourceOptions(mockDataSource, { type: 'better-sqlite3' });
+
+      expect(() => new TypeOrmTransactionFactory(mockDataSource)).not.toThrow();
     });
   });
 

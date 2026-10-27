@@ -25,7 +25,17 @@ import { type TransactionInterface } from '@concepta/nestjs-repository';
 export class TypeOrmTransaction implements TransactionInterface {
   private queryRunner: QueryRunner | null = null;
 
-  constructor(private readonly dataSource: DataSource) {}
+  /**
+   * @param dataSource - The data source to run on
+   * @param settings - Applied with `set_config(name, value, true)` once the
+   *   transaction has begun, in order; an `undefined` value is skipped
+   */
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly settings: Readonly<
+      Record<string, string | undefined>
+    > = {},
+  ) {}
 
   /**
    * Whether the transaction is currently active.
@@ -35,13 +45,14 @@ export class TypeOrmTransaction implements TransactionInterface {
   }
 
   /**
-   * Start the transaction by creating a QueryRunner and beginning a
-   * transaction.
+   * Start the transaction by creating a QueryRunner, beginning a
+   * transaction and applying the settings.
    *
-   * `this.queryRunner` is only assigned once both steps succeed. A
-   * `connect()`/`startTransaction()` failure still leaves a real,
-   * connected QueryRunner behind — it's released here rather than left to
-   * leak a pool connection, since nothing else holds a reference to it.
+   * `this.queryRunner` is only assigned once every step succeeds. A failure
+   * still leaves a real, connected QueryRunner behind — it's released here
+   * rather than left to leak a pool connection, since nothing else holds a
+   * reference to it. An open transaction is rolled back first, so the
+   * connection goes back to the pool with nothing open on it.
    */
   async start(): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -49,15 +60,17 @@ export class TypeOrmTransaction implements TransactionInterface {
     try {
       await queryRunner.connect();
       await queryRunner.startTransaction();
-    } catch (error) {
-      try {
-        await queryRunner.release();
-      } catch (releaseError) {
-        Logger.error(
-          `Failed to release QueryRunner after start() failed: ${releaseError}`,
-          releaseError instanceof Error ? releaseError.stack : undefined,
-        );
+
+      for (const [name, value] of Object.entries(this.settings)) {
+        if (value !== undefined) {
+          await queryRunner.query('select set_config($1, $2, true)', [
+            name,
+            value,
+          ]);
+        }
       }
+    } catch (error) {
+      await this.abandon(queryRunner);
       throw error;
     }
 
@@ -111,6 +124,33 @@ export class TypeOrmTransaction implements TransactionInterface {
       });
     }
     return this.queryRunner.manager as T;
+  }
+
+  // Rolls back whenever the QueryRunner reports a transaction, even if
+  // startTransaction() rejected: it can reject after BEGIN succeeded (a
+  // failing isolation-level statement or `afterTransactionStart`
+  // subscriber), and releasing that connection would hand its open
+  // transaction to the next request.
+  private async abandon(queryRunner: QueryRunner): Promise<void> {
+    if (queryRunner.isTransactionActive) {
+      try {
+        await queryRunner.rollbackTransaction();
+      } catch (rollbackError) {
+        Logger.error(
+          `Failed to roll back QueryRunner after start() failed: ${rollbackError}`,
+          rollbackError instanceof Error ? rollbackError.stack : undefined,
+        );
+      }
+    }
+
+    try {
+      await queryRunner.release();
+    } catch (releaseError) {
+      Logger.error(
+        `Failed to release QueryRunner after start() failed: ${releaseError}`,
+        releaseError instanceof Error ? releaseError.stack : undefined,
+      );
+    }
   }
 
   private async cleanup(): Promise<void> {

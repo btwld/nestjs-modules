@@ -1,5 +1,6 @@
 // Module
 export { TypeOrmRepositoryModule } from './typeorm-repository.module.js';
+export { TypeOrmDriverOptionsInterface } from './typeorm-driver-options.interface.js';
 
 // Repository
 export { TypeOrmRepository } from './repository/typeorm-repository.js';
@@ -8,6 +9,7 @@ export { TypeOrmProviderOptionsInterface } from './repository/typeorm-provider-o
 // Transaction
 export { TypeOrmTransaction } from './transaction/typeorm-transaction.js';
 export { TypeOrmTransactionFactory } from './transaction/typeorm-transaction.factory.js';
+export { TypeOrmTransactionSettingsResolver } from './transaction/typeorm-transaction-settings-resolver.type.js';
 
 // base entities
 export { ActivityPostgresEntity } from './entities/activity/activity-postgres.entity.js';

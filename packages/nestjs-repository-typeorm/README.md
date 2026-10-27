@@ -20,6 +20,7 @@ database-specific base entities for Postgres and SQLite.
 - [TypeOrmRepository](#typeormrepository)
 - [WhereClause Translation](#whereclause-translation)
 - [Transaction Support](#transaction-support)
+- [Row-Level Security (Postgres)](#row-level-security-postgres)
 - [Repository Hooks](#repository-hooks)
 - [Base Entities](#base-entities)
 - [Durable Messaging](#durable-messaging)
@@ -483,7 +484,7 @@ await tx.commit();
 | Property / Method | Description |
 | --- | --- |
 | `isActive` | Whether the transaction is currently active |
-| `start()` | Create a QueryRunner and begin a transaction |
+| `start()` | Create a QueryRunner, begin a transaction and apply its settings |
 | `commit()` | Commit the transaction and release the QueryRunner |
 | `rollback()` | Rollback the transaction and release the QueryRunner |
 | `getClient<T>()` | Get the transactional `EntityManager` |
@@ -543,6 +544,110 @@ export class OrderService {
   }
 }
 ```
+
+## Row-Level Security (Postgres)
+
+Put Postgres row-level security behind row scope, and the database itself
+hides other tenants' rows — even from raw SQL, reports, or a query someone
+forgot to scope. Row scope stays the enforcement; RLS is the backstop.
+
+You add one option, and the driver sets the caller's tenant at the start of
+every transaction. The policies are a few lines of SQL in your migrations.
+
+### Setting the tenant
+
+Give the driver a `transactionSettings` function. Every transaction it opens
+starts by setting those values, read from the caller's context.
+
+```ts
+import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmRepositoryModule,
+      entities: [{ key: 'orders', entity: Order }],
+      options: {
+        transactionSettings: (ctx) => ({
+          'app.tenant_id': ctx.supports(RowScopeCtx)
+            ? ctx.with(RowScopeCtx).tenantId
+            : undefined,
+        }),
+      },
+    },
+  ],
+});
+```
+
+Read the tenant from the same `RowScopeCtx` overlay your row scope resolver
+reads, so the two always agree on who the caller is. The second argument is
+the data source name; return `{}` for one without policies. Every data source
+in the registration must still be Postgres: anything else stops startup with
+`TypeOrmTransactionSettingsUnsupportedException`.
+
+Name each setting anything with a dot in it, and use the same name in your
+policies. An `undefined` value is skipped.
+
+What you get: each transaction the driver opens sets these values before any
+of your queries run, with `set_config(name, value, true)`. That includes
+`@Transactional()`, `TransactionScope.run()` and `runReadOnly()`, versioned
+`update` and `replace`, and the transactions other Rockets modules open
+themselves. The values end with the transaction, so the next request on a
+pooled connection starts with none. If a setting fails, the transaction is
+rolled back and you get the error.
+
+### Policies
+
+The policies, roles and table settings are your migrations. A recipe for one
+tenant-scoped table:
+
+```sql
+-- Policies apply to the table owner too.
+alter table orders enable row level security;
+alter table orders force row level security;
+
+-- An unset tenant matches no rows: reads return nothing, writes are refused.
+-- Keep the nullif: on a reused connection an unset tenant reads '', not NULL.
+create policy tenant_isolation on orders
+  for all
+  using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+  with check (
+    tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+  );
+
+-- The application connects as a role that owns nothing and can't bypass RLS.
+create role app_user login password '...' nosuperuser nobypassrls;
+grant select, insert, update, delete on orders to app_user;
+
+-- Migrations and background jobs that work across tenants use their own role.
+create role app_admin login password '...' bypassrls;
+```
+
+### Before you turn it on
+
+- **Run every request in a transaction, reads included.** Use
+  `@Transactional({ readOnly: true })` or `TransactionScope.runReadOnly()`
+  for reads. Outside a transaction there is no tenant: reads return no rows,
+  inserts are refused, and updates and deletes change nothing. Nothing
+  reports it, so a forgotten `@Transactional()` looks like an empty result.
+- **Pass `ctx` to every repository call.** Without it there is no tenant: the
+  call matches no rows, and a versioned write fails with
+  `OptimisticLockException`.
+- **Keep per-user rules in row scope.** The policy covers the tenant only, so
+  SQL that bypasses the repository sees every row in the caller's tenant.
+- **Serve callers who read across tenants from the bypass role.** The policy
+  still applies when `relax` lifts the tenant: such a caller reads only the
+  tenant in their setting, or nothing without one.
+- **Leave the outbox tables without a tenant policy.** The `@nestjs/outbox`
+  relay and its migrations run outside the driver's transactions, so they
+  never have a tenant.
+- **Include `tenant_id` in foreign keys.** Postgres checks foreign keys
+  without the policies, so otherwise a row can point into another tenant.
+- **Create views with `security_invoker = true`.** Otherwise they run as
+  their owner and skip the policies. `security definer` functions always do.
+- **Code on the raw `DataSource`** runs outside the driver's transactions and
+  has no tenant.
 
 ## Repository Hooks
 
@@ -808,5 +913,5 @@ Requirements and limits:
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity`, `ActivityPostgresEntity`, `ActivitySqliteEntity` |
+| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmDriverOptionsInterface`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity`, `ActivityPostgresEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

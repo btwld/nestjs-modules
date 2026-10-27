@@ -2,11 +2,16 @@ import { type DatabaseType, DataSource } from 'typeorm';
 
 import { Injectable } from '@nestjs/common';
 
+import { type AppContextHost } from '@concepta/nestjs-core';
 import {
   TransactionInterface,
   TransactionFactoryInterface,
 } from '@concepta/nestjs-repository';
 
+import { TypeOrmTransactionSettingsUnsupportedException } from '../exceptions/typeorm-transaction-settings-unsupported.exception.js';
+import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../typeorm-repository.constants.js';
+
+import { type TypeOrmTransactionSettingsResolver } from './typeorm-transaction-settings-resolver.type.js';
 import { TypeOrmTransaction } from './typeorm-transaction.js';
 
 // Drivers whose createQueryRunner() returns one shared QueryRunner per
@@ -43,16 +48,37 @@ const SHARED_QUERY_RUNNER_DRIVER_TYPES: ReadonlySet<DatabaseType | 'sqlite'> =
 export class TypeOrmTransactionFactory implements TransactionFactoryInterface {
   readonly supportsConcurrentTransactions: boolean;
 
-  constructor(private readonly dataSource: DataSource) {
+  /**
+   * @param dataSource - The data source transactions run on
+   * @param dataSourceKey - Its name, as given to `transactionSettings`
+   * @param transactionSettings - Settings applied at the start of every
+   *   transaction; Postgres only, refused for any other database
+   */
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly dataSourceKey: string = TYPEORM_DEFAULT_DATA_SOURCE_NAME,
+    private readonly transactionSettings?: TypeOrmTransactionSettingsResolver,
+  ) {
     this.supportsConcurrentTransactions = !SHARED_QUERY_RUNNER_DRIVER_TYPES.has(
       dataSource.options.type,
     );
+
+    if (transactionSettings && dataSource.options.type !== 'postgres') {
+      throw new TypeOrmTransactionSettingsUnsupportedException(
+        dataSourceKey,
+        dataSource.options.type,
+      );
+    }
   }
 
   /**
-   * Create a new transaction instance bound to this factory's DataSource.
+   * Create a new transaction instance bound to this factory's DataSource,
+   * with the settings resolved from the scope's context.
    */
-  create(): TransactionInterface {
-    return new TypeOrmTransaction(this.dataSource);
+  create(ctx: AppContextHost): TransactionInterface {
+    return new TypeOrmTransaction(
+      this.dataSource,
+      this.transactionSettings?.(ctx, this.dataSourceKey),
+    );
   }
 }

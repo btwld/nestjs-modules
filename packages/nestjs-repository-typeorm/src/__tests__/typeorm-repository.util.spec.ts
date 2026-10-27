@@ -7,7 +7,7 @@ import { mockDeep } from 'vitest-mock-extended';
 
 import { getDataSourceToken } from '@nestjs/typeorm';
 
-import { HookResolverService } from '@concepta/nestjs-core';
+import { AppContextHost, HookResolverService } from '@concepta/nestjs-core';
 import { getDynamicRepositoryToken } from '@concepta/nestjs-repository';
 
 import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-provider-options.interface.js';
@@ -470,6 +470,22 @@ describe('typeorm-repository.util', () => {
       const factory = descriptor.useFactory(mockDataSource);
 
       expect(factory).toBeInstanceOf(TypeOrmTransactionFactory);
+    });
+
+    it('useFactory should hand the driver options and data source name to the factory', () => {
+      const transactionSettings = vi.fn().mockReturnValue({});
+      const descriptor = createTransactionFactoryDescriptor('secondary', {
+        transactionSettings,
+      });
+      const mockDataSource = mockDeep<DataSource>();
+      Object.defineProperty(mockDataSource, 'options', {
+        value: { type: 'postgres' },
+      });
+      const ctx = new AppContextHost();
+
+      descriptor.useFactory(mockDataSource).create(ctx);
+
+      expect(transactionSettings).toHaveBeenCalledWith(ctx, 'secondary');
     });
   });
 });

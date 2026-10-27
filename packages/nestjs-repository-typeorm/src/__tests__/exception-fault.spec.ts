@@ -8,6 +8,7 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
 import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation-metadata.exception.js';
+import { TypeOrmTransactionSettingsUnsupportedException } from '../exceptions/typeorm-transaction-settings-unsupported.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 
 /**
@@ -27,6 +28,12 @@ const CASES: {
   {
     name: 'TypeOrmRelationMetadataException',
     build: () => new TypeOrmRelationMetadataException('posts', 'PostEntity'),
+    fault: 'usage',
+  },
+  {
+    name: 'TypeOrmTransactionSettingsUnsupportedException',
+    build: () =>
+      new TypeOrmTransactionSettingsUnsupportedException('default', 'mysql'),
     fault: 'usage',
   },
   {
