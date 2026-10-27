@@ -3,8 +3,8 @@ import { CommandBus } from '@nestjs/cqrs';
 
 import { Operation } from '@concepta/nestjs-core';
 
-import { ArchiveCacheCommand } from '../../../../application/commands/impl/archive-cache.command.js';
 import { RemoveCacheCommand } from '../../../../application/commands/impl/remove-cache.command.js';
+import { SoftDeleteCacheCommand } from '../../../../application/commands/impl/soft-delete-cache.command.js';
 import { assertCacheId } from '../../../../application/utils/assert-cache-id.util.js';
 import { Cache } from '../../../../domain/aggregates/cache.js';
 import { DeleteCacheRequest } from '../impl/delete-cache.request.js';
@@ -25,7 +25,7 @@ export class DeleteCacheRequestHandler {
 
     if (context.operation === Operation.SoftDelete) {
       cache = await this.commandBus.execute(
-        new ArchiveCacheCommand(context, namespace, id),
+        new SoftDeleteCacheCommand(context, namespace, id),
       );
     } else {
       cache = await this.commandBus.execute(

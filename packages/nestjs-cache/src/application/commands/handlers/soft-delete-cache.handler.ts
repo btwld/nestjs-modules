@@ -7,17 +7,17 @@ import { CACHE_REPOSITORY_RESOLVER_TOKEN } from '../../../cache.constants.js';
 import { Cache } from '../../../domain/aggregates/cache.js';
 import { CacheRepositoryResolverInterface } from '../../../domain/repositories/cache-repository-resolver.interface.js';
 import { CacheNotFoundException } from '../../exceptions/cache-not-found.exception.js';
-import { ArchiveCacheCommand } from '../impl/archive-cache.command.js';
+import { SoftDeleteCacheCommand } from '../impl/soft-delete-cache.command.js';
 
-@CommandHandler(ArchiveCacheCommand)
-export class ArchiveCacheHandler implements ICommandHandler<ArchiveCacheCommand> {
+@CommandHandler(SoftDeleteCacheCommand)
+export class SoftDeleteCacheHandler implements ICommandHandler<SoftDeleteCacheCommand> {
   constructor(
     @Inject(CACHE_REPOSITORY_RESOLVER_TOKEN)
     private readonly repositoryResolver: CacheRepositoryResolverInterface,
     private readonly txScope: TransactionScope,
   ) {}
 
-  async execute(command: ArchiveCacheCommand): Promise<Cache> {
+  async execute(command: SoftDeleteCacheCommand): Promise<Cache> {
     const { ctx, namespace, id } = command;
     const cacheRepo = this.repositoryResolver.resolve(namespace);
 
@@ -28,7 +28,7 @@ export class ArchiveCacheHandler implements ICommandHandler<ArchiveCacheCommand>
         throw new CacheNotFoundException(id);
       }
 
-      await cacheRepo.softRemove(txCtx, cache);
+      await cacheRepo.softDelete(txCtx, cache);
       return cache;
     });
   }

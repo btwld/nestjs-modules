@@ -26,5 +26,5 @@ export interface CacheRepositoryInterface {
     assigneeId: string,
   ): Promise<void>;
 
-  softRemove(ctx: PlainLiteralObject, cache: Cache): Promise<void>;
+  softDelete(ctx: PlainLiteralObject, cache: Cache): Promise<void>;
 }

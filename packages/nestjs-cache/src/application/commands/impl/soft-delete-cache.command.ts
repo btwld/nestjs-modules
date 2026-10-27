@@ -5,7 +5,7 @@ import { type ReferenceId } from '@concepta/nestjs-core';
 
 import { type Cache } from '../../../domain/aggregates/cache.js';
 
-export class ArchiveCacheCommand extends Command<Cache> {
+export class SoftDeleteCacheCommand extends Command<Cache> {
   constructor(
     public readonly ctx: PlainLiteralObject,
     public readonly namespace: string,

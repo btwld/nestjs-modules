@@ -112,6 +112,12 @@ import { ReadCacheRequest } from '../../queries/impl/read-cache.request.js';
             command: DeleteCacheRequest,
             commandHandler: DeleteCacheRequestHandler,
           },
+          {
+            operation: Operation.SoftDelete,
+            path: 'soft/:id',
+            command: DeleteCacheRequest,
+            commandHandler: DeleteCacheRequestHandler,
+          },
         ],
       },
     }),

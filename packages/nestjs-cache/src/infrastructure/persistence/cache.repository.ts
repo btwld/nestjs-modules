@@ -80,8 +80,10 @@ export class CacheRepository implements CacheRepositoryInterface {
     );
   }
 
-  async softRemove(ctx: PlainLiteralObject, cache: Cache): Promise<void> {
-    cache.stampDeleted();
+  async softDelete(ctx: PlainLiteralObject, cache: Cache): Promise<void> {
+    // Handed over as read: a row that already carries a delete date is one
+    // the repository treats as deleted, and it writes nothing.
     await this.repository.softDelete(this.mapper.toPersistence(cache), { ctx });
+    cache.stampDeleted();
   }
 }

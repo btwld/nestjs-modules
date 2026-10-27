@@ -178,20 +178,20 @@ describe(CacheRepository.name, () => {
     });
   });
 
-  describe('softRemove', () => {
-    it('should stamp deleted and soft delete the plain entity', async () => {
+  describe('softDelete', () => {
+    it('should soft delete the entity as read, then stamp the aggregate', async () => {
       mockRepoInterface.softDelete.mockResolvedValue(undefined as never);
 
       const cache = toCacheDomain(mockEntity);
-      const stampSpy = vi.spyOn(cache, 'stampDeleted');
+      const asRead = mapper.toPersistence(cache);
 
-      await repo.softRemove(ctx, cache);
+      await repo.softDelete(ctx, cache);
 
-      expect(stampSpy).toHaveBeenCalledTimes(1);
-      expect(mockRepoInterface.softDelete).toHaveBeenCalledWith(
-        mapper.toPersistence(cache),
-        { ctx },
-      );
+      expect(mockRepoInterface.softDelete).toHaveBeenCalledWith(asRead, {
+        ctx,
+      });
+      expect(asRead.dateDeleted).toBeNull();
+      expect(cache.meta.dateDeleted).toBeInstanceOf(Date);
     });
   });
 });

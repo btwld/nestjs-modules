@@ -35,7 +35,7 @@ export { CreateCacheCommand } from './application/commands/impl/create-cache.com
 export { UpdateCacheCommand } from './application/commands/impl/update-cache.command.js';
 export { RemoveCacheCommand } from './application/commands/impl/remove-cache.command.js';
 export { ReplaceCacheCommand } from './application/commands/impl/replace-cache.command.js';
-export { ArchiveCacheCommand } from './application/commands/impl/archive-cache.command.js';
+export { SoftDeleteCacheCommand } from './application/commands/impl/soft-delete-cache.command.js';
 
 // domain events
 export { CacheCreatedEvent } from './domain/events/cache-created.event.js';
@@ -55,7 +55,7 @@ export { CreateCacheHandler } from './application/commands/handlers/create-cache
 export { UpdateCacheHandler } from './application/commands/handlers/update-cache.handler.js';
 export { RemoveCacheHandler } from './application/commands/handlers/remove-cache.handler.js';
 export { ReplaceCacheHandler } from './application/commands/handlers/replace-cache.handler.js';
-export { ArchiveCacheHandler } from './application/commands/handlers/archive-cache.handler.js';
+export { SoftDeleteCacheHandler } from './application/commands/handlers/soft-delete-cache.handler.js';
 export { GetCacheHandler } from './application/queries/handlers/get-cache.handler.js';
 export { FindOneCacheHandler } from './application/queries/handlers/find-one-cache.handler.js';
 export { FindCachesByAssigneeHandler } from './application/queries/handlers/find-caches-by-assignee.handler.js';

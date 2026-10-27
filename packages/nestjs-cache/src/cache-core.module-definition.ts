@@ -9,11 +9,11 @@ import { CqrsModule } from '@nestjs/cqrs';
 
 import { createSettingsProvider } from '@concepta/nestjs-core';
 
-import { ArchiveCacheHandler } from './application/commands/handlers/archive-cache.handler.js';
 import { ClearCachesByAssigneeHandler } from './application/commands/handlers/clear-caches-by-assignee.handler.js';
 import { CreateCacheHandler } from './application/commands/handlers/create-cache.handler.js';
 import { RemoveCacheHandler } from './application/commands/handlers/remove-cache.handler.js';
 import { ReplaceCacheHandler } from './application/commands/handlers/replace-cache.handler.js';
+import { SoftDeleteCacheHandler } from './application/commands/handlers/soft-delete-cache.handler.js';
 import { UpdateCacheHandler } from './application/commands/handlers/update-cache.handler.js';
 import { UpsertCacheHandler } from './application/commands/handlers/upsert-cache.handler.js';
 import { FindCachesByAssigneeHandler } from './application/queries/handlers/find-caches-by-assignee.handler.js';
@@ -101,7 +101,7 @@ export function createCacheProviders(options: {
     UpdateCacheHandler,
     RemoveCacheHandler,
     ReplaceCacheHandler,
-    ArchiveCacheHandler,
+    SoftDeleteCacheHandler,
     GetCacheHandler,
     FindOneCacheHandler,
     FindCachesByAssigneeHandler,

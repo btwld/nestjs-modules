@@ -250,7 +250,7 @@ CrudModule.forFeature<CacheInterface>({
 | `ReplaceCacheCommand` | `(ctx, namespace, id, dto)` -- Full replacement (creates if ID not found) |
 | `UpsertCacheCommand` | `(ctx, namespace, dto)` -- Create or update by key/type/assigneeId |
 | `RemoveCacheCommand` | `(ctx, namespace, id)` -- Hard delete by ID |
-| `ArchiveCacheCommand` | `(ctx, namespace, id)` -- Soft delete by ID |
+| `SoftDeleteCacheCommand` | `(ctx, namespace, id)` -- Soft delete by ID |
 | `ClearCachesByAssigneeCommand` | `(ctx, namespace, assigneeId)` -- Remove all entries for an assignee |
 
 ### Dispatching a Command
@@ -389,7 +389,7 @@ persistence form via `toPersistence()`.
 | `save` | `(ctx, cache) => Promise<void>` |
 | `remove` | `(ctx, cache) => Promise<void>` |
 | `removeAllByAssignee` | `(ctx, assigneeId) => Promise<void>` |
-| `softRemove` | `(ctx, cache) => Promise<void>` |
+| `softDelete` | `(ctx, cache) => Promise<void>` |
 
 ### Repository Resolution
 

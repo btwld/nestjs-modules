@@ -10,7 +10,7 @@ import {
   UpdateCacheCommand,
   RemoveCacheCommand,
   ReplaceCacheCommand,
-  ArchiveCacheCommand,
+  SoftDeleteCacheCommand,
   GetCacheQuery,
   FindOneCacheQuery,
   FindCachesByAssigneeQuery,
@@ -20,7 +20,7 @@ import {
   UpdateCacheHandler,
   RemoveCacheHandler,
   ReplaceCacheHandler,
-  ArchiveCacheHandler,
+  SoftDeleteCacheHandler,
   GetCacheHandler,
   FindOneCacheHandler,
   FindCachesByAssigneeHandler,
@@ -54,7 +54,7 @@ describe('index', () => {
     expect(UpdateCacheCommand).toBeInstanceOf(Function);
     expect(RemoveCacheCommand).toBeInstanceOf(Function);
     expect(ReplaceCacheCommand).toBeInstanceOf(Function);
-    expect(ArchiveCacheCommand).toBeInstanceOf(Function);
+    expect(SoftDeleteCacheCommand).toBeInstanceOf(Function);
   });
 
   it('should export domain queries', () => {
@@ -70,7 +70,7 @@ describe('index', () => {
     expect(UpdateCacheHandler).toBeInstanceOf(Function);
     expect(RemoveCacheHandler).toBeInstanceOf(Function);
     expect(ReplaceCacheHandler).toBeInstanceOf(Function);
-    expect(ArchiveCacheHandler).toBeInstanceOf(Function);
+    expect(SoftDeleteCacheHandler).toBeInstanceOf(Function);
     expect(GetCacheHandler).toBeInstanceOf(Function);
     expect(FindOneCacheHandler).toBeInstanceOf(Function);
     expect(FindCachesByAssigneeHandler).toBeInstanceOf(Function);

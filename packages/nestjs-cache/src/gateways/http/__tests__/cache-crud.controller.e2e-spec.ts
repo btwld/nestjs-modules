@@ -2,6 +2,7 @@ import assert from 'assert';
 import { randomUUID } from 'crypto';
 
 import supertest from 'supertest';
+import { type DataSource } from 'typeorm';
 import { type MockInstance } from 'vitest';
 
 import { type INestApplication } from '@nestjs/common';
@@ -376,6 +377,34 @@ describe('CacheAssignmentController (e2e)', () => {
     await supertest(app.getHttpServer())
       .delete(`/cache/user/${userCache.id}`)
       .expect(204);
+  });
+
+  it('DELETE /cache/user/soft/:id soft deletes the stored row', async () => {
+    const userCache = await userCacheFactory
+      .map((userCache) => {
+        userCache.assigneeId = user.id;
+      })
+      .create();
+
+    await supertest(app.getHttpServer())
+      .delete(`/cache/user/soft/${userCache.id}`)
+      .expect(204);
+
+    const stored = app
+      .get<DataSource>(getDataSourceToken())
+      .getRepository(UserCacheEntityFixture);
+
+    expect(await stored.findOne({ where: { id: userCache.id } })).toBeNull();
+
+    const deleted = await stored.findOne({
+      where: { id: userCache.id },
+      withDeleted: true,
+    });
+    expect(deleted?.dateDeleted).toBeInstanceOf(Date);
+
+    await supertest(app.getHttpServer())
+      .get(`/cache/user/${userCache.id}`)
+      .expect(404);
   });
 
   describe('@Transactional', () => {
