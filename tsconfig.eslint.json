@@ -13,6 +13,7 @@
     "packages/nestjs-invitation/src/**/*.ts",
     "packages/nestjs-federated/src/**/*.ts",
     "packages/nestjs-authentication/src/**/*.ts",
-    "packages/nestjs-access-control/src/**/*.ts"
+    "packages/nestjs-access-control/src/**/*.ts",
+    "packages/nestjs-file/src/**/*.ts"
   ]
 }

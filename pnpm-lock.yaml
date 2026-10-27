@@ -873,43 +873,52 @@ importers:
 
   packages/nestjs-file:
     dependencies:
-      '@concepta/nestjs-common':
-        specifier: ^7.0.0-alpha.10
-        version: link:../nestjs-common
-      '@concepta/nestjs-typeorm-ext':
-        specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))
-      '@nestjs/common':
-        specifier: ^11.1.9
-        version: 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
-      '@nestjs/config':
-        specifier: ^4.0.2
-        version: 4.0.4(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(rxjs@7.8.2)
-      '@nestjs/swagger':
-        specifier: 11.2.2
-        version: 11.2.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
-      class-transformer:
-        specifier: '*'
-        version: 0.5.1
-      class-validator:
-        specifier: '*'
-        version: 0.15.1
+      '@concepta/nestjs-core':
+        specifier: workspace:^
+        version: link:../nestjs-core
+      '@concepta/nestjs-repository':
+        specifier: workspace:*
+        version: link:../nestjs-repository
       rxjs:
         specifier: ^7.1.0
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
         version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
-      '@concepta/nestjs-user':
-        specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))
-      '@nestjs/testing':
-        specifier: ^11.1.9
-        version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
-      jest-mock-extended:
+      '@concepta/nestjs-repository-typeorm':
+        specifier: workspace:*
+        version: link:../nestjs-repository-typeorm
+      '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.1(@jest/globals@30.5.1(supports-color@7.2.0))(jest@30.5.1(@types/node@20.19.43)(supports-color@7.2.0))(typescript@5.9.3)
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))
+      '@faker-js/faker':
+        specifier: ^8.4.1
+        version: 8.4.1
+      '@nestjs/common':
+        specifier: ^12.0.1
+        version: 12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
+      '@nestjs/config':
+        specifier: ^12.0.0
+        version: 12.0.0(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/cqrs':
+        specifier: ^12.0.0
+        version: 12.0.0(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/testing':
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
+      '@nestjs/typeorm':
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))
+      vitest-mock-extended:
+        specifier: ^4.0.0
+        version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
 
   packages/nestjs-invitation:
     dependencies:
@@ -1246,7 +1255,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-file':
         specifier: ^7.0.0-alpha.10
-        version: link:../nestjs-file
+        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/common':
         specifier: ^11.1.9
         version: 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -1918,6 +1927,14 @@ packages:
 
   '@concepta/nestjs-federated@7.0.0-alpha.10':
     resolution: {integrity: sha512-+igNSQ8z4nLhKk7BnVbEsNHeWGq7622rEQOLULhbLQZrzUIACSKUJta7wakecD+szN6wqjpEhgubb3JQjnX3kQ==}
+    peerDependencies:
+      class-transformer: '*'
+      class-validator: '*'
+      rxjs: ^7.1.0
+      typeorm: ~1.0.0
+
+  '@concepta/nestjs-file@7.0.0-alpha.10':
+    resolution: {integrity: sha512-SGU7iOkwWI/34kMP+DKS5uGssm5K2G3kqHLnhD9o0SdU/qIsNpdg3djlHymnZC7f9RJ2XkVEW1yTruimJ20CcQ==}
     peerDependencies:
       class-transformer: '*'
       class-validator: '*'
@@ -8850,6 +8867,23 @@ snapshots:
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@nestjs/config': 4.0.4(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(rxjs@7.8.2)
       '@nestjs/swagger': 11.2.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
+      class-transformer: 0.5.1
+      class-validator: 0.15.1
+      rxjs: 7.8.2
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - '@fastify/static'
+      - '@nestjs/core'
+      - reflect-metadata
+      - supports-color
+
+  '@concepta/nestjs-file@7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))':
+    dependencies:
+      '@concepta/nestjs-common': link:packages/nestjs-common
+      '@concepta/nestjs-typeorm-ext': 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)(supports-color@7.2.0))
+      '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
+      '@nestjs/config': 4.0.4(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(rxjs@7.8.2)
+      '@nestjs/swagger': 11.2.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
       class-transformer: 0.5.1
       class-validator: 0.15.1
       rxjs: 7.8.2

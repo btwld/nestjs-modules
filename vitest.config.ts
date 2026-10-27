@@ -18,6 +18,7 @@ export default defineConfig({
       'packages/nestjs-federated/**/*.spec.ts',
       'packages/nestjs-authentication/**/*.spec.ts',
       'packages/nestjs-access-control/**/*.spec.ts',
+      'packages/nestjs-file/**/*.spec.ts',
     ],
     exclude: ['**/node_modules/**', '**/dist/**'],
     testTimeout: 30000,

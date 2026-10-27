@@ -4,20 +4,27 @@ import {
   type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CqrsModule } from '@nestjs/cqrs';
 
-import { createSettingsProvider } from '@concepta/nestjs-common';
+import { createSettingsProvider } from '@concepta/nestjs-core';
+import { RepositoryModule } from '@concepta/nestjs-repository';
 
-import { fileDefaultConfig } from './config/file-default.config';
-import {
-  FILE_MODULE_SETTINGS_TOKEN,
-  FILE_STRATEGY_SERVICE_KEY,
-} from './file.constants';
-import { type FileOptionsExtrasInterface } from './interfaces/file-options-extras.interface';
-import { type FileOptionsInterface } from './interfaces/file-options.interface';
-import { type FileSettingsInterface } from './interfaces/file-settings.interface';
-import { FileModelService } from './services/file-model.service';
-import { FileStrategyService } from './services/file-strategy.service';
-import { FileService } from './services/file.service';
+import { ConfirmFileUploadHandler } from './application/commands/handlers/confirm-file-upload.handler.js';
+import { CreateFileHandler } from './application/commands/handlers/create-file.handler.js';
+import { RemoveFileHandler } from './application/commands/handlers/remove-file.handler.js';
+import { RestoreFileHandler } from './application/commands/handlers/restore-file.handler.js';
+import { SoftDeleteFileHandler } from './application/commands/handlers/soft-delete-file.handler.js';
+import { GetFileByKeyHandler } from './application/queries/handlers/get-file-by-key.handler.js';
+import { GetFileHandler } from './application/queries/handlers/get-file.handler.js';
+import { FileLifecycleService } from './domain/services/file-lifecycle.service.js';
+import { FileStorageService } from './domain/services/file-storage.service.js';
+import { FILE_MODULE_SETTINGS_TOKEN } from './file.constants.js';
+import { fileDefaultConfig } from './infrastructure/config/file-default.config.js';
+import { type FileExtrasInterface } from './infrastructure/config/interfaces/file-extras.interface.js';
+import { type FileOptionsInterface } from './infrastructure/config/interfaces/file-options.interface.js';
+import { type FileSettingsInterface } from './infrastructure/config/interfaces/file-settings.interface.js';
+import { FileMapper } from './infrastructure/persistence/file.mapper.js';
+import { createFileRepositoryProvider } from './infrastructure/utils/create-file-repository-provider.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__FILE_MODULE_RAW_OPTIONS_TOKEN__');
 
@@ -29,57 +36,90 @@ export const {
   moduleName: 'File',
   optionsInjectionToken: RAW_OPTIONS_TOKEN,
 })
-  .setExtras<FileOptionsExtrasInterface>({ global: false }, definitionTransform)
+  .setExtras<FileExtrasInterface>(
+    { global: false, entities: { file: 'file' } },
+    definitionTransform,
+  )
   .build();
 
-export type FileOptions = Omit<typeof FILE_OPTIONS_TYPE, 'global'>;
-
-export type FileAsyncOptions = Omit<typeof FILE_ASYNC_OPTIONS_TYPE, 'global'>;
+export type FileOptions = typeof FILE_OPTIONS_TYPE;
+export type FileAsyncOptions = typeof FILE_ASYNC_OPTIONS_TYPE;
 
 function definitionTransform(
   definition: DynamicModule,
-  extras: FileOptionsExtrasInterface,
+  {
+    global,
+    providers: overrideProviders,
+    entities,
+    repositories,
+  }: FileExtrasInterface,
 ): DynamicModule {
   const { providers = [], imports = [] } = definition;
-  const { global = false } = extras;
 
   return {
     ...definition,
     global,
-    imports: createFileImports({ imports }),
-    providers: createFileProviders({ providers }),
+    imports: createFileImports({ imports, entities }),
+    providers: createFileProviders({
+      providers: [...providers, ...(overrideProviders ?? [])],
+      entities,
+      repositories,
+    }),
     exports: [ConfigModule, RAW_OPTIONS_TOKEN, ...createFileExports()],
   };
 }
 
-export function createFileImports(
-  options: Pick<DynamicModule, 'imports'>,
-): DynamicModule['imports'] {
+export function createFileImports(options: {
+  imports: DynamicModule['imports'];
+  entities: FileExtrasInterface['entities'];
+}): DynamicModule['imports'] {
   return [
-    ...(options.imports ?? []),
+    ...(options.imports || []),
     ConfigModule.forFeature(fileDefaultConfig),
+    CqrsModule.forRoot(),
+    RepositoryModule.forFeature([options.entities.file]),
+  ];
+}
+
+export function createFileProviders(options: {
+  providers?: Provider[];
+  entities: FileExtrasInterface['entities'];
+  repositories?: FileExtrasInterface['repositories'];
+}): Provider[] {
+  return [
+    createFileSettingsProvider(),
+    createFileStorageServiceProvider(),
+    FileLifecycleService,
+    FileMapper,
+    createFileRepositoryProvider(
+      options.entities.file,
+      options.repositories?.file,
+    ),
+    CreateFileHandler,
+    ConfirmFileUploadHandler,
+    SoftDeleteFileHandler,
+    RestoreFileHandler,
+    RemoveFileHandler,
+    GetFileHandler,
+    GetFileByKeyHandler,
+    // Consumer overrides (last provider for a token wins)
+    ...(options.providers ?? []),
   ];
 }
 
 export function createFileExports(): Required<
   Pick<DynamicModule, 'exports'>
 >['exports'] {
-  return [FILE_MODULE_SETTINGS_TOKEN, FileService];
+  return [FILE_MODULE_SETTINGS_TOKEN, FileMapper];
 }
 
-export function createFileProviders(options: {
-  overrides?: FileOptions;
-  providers?: Provider[];
-}): Provider[] {
-  return [
-    ...(options.providers ?? []),
-    createFileSettingsProvider(options.overrides),
-    createStrategyServiceProvider(options.overrides),
-    // TODO: move to be overridable
-    FileModelService,
-    FileStrategyService,
-    FileService,
-  ];
+function createFileStorageServiceProvider(): Provider {
+  return {
+    provide: FileStorageService,
+    inject: [RAW_OPTIONS_TOKEN],
+    useFactory: (options: FileOptionsInterface) =>
+      new FileStorageService(options.storageServices),
+  };
 }
 
 export function createFileSettingsProvider(
@@ -91,26 +131,4 @@ export function createFileSettingsProvider(
     settingsKey: fileDefaultConfig.KEY,
     optionsOverrides,
   });
-}
-
-export function createStrategyServiceProvider(
-  optionsOverrides?: FileOptions,
-): Provider {
-  return {
-    provide: FILE_STRATEGY_SERVICE_KEY,
-    inject: [RAW_OPTIONS_TOKEN, FileStrategyService],
-    useFactory: async (
-      options: FileOptionsInterface,
-      fileStrategyService: FileStrategyService,
-    ) => {
-      const storageServices =
-        optionsOverrides?.storageServices ?? options.storageServices;
-
-      storageServices?.forEach((storageService) => {
-        fileStrategyService.addStorageService(storageService);
-      });
-
-      return fileStrategyService;
-    },
-  };
 }

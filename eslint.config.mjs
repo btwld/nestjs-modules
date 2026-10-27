@@ -6,7 +6,7 @@ import tsdocPlugin from 'eslint-plugin-tsdoc';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
 import nPlugin from 'eslint-plugin-n';
 
-// The 13 packages migrated to v8 (nodenext, DDD) — same set as root
+// The 14 packages migrated to v8 (nodenext, DDD) — same set as root
 // tsconfig.json's `references` and tsconfig.eslint.json's `include`. Only
 // these get type-aware linting; older packages predate the migration and
 // aren't part of the tsconfig project-reference graph the parser resolves
@@ -25,6 +25,7 @@ const v8Packages = [
   'nestjs-federated',
   'nestjs-authentication',
   'nestjs-access-control',
+  'nestjs-file',
 ];
 const v8Files = v8Packages.map((name) => `packages/${name}/src/**/*.ts`);
 

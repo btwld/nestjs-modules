@@ -1,4 +1,4 @@
-# The 13 v8 packages. The 14 legacy v7 dirs under packages/ are added below in a
+# The 14 v8 packages. The 13 legacy v7 dirs under packages/ are added below in a
 # separate block — they are install-only members and are never built, tested,
 # linted, or published. See TODOs.md for the port checklist.
 packages:
@@ -15,6 +15,7 @@ packages:
   - 'packages/nestjs-federated'
   - 'packages/nestjs-authentication'
   - 'packages/nestjs-access-control'
+  - 'packages/nestjs-file'
 
   # Legacy v7 packages, install-only. Not built, tested, linted, or published
   # from this repo — each is marked "private": true for exactly that reason.
@@ -28,7 +29,6 @@ packages:
   - 'packages/nestjs-common'
   - 'packages/nestjs-email'
   - 'packages/nestjs-event'
-  - 'packages/nestjs-file'
   - 'packages/nestjs-logger'
   - 'packages/nestjs-logger-coralogix'
   - 'packages/nestjs-logger-sentry'

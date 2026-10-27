@@ -18,6 +18,7 @@ export default defineConfig({
       'packages/nestjs-federated/**/*.e2e-spec.ts',
       'packages/nestjs-authentication/**/*.e2e-spec.ts',
       'packages/nestjs-access-control/**/*.e2e-spec.ts',
+      'packages/nestjs-file/**/*.e2e-spec.ts',
     ],
     exclude: ['**/node_modules/**', '**/dist/**'],
     testTimeout: 30000,
