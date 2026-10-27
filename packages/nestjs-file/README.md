@@ -1,530 +1,494 @@
-# Rockets NestJS File Manager
+# @concepta/nestjs-file
 
-Manage files for several components using one module.
+File records for NestJS using DDD/CQRS. You plug in one storage service per
+backend (S3, a filesystem, ...); the module keeps a row per file, hands out
+upload and download URLs, and tracks each file from upload to removal.
 
 ## Project
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-file)](https://www.npmjs.com/package/@concepta/nestjs-file)
-[![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-file)](https://www.npmjs.com/package/@concepta/nestjs-file)
+[![NPM Downloads](https://img.shields.io/npm/dw/@concepta/nestjs-file)](https://www.npmjs.com/package/@concepta/nestjs-file)
 [![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
 [![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-file%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
 
-1. [Tutorial](#tutorial)
-   1. [Integrating AWS with FileModule in NestJS](#integrating-aws-with-filemodule-in-nestjs)
-      - [Step 1: Install Required Packages](#step-1-install-required-packages)
-      - [Step 2: Configure AWS](#step-2-configure-aws)
-      - [Step 3: Create AWS Storage Service](#step-3-create-aws-storage-service)
-1. [How to Guide](#how-to-guide)
-   1. [How to Create a New Storage Service](#1-how-to-create-a-new-storage-service)
-   1. [How to Integrate a New Storage Service](#2-how-to-integrate-a-new-storage-service)
-   1. [How to Integrate with Multiple Storage Services](#3-how-to-integrate-with-multiple-storage-services)
-   1. [How to create a new File Entity](#4-how-to-create-a-new-file-entity)
-1. [Reference](#reference)
-1. [Explanation](#explanation)
-   1. [Advantages of a Generic File Module](#advantages-of-a-generic-file-module)
-   1. [Multiple Storage Services](#multiple-storage-services)
-   1. [Ease of Creating New File Module Structures](#ease-of-creating-new-file-module-structures)
+- [Installation](#installation)
+- [Module Registration](#module-registration)
+- [Storage Services](#storage-services)
+- [File Lifecycle](#file-lifecycle)
+- [The File Aggregate](#the-file-aggregate)
+- [Commands](#commands)
+- [Queries](#queries)
+- [Domain Events](#domain-events)
+- [Referring to a File](#referring-to-a-file)
+- [Writing a Controller](#writing-a-controller)
+- [Repository](#repository)
+- [Schemas](#schemas)
+- [Exceptions](#exceptions)
+- [Entry Points](#entry-points)
+- [Seeding](#seeding)
+- [Environment Variables](#environment-variables)
 
-## Tutorial
+## Installation
 
-### Integrating AWS with FileModule in NestJS
-
-This guide will walk you through the steps to integrate AWS S3 storage with
-the `FileModule` in your NestJS application. This integration allows you to
-upload and download files using AWS S3.
-
-#### Step 1: Install Required Packages
-
-First, ensure you have the necessary packages installed. You will need
-`@aws-sdk/client-s3` and `@nestjs/config`.
-
-```bash
-yarn add @concepta/nestjs-file @aws-sdk/client-s3 @nestjs/config
+```sh
+yarn add @concepta/nestjs-file @concepta/nestjs-core @concepta/nestjs-repository \
+  @nestjs/common @nestjs/config @nestjs/core @nestjs/cqrs rxjs
 ```
 
-#### Step 2: Configure AWS
+With TypeORM, as in [Module Registration](#module-registration), also add:
 
-Create a configuration file for AWS in your `config` directory.
-
-```ts
-// config/aws.config.ts
-import { registerAs } from '@nestjs/config';
-import { AwsConfigInterface } from '../aws/interfaces/aws.config.interface';
-
-export const awsConfig = registerAs('aws', (): AwsConfigInterface => ({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-  bucketName: process.env.AWS_BUCKET_NAME,
-}));
+```sh
+yarn add @concepta/nestjs-repository-typeorm @nestjs/typeorm typeorm
 ```
 
-#### Step 3: Create AWS Storage Service
+This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 
-Implement the AWS storage service that implements the
-`FileStorageServiceInterface` that will handle file uploads and downloads.
+### Peer Dependencies
+
+| Package | Required | Notes |
+| --- | --- | --- |
+| `@nestjs/common` | Yes | NestJS 12 framework |
+| `@nestjs/core` | Yes | Module reference and reflection |
+| `@nestjs/config` | Yes | Settings/config loading |
+| `@nestjs/cqrs` | No | Optional peer — required in practice for `CommandBus`, `QueryBus`, `EventBus` |
+| `rxjs` | Yes | Required by NestJS |
+| `typeorm` | No | Only if using the TypeORM repository adapter |
+| `@concepta/typeorm-seeding` | No | Only for database seeding |
+| `@faker-js/faker` | No | Only for database seeding |
+
+## Module Registration
+
+Extend one of the abstract entities, register it with `RepositoryModule`, then
+register `FileModule` with your storage services:
 
 ```ts
-// aws/aws-storage.service.ts
-import {
-  FileCreateDto,
-  FileStorageServiceInterface,
-} from '@concepta/nestjs-file';
-import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Inject } from '@nestjs/common';
-import { awsConfig } from '../config/aws.config';
-import { ConfigType } from '@nestjs/config';
+import { Entity } from 'typeorm';
+import { FileSqliteEntity } from '@concepta/nestjs-file/optional/typeorm';
 
-export class AwsStorageService implements FileStorageServiceInterface {
-  KEY = 'aws-storage';
-
-  private s3Client: S3Client;
-  private bucketName: string;
-
-  constructor(
-    @Inject(awsConfig.KEY)
-    private config: ConfigType<typeof awsConfig>,
-  ) {
-    this.s3Client = new S3Client(config);
-    this.bucketName = config.bucketName;
-  }
-
-  async getUploadUrl(file: FileCreateDto): Promise<string> {
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: file.fileName,
-      ContentType: file.contentType,
-    });
-
-    return await getSignedUrl(this.s3Client, command, {
-      expiresIn: 3600,
-    });
-  }
-
-  async getDownloadUrl(file: FileCreateDto): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucketName,
-      Key: file.fileName,
-    });
-
-    return await getSignedUrl(this.s3Client, command, {
-      expiresIn: 3600,
-    }); // URL expires in 1 hour
-  }
-}
+@Entity()
+export class FileEntity extends FileSqliteEntity {}
 ```
 
-#### Step 4: Create AWS Module
-
-Create an AWS module to provide the AWS storage service.
-
 ```ts
-// aws/aws.module.ts
 import { Module } from '@nestjs/common';
-import { AwsStorageService } from './aws-storage.service';
-import { AwsController } from './aws.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CoreModule } from '@concepta/nestjs-core';
+import { FileModule } from '@concepta/nestjs-file';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
 @Module({
-  providers: [AwsStorageService],
-  exports: [AwsStorageService],
-  controllers: [AwsController],
+  imports: [
+    CoreModule.forRoot(),
+    TypeOrmModule.forRoot({ /* ... */ entities: [FileEntity] }),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmRepositoryModule,
+          entities: [{ key: 'file', entity: FileEntity }],
+        },
+      ],
+    }),
+    FileModule.forRootAsync({
+      imports: [S3Module],
+      inject: [S3StorageService],
+      useFactory: (s3: S3StorageService) => ({ storageServices: [s3] }),
+      entities: { file: 'file' },
+    }),
+  ],
 })
-export class AwsModule {}
+export class AppModule {}
 ```
 
-#### Step 5: Create entity AWS DTO
+Use `forRoot({ storageServices: [...] })` when the services need no injection.
 
-Define Entity and Data Transfer Object (DTO) for AWS file operations.
+### Options
 
-```ts
-import { FilePostgresEntity } from '@concepta/nestjs-file';
-import { Entity } from 'typeorm';
+| Option | Where | Notes |
+| --- | --- | --- |
+| `storageServices` | options | One per `KEY`. Required. |
+| `entities.file` | extras | The entity key registered with `RepositoryModule`. Defaults to `'file'`. |
+| `repositories.file` | extras | A `FileRepository` subclass to use instead; see [Repository](#repository). |
+| `providers` | extras | Extra providers; the last provider for a token wins. |
+| `global` | extras | Set by `forRoot`/`forRootAsync`. |
 
-@Entity('file')
-export class FileEntity extends FilePostgresEntity {}
+The file entity is mutable: if your deployment requires a write policy on
+every entity, register it with `writePolicy: { access: 'mutable' }`. It needs
+no other repository opt-ins.
 
-```
+## Storage Services
 
-```ts
-// aws/dto/aws.dto.ts
-import { FileCreateDto } from '@concepta/nestjs-file';
-import { PickType } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
-
-@Exclude()
-export class AwsCreateDto extends PickType(FileCreateDto, [
-  'fileName',
-  'contentType',
-] as const) {}
-```
-
-#### Step 6: Create AWS Controller
-
-Create a controller to handle AWS file operations.
+A storage service implements `FileStorageServiceInterface`. A file uses the
+service whose `KEY` equals its `serviceKey`.
 
 ```ts
-// aws/aws.controller.ts
-import { FileEntityInterface, FileService } from '@concepta/nestjs-file';
-import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AwsCreateDto } from './dto/aws.dto';
+import { Injectable, type PlainLiteralObject } from '@nestjs/common';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import {
+  type FileInterface,
+  type FileStorageServiceInterface,
+} from '@concepta/nestjs-file';
 
-@Controller('aws')
-@ApiTags('aws')
-export class AwsController {
-  constructor(private fileService: FileService) {}
+@Injectable()
+export class S3StorageService implements FileStorageServiceInterface {
+  KEY = 's3';
 
-  @Post('')
-  @ApiResponse({
-    description: 'Create a file and return upload and download url',
-  })
-  async create(@Body() fileDto: AwsCreateDto): Promise<FileEntityInterface> {
-    return this.fileService.push({
-      ...fileDto,
-      serviceKey: 'aws-storage',
-    });
+  constructor(
+    private readonly client: S3Client,
+    private readonly bucket: string,
+  ) {}
+
+  getSignedUploadUrl(_ctx: PlainLiteralObject, file: FileInterface) {
+    return getSignedUrl(
+      this.client,
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: file.fileName,
+        ContentType: file.contentType,
+      }),
+    );
   }
 
-  @Get('')
-  @ApiResponse({
-    description: 'Get file created',
-  })
-  async get(fileId: string): Promise<FileEntityInterface> {
-    return this.fileService.fetch({
-      id: fileId,
-    });
+  getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileInterface) {
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({ Bucket: this.bucket, Key: file.fileName }),
+    );
+  }
+
+  async exists(_ctx: PlainLiteralObject, file: FileInterface) {
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: file.fileName }),
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof NotFound) return false;
+      throw error;
+    }
+  }
+
+  async delete(_ctx: PlainLiteralObject, file: FileInterface) {
+    // S3 deletes are idempotent: deleting a missing key succeeds.
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: file.fileName }),
+    );
   }
 }
 ```
 
-#### Step 7: Integrate AWS with FileModule
+`getSignedUploadUrl` and `getSignedDownloadUrl` are required and return
+signed, expiring URLs the client uses directly. The upload URL is asked for
+only when a file is created. `exists` and `delete` are optional, and leaving
+one out is how you choose the behaviour:
 
-Finally, integrate the AWS module with the `FileModule` in your `AppModule`.
+- **No `exists`:** confirming an upload doesn't check storage.
+- **No `delete`:** removing a file deletes only its row and keeps the object.
+
+`delete` must be idempotent: resolve when the object is already gone. A
+removal that is retried after a crash calls it again for an object it already
+deleted.
+
+Every method receives the caller's `ctx` first, so a tenant-aware service can
+pick a bucket or prefix from it.
+
+## File Lifecycle
+
+| Status | What it means for you |
+| --- | --- |
+| `pending` | Created. Upload to `signedUploadUrl`, then confirm. |
+| `active` | Confirmed and ready to download. |
+| `removing` | A removal is running, or was interrupted. The file stays readable until it's gone. Remove it again to finish. |
+| `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
+
+**Soft delete** a `pending` or `active` file to hide it from reads while
+keeping the stored object; **restore** it to bring it back. Its name stays
+taken until you remove it. A soft-deleted file can't change, so it keeps its
+status until it's restored or removed.
+
+**Remove** a file to delete the stored object and then its record. If storage
+fails, you get `FileRemoveException`; dispatch `RemoveFileCommand` again to
+retry. A live file is left `remove-failed`, so its record never points at a
+deleted object without its status saying so. A soft-deleted file is left as
+it was, still hidden. Once a removal of a soft-deleted file has failed, remove
+it again rather than restore it: its object may already be gone.
+
+If two commands change the same file at once, the later one fails with
+`OptimisticLockException` instead of overwriting the first; retry it.
+
+## The File Aggregate
+
+Commands and queries hand you a `File`:
+
+| Member | What you get |
+| --- | --- |
+| `id`, `version` | The record's id, and the version each write is checked against. |
+| `serviceKey`, `fileName`, `contentType` | What you created it with. |
+| `status` | `pending`, `active`, `removing` or `remove-failed`. |
+| `isSoftDeleted` | Whether it's soft-deleted. |
+| `isInUse` | Whether it's `pending` or `active` and not soft-deleted. |
+| `isUploadConfirmed` | Whether the upload is confirmed (`active`). |
+| `meta` | `dateCreated`, `dateUpdated`, `dateDeleted`. |
+| `toPlain()` | The whole record as a plain object, to return from a controller. |
+
+Change a file only through the commands; they apply the rules and write it.
+
+## Commands
+
+| Command | Returns | Does |
+| --- | --- | --- |
+| `CreateFileCommand(ctx, { serviceKey, fileName, contentType })` | `FileCreatedResultInterface` | Creates a `pending` file. Throws `FileAlreadyExistsException` when the name is taken, by a soft-deleted file too. |
+| `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`. Confirming twice returns the file unchanged. |
+| `SoftDeleteFileCommand(ctx, id)` | `File` | Hides the file from reads and returns it, soft-deleted. |
+| `RestoreFileCommand(ctx, id)` | `File` | Brings a soft-deleted file back. Restoring a file that isn't soft-deleted returns it unchanged. |
+| `RemoveFileCommand(ctx, id)` | `File` | Deletes the stored object and the file (see [File Lifecycle](#file-lifecycle)). |
+
+| Result | Properties |
+| --- | --- |
+| `FileCreatedResultInterface` | `file`, `signedUploadUrl`, `signedDownloadUrl` |
+| `FileReadResultInterface` | `file`, `signedDownloadUrl` |
+
+Create is the only command that gives you a `signedUploadUrl`; confirm and
+reads give you `signedDownloadUrl`. If storage can't produce a URL, you get
+`FileUploadUrlException` or `FileDownloadUrlException`, and a failed create
+leaves nothing behind.
+
+Create and confirm wait for your storage service inside a transaction, so keep
+those calls fast: past the transaction timeout (30 seconds by default) the
+command fails and leaves nothing behind.
+
+Two creates of the same name at the same moment: one wins, and the other can
+fail with `RepositoryDatabaseException` instead of
+`FileAlreadyExistsException`. Treat both as "name taken".
+
+**Dispatch `RemoveFileCommand` outside any transaction**, including the
+transactional interceptor; inside one it throws
+`FileRemoveInTransactionException`.
 
 ```ts
-// app.module.ts
-    FileModule.forRootAsync({
-      imports: [AwsModule],
-      inject: [AwsStorageService],
-      useFactory: (awsStorageService: AwsStorageService) => ({
-        storageServices: [awsStorageService],
-      }),
-      entities: {
-        file: {
-          entity: FileEntity,
-        },
-      },
-    }),
+const { file, signedUploadUrl } = await this.commandBus.execute(
+  new CreateFileCommand(ctx, {
+    serviceKey: 's3',
+    fileName: `avatars/${userId}.png`,
+    contentType: 'image/png',
+  }),
+);
 ```
 
-#### Step 8: Environment Variables
+## Queries
 
-Ensure you have the following environment variables set in your `.env` file:
+| Query | Returns |
+| --- | --- |
+| `GetFileQuery(ctx, id, { status? })` | `FileReadResultInterface`, or throws `FileNotFoundException` |
+| `GetFileByKeyQuery(ctx, { serviceKey, fileName }, { status? })` | `File \| null` |
+
+`status` limits the match to those statuses; without it every status matches.
+Neither query returns soft-deleted files.
 
 ```ts
-env
-AWS_REGION=your-aws-region
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-AWS_BUCKET_NAME=your-bucket-name
+const { signedDownloadUrl } = await this.queryBus.execute(
+  new GetFileQuery(ctx, id, { status: ['active'] }),
+);
 ```
 
-### Uploading a file using curl
+## Domain Events
 
-After setting up the AWS integration with the `FileModule`, you can use the
-provided endpoints to upload files. Here's a step-by-step guide on how to
-upload a file using curl:
+| Event | Published when |
+| --- | --- |
+| `FileCreatedEvent` | a file is created |
+| `FileUploadConfirmedEvent` | an upload is confirmed |
+| `FileSoftDeletedEvent` | a file is soft-deleted |
+| `FileRestoredEvent` | a soft-deleted file is restored |
+| `FileRemoveFailedEvent` | a removal is recorded as failed (`remove-failed`) |
+| `FileRemovedEvent` | the row is deleted, after the object |
 
-- First, get a pre-signed URL for file upload:
+Each event carries `eventContext` and the plain `file` as stored, and is
+published once the write that produced it commits; a write that rolls back
+publishes nothing. A failed removal is the one command that throws and still
+publishes: `FileRemoveFailedEvent` goes out once `remove-failed` commits.
 
-   ```bash
-   curl -X POST http://localhost:3000/aws \
-   -H "Content-Type: application/json" \
-   -d '{"fileName": "example.txt", "contentType": "text/plain"}'
-   ```
+## Referring to a File
 
-   This will return a JSON response with the pre-signed URL:
+Give your own entity a `fileId` column and implement `FileOwnableInterface`
+(`{ fileId }`) to point at a file, for example a report's output or a user's
+avatar.
 
-  ```json
-  {
-    "serviceKey": "aws-storage",
-    "fileName": "image_3.png",
-    "contentType": "image/png",
-    "dateCreated": "2024-10-01T17:56:07.420Z",
-    "dateUpdated": "2024-10-01T17:56:07.420Z",
-    "dateDeleted": null,
-    "version": 1,
-    "id": "1ef0d299-997d-409e-9ce1-dcc8fe3a280e",
-    "uploadUri": "<https://your-bucket-name.s3.amazonaws.com/example.txt>?...",
-    "downloadUrl": "<https://your-bucket-name.s3.amazonaws.com/example.txt>?.."
-  }
-  ```
+## Writing a Controller
 
-- Use the pre-signed URL to upload the file:
-
-   ```bash
-   curl -X PUT -T /path/to/your/example.txt \
-   -H "Content-Type: text/plain" \
-   "https://your-bucket-name.s3.amazonaws.com/example.txt?AWSAccessKeyId=..."
-   ```
-
-   Replace `/path/to/your/example.txt` with the actual path to your file, and
-   use the full URL returned from step 1.
-
-- After successful upload, you can use the file ID to retrieve the file
-information:
-
-  ```bash
-  curl -X GET http://localhost:3000/aws/{fileId}
-  ```
-
-   Replace `{fileId}` with the actual file ID returned when you created the
-   file record.
-
-- To get a download URL for the file:
-
-   ```bash
-   curl -X GET http://localhost:3000/aws/download-url/{fileId}
-   ```
-
-   This will return a JSON response with the download URL:
-
-   ```json
-   {
-     //...
-     "downloadUrl": "https://your-bucket-name.s3.amazonaws.com/example.txt?AWSAccessKeyId=..."
-   }
-   ```
-
-By following these steps, you can upload a file to your AWS S3 bucket using the
-pre-signed URLs generated by your NestJS application.
-
-### Conclusion
-
-You have now integrated AWS S3 with the `FileModule` in your NestJS application.
-You can use the endpoints defined in the `AwsController` to upload and download
-files from your S3 bucket.
-
-## How to Guide
-
-### 1. How to Create a New Storage Service
-
-To create a new storage service, you need to implement the
-`FileStorageServiceInterface`. Here's a step-by-step guide:
-
-1. Create a new file for your storage service (e.g., `my-storage.service.ts`).
-1. Import the necessary interfaces and implement the
-`FileStorageServiceInterface`.
-1. Implement the required methods: `getUploadUrl` and `getDownloadUrl`.
-1. Define the key for the storage service.
-
-Here's an example of a custom storage service:
+The module ships no HTTP routes. Write a controller that dispatches the
+commands and queries:
 
 ```ts
 import {
-  FileCreateDto,
-  FileStorageServiceInterface,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  type PlainLiteralObject,
+} from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { Ctx } from '@concepta/nestjs-core';
+import {
+  ConfirmFileUploadCommand,
+  CreateFileCommand,
+  GetFileQuery,
+  RemoveFileCommand,
+  RestoreFileCommand,
+  SoftDeleteFileCommand,
 } from '@concepta/nestjs-file';
-import { Inject } from '@nestjs/common';
 
-export class MyStorageService implements FileStorageServiceInterface {
-  KEY = 'my-storage';
+@Controller('files')
+export class FileController {
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
 
-  constructor( ) {
-    
+  @Post()
+  async create(
+    @Ctx() ctx: PlainLiteralObject,
+    @Body() body: { fileName: string; contentType: string },
+  ) {
+    const { file, signedUploadUrl } = await this.commandBus.execute(
+      new CreateFileCommand(ctx, { ...body, serviceKey: 's3' }),
+    );
+    return { ...file.toPlain(), signedUploadUrl };
   }
 
-  async getUploadUrl(file: FileCreateDto): Promise<string> {
-    // Implement your logic to generate an upload URL
+  @Put(':id/confirm')
+  async confirm(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const { file, signedDownloadUrl } = await this.commandBus.execute(
+      new ConfirmFileUploadCommand(ctx, id),
+    );
+    return { ...file.toPlain(), signedDownloadUrl };
   }
 
-  async getDownloadUrl(file: FileCreateDto): Promise<string> {
-    // Implement your logic to generate a download URL
+  @Get(':id')
+  async read(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const { file, signedDownloadUrl } = await this.queryBus.execute(
+      new GetFileQuery(ctx, id, { status: ['active'] }),
+    );
+    return { ...file.toPlain(), signedDownloadUrl };
+  }
+
+  @Put(':id/soft-delete')
+  async softDelete(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const file = await this.commandBus.execute(
+      new SoftDeleteFileCommand(ctx, id),
+    );
+    return file.toPlain();
+  }
+
+  @Put(':id/restore')
+  async restore(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const file = await this.commandBus.execute(new RestoreFileCommand(ctx, id));
+    return file.toPlain();
+  }
+
+  @Delete(':id')
+  async remove(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    await this.commandBus.execute(new RemoveFileCommand(ctx, id));
   }
 }
 ```
 
-### 2. How to Integrate a New Storage Service
+`@Ctx()` passes the request's context, so your storage service, hooks and
+event listeners see the caller and the request's correlation id.
 
-To integrate a new storage service into the `FileModule`, follow these steps:
+The client uploads to `signedUploadUrl` directly, then calls
+`PUT /files/:id/confirm`. Validate request bodies with `fileCreateSchema`.
 
-1. Import the new storage service module into your `AppModule`.
-1. Configure the `FileModule` with the new storage service.
+To finish interrupted removals, find files in `removing` or `remove-failed`
+with your own query on the entity, then dispatch `RemoveFileCommand` for each.
+A soft-deleted file has no removal status, so track the ones you mean to
+remove yourself and dispatch it again for those. If your sweep catches a
+removal that is still running, the later one takes over and the other fails
+with `OptimisticLockException`, possibly after its object was already deleted.
+Both are safe to retry, and the file ends up removed either way.
 
-Here's an example of how to integrate the `MyStorageService` into the
-`FileModule`:
+## Repository
+
+`FileRepository` implements `FileRepositoryInterface` over the repository
+registered for `entities.file`. To change how files are read or written,
+extend it and pass the class as `repositories.file`; the module builds it with
+the same repository and `FileMapper`, so `this.repository` and `this.mapper`
+are there for you:
 
 ```ts
-// ...
+import { FileRepository } from '@concepta/nestjs-file';
+
+export class MyFileRepository extends FileRepository {
+  // override any method, following the contract on FileRepositoryInterface
+}
+
 FileModule.forRoot({
-  storageServices: [new MyStorageService],
-  // ...
-}),
-//...
-```
-
-### 3. How to Integrate with Multiple Storage Services
-
-Repeat the previous step but define a different key for the storage service.
-
-Here's an example of how to set multiple custom storage service:
-
-```ts
-// ...
-FileModule.forRoot({
-  storageServices: [new MyStorageService(), new MySecondStorageService()],
-  // ...
-}),
-//...
-```
-
-```ts
-// to access MyStorageService
-this.fileService.push({
-  ...fileDto,
-  serviceKey: 'my-storage',
+  storageServices: [s3],
+  entities: { file: 'file' },
+  repositories: { file: MyFileRepository },
 });
-// ... 
 ```
+
+To change how files are created, confirmed, soft-deleted, restored or removed,
+provide your own `FileLifecycleService` subclass through `providers`.
+
+## Schemas
+
+| Schema | Shape |
+| --- | --- |
+| `fileSchema` | A stored file: own columns, `status`, id, version and dates. Named OpenAPI component `File`. |
+| `fileCreateSchema` | Create body: non-empty `serviceKey`, `fileName`, `contentType`. |
+
+## Exceptions
+
+| Exception | Fault | When |
+| --- | --- | --- |
+| `FileNotFoundException` | client | No file matches the id (and status filter). |
+| `FileAlreadyExistsException` | client | The key is taken, by a soft-deleted file too. |
+| `FileNotUploadedException` | client | `exists` says the object isn't uploaded. |
+| `FileStatusException` | client | The status doesn't allow the operation. |
+| `FileStorageNotFoundException` | usage | No storage service has the file's `serviceKey`. |
+| `FileRemoveInTransactionException` | usage | `RemoveFileCommand` was dispatched inside a transaction. |
+| `FileUploadUrlException` | internal | Storage failed to produce an upload URL. |
+| `FileDownloadUrlException` | internal | Storage failed to produce a download URL. |
+| `FileExistsCheckException` | internal | Storage failed to check whether the object is uploaded. |
+| `FileStorageDeleteException` | internal | Storage failed to delete the object. You see it as the `cause` of `FileRemoveException`. |
+| `FileRemoveException` | internal | Storage failed to delete the object. A live file is `remove-failed`, unless `context.statusError` says that couldn't be recorded either; a soft-deleted file is left as it was. Remove it again to retry. |
+
+All extend `FileException`. For the `internal` ones, the storage error is the
+exception's `cause`; for `FileRemoveException` it is one level down, on the
+`FileStorageDeleteException` that is its `cause`.
+
+## Entry Points
+
+| Import Path | Contents |
+| --- | --- |
+| `@concepta/nestjs-file` | Module, aggregate, commands, queries, handlers, events, `FileStorageService`, `FileLifecycleService`, repository, schemas, exceptions, domain and config interfaces |
+| `@concepta/nestjs-file/optional/typeorm` | `FileSqliteEntity`, `FilePostgresEntity` |
+| `@concepta/nestjs-file/optional/seeding` | `FileFactory` |
+
+## Seeding
+
+`FileFactory` seeds `active` files with `serviceKey` `'default'`. Override
+`serviceKey` to one of your storage services:
 
 ```ts
-// to access MySecondStorageService
-this.fileService.push({
-  ...fileDto,
-  serviceKey: 'my-second-storage',
-});
-// ... 
+import { FileFactory } from '@concepta/nestjs-file/optional/seeding';
 ```
 
-### 4. How to create a new File Entity
+## Environment Variables
 
-To create a new entity, follow these steps:
-
-1. Create a new file for your entity (e.g., `my-entity.entity.ts`).
-1. Extend the `FilePostgresEntity` or `FileMongoEntity` class and add your
-custom fields.
-1. Register the new entity in the `FileModule`.
-
-Here's an example of a custom entity:
-
-```ts
-import { FilePostgresEntity } from '@concepta/nestjs-file';
-import { Entity } from 'typeorm';
-
-@Entity('my-entity')
-export class MyEntity extends FilePostgresEntity {}
-```
-
-```ts
-// ...
-FileModule.forRootAsync({
-  entities: {
-    file: {
-      entity: MyEntity,
-    },
-  },
-  // ...
-}),
-// ...
-```
-
-## Reference
-
-For detailed API documentation, please refer to our
-[API Reference](https://www.rockets.tools/reference/rockets/nestjs-file/README).
-This comprehensive guide provides in-depth information about all available
-methods, interfaces, and configurations for the `@concepta/nestjs-file`
-package.
-
-## Explanation
-
-### Advantages of a Generic File Module
-
-The `@concepta/nestjs-file` module offers a generic, flexible approach to file
-handling in NestJS applications. This design provides several key advantages:
-
-1. **Abstraction**: By abstracting file operations, developers can work with
-   files without worrying about the underlying storage mechanism. This
-   separation of concerns simplifies application logic and improves
-   maintainability.
-
-1. **Flexibility**: The module's design allows for easy integration with
-   various storage services. Whether using local storage, cloud services like
-   AWS S3, Google Cloud Storage, or any custom solution, the module can
-   accommodate your needs.
-
-1. **Consistency**: With a standardized interface for file operations, your
-   application maintains consistent behavior across different storage services.
-   This consistency simplifies development and reduces errors when switching
-   between or combining different storage solutions.
-
-1. **Scalability**: As your application grows, you can easily add new storage
-   services or switch between them without significant changes to your
-   application code. This scalability is crucial for applications that may need
-   to adapt to changing requirements or infrastructure.
-
-1. **Testability**: The abstraction layer makes it easier to mock file
-   operations in unit tests, allowing for more comprehensive and isolated
-   testing of your application logic.
-
-### Multiple Storage Services
-
-Supporting multiple storage services within the same module offers several
-benefits:
-
-1. **Versatility**: Different parts of your application may have different
-   storage requirements. With support for multiple services, you can use the
-   most appropriate storage solution for each use case within a single
-   application.
-
-1. **Migration**: If you need to migrate from one storage service to another,
-   you can do so gradually by running multiple services in parallel during the
-   transition period.
-
-1. **Redundancy**: For critical applications, you can implement redundancy by
-   storing files across multiple services simultaneously.
-
-1. **Cost Optimization**: Different storage services have different pricing
-   models. By supporting multiple services, you can optimize costs by choosing
-   the most cost-effective solution for each type of data or usage pattern.
-
-### Ease of Creating New File Module Structures
-
-The `@concepta/nestjs-file` module is designed with extensibility in mind,
-making it straightforward to create new file module structures:
-
-1. **Standardized Interface**: By implementing the
-   `FileStorageServiceInterface`, you can easily create new storage services
-   that seamlessly integrate with the existing module structure.
-
-1. **Minimal Boilerplate**: The module provides base classes and interfaces
-   that handle much of the common functionality, allowing you to focus on the
-   specific implementation details of your new storage service.
-
-1. **Plug-and-Play**: Once a new storage service is implemented, it can be
-   easily plugged into the existing module configuration without requiring
-   changes to other parts of your application.
-
-1. **Customizable Entities**: The module allows for easy creation and
-   registration of custom file entities, enabling you to tailor the data model
-   to your specific needs while still leveraging the module's core
-   functionality.
-
-1. **Dependency Injection**: Leveraging NestJS's dependency injection system,
-   new services and entities can be easily integrated and made available
-   throughout your application.
-
-This design philosophy ensures that extending the file module to support new
-storage services or customize existing functionality is a straightforward
-process, promoting adaptability and reducing development time for custom file
-handling solutions.
+None. Everything is configured through the module options.

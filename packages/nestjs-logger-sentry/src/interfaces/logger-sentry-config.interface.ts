@@ -1,4 +1,4 @@
-import { NodeOptions as SentryNodeOptions } from '@sentry/node';
+import { type NodeOptions as SentryNodeOptions } from '@sentry/node';
 
 /**
  * Interface for Sentry configuration to define the log level

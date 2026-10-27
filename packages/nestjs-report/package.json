@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-report",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "BSD-3-Clause",
@@ -15,7 +16,7 @@
     "@concepta/nestjs-file": "^7.0.0-alpha.10",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",
-    "@nestjs/swagger": "^11.2.2"
+    "@nestjs/swagger": "11.2.2"
   },
   "devDependencies": {
     "@concepta/nestjs-typeorm-ext": "^7.0.0-alpha.10",

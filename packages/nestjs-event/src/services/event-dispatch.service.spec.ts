@@ -6,11 +6,11 @@ import {
   EVENT_MODULE_EMITTER_SERVICE_TOKEN,
   EVENT_MODULE_SETTINGS_TOKEN,
 } from '../event-constants';
-import { EventReturnType } from '../event-types';
+import { type EventReturnType } from '../event-types';
 import { Event } from '../events/event';
 import { EventAsync } from '../events/event-async';
 import { EventDispatchException } from '../exceptions/event-dispatch.exception';
-import { EventSettingsInterface } from '../interfaces/event-settings.interface';
+import { type EventSettingsInterface } from '../interfaces/event-settings.interface';
 
 import { EventDispatchService } from './event-dispatch.service';
 

@@ -1,12 +1,12 @@
 import {
-  ConfigFactory,
-  ConfigFactoryKeyHost,
+  type ConfigFactory,
+  type ConfigFactoryKeyHost,
   registerAs,
 } from '@nestjs/config';
 
 import { splitLogLevel } from '@concepta/nestjs-logger';
 
-import { LoggerSentrySettingsInterface } from '../interfaces/logger-sentry-settings.interface';
+import { type LoggerSentrySettingsInterface } from '../interfaces/logger-sentry-settings.interface';
 import { formatMessage, logLevelMap } from '../utils';
 
 /**

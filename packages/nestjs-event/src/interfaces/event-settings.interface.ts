@@ -1,4 +1,4 @@
-import { EventEmitter2OptionsInterface } from './event-emitter2-options.interface';
+import { type EventEmitter2OptionsInterface } from './event-emitter2-options.interface';
 
 /**
  * Event module settings interface

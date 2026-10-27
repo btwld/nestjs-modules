@@ -6,6 +6,7 @@
     "**/__fixtures__/**",
     "./packages/*/src/**/*.spec.ts",
     "./packages/*/src/**/*.e2e-spec.ts",
+    "./packages/*/src/**/*.docker-spec.ts",
     "./packages/nestjs-samples/**"
   ]
 }

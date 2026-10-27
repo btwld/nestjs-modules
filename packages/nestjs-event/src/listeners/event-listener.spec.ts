@@ -1,4 +1,4 @@
-import { EventEmitter2, Listener as EmitterListener } from 'eventemitter2';
+import { EventEmitter2, type Listener as EmitterListener } from 'eventemitter2';
 
 import { Event } from '../events/event';
 import { EventListenerException } from '../exceptions/event-listener.exception';

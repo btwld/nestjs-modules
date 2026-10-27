@@ -1,4 +1,4 @@
-export class TestModelDto {
+export class TestModel {
   id?: number;
   firstName?: string;
   lastName?: string;

@@ -8,7 +8,7 @@ import { AuditInterface } from '../../audit/interfaces/audit.interface';
 import { ReferenceIdInterface } from '../../reference/interfaces/reference-id.interface';
 
 /**
- * User DTO
+ * Common Entity DTO
  */
 @Exclude()
 export class CommonEntityDto

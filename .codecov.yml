@@ -3,6 +3,7 @@ ignore:
   - '**/__mocks__/**'
   - '**/__stubs__/**'
   - '**/__fixtures__/**'
+  - '**/__tests__/**'
   - '**/**.spec.js'
   - '**/**.e2e-spec.js'
   - '.devcontainer'

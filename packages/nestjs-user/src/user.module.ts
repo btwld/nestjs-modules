@@ -4,26 +4,26 @@ import {
   UserAsyncOptions,
   UserModuleClass,
   UserOptions,
-} from './user.module-definition';
+} from './user.module-definition.js';
 
-/**
- * User Module
- */
+type UserRegistrationOptions = Omit<UserOptions, 'global'>;
+type UserAsyncRegistrationOptions = Omit<UserAsyncOptions, 'global'>;
+
 @Module({})
 export class UserModule extends UserModuleClass {
-  static register(options: UserOptions): DynamicModule {
-    return super.register(options);
+  static register(options: UserRegistrationOptions): DynamicModule {
+    return super.register({ ...options, global: false });
   }
 
-  static registerAsync(options: UserAsyncOptions): DynamicModule {
-    return super.registerAsync(options);
+  static registerAsync(options: UserAsyncRegistrationOptions): DynamicModule {
+    return super.registerAsync({ ...options, global: false });
   }
 
-  static forRoot(options: UserOptions): DynamicModule {
+  static forRoot(options: UserRegistrationOptions): DynamicModule {
     return super.register({ ...options, global: true });
   }
 
-  static forRootAsync(options: UserAsyncOptions): DynamicModule {
+  static forRootAsync(options: UserAsyncRegistrationOptions): DynamicModule {
     return super.registerAsync({ ...options, global: true });
   }
 }

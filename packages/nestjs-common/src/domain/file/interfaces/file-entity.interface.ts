@@ -1,3 +1,3 @@
-import { FileInterface } from './file.interface';
+import { type FileInterface } from './file.interface';
 
 export interface FileEntityInterface extends FileInterface {}

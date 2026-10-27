@@ -1,4 +1,7 @@
-import { SwaggerCustomOptions, SwaggerDocumentOptions } from '@nestjs/swagger';
+import {
+  type SwaggerCustomOptions,
+  type SwaggerDocumentOptions,
+} from '@nestjs/swagger';
 
 export interface SwaggerUiSettingsInterface {
   // ui

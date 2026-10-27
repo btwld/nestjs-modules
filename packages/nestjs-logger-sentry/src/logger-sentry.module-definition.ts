@@ -1,7 +1,7 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -11,9 +11,9 @@ import {
   LOGGER_SENTRY_MODULE_SETTINGS_TOKEN,
   loggerSentryConfig,
 } from './config/logger-sentry.config';
-import { LoggerSentryOptionsExtrasInterface } from './interfaces/logger-sentry-options-extras.interface';
-import { LoggerSentryOptionsInterface } from './interfaces/logger-sentry-options.interface';
-import { LoggerSentrySettingsInterface } from './interfaces/logger-sentry-settings.interface';
+import { type LoggerSentryOptionsExtrasInterface } from './interfaces/logger-sentry-options-extras.interface';
+import { type LoggerSentryOptionsInterface } from './interfaces/logger-sentry-options.interface';
+import { type LoggerSentrySettingsInterface } from './interfaces/logger-sentry-settings.interface';
 import { LoggerSentryTransport } from './transports/logger-sentry.transport';
 
 const RAW_OPTIONS_TOKEN = Symbol('__LOGGER_SENTRY_MODULE_RAW_OPTIONS_TOKEN__');

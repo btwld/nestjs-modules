@@ -8,7 +8,7 @@ import { NotAnErrorException } from '@concepta/nestjs-common';
 import { EMAIL_MODULE_MAILER_SERVICE_TOKEN } from './email.constants';
 import { EmailService } from './email.service';
 import { EmailSendException } from './exceptions/email-send.exception';
-import { EmailServiceInterface } from './interfaces/email-service.interface';
+import { type EmailServiceInterface } from './interfaces/email-service.interface';
 
 describe(EmailService, () => {
   let logger: Logger;

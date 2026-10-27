@@ -1,15 +1,13 @@
-import { AuditInterface } from '../../../audit/interfaces/audit.interface';
-import { ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
-import { FileOwnableInterface } from '../../file/interfaces/file-ownable.interface';
-import { ReportStatusEnum } from '../enum/report-status.enum';
+import { type AuditInterface } from '../../../audit/interfaces/audit.interface';
+import { type ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
+import { type FileOwnableInterface } from '../../file/interfaces/file-ownable.interface';
+import { type ReportStatusEnum } from '../enum/report-status.enum';
 
 /**
  * Interface representing a report entity
  */
 export interface ReportInterface
-  extends ReferenceIdInterface,
-    FileOwnableInterface,
-    AuditInterface {
+  extends ReferenceIdInterface, FileOwnableInterface, AuditInterface {
   /**
    * Service key associated with the report
    */
