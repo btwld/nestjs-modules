@@ -23,7 +23,6 @@ import { EntityAlreadyExistsException } from '../exceptions/entity-already-exist
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
-import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
 import { RelationWriteException } from '../exceptions/relation-write.exception.js';
 import { RepositoryBootException } from '../exceptions/repository-boot.exception.js';
@@ -1185,7 +1184,6 @@ export abstract class RepositoryAdapter<
             options?.ctx,
           ),
         );
-        this.assertKeyNotPartial(value);
         await this.assertNotExisting(value, options?.ctx);
         const row = this.checkedRow(await this.doCreate(value, options));
         await this.activity?.record('create', [row], options?.ctx);
@@ -1221,7 +1219,6 @@ export abstract class RepositoryAdapter<
           )
         ).map((entity) => this.toOwnColumns(entity));
         for (const value of values) {
-          this.assertKeyNotPartial(value);
           await this.assertNotExisting(value, options?.ctx);
         }
         const rows = await this.doCreateMany(values, options);
@@ -1557,12 +1554,11 @@ export abstract class RepositoryAdapter<
   // Utility methods
 
   /**
-   * Get primary key column names from metadata
+   * The primary key column, if the entity has one. The repository refuses at
+   * startup an entity that reports more than one.
    */
-  protected getPrimaryColumns(): (keyof Entity & string)[] {
-    return this.metadata.columns
-      .filter((col) => col.isPrimary)
-      .map((col) => col.name);
+  protected getPrimaryColumn(): (keyof Entity & string) | undefined {
+    return this.metadata.columns.find((col) => col.isPrimary)?.name;
   }
 
   /**
@@ -1656,7 +1652,7 @@ export abstract class RepositoryAdapter<
    *
    * Reads via `doFindOne`, bypassing hooks and row scope: the question is
    * whether the key is taken, not whether the caller may see the row. A key is
-   * only checkable when every primary column is present. `withDeleted` because
+   * only checkable when the primary key is present. `withDeleted` because
    * a soft-deleted row still occupies its key. See "Create Inserts, It Never
    * Updates" in the README.
    */
@@ -1687,51 +1683,17 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * Refuse a create that supplies only part of a composite primary key.
-   *
-   * A partial key cannot be looked up, so `assertNotExisting` cannot tell
-   * whether it is taken, and the driver then fails with a message about
-   * updating a row — for a call to `create`, naming no column. Refusing here
-   * reports which columns are missing.
-   *
-   * Supplying none of them is the ordinary generated-key create and is left
-   * alone, as is a single-column key.
-   */
-  private assertKeyNotPartial(entity: DeepPartial<Entity>): void {
-    const primaryColumns = this.getPrimaryColumns();
-    if (primaryColumns.length < 2) return;
-
-    if (!isObject(entity)) return;
-
-    const values: PlainLiteralObject = entity;
-    const missing = primaryColumns.filter((col) => values[col] === undefined);
-
-    if (missing.length === 0 || missing.length === primaryColumns.length) {
-      return;
-    }
-
-    throw new PartialPrimaryKeyException(this.metadata.name, missing);
-  }
-
-  /**
-   * An equality clause on every primary key column, read as given, or
-   * `undefined` when the key is incomplete — nothing to identify a row with.
+   * An equality clause on the primary key, read as given, or `undefined` when
+   * the key is absent — nothing to identify a row with.
    */
   private keyClause(entity: DeepPartial<Entity>): WhereClause | undefined {
-    const primaryColumns = this.getPrimaryColumns();
-    if (primaryColumns.length === 0) return undefined;
-
-    if (!isObject(entity)) return undefined;
+    const primaryColumn = this.getPrimaryColumn();
+    if (primaryColumn === undefined || !isObject(entity)) return undefined;
 
     const values: PlainLiteralObject = entity;
-    const conditions: WhereClause[] = [];
-    for (const col of primaryColumns) {
-      const value = values[col];
-      if (value === undefined) return undefined;
-      conditions.push(Where.eq(col, value));
-    }
+    const value = values[primaryColumn];
 
-    return conditions.length === 1 ? conditions[0] : Where.and(...conditions);
+    return value === undefined ? undefined : Where.eq(primaryColumn, value);
   }
 
   /**
@@ -1800,8 +1762,9 @@ export abstract class RepositoryAdapter<
     const allowed = new Set<string>(
       this.metadata.columns.map((column) => column.name),
     );
+    const primaryColumn = this.getPrimaryColumn();
     const keys = new Set<string>([
-      ...this.getPrimaryColumns(),
+      ...(primaryColumn === undefined ? [] : [primaryColumn]),
       ...relations.flatMap(({ foreignKey = [] }) =>
         foreignKey.map(({ from }) => from),
       ),
@@ -1892,16 +1855,16 @@ export abstract class RepositoryAdapter<
     target: PlainLiteralObject,
     values: PlainLiteralObject,
   ): void {
-    const primaryColumns = this.getPrimaryColumns();
-    if (primaryColumns.length === 0) return;
+    const primaryColumn = this.getPrimaryColumn();
+    if (primaryColumn === undefined) return;
 
-    const changed = primaryColumns.filter(
-      (column) =>
-        column in values && !this.sameKey(values[column], target[column]),
-    );
-
-    if (changed.length > 0) {
-      throw new PrimaryKeyImmutableException(this.metadata.name, changed);
+    if (
+      primaryColumn in values &&
+      !this.sameKey(values[primaryColumn], target[primaryColumn])
+    ) {
+      throw new PrimaryKeyImmutableException(this.metadata.name, [
+        primaryColumn,
+      ]);
     }
   }
 

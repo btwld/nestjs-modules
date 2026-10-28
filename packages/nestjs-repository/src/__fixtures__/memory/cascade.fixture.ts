@@ -269,36 +269,7 @@ export const REFUND_METADATA: RepositoryMetadataInterface<RefundFixture> = {
   relations: [],
 };
 
-export const BUNDLE_TOKEN = 'bundles';
 export const CATEGORY_TOKEN = 'categories';
-
-/** A bundle, keyed by two columns, with refunds joined on one of them. */
-export interface BundleFixture {
-  id: string;
-  region: string;
-}
-
-export class BundleEntityFixture implements BundleFixture {
-  declare id: string;
-  declare region: string;
-}
-
-export const BUNDLE_METADATA: RepositoryMetadataInterface<BundleFixture> = {
-  name: 'Bundle',
-  type: BundleEntityFixture,
-  urn: 'urn:memory:Bundle',
-  columns: [id, column('region', { isPrimary: true })],
-  relations: [
-    {
-      name: 'refunds',
-      targetEntity: 'Refund',
-      targetUrn: 'urn:memory:Refund',
-      targetColumns: REFUND_COLUMNS,
-      cardinality: 'many',
-      on: { from: 'id', to: 'paymentId' },
-    },
-  ],
-};
 
 /** A category, with child categories. */
 export interface CategoryFixture {

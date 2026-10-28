@@ -22,8 +22,6 @@ import {
   WidgetEntityFixture,
 } from './activity.fixture.js';
 import {
-  BUNDLE_METADATA,
-  BundleEntityFixture,
   CATEGORY_METADATA,
   CategoryEntityFixture,
   INVOICE_LINE_METADATA,
@@ -103,7 +101,6 @@ const ADAPTERS = new Map<
   [ReceiptEntityFixture, memory(RECEIPT_METADATA)],
   [PaymentEntityFixture, memory(PAYMENT_METADATA)],
   [RefundEntityFixture, memory(REFUND_METADATA)],
-  [BundleEntityFixture, memory(BUNDLE_METADATA)],
   [CategoryEntityFixture, memory(CATEGORY_METADATA)],
   [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
   [ProjectEntityFixture, memory(PROJECT_METADATA)],

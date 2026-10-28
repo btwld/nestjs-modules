@@ -176,6 +176,10 @@ export class TestRepositoryAdapter extends RepositoryAdapter<TestEntity> {
     return this.entityCtx(ctx);
   }
 
+  exposedGetPrimaryColumn(): (keyof TestEntity & string) | undefined {
+    return this.getPrimaryColumn();
+  }
+
   exposedGetVersionColumn(): (keyof TestEntity & string) | undefined {
     return this.getVersionColumn();
   }

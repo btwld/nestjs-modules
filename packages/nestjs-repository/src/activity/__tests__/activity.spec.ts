@@ -619,7 +619,7 @@ describe('activity', () => {
         /omits "size", which is not a column of Widget/,
       ],
       [
-        'an entity with a composite primary key',
+        'an entity with no primary key',
         [
           {
             key: PAIR_TOKEN,
@@ -628,7 +628,7 @@ describe('activity', () => {
           },
           STORE,
         ],
-        /needs a single-column primary key, and has 2 key columns/,
+        /cannot identify its rows: Pair has no primary key column/,
       ],
     ])('refuses %s', async (_label, entities, message) => {
       const failure = boot(entities);

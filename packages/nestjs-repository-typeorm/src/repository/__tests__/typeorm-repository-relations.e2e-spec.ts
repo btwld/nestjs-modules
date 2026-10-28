@@ -9,7 +9,6 @@ import { SeedingSource } from '@concepta/typeorm-seeding';
 import {
   AUTHOR_ENTITY_TOKEN,
   COMMENT_ENTITY_TOKEN,
-  DOC_ENTITY_TOKEN,
   EAGER_COMMENT_ENTITY_TOKEN,
   POST_ENTITY_TOKEN,
   PROFILE_ENTITY_TOKEN,
@@ -17,7 +16,6 @@ import {
 } from '../../__fixtures__/repository/config/relation.constants.fixture.js';
 import { AuthorEntityFixture } from '../../__fixtures__/repository/entity/author.entity.fixture.js';
 import { CommentEntityFixture } from '../../__fixtures__/repository/entity/comment.entity.fixture.js';
-import { DocEntityFixture } from '../../__fixtures__/repository/entity/doc.entity.fixture.js';
 import { PostEntityFixture } from '../../__fixtures__/repository/entity/post.entity.fixture.js';
 import { type ProfileEntityFixture } from '../../__fixtures__/repository/entity/profile.entity.fixture.js';
 import { TagEntityFixture } from '../../__fixtures__/repository/entity/tag.entity.fixture.js';
@@ -33,7 +31,6 @@ describe('TypeOrmRepository (relations)', () => {
   let tagRepo: TypeOrmRepository<TagEntityFixture>;
   let commentRepo: TypeOrmRepository<CommentEntityFixture>;
   let eagerCommentRepo: TypeOrmRepository<CommentEntityFixture>;
-  let docRepo: TypeOrmRepository<DocEntityFixture>;
   let profileRepo: TypeOrmRepository<ProfileEntityFixture>;
   let seedingSource: SeedingSource;
   let authorFactory: AuthorFactoryFixture;
@@ -78,10 +75,6 @@ describe('TypeOrmRepository (relations)', () => {
       TypeOrmRepository<CommentEntityFixture>
     >(getDynamicRepositoryToken(EAGER_COMMENT_ENTITY_TOKEN));
     eagerCommentRepo.bind({ allowEagerRelations: true });
-
-    docRepo = moduleFixture.get<TypeOrmRepository<DocEntityFixture>>(
-      getDynamicRepositoryToken(DOC_ENTITY_TOKEN),
-    );
 
     profileRepo = moduleFixture.get<TypeOrmRepository<ProfileEntityFixture>>(
       getDynamicRepositoryToken(PROFILE_ENTITY_TOKEN),
@@ -661,27 +654,6 @@ describe('TypeOrmRepository (relations)', () => {
   });
 
   describe('primary keys', () => {
-    it('reports every column of a composite primary key', () => {
-      expect(
-        docRepo.metadata.columns
-          .filter((column) => column.isPrimary)
-          .map((column) => column.name),
-      ).toEqual(['slug', 'locale']);
-    });
-
-    it('stores and returns a caller-supplied composite key', async () => {
-      const created = await docRepo.create({
-        slug: 'home',
-        locale: 'fr',
-        body: 'accueil',
-      });
-
-      expect(created).toEqual({ slug: 'home', locale: 'fr', body: 'accueil' });
-      expect(await dataSource.getRepository(DocEntityFixture).find()).toEqual([
-        { slug: 'home', locale: 'fr', body: 'accueil' },
-      ]);
-    });
-
     it('reports a primary key that is also a join column', () => {
       expect(
         profileRepo.metadata.columns.find(

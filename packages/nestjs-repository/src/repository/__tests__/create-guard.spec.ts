@@ -5,7 +5,6 @@ import { type PlainLiteralObject, type Type } from '@nestjs/common';
 import { type DeepPartial } from '@concepta/nestjs-core';
 
 import { EntityAlreadyExistsException } from '../../exceptions/entity-already-exists.exception.js';
-import { PartialPrimaryKeyException } from '../../exceptions/partial-primary-key.exception.js';
 import { RelationWriteException } from '../../exceptions/relation-write.exception.js';
 import { type RepositoryMetadataInterface } from '../interfaces/repository-metadata.interface.js';
 import {
@@ -39,8 +38,8 @@ const COLUMN = (name: string, isPrimary = false) => ({
  * Adapter whose `doFindOne` answers from a fixed set of rows, so the create
  * guard can be exercised without a driver.
  *
- * `primaries` picks which columns are primary, and the `account` relation's
- * foreign key is the `accountId` column.
+ * `primary` picks the primary column, and the `account` relation's foreign
+ * key is the `accountId` column.
  */
 class TestAdapter extends RepositoryAdapter<Row> {
   readonly metadata: RepositoryMetadataInterface<Row>;
@@ -49,7 +48,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
 
   constructor(
     private readonly rows: Row[],
-    primaries: string[] = ['id'],
+    primary: 'id' | 'accountId' = 'id',
   ) {
     super('row');
     this.bind({});
@@ -58,8 +57,8 @@ class TestAdapter extends RepositoryAdapter<Row> {
       type: RowClass as Type<Row>,
       urn: 'urn:memory:Row',
       columns: [
-        COLUMN('id', primaries.includes('id')),
-        COLUMN('accountId', primaries.includes('accountId')),
+        COLUMN('id', primary === 'id'),
+        COLUMN('accountId', primary === 'accountId'),
         COLUMN('name'),
       ],
       relations: [
@@ -199,7 +198,7 @@ describe('create guard', () => {
 
   describe('a primary key that is also a join column', () => {
     it('refuses a key supplied through the relation object', async () => {
-      const adapter = new TestAdapter([EXISTING], ['accountId']);
+      const adapter = new TestAdapter([EXISTING], 'accountId');
 
       await expect(
         adapter.create({ account: { id: EXISTING.accountId }, name: 'Hijack' }),
@@ -209,66 +208,11 @@ describe('create guard', () => {
     });
 
     it('reads the key column', async () => {
-      const adapter = new TestAdapter([EXISTING], ['accountId']);
+      const adapter = new TestAdapter([EXISTING], 'accountId');
 
       await expect(
         adapter.create({ accountId: EXISTING.accountId, name: 'Hijack' }),
       ).rejects.toThrow(EntityAlreadyExistsException);
-    });
-  });
-
-  describe('composite primary keys', () => {
-    it('refuses only when every column matches', async () => {
-      const adapter = new TestAdapter([EXISTING], ['id', 'accountId']);
-
-      await expect(
-        adapter.create({
-          id: EXISTING.id,
-          accountId: EXISTING.accountId,
-          name: 'Hijack',
-        }),
-      ).rejects.toThrow(EntityAlreadyExistsException);
-
-      await expect(
-        adapter.create({ id: EXISTING.id, accountId: 'other', name: 'New' }),
-      ).resolves.toBeDefined();
-    });
-
-    it('refuses a partial key, naming the missing column', async () => {
-      // Left to the database this is a 500 reporting that it cannot *update* a
-      // row — for a call to `create`, naming no column. A partial key also
-      // cannot be looked up, so the existence check never runs: refusing is
-      // the only answer that tells the caller what is wrong.
-      const adapter = new TestAdapter([EXISTING], ['id', 'accountId']);
-
-      await expect(
-        adapter.create({ id: EXISTING.id, name: 'Partial' }),
-      ).rejects.toThrow(PartialPrimaryKeyException);
-
-      await expect(
-        adapter.create({ id: EXISTING.id, name: 'Partial' }),
-      ).rejects.toMatchObject({ context: { missing: ['accountId'] } });
-
-      expect(adapter.reads).toEqual([]);
-    });
-
-    it('allows every key column absent, which is a generated key', async () => {
-      const adapter = new TestAdapter([EXISTING], ['id', 'accountId']);
-
-      await expect(
-        adapter.create({ name: 'Generated' }),
-      ).resolves.toBeDefined();
-      expect(adapter.reads).toEqual([]);
-    });
-
-    it('does not refuse a partial key on a single-column key', async () => {
-      // One column means there is no such thing as partial: absent is the
-      // generated-key case.
-      const adapter = new TestAdapter([EXISTING], ['id']);
-
-      await expect(
-        adapter.create({ name: 'Generated' }),
-      ).resolves.toBeDefined();
     });
   });
 });

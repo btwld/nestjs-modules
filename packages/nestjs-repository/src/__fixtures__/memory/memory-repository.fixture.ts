@@ -37,7 +37,7 @@ export interface MemoryRepositoryOptionsFixture {
  *   including a `join`, so a test cannot pass on a query silently ignored.
  * - A soft-deleted row is hidden unless `withDeleted` is set.
  * - A create whose primary key is already stored throws, as a database would.
- * - A missing single-column primary key is generated as `<key>-<n>`.
+ * - A missing primary key is generated as `<key>-<n>`.
  * - Rows are copied in and out, so mutating a returned entity changes nothing.
  */
 export class MemoryRepositoryFixture<
@@ -242,9 +242,8 @@ export class MemoryRepositoryFixture<
   }
 
   private withKey(row: Entity): Entity {
-    const [column, ...others] = this.getPrimaryColumns();
-    if (column === undefined || others.length > 0) return row;
-    if (row[column] !== undefined) return row;
+    const column = this.getPrimaryColumn();
+    if (column === undefined || row[column] !== undefined) return row;
 
     this.generated += 1;
     return Object.assign(row, {
@@ -253,10 +252,9 @@ export class MemoryRepositoryFixture<
   }
 
   private indexOf(entity: PlainLiteralObject): number {
-    const columns = this.getPrimaryColumns();
-    return this.rows.findIndex((row) =>
-      columns.every((column) => row[column] === entity[column]),
-    );
+    const column = this.getPrimaryColumn();
+    if (column === undefined) return -1;
+    return this.rows.findIndex((row) => row[column] === entity[column]);
   }
 
   private require(entity: PlainLiteralObject): number {

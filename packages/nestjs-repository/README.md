@@ -296,13 +296,9 @@ even when another tenant holds it: `create` refuses it, and under a
 [row scope](#row-scope) `upsert` answers `404`. Where that matters, let the
 database generate the key.
 
-Caller-supplied primary keys are otherwise fine. A key is only checked when
-every primary column is present. A *partial* composite key is refused with
-`PartialPrimaryKeyException` (HTTP 400) naming the missing columns: it cannot
-identify a row, so nothing can tell whether it is taken, and a driver
-implementing create as a save-by-key would otherwise fail reporting that it
-cannot *update* a row. Supplying none of the key columns is the ordinary
-generated-key create and is untouched.
+Caller-supplied primary keys are otherwise fine. A key is only checked when it
+is present; leaving it out is the ordinary generated-key create and is
+untouched.
 
 **This is a check-then-write with a real race.** A row inserted between the
 check and the write is *overwritten* rather than rejected, because a driver
@@ -321,7 +317,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 
 | Member | Visibility | Description |
 | --- | --- | --- |
-| `getPrimaryColumns()` | protected | Get primary key column names from metadata (subclass-author API) |
+| `getPrimaryColumn()` | protected | Get the primary key column name from metadata, if the entity has one (subclass-author API) |
 | `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any — backs both the in-request lock and `expectedVersion` (subclass-author API) |
 | `getDeleteDateColumn()` | protected | Get the soft-remove date column name from metadata, if any (subclass-author API) |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
@@ -605,10 +601,15 @@ your own risk. Your driver's README lists what it runs.
 
 A `join` still returns related rows as objects.
 
-Two entity shapes are refused at startup with `RepositoryBootException`: a
-relation whose foreign key has no column of its own, since it could never be
-written, and a primary or foreign key column defined as a getter or setter on
-the entity class. Keys are plain properties.
+Three entity shapes are refused at startup with `RepositoryBootException`:
+
+- a composite primary key — give the entity a single primary key column, and
+  make the others unique together. A foreign key may still span several
+  columns;
+- a relation whose foreign key has no column of its own, since it could never
+  be written;
+- a primary or foreign key column defined as a getter or setter on the entity
+  class. Keys are plain properties.
 
 ### Cascading writes
 
@@ -675,13 +676,12 @@ write. A tenant admin deleting a project that holds a colleague's drafts is
 refused with a `404` rather than leaving those drafts behind.
 
 A relation can cascade only where its rows hold the foreign key to the entity's
-primary key, a single column: a one-to-many, or the other side of a
+primary key: a one-to-many, or the other side of a
 one-to-one. Startup refuses `cascade: true`, with `RepositoryBootException`, on:
 
 - a relation whose foreign key the entity holds — a write never changes the
   row it points to;
-- a relation not joined on the entity's single primary key column, including
-  any relation of an entity with a composite primary key;
+- a relation not joined on the entity's primary key column;
 - relations that lead back to an entity they started from, such as a category
   cascading to its child categories — a cascading delete would never finish;
 - a many-to-many relation — write its junction rows through their own
@@ -1853,9 +1853,8 @@ Each write is pre-checked against the repository it is for, and refusals name
 that entity. Every entity registered with the resolver must have each `scope`
 column; startup refuses one that doesn't.
 
-Scope values and primary keys may be strings or numbers. Primary key columns
-are read from the entity's own metadata, so composite primary keys work too — a
-key counts as naming a row only when every primary column is present.
+Scope values and primary keys may be strings or numbers. The primary key column
+is read from the entity's own metadata.
 
 It assumes **every scoped entity carries its own scope column**, so scope is
 decided per row without following a relation. That assumption is what makes the
@@ -2385,7 +2384,7 @@ entities can share one.
 | `values` | Also record each changed column's new value. Off by default |
 | `omit` | Columns whose values are never recorded. Only with `values` |
 
-The entity needs a single-column primary key.
+The entity needs a primary key.
 
 ### What a record holds
 
@@ -2491,7 +2490,7 @@ a scheduled job outside the repository.
 
 | Check | What it catches |
 | --- | --- |
-| Single-column primary key | The recorded entity's key has several columns, or none |
+| Primary key | The recorded entity has no primary key |
 | Registered store | `store` names no `forRoot()` entry |
 | Not its own store | The entity names itself as the store |
 | Unrecorded store | The store declares `activity` too |
@@ -2788,7 +2787,6 @@ also exported for manual provider wiring.
 | `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
 | `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
-| `PartialPrimaryKeyException` | A `create`/`createMany` supplied only part of a composite primary key. A partial key cannot be looked up, so nothing can tell whether it is taken. Supply every key column, or none for a generated key |
 | `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
 | `CascadeWriteException` | A cascade relation in a write payload held something other than its rows: a list of objects for a to-many relation, an object or `null` for a to-one — see [Cascading writes](#cascading-writes) |
 | `UnknownColumnException` | A write payload, or a read's `select`, `where` or `order`, named a property that is not a column of the entity; the message lists them — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
@@ -2799,7 +2797,7 @@ also exported for manual provider wiring.
 | `TransactionReadOnlyConflictException` | A joining `run()`/`runReadOnly()` call's `readOnly` option conflicts with the scope it's joining |
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |
 | `FederationException` | A federated read that cannot be answered exactly ([What is refused](#what-is-refused), [`maxKeys`](#maxkeys)), or a to-one that more than one related row points at. An error from the related repository reaches you as it threw it |
-| `RepositoryBootException` | One or more structural repository checks failed at startup, such as a foreign key with no column of its own; the message lists every failure. Also thrown for a `forFeature()` key `forRoot()` did not register |
+| `RepositoryBootException` | One or more structural repository checks failed at startup, such as a composite primary key or a foreign key with no column of its own; the message lists every failure. Also thrown for a `forFeature()` key `forRoot()` did not register |
 | `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |

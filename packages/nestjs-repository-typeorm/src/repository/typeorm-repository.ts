@@ -230,8 +230,7 @@ export class TypeOrmRepository<
    * an arbitrary column, since the raw expression ignores its value.
    */
   protected neverWhere(): FindOptionsWhere<Entity> {
-    const anchor =
-      this.getPrimaryColumns()[0] ?? this.metadata.columns[0]?.name;
+    const anchor = this.getPrimaryColumn() ?? this.metadata.columns[0]?.name;
     if (!anchor) {
       throw new RuntimeException({
         message:
@@ -554,15 +553,16 @@ export class TypeOrmRepository<
     const saved = await repo.save(instance);
 
     const primaryWhere: FindOptionsWhere<Entity> = {};
-    for (const col of this.getPrimaryColumns()) {
-      if (saved[col] === undefined) {
+    const primaryColumn = this.getPrimaryColumn();
+    if (primaryColumn !== undefined) {
+      if (saved[primaryColumn] === undefined) {
         throw new RuntimeException({
           message: 'Upsert of "%s" left primary key column "%s" unset',
-          messageParams: [this.metadata.name, col],
+          messageParams: [this.metadata.name, primaryColumn],
           fault: 'internal',
         });
       }
-      primaryWhere[col] = saved[col];
+      primaryWhere[primaryColumn] = saved[primaryColumn];
     }
 
     // Identity re-read of the row just written, whatever its delete date, for
@@ -635,8 +635,9 @@ export class TypeOrmRepository<
       const repo = await this.getRepo(txCtx);
 
       const primaryWhere: FindOptionsWhere<Entity> = {};
-      for (const col of this.getPrimaryColumns()) {
-        primaryWhere[col] = entity[col];
+      const primaryColumn = this.getPrimaryColumn();
+      if (primaryColumn !== undefined) {
+        primaryWhere[primaryColumn] = entity[primaryColumn];
       }
 
       const lockWhere: FindOptionsWhere<Entity> = { ...primaryWhere };

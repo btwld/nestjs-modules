@@ -60,20 +60,6 @@ done — see git history for what shipped. Reference notes that are not work liv
       so the exposure is a consumer who runs it against an untrusted schema. Landing the
       count fix above is what clears it.
 
-  5. **Audit composite key support across the codebase, and drop it** (M) — no v8 package
-      declares a composite primary key outside test fixtures; every shipped entity uses a
-      single generated key, and activity refuses anything else (as does cascade). Find each
-      place that handles several key columns, and decide what to remove:
-      - `PartialPrimaryKeyException` / `assertKeyNotPartial` and `keyClause` in the adapter;
-      - relation metadata's `joinOn` (several pairs) beside `on`, and the TypeORM driver's
-        `joinPairsOf` primary-first ordering;
-      - the memory fixture's composite relations (`TENANT_ORDER_LINE_METADATA`).
-
-      Weigh one consumer first: a joinable row-scope join relies on a composite foreign key
-      (`tenantId, orderId`), which `sharedScopeJoin` checks pair by pair. Its target's primary
-      key is still the single column `id`, so dropping composite primary keys leaves it
-      intact; dropping composite foreign keys would not.
-
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.

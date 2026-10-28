@@ -247,7 +247,7 @@ export abstract class RowScopeBase<
   }
 
   /**
-   * The primary key `source` names, or `undefined` if any column is missing.
+   * The primary key `source` names, or `undefined` if it is missing.
    *
    * The repository hands a resolver only the entity's own columns, so the key
    * is read off `source`. The repository refuses at startup to scope an
@@ -257,28 +257,23 @@ export abstract class RowScopeBase<
     params: RowScopeWriteParams<PlainLiteralObject, Scope>,
     source: PlainLiteralObject | undefined,
   ): PlainLiteralObject | undefined {
-    if (!source) return undefined;
+    const column = this.primaryColumnOf(params);
+    if (!source || column === undefined) return undefined;
 
-    const key: PlainLiteralObject = {};
+    const value: unknown = source[column];
 
-    for (const column of this.primaryColumnsOf(params)) {
-      const value: unknown = source[column];
+    if (value === undefined) return undefined;
 
-      if (value === undefined) return undefined;
-
-      if (!isScalarValue(value)) {
-        // Malformed input rather than a denial: 400 keeps it distinct from the
-        // 404 that deliberately does not reveal whether a row exists.
-        this.refuse(
-          HttpStatus.BAD_REQUEST,
-          `Unusable ${params.repository.metadata.name} key`,
-        );
-      }
-
-      key[column] = value;
+    if (!isScalarValue(value)) {
+      // Malformed input rather than a denial: 400 keeps it distinct from the
+      // 404 that deliberately does not reveal whether a row exists.
+      this.refuse(
+        HttpStatus.BAD_REQUEST,
+        `Unusable ${params.repository.metadata.name} key`,
+      );
     }
 
-    return key;
+    return { [column]: value };
   }
 
   /**
@@ -307,9 +302,7 @@ export abstract class RowScopeBase<
     }
 
     const conditions = [
-      ...this.primaryColumnsOf(params).map((column) =>
-        Where.eq(column, key[column]),
-      ),
+      ...Object.entries(key).map(([column, value]) => Where.eq(column, value)),
       ...this.predicatesOf(values),
     ];
 
@@ -354,11 +347,10 @@ export abstract class RowScopeBase<
     return Object.assign({ ...value }, values);
   }
 
-  private primaryColumnsOf(
+  private primaryColumnOf(
     params: RowScopeWriteParams<PlainLiteralObject, Scope>,
-  ): string[] {
-    return params.repository.metadata.columns
-      .filter((column) => column.isPrimary)
-      .map((column) => column.name);
+  ): string | undefined {
+    return params.repository.metadata.columns.find((column) => column.isPrimary)
+      ?.name;
   }
 }

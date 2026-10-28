@@ -4,8 +4,6 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { AppContextHost } from '@concepta/nestjs-core';
 
 import {
-  BUNDLE_TOKEN,
-  BundleEntityFixture,
   CATEGORY_TOKEN,
   CategoryEntityFixture,
   INVOICE_LINE_TOKEN,
@@ -567,28 +565,8 @@ describe('cascade startup checks', () => {
         { key: REFUND_TOKEN, entity: RefundEntityFixture },
       ],
       '"invoices" relation "refundsByNumber" cannot cascade: it is joined on ' +
-        '"number", and only a join on Invoice\'s single primary key column ' +
+        '"number", and only a join on Invoice\'s primary key column ' +
         'identifies its rows.',
-    );
-  });
-
-  it('refuses a relation joined on one column of a composite key', async () => {
-    await expect(
-      compile(
-        [
-          {
-            key: BUNDLE_TOKEN,
-            entity: BundleEntityFixture,
-            relations: { refunds: { cascade: true } },
-          },
-          { key: REFUND_TOKEN, entity: RefundEntityFixture },
-        ],
-        false,
-      ),
-    ).rejects.toThrow(
-      '"bundles" relation "refunds" cannot cascade: it is joined on "id", ' +
-        "and only a join on Bundle's single primary key column identifies " +
-        'its rows.',
     );
   });
 

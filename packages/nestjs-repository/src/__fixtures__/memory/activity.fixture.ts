@@ -57,7 +57,7 @@ export class TenantActivityEntityFixture
   declare tenantId: string;
 }
 
-/** A row keyed by two columns, which activity cannot name by one value. */
+/** A row with no primary key, which activity cannot name by one value. */
 export interface PairFixture {
   leftId: string;
   rightId: string;
@@ -131,10 +131,6 @@ export const PAIR_METADATA: RepositoryMetadataInterface<PairFixture> = {
   name: 'Pair',
   type: PairEntityFixture,
   urn: 'urn:memory:Pair',
-  columns: [
-    column('leftId', { isPrimary: true }),
-    column('rightId', { isPrimary: true }),
-    column('label'),
-  ],
+  columns: [column('leftId'), column('rightId'), column('label')],
   relations: [],
 };

@@ -8,7 +8,6 @@ import { relationOrmConfig } from '../config/relation-ormconfig.fixture.js';
 import {
   AUTHOR_ENTITY_TOKEN,
   COMMENT_ENTITY_TOKEN,
-  DOC_ENTITY_TOKEN,
   EAGER_COMMENT_ENTITY_TOKEN,
   POST_ENTITY_TOKEN,
   PROFILE_ENTITY_TOKEN,
@@ -16,7 +15,6 @@ import {
 } from '../config/relation.constants.fixture.js';
 import { AuthorEntityFixture } from '../entity/author.entity.fixture.js';
 import { CommentEntityFixture } from '../entity/comment.entity.fixture.js';
-import { DocEntityFixture } from '../entity/doc.entity.fixture.js';
 import { PostEntityFixture } from '../entity/post.entity.fixture.js';
 import { ProfileEntityFixture } from '../entity/profile.entity.fixture.js';
 import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
@@ -39,7 +37,6 @@ import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
             { key: AUTHOR_ENTITY_TOKEN, entity: AuthorEntityFixture },
             { key: POST_ENTITY_TOKEN, entity: PostEntityFixture },
             { key: TAG_ENTITY_TOKEN, entity: TagEntityFixture },
-            { key: DOC_ENTITY_TOKEN, entity: DocEntityFixture },
             { key: PROFILE_ENTITY_TOKEN, entity: ProfileEntityFixture },
           ],
         },

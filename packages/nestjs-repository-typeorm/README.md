@@ -906,7 +906,6 @@ Requirements and limits:
 | `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
 | `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |
-| `PartialPrimaryKeyException` | `@concepta/nestjs-repository` | A `create` supplied only part of a composite primary key |
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
 
 ## Entry Points

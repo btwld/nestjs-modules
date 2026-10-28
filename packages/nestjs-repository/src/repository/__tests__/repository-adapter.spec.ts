@@ -209,14 +209,9 @@ describe(RepositoryAdapter.name, () => {
     );
   });
 
-  describe('getPrimaryColumns', () => {
-    it('should return primary column names', () => {
-      // Access via metadata — getPrimaryColumns is protected but we can verify
-      // through the columns metadata
-      const primaries = adapter.metadata.columns
-        .filter((c) => c.isPrimary)
-        .map((c) => c.name);
-      expect(primaries).toEqual(['id']);
+  describe('getPrimaryColumn', () => {
+    it('should return the primary column name', () => {
+      expect(adapter.exposedGetPrimaryColumn()).toBe('id');
     });
   });
 

@@ -15,7 +15,7 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  * cannot cascade.
  *
  * A relation cascades only where the related row holds the foreign key to
- * this entity's single primary key column: one-to-many, or the inverse side
+ * this entity's primary key column: one-to-many, or the inverse side
  * of a one-to-one. The related entity must be registered, and must be soft
  * deletable if this entity is.
  */
@@ -27,9 +27,7 @@ export function cascadeRelationsOf(
 ): { relations: Map<string, CascadeRelation>; failures: string[] } {
   const relations = new Map<string, CascadeRelation>();
   const failures: string[] = [];
-  const primary = metadata.columns
-    .filter((column) => column.isPrimary)
-    .map((column) => column.name);
+  const primary = metadata.columns.find((column) => column.isPrimary)?.name;
   const softDeletes = metadata.columns.some((column) => column.isRemoveDate);
 
   for (const [name, { cascade, federated }] of Object.entries(config)) {
@@ -57,10 +55,10 @@ export function cascadeRelationsOf(
         `${label} cascades, but no repository for ${relation.targetEntity} ` +
           'is registered in forRoot().',
       );
-    } else if (primary.length !== 1 || primary[0] !== relation.on.from) {
+    } else if (primary !== relation.on.from) {
       failures.push(
         `${label} cannot cascade: it is joined on "${relation.on.from}", ` +
-          `and only a join on ${metadata.name}'s single primary key column ` +
+          `and only a join on ${metadata.name}'s primary key column ` +
           'identifies its rows.',
       );
     } else if (

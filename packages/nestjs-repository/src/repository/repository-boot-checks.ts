@@ -24,6 +24,29 @@ function isAccessor(type: PlainLiteralObject, name: string): boolean {
 }
 
 /**
+ * Check that no entity reports more than one primary key column.
+ *
+ * A row is named by one key column throughout: the create guard, the row
+ * scope checks, cascade and activity all look a row up by it. A foreign key
+ * may still span several columns.
+ */
+export function checkSinglePrimaryKey(adapters: AnyAdapter[]): string[] {
+  return adapters.flatMap((adapter) => {
+    const primary = adapter.metadata.columns
+      .filter((column) => column.isPrimary)
+      .map(({ name }) => name);
+
+    return primary.length > 1
+      ? [
+          `"${adapter.entityKey}" has a composite primary key ` +
+            `(${primary.join(', ')}). Give it a single primary key column, ` +
+            `and make the others unique together.`,
+        ]
+      : [];
+  });
+}
+
+/**
  * Check that no primary or foreign key column is backed by a getter or setter
  * on the entity class.
  *

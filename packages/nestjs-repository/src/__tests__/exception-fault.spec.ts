@@ -14,7 +14,6 @@ import { EntityAlreadyExistsException } from '../exceptions/entity-already-exist
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
-import { PartialPrimaryKeyException } from '../exceptions/partial-primary-key.exception.js';
 import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
 import { RelationWriteException } from '../exceptions/relation-write.exception.js';
 import { RepositoryBootException } from '../exceptions/repository-boot.exception.js';
@@ -84,11 +83,6 @@ const CASES: {
   {
     name: 'EntityAlreadyExistsException',
     build: () => new EntityAlreadyExistsException('SomeEntity'),
-    fault: 'client',
-  },
-  {
-    name: 'PartialPrimaryKeyException',
-    build: () => new PartialPrimaryKeyException('SomeEntity', ['locale']),
     fault: 'client',
   },
   {

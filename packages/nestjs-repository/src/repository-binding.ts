@@ -26,6 +26,7 @@ import {
   checkColumnsAreNotRelations,
   checkForeignKeyColumns,
   checkNoAccessorKeys,
+  checkSinglePrimaryKey,
 } from './repository/repository-boot-checks.js';
 import { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
 import { isRowScopeScoped } from './row-scope/interfaces/row-scope-registration.interface.js';
@@ -196,6 +197,7 @@ export function bindRepositories(params: {
   });
 
   const repositoryFailures = [
+    ...checkSinglePrimaryKey(adapters),
     ...checkColumnsAreNotRelations(adapters),
     ...checkForeignKeyColumns(adapters),
     ...checkNoAccessorKeys(adapters),

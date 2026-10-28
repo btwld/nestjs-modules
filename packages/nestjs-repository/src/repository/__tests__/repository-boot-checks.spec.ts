@@ -17,6 +17,7 @@ import {
   checkColumnsAreNotRelations,
   checkForeignKeyColumns,
   checkNoAccessorKeys,
+  checkSinglePrimaryKey,
 } from '../repository-boot-checks.js';
 
 /** Lowercases its keys on assignment, so the driver writes another value. */
@@ -58,11 +59,12 @@ const owner = (from: string): RepositoryRelationMetadataInterface => ({
   foreignKey: [{ from, to: 'id' }],
 });
 
-/** The first column is the primary key. */
+/** The first `primaries` columns are the primary key. */
 const adapterFor = (
   type: Type<PlainLiteralObject>,
   columns: string[],
   relations: RepositoryRelationMetadataInterface[] = [],
+  primaries = 1,
 ) =>
   new MemoryRepositoryFixture('accounts', {
     name: type.name,
@@ -70,12 +72,39 @@ const adapterFor = (
     urn: `urn:memory:${type.name}`,
     columns: columns.map((name, index): RepositoryColumnMetadataInterface => ({
       name,
-      isPrimary: index === 0,
+      isPrimary: index < primaries,
       isVersion: false,
       isRemoveDate: false,
     })),
     relations,
   });
+
+describe(checkSinglePrimaryKey, () => {
+  it('refuses a composite primary key', () => {
+    expect(
+      checkSinglePrimaryKey([
+        adapterFor(PlainAccountEntity, ['email', 'ownerId'], [], 2),
+      ]),
+    ).toEqual([
+      '"accounts" has a composite primary key (email, ownerId). Give it a ' +
+        'single primary key column, and make the others unique together.',
+    ]);
+  });
+
+  it('allows a single primary key column', () => {
+    expect(
+      checkSinglePrimaryKey([adapterFor(PlainAccountEntity, ['id', 'email'])]),
+    ).toEqual([]);
+  });
+
+  it('allows an entity with no primary key column', () => {
+    expect(
+      checkSinglePrimaryKey([
+        adapterFor(PlainAccountEntity, ['id', 'email'], [], 0),
+      ]),
+    ).toEqual([]);
+  });
+});
 
 describe(checkNoAccessorKeys, () => {
   it('refuses a primary key backed by a getter or setter', () => {
@@ -218,6 +247,10 @@ describe(checkColumnsAreNotRelations, () => {
 
 describe('repository startup checks', () => {
   it.each([
+    [
+      'a composite primary key',
+      () => adapterFor(PlainAccountEntity, ['email', 'ownerId'], [], 2),
+    ],
     [
       'an accessor-backed primary key',
       () => adapterFor(AccountEntity, ['email']),

@@ -14,8 +14,8 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  * An entity's activity binding, from its `forRoot()` `activity` entry, and a
  * message for each reason it cannot be bound.
  *
- * The entity must have a single-column primary key, so each record names its
- * row by one value. The store
+ * The entity must have a primary key, so each record names its row by one
+ * value. The store
  * must be another registered entity, append-only, not itself recorded, and
  * carry every column of `ActivityInterface`; for a scoped entity it must also
  * declare a row scope, scoped or public. `omit` names the entity's own
@@ -39,14 +39,13 @@ export function activityBindingOf(
   );
   const omit = registration.omit ?? [];
 
-  const primary = adapter.metadata.columns
-    .filter((column) => column.isPrimary)
-    .map((column) => column.name);
-  const [primaryColumn] = primary;
-  if (primary.length !== 1) {
+  const primaryColumn = adapter.metadata.columns.find(
+    (column) => column.isPrimary,
+  )?.name;
+  if (!primaryColumn) {
     failures.push(
-      `${label} cannot identify its rows: ${adapter.metadata.name} needs a ` +
-        `single-column primary key, and has ${primary.length} key columns.`,
+      `${label} cannot identify its rows: ${adapter.metadata.name} has no ` +
+        'primary key column.',
     );
   }
 

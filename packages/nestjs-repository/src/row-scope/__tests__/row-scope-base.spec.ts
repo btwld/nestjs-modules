@@ -29,8 +29,6 @@ interface RowFixture {
   id?: string | number;
   tenantId?: string | number;
   region?: string;
-  slug?: string;
-  locale?: string;
   status?: string;
   name?: string;
 }
@@ -48,11 +46,6 @@ const column = (name: keyof RowFixture, isPrimary = false) => ({
 });
 
 const SINGLE_KEY = [column('id', true), column('tenantId'), column('region')];
-const COMPOSITE_KEY = [
-  column('slug', true),
-  column('locale', true),
-  column('tenantId'),
-];
 
 const metadataOf = (columns: ReturnType<typeof column>[]) => ({
   name: 'Order',
@@ -294,39 +287,6 @@ describe('RowScopeBase', () => {
       expect(findOne).toHaveBeenCalledWith(expect.objectContaining({ ctx }));
     });
 
-    it('resolves a composite key before querying', async () => {
-      const { repo, findOne } = repoWith(COMPOSITE_KEY, [
-        { slug: 'a', locale: 'en', tenantId: 'acme' },
-      ]);
-      const scope = scoped(repo);
-
-      await write(scope, { target: { slug: 'a', locale: 'en' } });
-
-      expect(findOne).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            operator: 'and',
-            conditions: [
-              { field: 'slug', operator: 'eq', value: 'a' },
-              { field: 'locale', operator: 'eq', value: 'en' },
-              { field: 'tenantId', operator: 'eq', value: 'acme' },
-            ],
-          },
-        }),
-      );
-    });
-
-    it('refuses a partial composite key rather than querying', async () => {
-      const { repo, findOne } = repoWith(COMPOSITE_KEY, [
-        { slug: 'a', locale: 'en', tenantId: 'acme' },
-      ]);
-
-      expect(
-        await statusOf(() => write(scoped(repo), { target: { slug: 'a' } })),
-      ).toBe(HttpStatus.NOT_FOUND);
-      expect(findOne).not.toHaveBeenCalled();
-    });
-
     it('refuses an unusable key shape as malformed input', async () => {
       const scope = scopeOf(OWN_ROW);
 
@@ -458,22 +418,6 @@ describe('RowScopeBase', () => {
           write(scopeOf(OWN_ROW), {
             operation: RowScopeOperation.UPSERT,
             value: {},
-            target: undefined,
-          }),
-        ),
-      ).toBe(HttpStatus.BAD_REQUEST);
-    });
-
-    it('refuses a partial composite key', async () => {
-      const { repo } = repoWith(COMPOSITE_KEY, [
-        { slug: 'a', locale: 'en', tenantId: 'acme' },
-      ]);
-
-      expect(
-        await statusOf(() =>
-          write(scoped(repo), {
-            operation: RowScopeOperation.UPSERT,
-            value: { slug: 'a' },
             target: undefined,
           }),
         ),

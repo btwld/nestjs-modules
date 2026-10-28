@@ -43,13 +43,13 @@ class TestAdapter extends RepositoryAdapter<Row> {
   readonly updated: DeepPartial<Row>[] = [];
   readonly replaced: DeepPartial<Row>[] = [];
 
-  constructor(primaries: string[] = ['id']) {
+  constructor(primary: 'id' | 'accountId' | 'none' = 'id') {
     super('row');
     this.bind({});
     this.metadata = {
       ...metadataOf([
-        column('id', primaries.includes('id')),
-        column('accountId', primaries.includes('accountId')),
+        column('id', primary === 'id'),
+        column('accountId', primary === 'accountId'),
         column('name'),
         { ...column('dateDeleted'), isRemoveDate: true },
       ]),
@@ -158,15 +158,15 @@ describe('primary key immutability on update and replace', () => {
     expect(adapter.replaced).toEqual([]);
   });
 
-  it('names every changed primary column', async () => {
-    const adapter = new TestAdapter(['id', 'accountId']);
+  it('names the primary column', async () => {
+    const adapter = new TestAdapter('accountId');
 
     // The structured context rather than the message prose: the columns are
     // the contract, the wording is not.
     await expect(
       adapter.update(EXISTING, { id: 'row-2', accountId: 'acct-2' }),
     ).rejects.toMatchObject({
-      context: { columns: ['id', 'accountId'] },
+      context: { columns: ['accountId'] },
     });
   });
 
@@ -208,22 +208,13 @@ describe('primary key immutability on update and replace', () => {
     expect(entity).toEqual(EXISTING);
   });
 
-  it('refuses a partial composite key change', async () => {
-    const adapter = new TestAdapter(['id', 'accountId']);
-
-    await expect(
-      adapter.update(EXISTING, { accountId: 'acct-2' }),
-    ).rejects.toThrow(PrimaryKeyImmutableException);
-    expect(adapter.updated).toEqual([]);
-  });
-
   // This fixture's `merge` copies properties as given, so nothing but the
   // repository stands between the relation object and the driver.
   it.each([
     ['update', (a: TestAdapter, data: Row) => a.update(EXISTING, data)],
     ['replace', (a: TestAdapter, data: Row) => a.replace(EXISTING, data)],
   ])('refuses on %s a key sent through a relation object', async (_n, run) => {
-    const adapter = new TestAdapter(['id', 'accountId']);
+    const adapter = new TestAdapter('accountId');
 
     await expect(run(adapter, { account: { id: 'acct-2' } })).rejects.toThrow(
       RelationWriteException,
@@ -322,7 +313,7 @@ describe('primary key immutability on update and replace', () => {
   });
 
   it('leaves an entity with no primary key columns alone', async () => {
-    const adapter = new TestAdapter([]);
+    const adapter = new TestAdapter('none');
 
     await adapter.update(EXISTING, { id: 'row-2', name: 'Whatever' });
 
