@@ -24,6 +24,10 @@ import {
   REFUND_TOKEN,
   RefundEntityFixture,
   TenantRowScopeFixture,
+  PAYOUT_TOKEN,
+  PayoutEntityFixture,
+  TIP_TOKEN,
+  TipEntityFixture,
 } from '../../__fixtures__/memory/cascade.fixture.js';
 import {
   AUTHOR_TAG_TOKEN,
@@ -567,6 +571,44 @@ describe('cascade startup checks', () => {
       '"invoices" relation "refundsByNumber" cannot cascade: it is joined on ' +
         '"number", and only a join on Invoice\'s primary key column ' +
         'identifies its rows.',
+    );
+  });
+
+  it('refuses a relation from an entity without a primary key', async () => {
+    await expect(
+      compile(
+        [
+          {
+            key: PAYOUT_TOKEN,
+            entity: PayoutEntityFixture,
+            relations: { refunds: { cascade: true } },
+          },
+          { key: REFUND_TOKEN, entity: RefundEntityFixture },
+        ],
+        false,
+      ),
+    ).rejects.toThrow(
+      '"payouts" relation "refunds" cannot cascade: Payout has no primary ' +
+        'key column, so its related rows cannot be found by it.',
+    );
+  });
+
+  it('refuses a relation into rows without a primary key', async () => {
+    await expect(
+      compile(
+        [
+          {
+            key: PAYMENT_TOKEN,
+            entity: PaymentEntityFixture,
+            relations: { tips: { cascade: true } },
+          },
+          { key: TIP_TOKEN, entity: TipEntityFixture },
+        ],
+        false,
+      ),
+    ).rejects.toThrow(
+      '"payments" relation "tips" cannot cascade: Tip has no primary key ' +
+        'column, so its rows cannot be told apart to keep, update or delete.',
     );
   });
 

@@ -233,18 +233,18 @@ export class CascadeWriter {
     return relation.cardinality === 'many' ? rows : (rows[0] ?? null);
   }
 
-  /** `row`'s primary key, or `undefined` when any key column is missing. */
+  /**
+   * `row`'s primary key, or `undefined` when it is missing. Startup refuses a
+   * cascade into rows without a primary key column.
+   */
   private keyOf(
     target: RepositoryInterface<PlainLiteralObject>,
     row: PlainLiteralObject,
   ): string | undefined {
-    const values = target.metadata.columns
-      .filter((column) => column.isPrimary)
-      .map((column) => row[column.name]);
+    const column = target.metadata.columns.find(({ isPrimary }) => isPrimary);
+    const value: unknown = column ? row[column.name] : undefined;
 
-    return values.some((value) => value === undefined)
-      ? undefined
-      : JSON.stringify(values);
+    return value === undefined ? undefined : JSON.stringify(value);
   }
 }
 

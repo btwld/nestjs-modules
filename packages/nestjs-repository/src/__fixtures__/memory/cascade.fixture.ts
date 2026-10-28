@@ -113,6 +113,34 @@ export class RefundEntityFixture implements RefundFixture {
   declare amount: number;
 }
 
+export const TIP_TOKEN = 'tips';
+
+/** A tip on a payment, with no primary key, so its rows cannot be told apart. */
+export interface TipFixture {
+  paymentId: string;
+  amount: number;
+}
+
+export class TipEntityFixture implements TipFixture {
+  declare paymentId: string;
+  declare amount: number;
+}
+
+export const PAYOUT_TOKEN = 'payouts';
+
+/** A payout with refunds, whose `id` is not a primary key. */
+export interface PayoutFixture {
+  id: string;
+  amount: number;
+  refunds?: RefundFixture[];
+}
+
+export class PayoutEntityFixture implements PayoutFixture {
+  declare id: string;
+  declare amount: number;
+  declare refunds?: RefundFixture[];
+}
+
 const column = (
   name: string,
   flags: Partial<RepositoryColumnMetadataInterface> = {},
@@ -156,6 +184,7 @@ const REFUND_COLUMNS = [
   column('invoiceId'),
   column('amount'),
 ];
+const TIP_COLUMNS = [column('paymentId'), column('amount')];
 
 export const INVOICE_METADATA: RepositoryMetadataInterface<InvoiceFixture> = {
   name: 'Invoice',
@@ -258,6 +287,14 @@ export const PAYMENT_METADATA: RepositoryMetadataInterface<PaymentFixture> = {
       cardinality: 'many',
       on: { from: 'id', to: 'paymentId' },
     },
+    {
+      name: 'tips',
+      targetEntity: 'Tip',
+      targetUrn: 'urn:memory:Tip',
+      targetColumns: TIP_COLUMNS,
+      cardinality: 'many',
+      on: { from: 'id', to: 'paymentId' },
+    },
   ],
 };
 
@@ -267,6 +304,31 @@ export const REFUND_METADATA: RepositoryMetadataInterface<RefundFixture> = {
   urn: 'urn:memory:Refund',
   columns: REFUND_COLUMNS,
   relations: [],
+};
+
+export const TIP_METADATA: RepositoryMetadataInterface<TipFixture> = {
+  name: 'Tip',
+  type: TipEntityFixture,
+  urn: 'urn:memory:Tip',
+  columns: TIP_COLUMNS,
+  relations: [],
+};
+
+export const PAYOUT_METADATA: RepositoryMetadataInterface<PayoutFixture> = {
+  name: 'Payout',
+  type: PayoutEntityFixture,
+  urn: 'urn:memory:Payout',
+  columns: [column('id'), column('amount')],
+  relations: [
+    {
+      name: 'refunds',
+      targetEntity: 'Refund',
+      targetUrn: 'urn:memory:Refund',
+      targetColumns: REFUND_COLUMNS,
+      cardinality: 'many',
+      on: { from: 'id', to: 'paymentId' },
+    },
+  ],
 };
 
 export const CATEGORY_TOKEN = 'categories';

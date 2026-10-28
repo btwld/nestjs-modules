@@ -55,11 +55,22 @@ export function cascadeRelationsOf(
         `${label} cascades, but no repository for ${relation.targetEntity} ` +
           'is registered in forRoot().',
       );
+    } else if (primary === undefined) {
+      failures.push(
+        `${label} cannot cascade: ${metadata.name} has no primary key ` +
+          'column, so its related rows cannot be found by it.',
+      );
     } else if (primary !== relation.on.from) {
       failures.push(
         `${label} cannot cascade: it is joined on "${relation.on.from}", ` +
           `and only a join on ${metadata.name}'s primary key column ` +
           'identifies its rows.',
+      );
+    } else if (!target.metadata.columns.some((column) => column.isPrimary)) {
+      failures.push(
+        `${label} cannot cascade: ${relation.targetEntity} has no primary ` +
+          'key column, so its rows cannot be told apart to keep, update or ' +
+          'delete.',
       );
     } else if (
       !target.metadata.columns.some((column) => column.name === relation.on.to)

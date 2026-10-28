@@ -36,6 +36,10 @@ import {
   ReceiptEntityFixture,
   REFUND_METADATA,
   RefundEntityFixture,
+  PAYOUT_METADATA,
+  PayoutEntityFixture,
+  TIP_METADATA,
+  TipEntityFixture,
 } from './cascade.fixture.js';
 import {
   ARCHIVED_POST_METADATA,
@@ -101,6 +105,8 @@ const ADAPTERS = new Map<
   [ReceiptEntityFixture, memory(RECEIPT_METADATA)],
   [PaymentEntityFixture, memory(PAYMENT_METADATA)],
   [RefundEntityFixture, memory(REFUND_METADATA)],
+  [TipEntityFixture, memory(TIP_METADATA)],
+  [PayoutEntityFixture, memory(PAYOUT_METADATA)],
   [CategoryEntityFixture, memory(CATEGORY_METADATA)],
   [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
   [ProjectEntityFixture, memory(PROJECT_METADATA)],

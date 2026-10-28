@@ -681,13 +681,16 @@ one-to-one. Startup refuses `cascade: true`, with `RepositoryBootException`, on:
 
 - a relation whose foreign key the entity holds — a write never changes the
   row it points to;
-- a relation not joined on the entity's primary key column;
+- a relation from an entity without a primary key, or not joined on the
+  entity's primary key column;
 - relations that lead back to an entity they started from, such as a category
   cascading to its child categories — a cascading delete would never finish;
 - a many-to-many relation — write its junction rows through their own
   repository;
 - a relation that is also `federated`;
 - a relation whose entity is not registered in `forRoot()`;
+- a relation into rows without a primary key — they cannot be told apart to
+  keep, update or delete;
 - a relation from a soft-deleted entity to one without a delete date column.
 
 A cascade into append-only rows is refused with `WritePolicyBootException`,
