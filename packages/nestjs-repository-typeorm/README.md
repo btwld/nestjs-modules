@@ -298,6 +298,11 @@ guarantees: row scope, write policy and hooks never see what it does.
   `@BeforeUpdate`/`@AfterUpdate` methods on the entity don't run for them;
   your subscribers' `beforeUpdate`/`afterUpdate` do, with only the written
   columns in `event.entity` and no `databaseEntity`.
+- **`@Column({ insert: false })` and `@Column({ update: false })`** are
+  honoured by TypeORM, not the repository: a value for such a column is
+  dropped from a create or update without an error. An `update` or `replace`
+  whose `data` names nothing else fails with `RepositoryQueryException`, since
+  TypeORM is left with nothing to set.
 - **`cascade`** has nothing to act on. A write payload holds no relations (see
   [Writing relations](../nestjs-repository/README.md#writing-relations)) and
   only the entity's own columns reach TypeORM, so nothing cascades. `onDelete`
