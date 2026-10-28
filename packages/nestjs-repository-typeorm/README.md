@@ -292,6 +292,12 @@ guarantees: row scope, write policy and hooks never see what it does.
 - **Write listeners** (`@BeforeInsert`, `@AfterUpdate`, …) receive an entity
   the driver built without running its constructor, so they can't rely on
   state the constructor sets, and reading an ES `#private` field throws.
+- **`update` and `replace` of an entity without a version column** write only
+  the columns in `data`, with one `UPDATE` followed by a re-read in the same
+  transaction, so a stale `entity` never overwrites a later writer's change.
+  `@BeforeUpdate`/`@AfterUpdate` methods on the entity don't run for them;
+  your subscribers' `beforeUpdate`/`afterUpdate` do, with only the written
+  columns in `event.entity` and no `databaseEntity`.
 - **`cascade`** has nothing to act on. A write payload holds no relations (see
   [Writing relations](../nestjs-repository/README.md#writing-relations)) and
   only the entity's own columns reach TypeORM, so nothing cascades. `onDelete`
@@ -906,6 +912,7 @@ Requirements and limits:
 | `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
 | `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |
+| `EntityNotFoundException` | `@concepta/nestjs-repository` | An `update` or `replace` named a row that is no longer stored |
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
 
 ## Entry Points

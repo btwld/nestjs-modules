@@ -11,6 +11,7 @@ import { ActivityWriteException } from '../activity/exceptions/activity-write.ex
 import { UnsupportedDurableDriverException } from '../durable/exceptions/unsupported-durable-driver.exception.js';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
+import { EntityNotFoundException } from '../exceptions/entity-not-found.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
@@ -83,6 +84,11 @@ const CASES: {
   {
     name: 'EntityAlreadyExistsException',
     build: () => new EntityAlreadyExistsException('SomeEntity'),
+    fault: 'client',
+  },
+  {
+    name: 'EntityNotFoundException',
+    build: () => new EntityNotFoundException('SomeEntity', 'update'),
     fault: 'client',
   },
   {

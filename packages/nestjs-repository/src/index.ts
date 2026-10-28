@@ -93,6 +93,7 @@ export { ActivityRegistration } from './activity/interfaces/activity-registratio
 export { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
 export { RepositoryDuplicateUrnException } from './exceptions/repository-duplicate-urn.exception.js';
 export { EntityAlreadyExistsException } from './exceptions/entity-already-exists.exception.js';
+export { EntityNotFoundException } from './exceptions/entity-not-found.exception.js';
 export { PrimaryKeyImmutableException } from './exceptions/primary-key-immutable.exception.js';
 export { RelationWriteException } from './exceptions/relation-write.exception.js';
 export { CascadeWriteException } from './exceptions/cascade-write.exception.js';

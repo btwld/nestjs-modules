@@ -13,6 +13,7 @@ import {
   MoreThanOrEqual,
   Not,
   QueryFailedError,
+  type QueryDeepPartialEntity,
   Raw,
   type Repository,
   type EntityManager,
@@ -34,6 +35,7 @@ import {
 import {
   isWhereCondition,
   isWhereNever,
+  EntityNotFoundException,
   type JoinClause,
   OptimisticLockException,
   TrxCtx,
@@ -524,8 +526,7 @@ export class TypeOrmRepository<
       );
     }
 
-    const repo = await this.getRepo(options?.ctx);
-    return repo.save(this.toEntity({ ...entity, ...data }));
+    return this.writeData(entity, data, 'update', options?.ctx);
   }
 
   /**
@@ -598,8 +599,69 @@ export class TypeOrmRepository<
       );
     }
 
-    const repo = await this.getRepo(options?.ctx);
-    return repo.save(this.toEntity({ ...entity, ...data }));
+    return this.writeData(entity, data, 'replace', options?.ctx);
+  }
+
+  /**
+   * `update`/`replace`'s write when no version guard applies: one `UPDATE` of
+   * the columns in `data` on the row `entity`'s primary key names, then a
+   * re-read of that row, both in one transaction so the row returned is the
+   * row written.
+   *
+   * Only `data` is written, so a column the caller's `entity` holds a stale
+   * value for keeps the value stored by a later writer. A row no longer stored
+   * is reported by the re-read rather than by the `UPDATE`'s affected count,
+   * which some databases give as rows changed rather than rows matched.
+   */
+  private async writeData(
+    entity: Entity,
+    data: DeepPartial<Entity>,
+    operation: 'update' | 'replace',
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<Entity> {
+    const primaryColumn = this.getPrimaryColumn();
+    if (primaryColumn === undefined) {
+      throw new RuntimeException({
+        message: 'Cannot %s "%s": the entity has no primary key column',
+        messageParams: [operation, this.metadata.name],
+        fault: 'usage',
+      });
+    }
+
+    const primaryWhere: FindOptionsWhere<Entity> = {};
+    primaryWhere[primaryColumn] = entity[primaryColumn];
+
+    const run = async (txCtx?: AppContextLike): Promise<Entity> => {
+      const repo = await this.getRepo(txCtx);
+
+      if (Object.keys(data).length > 0) {
+        await repo.update(
+          primaryWhere,
+          Object.assign<QueryDeepPartialEntity<Entity>, DeepPartial<Entity>>(
+            {},
+            data,
+          ),
+        );
+      }
+
+      // `withDeleted: true` — identity re-read of the row just written, by its
+      // primary key alone, whatever its delete date.
+      const result = await repo.findOne({
+        where: primaryWhere,
+        withDeleted: true,
+        loadEagerRelations: false,
+      });
+
+      if (!result) {
+        throw new EntityNotFoundException(this.metadata.name, operation);
+      }
+
+      return this.toResult(result, {});
+    };
+
+    return this.options.transactionScope
+      ? this.options.transactionScope.run(ctx ?? {}, (txCtx) => run(txCtx))
+      : run(ctx);
   }
 
   /**
