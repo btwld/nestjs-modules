@@ -272,9 +272,11 @@ the `metadata` property:
 
 Override `describeDatabaseError(error)` to report an error your database raised
 as `{ database, code?, message }`; the caller then receives a
-`RepositoryDatabaseException` carrying them. It returns `undefined` by
-default, so a database error arrives as a plain `RepositoryQueryException`
-like any other opaque error.
+`RepositoryDatabaseException` carrying them. Every driver overrides it, so
+that an error its store raised, such as a duplicate key, says which store
+and what failed. Return `undefined` for any error that isn't the store's; it
+then arrives as a plain `RepositoryQueryException`, as it does from the
+default.
 
 ### Create Inserts, It Never Updates
 
@@ -358,10 +360,13 @@ reads it. Adapters that leave it `false` everywhere simply get no
 optimistic-locking support.
 
 Setting `isRemoveDate: true` on a column declares that your driver supports soft
-delete for that entity. `softDelete` and `restore` set and clear it, and a read
-without `withDeleted` leaves out rows where it is set, both on the entity and on
-every relation the read joins. A driver that cannot do all of that reports no
-such column, and `softDelete` and `restore` then throw.
+delete for that entity. The column holds a `Date` once set and `null` until
+then. `softDelete` and `restore` set and clear it, and a read without
+`withDeleted` leaves out rows where it is set, both on the entity and on every
+relation the read joins. Restoring a row that isn't soft-deleted leaves it as
+it is. A driver that cannot do all of that reports no such column, and
+`softDelete` and `restore` then throw. On an entity without the column,
+`withDeleted` changes nothing.
 
 `metadata.urn` names the rows an entity reads, and each relation's `targetUrn`
 (and `through.urn` for a many-to-many junction) names the rows it reaches.
@@ -388,13 +393,74 @@ as a whole as `register`'s second parameter, `register(entities, options?)`:
 applications pass them as the registration's `options`, type-checked the
 same way.
 
+### Testing Your Driver
+
+`@concepta/nestjs-repository/conformance` is the driver contract as a test
+suite: what your driver reports, how it translates every read, what each
+write persists, and which database errors it reports. Run it once per
+database your driver supports. You give it a harness, and it registers its
+own cases with your test runner:
+
+```ts
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+
+runRepositoryConformance(
+  {
+    name: 'my-driver/postgres',
+    driver: MyDriverModule,
+    imports: [MyConnectionModule.forRoot({ url: process.env.DATABASE_URL })],
+    fixtures: {
+      item: { key: 'conformance-item', entity: ItemEntity },
+      bookWithEagerAuthor: {
+        key: 'conformance-book-with-eager-author',
+        entity: BookWithEagerAuthorEntity,
+        allowEagerRelations: true,
+      },
+      // ...one entry for every fixture
+    },
+    capabilities: {
+      transactions: 'supported',
+      eagerResults: 'refused',
+      referentialIntegrity: 'supported',
+    },
+    reset: (app) => removeEveryFixtureRow(app),
+    linkBookTag: (app, { bookId, tagId }) => linkInStore(app, bookId, tagId),
+  },
+  { describe, it, beforeAll, afterAll, beforeEach },
+);
+```
+
+- **Fixtures.** The suite defines the entities it needs
+  (`ConformanceItemInterface`, `ConformanceBookInterface`, …). You map every
+  key to your own entity of that shape, with your own entity options;
+  `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
+  an entity of the wrong shape, or a missing opt-in doesn't compile. Your
+  driver's own options go in `driverOptions`.
+- **Capabilities.** Three are optional, each `'supported'` or `'refused'`:
+  `transactions`, `eagerResults`, and `referentialIntegrity` (your store
+  refuses a book naming no author, and the delete of an author a book still
+  names). A refused one runs its refusal cases, if it has any, instead.
+  Every other case is required, including that your driver describes the
+  errors its store raises.
+- **Versions.** Every driver is checked for changing the version on each
+  write. Refusing a stale row is checked inside a transaction only.
+- **Transactions.** On a store with a single connection, a call that ignores
+  the run's `ctx` still lands in the open transaction, so the suite can't see
+  it. Run it against a store with more than one connection too.
+- **`reset`** removes every fixture's rows before each case. **`linkBookTag`**
+  writes one many-to-many link, since a repository refuses those writes.
+
+The suite builds one application per harness and imports nothing from a
+test runner. Test your driver's own options and behaviour in your own specs,
+on top of it.
+
 ### Soft-Deleted Immutability
 
 A soft-deleted row is immutable: `update`, `replace`, and `upsert` all reject
 it with `SoftDeletedImmutableException` (409 Conflict), for every driver —
 the guard lives in `RepositoryAdapter` itself, above the `do*` methods, so no
 driver implementation can forget it or diverge from it. `restore()` is the
-sanctioned way back.
+sanctioned way back, and `delete` and `deleteMany` still remove it for good.
 
 ```ts
 import { SoftDeletedImmutableException } from '@concepta/nestjs-repository';
@@ -450,6 +516,11 @@ execute an atomic compare-and-swap on `column === value` before writing.
 `versionGuard` is not a caller option: it is added to the options a driver's
 `do*` methods receive (`RepositoryVersionGuardOptions`), and a value a caller
 passes anyway is overwritten.
+
+The `expectedVersion` check itself is always certain: the repository makes
+it. The driver's compare-and-swap is certain inside a transaction; outside
+one, it is the driver's best effort, and your driver's README says what it
+does.
 
 ## Relations and Joins
 
@@ -509,6 +580,9 @@ Filter on the related row, not on the user's own `companyId`. A user whose
 company was soft-deleted still holds its `companyId`, so a filter on that key
 keeps the user, with `company: null`.
 
+The other way round, `Where.isNull` on the related row's primary key returns
+the rows that have no related row: a user with no posts, or no company.
+
 ### Filtering by Relations
 
 Use `Where.rel()` to filter by fields on a related entity. The relation
@@ -527,6 +601,10 @@ const [users, total] = await userRepo.findAndCount({
   ),
 });
 ```
+
+A relation condition combines with the entity's own in an `or` too, e.g.
+users who are admins or have a published post:
+`Where.or(Where.eq('role', 'admin'), Where.rel('posts', Where.eq('published', true)))`.
 
 ### Sorting by Relations
 
@@ -715,6 +793,8 @@ A read reaches another table only through a relation it names in `join`:
 | a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
 | a sort direction other than `ASC` or `DESC` | refused (`400`) |
 
+A read may sort by an own column it doesn't select.
+
 ```ts
 // Refused: `orders` is a relation, not a column.
 await customers.find({ where: Where.gt('orders', 0) });
@@ -740,7 +820,9 @@ const page = await customers.find(query);
 const total = await customers.count(query); // every match, not the page
 ```
 
-`findAndCount` returns both at once.
+`findAndCount` returns both at once. `skip` and `take` page the entity's rows,
+never joined ones: under a to-many join, each row on the page holds all its
+related rows.
 
 ### What a result holds
 
@@ -748,6 +830,14 @@ A row comes back holding its own columns and the relations its read joined,
 each of those holding the related entity's own columns. That holds for the
 rows a write returns too. If the driver hands back anything else, the call
 throws `RepositoryQueryException` instead of returning it.
+
+Every own column is there, `null` where the row holds no value. A write that
+leaves the row stored returns it as it is now stored; `delete` and
+`deleteMany` return the rows they removed, with their keys. With `select`,
+only the columns it names are: absent or empty, it means every own column. A
+joined relation is attached whether or not its key columns are selected,
+except a federated one (see [What is refused](#what-is-refused)). A to-one
+relation with no related row holds `null`, and a to-many one holds `[]`.
 
 An entity whose relations load on their own, eagerly, opts in with
 `allowEagerRelations`:
@@ -951,6 +1041,13 @@ The text operators (`contains` through `notEnds`) take a string and match it
 as written: no character in it is a wildcard, so `contains('sku', '50%')`
 finds SKUs containing `50%`. Whether case matters depends on your database;
 your driver's README says which.
+
+No operator but `isNull` matches a null value. `ne('rank', 2)` and
+`notIn('rank', [1, 3])` leave out rows whose `rank` is null, as do the negated
+text operators; add `Where.isNull('rank')` in an `or` to keep them.
+
+`in` with no values matches nothing, and `notIn` with no values filters
+nothing out.
 
 ### Compound Operators
 
@@ -1321,6 +1418,11 @@ each driver that returns `transactionFactories` in its
 `create` is called once per scope and data source, with the context the
 scope runs under. Read the caller's overlays from it, row scope included, to
 prepare the transaction; never define overlays on it.
+
+Every read and write a driver makes with a scope's `ctx` takes part in that
+scope's transaction. A driver that registers no factory has none to join:
+`run()` then works without a transaction, and the writes made before a throw
+stay.
 
 `supportsConcurrentTransactions` defaults to `true` when omitted — the normal
 case for a pooled/multi-connection backend, where each transaction gets its
@@ -2786,11 +2888,11 @@ also exported for manual provider wiring.
 | --- | --- |
 | `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline, and is thrown when a driver returns a property the call did not ask for — see [What a result holds](#what-a-result-holds) — or a `createMany`/`deleteMany` result without one row per input. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
 | `RepositoryDatabaseException` | A `RepositoryQueryException` for an error the database raised, such as a foreign key or unique constraint it refused. `context.database` and `context.code` name the database and its own error code, for logs and diagnosis |
-| `OptimisticLockException` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — the row was modified by another request since it was read |
+| `OptimisticLockException` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — the row was modified, or deleted, by another request since it was read |
 | `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
 | `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
-| `EntityNotFoundException` | An `update` or `replace` named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404) |
+| `EntityNotFoundException` | An `update` or `replace` on an entity without a version column named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404) |
 | `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
 | `CascadeWriteException` | A cascade relation in a write payload held something other than its rows: a list of objects for a to-many relation, an object or `null` for a to-one — see [Cascading writes](#cascading-writes) |
 | `UnknownColumnException` | A write payload, or a read's `select`, `where` or `order`, named a property that is not a column of the entity; the message lists them — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
@@ -2816,5 +2918,6 @@ also exported for manual provider wiring.
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
+| `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle` |

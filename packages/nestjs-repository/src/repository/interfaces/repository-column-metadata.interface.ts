@@ -12,9 +12,10 @@ export interface RepositoryColumnMetadataInterface<
   isPrimary: boolean;
   /**
    * Whether this column is the soft-remove date column. Reporting one declares
-   * that the driver supports soft delete for the entity: `softDelete` and
-   * `restore` set and clear it, and a read without `withDeleted` leaves out
-   * rows where it is set, on the entity and on every relation the read joins.
+   * that the driver supports soft delete for the entity: the column holds a
+   * `Date` once set and `null` until then, `softDelete` and `restore` set and
+   * clear it, and a read without `withDeleted` leaves out rows where it is
+   * set, on the entity and on every relation the read joins.
    */
   isRemoveDate: boolean;
   /** Whether this column is the optimistic-locking version column */

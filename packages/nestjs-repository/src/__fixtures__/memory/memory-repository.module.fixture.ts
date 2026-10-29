@@ -111,61 +111,18 @@ const ADAPTERS = new Map<
   [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
   [ProjectEntityFixture, memory(PROJECT_METADATA)],
   [DraftEntityFixture, memory(DRAFT_METADATA)],
-  [
-    OrderEntityFixture,
-    (key, options) => new MemoryRepositoryFixture(key, ORDER_METADATA, options),
-  ],
-  [
-    OrderLineEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, ORDER_LINE_METADATA, options),
-  ],
-  [
-    PetEntityFixture,
-    (key, options) => new MemoryRepositoryFixture(key, PET_METADATA, options),
-  ],
-  [
-    NoteEntityFixture,
-    (key, options) => new MemoryRepositoryFixture(key, NOTE_METADATA, options),
-  ],
-  [
-    AuthorEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, AUTHOR_METADATA, options),
-  ],
-  [
-    ArchivedPostEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, ARCHIVED_POST_METADATA, options),
-  ],
-  [
-    DriftedAuthorEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, DRIFTED_AUTHOR_METADATA, options),
-  ],
-  [
-    PostEntityFixture,
-    (key, options) => new MemoryRepositoryFixture(key, POST_METADATA, options),
-  ],
-  [
-    ProfileEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, PROFILE_METADATA, options),
-  ],
-  [
-    CompanyEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, COMPANY_METADATA, options),
-  ],
-  [
-    TagEntityFixture,
-    (key, options) => new MemoryRepositoryFixture(key, TAG_METADATA, options),
-  ],
-  [
-    AuthorTagEntityFixture,
-    (key, options) =>
-      new MemoryRepositoryFixture(key, AUTHOR_TAG_METADATA, options),
-  ],
+  [OrderEntityFixture, memory(ORDER_METADATA)],
+  [OrderLineEntityFixture, memory(ORDER_LINE_METADATA)],
+  [PetEntityFixture, memory(PET_METADATA)],
+  [NoteEntityFixture, memory(NOTE_METADATA)],
+  [AuthorEntityFixture, memory(AUTHOR_METADATA)],
+  [ArchivedPostEntityFixture, memory(ARCHIVED_POST_METADATA)],
+  [DriftedAuthorEntityFixture, memory(DRIFTED_AUTHOR_METADATA)],
+  [PostEntityFixture, memory(POST_METADATA)],
+  [ProfileEntityFixture, memory(PROFILE_METADATA)],
+  [CompanyEntityFixture, memory(COMPANY_METADATA)],
+  [TagEntityFixture, memory(TAG_METADATA)],
+  [AuthorTagEntityFixture, memory(AUTHOR_TAG_METADATA)],
 ]);
 
 /**

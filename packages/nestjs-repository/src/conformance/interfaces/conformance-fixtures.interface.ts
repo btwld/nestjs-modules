@@ -1,0 +1,23 @@
+import { type ConformanceAuthorInterface } from './conformance-author.interface.js';
+import { type ConformanceBookWithEagerAuthorInterface } from './conformance-book-with-eager-author.interface.js';
+import { type ConformanceBookInterface } from './conformance-book.interface.js';
+import { type ConformanceItemInterface } from './conformance-item.interface.js';
+import { type ConformancePlainItemInterface } from './conformance-plain-item.interface.js';
+import { type ConformanceTagInterface } from './conformance-tag.interface.js';
+import { type ConformanceTenantOrderLineInterface } from './conformance-tenant-order-line.interface.js';
+import { type ConformanceTenantOrderInterface } from './conformance-tenant-order.interface.js';
+
+/**
+ * Every entity the conformance suite reads and writes, by fixture key. A
+ * harness maps each key to the driver's own entity for that shape.
+ */
+export interface ConformanceFixturesInterface {
+  item: ConformanceItemInterface;
+  plainItem: ConformancePlainItemInterface;
+  author: ConformanceAuthorInterface;
+  book: ConformanceBookInterface;
+  bookWithEagerAuthor: ConformanceBookWithEagerAuthorInterface;
+  tag: ConformanceTagInterface;
+  tenantOrder: ConformanceTenantOrderInterface;
+  tenantOrderLine: ConformanceTenantOrderLineInterface;
+}

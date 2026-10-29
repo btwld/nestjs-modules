@@ -27,7 +27,8 @@ export interface WhereConditionNullary<
 }
 
 /**
- * Condition with a scalar value (EQ, NE, GT, GTE, LT, LTE).
+ * Condition with a scalar value (EQ, NE, GT, GTE, LT, LTE). None matches a
+ * null value, NE included.
  */
 export interface WhereConditionScalar<
   T extends PlainLiteralObject = PlainLiteralObject,
@@ -40,7 +41,8 @@ export interface WhereConditionScalar<
 
 /**
  * Condition matching text (CONTAINS, STARTS, ENDS and their negations). The
- * value is matched literally: no character in it is a wildcard.
+ * value is matched literally: no character in it is a wildcard. None matches
+ * a null value, the negations included.
  */
 export interface WhereConditionText<
   T extends PlainLiteralObject = PlainLiteralObject,
@@ -52,7 +54,9 @@ export interface WhereConditionText<
 }
 
 /**
- * Condition with an array value (IN, NIN).
+ * Condition with an array value (IN, NIN). Given values, neither matches a
+ * null value. IN with no values matches nothing; NIN with no values filters
+ * nothing out.
  */
 export interface WhereConditionArray<
   T extends PlainLiteralObject = PlainLiteralObject,

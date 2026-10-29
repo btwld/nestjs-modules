@@ -5,6 +5,7 @@ import {
   type HookResolverService,
 } from '@concepta/nestjs-core';
 
+import { EntityNotFoundException } from '../../exceptions/entity-not-found.exception.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
 import {
   type RepositoryCountOptions,
@@ -32,12 +33,23 @@ export interface MemoryRepositoryOptionsFixture {
  * A repository that keeps its rows in memory, so the abstraction's rules can
  * be tested against real reads and writes without a database.
  *
+ * It is not a conforming driver, nor a reference for how one behaves: the
+ * conformance suite, run against a real driver, is. Where it does something
+ * the driver contract covers, it does it the contract's way.
+ *
  * - Queries understand `eq`, `ne`, `in`, `isNull`, `notNull`, `and`, `or` and
  *   `never`, plus `select`, `order`, `skip` and `take`. Anything else throws,
  *   including a `join`, so a test cannot pass on a query silently ignored.
+ * - Nulls sort before any value: this fixture's choice, which the contract
+ *   leaves open.
  * - A soft-deleted row is hidden unless `withDeleted` is set.
- * - A create whose primary key is already stored throws, as a database would.
+ * - A create whose primary key is already stored throws a plain error; it
+ *   does not describe it as a database error.
+ * - An update or replace of a row no longer stored throws
+ *   `EntityNotFoundException`.
  * - A missing primary key is generated as `<key>-<n>`.
+ * - No version column is supported: it neither guards nor bumps one.
+ * - No transaction is supported: a batch is not atomic.
  * - Rows are copied in and out, so mutating a returned entity changes nothing.
  */
 export class MemoryRepositoryFixture<
@@ -110,14 +122,14 @@ export class MemoryRepositoryFixture<
     entity: Entity,
     data: DeepPartial<Entity>,
   ): Promise<Entity> {
-    return this.write(this.require(entity), data);
+    return this.write(this.requireToWrite(entity, 'update'), data);
   }
 
   protected async doReplace(
     entity: Entity,
     data: DeepPartial<Entity>,
   ): Promise<Entity> {
-    return this.write(this.require(entity), data);
+    return this.write(this.requireToWrite(entity, 'replace'), data);
   }
 
   protected async doUpsert(entity: DeepPartial<Entity>): Promise<Entity> {
@@ -146,7 +158,7 @@ export class MemoryRepositoryFixture<
     return this.markDeleted(entity, null);
   }
 
-  toRow(entityLike: DeepPartial<Entity>): Entity {
+  protected toRow(entityLike: DeepPartial<Entity>): Entity {
     return Object.assign(new this.metadata.type(), entityLike);
   }
 
@@ -173,7 +185,12 @@ export class MemoryRepositoryFixture<
       options.take === undefined ? undefined : skip + options.take,
     );
 
-    return paged.map((row) => this.copy(row, options.select?.map(String)));
+    // An absent or empty select holds every own column.
+    const columns = options.select?.length
+      ? options.select.map(String)
+      : undefined;
+
+    return paged.map((row) => this.copy(row, columns));
   }
 
   /** Orders rows by `order`, with `null` before any value. */
@@ -261,6 +278,18 @@ export class MemoryRepositoryFixture<
     const index = this.indexOf(entity);
     if (index === -1) {
       throw new Error(`${this.metadata.name} row is not stored`);
+    }
+    return index;
+  }
+
+  /** The stored row an update or replace writes, which must still exist. */
+  private requireToWrite(
+    entity: PlainLiteralObject,
+    operation: 'update' | 'replace',
+  ): number {
+    const index = this.indexOf(entity);
+    if (index === -1) {
+      throw new EntityNotFoundException(this.metadata.name, operation);
     }
     return index;
   }

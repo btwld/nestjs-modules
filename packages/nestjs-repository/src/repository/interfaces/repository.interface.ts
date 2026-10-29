@@ -32,10 +32,12 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   find(options?: RepositoryFindOptions<Entity>): Promise<Entity[]>;
 
   /**
-   * Find a single entity matching the given options.
+   * Find the first entity the given options match, in `order`. `where` is
+   * optional: without it, the first row of all. Without `order`, which
+   * matching row comes back is the database's to choose.
    *
    * @param options - Find options (where, order, etc.)
-   * @returns The matching entity or null if not found
+   * @returns The first matching entity, or null if none matches
    */
   findOne(options: RepositoryFindOneOptions<Entity>): Promise<Entity | null>;
 
@@ -90,11 +92,13 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    * Create multiple entities.
    *
    * Inserts, never updates — see {@link RepositoryInterface.create}. A
-   * duplicate primary key anywhere in the batch fails the whole call.
+   * duplicate primary key anywhere in the batch fails the call. Inside the
+   * caller's transaction no row of the batch stays; without one, rows
+   * written before the failure may.
    *
    * @param entities - Array of partial entity data to create
    * @param options - Create options
-   * @returns Array of created entities, in the order given
+   * @returns Array of created entities, in the order given; `[]` for none
    */
   createMany(
     entities: DeepPartial<Entity>[],
@@ -105,7 +109,12 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
 
   /**
    * Update an existing entity by merging partial data.
-   * Preserves fields not specified in the data.
+   * Preserves fields not specified in the data, whatever value the given
+   * entity holds for them. Empty `data` changes no column and returns the
+   * stored row. A row deleted since it was read throws
+   * `EntityNotFoundException`, or `OptimisticLockException` on an entity
+   * with a version column, whose guard can't tell a deleted row from a
+   * changed one.
    *
    * @param entity - Existing entity to update (primary keys used for identification)
    * @param data - Partial data to merge into entity
@@ -120,9 +129,10 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
 
   /**
    * Create or update an entity based on primary key.
-   * If entity with matching primary key exists, updates it; otherwise creates new.
+   * If entity with matching primary key exists, updates it; otherwise creates
+   * new, generating the key when it has none.
    *
-   * @param entity - Entity data with primary key
+   * @param entity - Entity data, with or without its primary key
    * @param options - Upsert options
    * @returns The created or updated entity
    */
@@ -136,7 +146,9 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    *
    * Writes exactly the fields in `data`; a field it leaves out keeps its
    * stored value. That `data` supplies every field is the caller's to
-   * validate, e.g. with a schema that requires the whole body.
+   * validate, e.g. with a schema that requires the whole body. A row deleted
+   * since it was read throws `EntityNotFoundException`, or
+   * `OptimisticLockException` on an entity with a version column.
    *
    * @param entity - Existing entity to replace (primary keys used for identification)
    * @param data - New data to replace entity with
@@ -156,7 +168,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    *
    * @param entity - Entity to delete (primary keys used for identification)
    * @param options - Delete options
-   * @returns The deleted entity
+   * @returns The deleted entity, with its key
    */
   delete(entity: Entity, options?: RepositoryDeleteOneOptions): Promise<Entity>;
 
@@ -165,7 +177,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    *
    * @param entities - Array of entities to delete
    * @param options - Delete options
-   * @returns Array of deleted entities
+   * @returns Array of deleted entities with their keys, in the order given
    */
   deleteMany(
     entities: Entity[],
@@ -185,7 +197,8 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   ): Promise<Entity>;
 
   /**
-   * Restore a soft-deleted entity.
+   * Restore a soft-deleted entity. A row that isn't soft-deleted is left as
+   * it is.
    *
    * @param entity - Soft-deleted entity to restore (primary keys used for identification)
    * @param options - Restore options

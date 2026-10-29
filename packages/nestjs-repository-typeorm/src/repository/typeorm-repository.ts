@@ -461,8 +461,13 @@ export class TypeOrmRepository<
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
     const repo = await this.getRepo(options.ctx);
-    const row = await repo.findOne(this.buildNativeFindOneOptions(options));
-    return row && this.toResult(row, options, this.allowsEagerRelations);
+    // TypeORM's findOne() refuses a read with no `where`, which ours allows
+    // (the first row in order); it is otherwise this same one-row find.
+    const [row] = await repo.find({
+      ...this.buildNativeFindOneOptions(options),
+      take: 1,
+    });
+    return row ? this.toResult(row, options, this.allowsEagerRelations) : null;
   }
 
   protected async doCount(

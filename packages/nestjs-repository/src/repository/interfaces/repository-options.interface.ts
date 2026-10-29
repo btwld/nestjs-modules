@@ -19,15 +19,27 @@ export interface RepositoryBaseOptions {
 export interface RepositoryFindOneOptions<
   Entity extends PlainLiteralObject = PlainLiteralObject,
 > extends RepositoryBaseOptions {
+  /**
+   * The own columns each row holds. Absent or empty, it holds every own
+   * column. A joined relation is attached whether or not its key columns
+   * are selected, except a federated one, whose key must be selected.
+   */
   select?: (keyof Entity)[];
   where?: WhereClause;
   join?: JoinClause[];
   order?: OrderClause;
+  /**
+   * Include soft-deleted rows, on the entity and on every relation the read
+   * joins. Changes nothing on an entity without a soft-remove date column.
+   */
   withDeleted?: boolean;
 }
 
 /**
  * Options for finding multiple entities.
+ *
+ * `skip` and `take` page the entity's rows, never joined ones: under a
+ * to-many join, each row on the page holds all its related rows.
  */
 export interface RepositoryFindOptions<
   Entity extends PlainLiteralObject = PlainLiteralObject,

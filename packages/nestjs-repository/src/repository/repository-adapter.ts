@@ -436,7 +436,9 @@ export abstract class RepositoryAdapter<
    * What the driver can report about `error` when its database raised it, or
    * `undefined` otherwise. A reported error reaches the caller as a
    * `RepositoryDatabaseException`; any other opaque error as a
-   * `RepositoryQueryException`.
+   * `RepositoryQueryException`. The default reports nothing, which is right
+   * only for errors that aren't the store's: every driver overrides it to
+   * report its store's own.
    */
   protected describeDatabaseError(
     _error: unknown,
