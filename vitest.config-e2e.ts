@@ -8,6 +8,7 @@ export default defineConfig({
       'packages/nestjs-core/**/*.e2e-spec.ts',
       'packages/nestjs-repository/**/*.e2e-spec.ts',
       'packages/nestjs-repository-typeorm/**/*.e2e-spec.ts',
+      'packages/nestjs-repository-drizzle/**/*.e2e-spec.ts',
       'packages/nestjs-crud/**/*.e2e-spec.ts',
       'packages/nestjs-cache/**/*.e2e-spec.ts',
       'packages/nestjs-otp/**/*.e2e-spec.ts',

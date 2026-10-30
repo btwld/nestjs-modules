@@ -5,6 +5,7 @@ packages:
   - 'packages/nestjs-core'
   - 'packages/nestjs-repository'
   - 'packages/nestjs-repository-typeorm'
+  - 'packages/nestjs-repository-drizzle'
   - 'packages/nestjs-crud'
   - 'packages/nestjs-cache'
   - 'packages/nestjs-otp'

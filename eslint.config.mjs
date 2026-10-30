@@ -15,6 +15,7 @@ const v8Packages = [
   'nestjs-core',
   'nestjs-repository',
   'nestjs-repository-typeorm',
+  'nestjs-repository-drizzle',
   'nestjs-crud',
   'nestjs-cache',
   'nestjs-otp',
@@ -36,7 +37,11 @@ const v8Files = v8Packages.map((name) => `packages/${name}/src/**/*.ts`);
 // are the TypeORM driver and the CRUD framework these entry points build on,
 // so restricting them from importing their own reason for existing is
 // pointless.
-const optionalDepFreePackages = ['nestjs-repository-typeorm', 'nestjs-crud'];
+const optionalDepFreePackages = [
+  'nestjs-repository-typeorm',
+  'nestjs-repository-drizzle',
+  'nestjs-crud',
+];
 const optionalDepRestrictedPackages = v8Packages.filter(
   (name) => !optionalDepFreePackages.includes(name),
 );

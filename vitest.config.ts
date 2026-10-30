@@ -8,6 +8,7 @@ export default defineConfig({
       'packages/nestjs-core/**/*.spec.ts',
       'packages/nestjs-repository/**/*.spec.ts',
       'packages/nestjs-repository-typeorm/**/*.spec.ts',
+      'packages/nestjs-repository-drizzle/**/*.spec.ts',
       'packages/nestjs-crud/**/*.spec.ts',
       'packages/nestjs-cache/**/*.spec.ts',
       'packages/nestjs-otp/**/*.spec.ts',

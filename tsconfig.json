@@ -23,6 +23,7 @@
     { "path": "packages/nestjs-core" },
     { "path": "packages/nestjs-repository" },
     { "path": "packages/nestjs-repository-typeorm" },
+    { "path": "packages/nestjs-repository-drizzle" },
     { "path": "packages/nestjs-crud" },
     { "path": "packages/nestjs-cache" },
     { "path": "packages/nestjs-otp" },
