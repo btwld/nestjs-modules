@@ -39,7 +39,8 @@ export interface RepositoryFindOneOptions<
  * Options for finding multiple entities.
  *
  * `skip` and `take` page the entity's rows, never joined ones: under a
- * to-many join, each row on the page holds all its related rows.
+ * to-many join, each row on the page holds every related row its `where`
+ * keeps.
  */
 export interface RepositoryFindOptions<
   Entity extends PlainLiteralObject = PlainLiteralObject,

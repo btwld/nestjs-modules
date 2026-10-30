@@ -554,6 +554,74 @@ export function readTranslationSection(ctx: ConformanceContext): void {
       assert.deepStrictEqual(valuesOf(found, 'name'), ['bob']);
     });
 
+    it('doFind: a filter on a to-many joined column narrows the joined rows to those it matches', async () => {
+      const found = await ctx.repo('author').find({
+        join: [{ relation: 'books' }],
+        where: Where.rel('books', Where.eq('title', 'alpha')),
+      });
+
+      assertRows(found, [
+        {
+          ...ownAuthor(library.authors.ann),
+          books: [ownBook(library.books.alpha)],
+        },
+      ]);
+    });
+
+    it('doFind: a root an or matches on its own columns holds every joined row', async () => {
+      const found = await ctx.repo('author').find({
+        join: [{ relation: 'books' }],
+        where: Where.or(
+          Where.eq('name', 'ann'),
+          Where.rel('books', Where.eq('title', 'gamma')),
+        ),
+        order: [OrderBy.asc('name')],
+      });
+      const { alpha, beta, gamma } = library.books;
+
+      assertRows(
+        found.map((author) => ({
+          ...author,
+          books: sortedBy(author.books, 'title'),
+        })),
+        [
+          {
+            ...ownAuthor(library.authors.ann),
+            books: [ownBook(alpha), ownBook(beta)],
+          },
+          { ...ownAuthor(library.authors.bob), books: [ownBook(gamma)] },
+        ],
+      );
+    });
+
+    it('doFind: a root an or matches only through a joined column holds only the joined rows it matches', async () => {
+      const found = await ctx.repo('author').find({
+        join: [{ relation: 'books' }],
+        where: Where.or(
+          Where.eq('name', 'bob'),
+          Where.rel('books', Where.eq('title', 'alpha')),
+        ),
+        order: [OrderBy.asc('name')],
+      });
+      const { alpha, gamma } = library.books;
+
+      assertRows(found, [
+        { ...ownAuthor(library.authors.ann), books: [ownBook(alpha)] },
+        { ...ownAuthor(library.authors.bob), books: [ownBook(gamma)] },
+      ]);
+    });
+
+    it('doFind: a filter on a many-to-many joined column narrows the joined rows to those it matches', async () => {
+      const found = await ctx.repo('tag').find({
+        join: [{ relation: 'books' }],
+        where: Where.rel('books', Where.eq('title', 'beta')),
+      });
+
+      assertRows(found, [
+        { ...ownTag(library.tags.tech), books: [ownBook(library.books.beta)] },
+      ]);
+    });
+
     it('doFind: a null check on a to-many joined column matches a root with no related rows', async () => {
       const found = await ctx.repo('author').find({
         join: [{ relation: 'books' }],

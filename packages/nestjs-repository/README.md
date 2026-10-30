@@ -602,9 +602,14 @@ const [users, total] = await userRepo.findAndCount({
 });
 ```
 
+A filter on a relation narrows the related rows too: each user above holds
+only its published posts, not every post.
+
 A relation condition combines with the entity's own in an `or` too, e.g.
 users who are admins or have a published post:
 `Where.or(Where.eq('role', 'admin'), Where.rel('posts', Where.eq('published', true)))`.
+A related row is kept when the whole condition holds with it, so an admin
+holds all its posts and anyone else only the published ones.
 
 ### Sorting by Relations
 
@@ -821,8 +826,8 @@ const total = await customers.count(query); // every match, not the page
 ```
 
 `findAndCount` returns both at once. `skip` and `take` page the entity's rows,
-never joined ones: under a to-many join, each row on the page holds all its
-related rows.
+never joined ones: under a to-many join, each row on the page holds every
+related row its `where` keeps.
 
 ### What a result holds
 

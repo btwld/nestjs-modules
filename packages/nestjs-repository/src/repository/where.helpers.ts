@@ -221,6 +221,9 @@ export class Where<Entity extends PlainLiteralObject = PlainLiteralObject> {
   /**
    * Tag a WhereCondition with a relation name.
    *
+   * The relation must be joined. The condition narrows the related rows each
+   * result holds as well as the results themselves (see `JoinClause`).
+   *
    * @example
    * ```typescript
    * Where.rel('tasks', Where.eq('status', 'active'))

@@ -5,6 +5,10 @@
  * does, holding `null` or `[]`. Only `where` narrows rows, so "has a related
  * row" is a filter on one of the related row's columns.
  *
+ * A `where` on a relation's columns narrows that relation too: each row holds
+ * only the related rows the whole `where` holds for. Under an `or` with the
+ * row's own columns, a row that matches on its own holds every related row.
+ *
  * Structural properties (`on`, `through`, `cardinality`) are resolved
  * from repository relation metadata — only `relation` is specified at
  * query time.
