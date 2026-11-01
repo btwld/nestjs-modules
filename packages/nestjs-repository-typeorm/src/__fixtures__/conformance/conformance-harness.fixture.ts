@@ -10,6 +10,7 @@ import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
 import {
   CONFORMANCE_ENTITIES,
   ConformanceAuthorEntity,
+  ConformanceAwardEntity,
   ConformanceBookEntity,
   ConformanceBookWithEagerAuthorEntity,
   ConformanceItemEntity,
@@ -26,6 +27,7 @@ const TABLES = [
   'conformance_tenant_order',
   'conformance_book',
   'conformance_book_with_eager_author',
+  'conformance_award',
   'conformance_tag',
   'conformance_author',
   'conformance_item',
@@ -60,6 +62,7 @@ export function typeOrmConformanceHarness(
         entity: ConformancePlainItemEntity,
       },
       author: { key: 'conformance-author', entity: ConformanceAuthorEntity },
+      award: { key: 'conformance-award', entity: ConformanceAwardEntity },
       book: { key: 'conformance-book', entity: ConformanceBookEntity },
       bookWithEagerAuthor: {
         key: 'conformance-book-with-eager-author',

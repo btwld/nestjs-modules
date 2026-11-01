@@ -11,6 +11,7 @@ import {
 import { type ConformanceContext } from '../conformance-context.js';
 import {
   ownAuthor,
+  ownAward,
   ownBook,
   ownTag,
   seedItems,
@@ -609,6 +610,40 @@ export function readTranslationSection(ctx: ConformanceContext): void {
         { ...ownAuthor(library.authors.ann), books: [ownBook(alpha)] },
         { ...ownAuthor(library.authors.bob), books: [ownBook(gamma)] },
       ]);
+    });
+
+    it('doFind: an or across two to-many relations keeps the joined rows the whole where holds for', async () => {
+      const found = await ctx.repo('author').find({
+        join: [{ relation: 'books' }, { relation: 'awards' }],
+        where: Where.or(
+          Where.rel('books', Where.eq('title', 'alpha')),
+          Where.rel('awards', Where.eq('name', 'bronze')),
+        ),
+        order: [OrderBy.asc('name')],
+      });
+      const { alpha, gamma } = library.books;
+      const { copper, silver, bronze } = library.awards;
+
+      // ann matches through alpha, so it holds every award beside alpha;
+      // bob matches through bronze, so it holds every book beside bronze.
+      assertRows(
+        found.map((author) => ({
+          ...author,
+          awards: sortedBy(author.awards, 'name'),
+        })),
+        [
+          {
+            ...ownAuthor(library.authors.ann),
+            books: [ownBook(alpha)],
+            awards: [ownAward(copper), ownAward(silver)],
+          },
+          {
+            ...ownAuthor(library.authors.bob),
+            books: [ownBook(gamma)],
+            awards: [ownAward(bronze)],
+          },
+        ],
+      );
     });
 
     it('doFind: a filter on a many-to-many joined column narrows the joined rows to those it matches', async () => {

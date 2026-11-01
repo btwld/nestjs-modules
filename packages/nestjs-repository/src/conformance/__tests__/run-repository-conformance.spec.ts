@@ -3,6 +3,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type DynamicRepositoryModule } from '../../interfaces/repository-module.interface.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
 import { type ConformanceAuthorInterface } from '../interfaces/conformance-author.interface.js';
+import { type ConformanceAwardInterface } from '../interfaces/conformance-award.interface.js';
 import { type ConformanceBookWithEagerAuthorInterface } from '../interfaces/conformance-book-with-eager-author.interface.js';
 import { type ConformanceBookInterface } from '../interfaces/conformance-book.interface.js';
 import { type ConformanceCapabilitiesInterface } from '../interfaces/conformance-capabilities.interface.js';
@@ -44,6 +45,11 @@ class Author implements ConformanceAuthorInterface {
   declare name: string;
   declare removedAt: Date | null;
 }
+class Award implements ConformanceAwardInterface {
+  declare id: string;
+  declare name: string;
+  declare authorId: string | null;
+}
 class Book implements ConformanceBookInterface {
   declare id: string;
   declare title: string;
@@ -76,6 +82,7 @@ const FIXTURES: ConformanceFixtureBindings<typeof StubDriver> = {
   item: { key: 'item', entity: Item },
   plainItem: { key: 'plain-item', entity: PlainItem },
   author: { key: 'author', entity: Author },
+  award: { key: 'award', entity: Award },
   book: { key: 'book', entity: Book },
   bookWithEagerAuthor: {
     key: 'book-with-eager-author',

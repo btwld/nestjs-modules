@@ -1,9 +1,10 @@
 import { type ConformanceAuthorInterface } from './conformance-author.interface.js';
+import { type ConformanceAwardInterface } from './conformance-award.interface.js';
 import { type ConformanceBookInterface } from './conformance-book.interface.js';
 import { type ConformanceTagInterface } from './conformance-tag.interface.js';
 
 /**
- * The authors, books and tags the relation cases seed, by name.
+ * The authors, books, tags and awards the relation cases seed, by name.
  */
 export interface ConformanceLibraryInterface {
   authors: {
@@ -20,5 +21,11 @@ export interface ConformanceLibraryInterface {
   tags: {
     news: ConformanceTagInterface;
     tech: ConformanceTagInterface;
+  };
+  awards: {
+    copper: ConformanceAwardInterface;
+    silver: ConformanceAwardInterface;
+    bronze: ConformanceAwardInterface;
+    gold: ConformanceAwardInterface;
   };
 }

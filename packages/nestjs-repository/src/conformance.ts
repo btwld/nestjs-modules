@@ -23,6 +23,7 @@ export { ConformanceFixturesInterface } from './conformance/interfaces/conforman
 export { ConformanceItemInterface } from './conformance/interfaces/conformance-item.interface.js';
 export { ConformancePlainItemInterface } from './conformance/interfaces/conformance-plain-item.interface.js';
 export { ConformanceAuthorInterface } from './conformance/interfaces/conformance-author.interface.js';
+export { ConformanceAwardInterface } from './conformance/interfaces/conformance-award.interface.js';
 export { ConformanceBookInterface } from './conformance/interfaces/conformance-book.interface.js';
 export { ConformanceBookWithEagerAuthorInterface } from './conformance/interfaces/conformance-book-with-eager-author.interface.js';
 export { ConformanceTagInterface } from './conformance/interfaces/conformance-tag.interface.js';

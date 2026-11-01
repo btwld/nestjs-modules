@@ -611,7 +611,10 @@ A relation condition combines with the entity's own in an `or` too, e.g.
 users who are admins or have a published post:
 `Where.or(Where.eq('role', 'admin'), Where.rel('posts', Where.eq('published', true)))`.
 A related row is kept when the whole condition holds with it, so an admin
-holds all its posts and anyone else only the published ones.
+holds all its posts and anyone else only the published ones. The same goes
+for two relations: with `posts` and `comments` joined, a user that matches
+`Where.or(Where.rel('posts', …), Where.rel('comments', …))` through a post
+holds every comment.
 
 ### Sorting by Relations
 

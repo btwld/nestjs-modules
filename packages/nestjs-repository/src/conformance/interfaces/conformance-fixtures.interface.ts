@@ -1,4 +1,5 @@
 import { type ConformanceAuthorInterface } from './conformance-author.interface.js';
+import { type ConformanceAwardInterface } from './conformance-award.interface.js';
 import { type ConformanceBookWithEagerAuthorInterface } from './conformance-book-with-eager-author.interface.js';
 import { type ConformanceBookInterface } from './conformance-book.interface.js';
 import { type ConformanceItemInterface } from './conformance-item.interface.js';
@@ -15,6 +16,7 @@ export interface ConformanceFixturesInterface {
   item: ConformanceItemInterface;
   plainItem: ConformancePlainItemInterface;
   author: ConformanceAuthorInterface;
+  award: ConformanceAwardInterface;
   book: ConformanceBookInterface;
   bookWithEagerAuthor: ConformanceBookWithEagerAuthorInterface;
   tag: ConformanceTagInterface;
