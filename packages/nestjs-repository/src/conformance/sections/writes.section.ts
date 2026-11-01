@@ -267,4 +267,26 @@ export function writesSection(ctx: ConformanceContext): void {
 
     assert.equal(new Set(versions).size, versions.length, String(versions));
   });
+
+  it('a write that changes nothing keeps the version', async () => {
+    const item = ctx.repo('item');
+    const created = await item.create({ name: 'v', rank: 1, note: null });
+    const { version } = created;
+
+    const writes: [string, () => Promise<{ version: number }>][] = [
+      ['update with no data', () => item.update(created, {})],
+      ['update with stored values', () => item.update(created, { rank: 1 })],
+      ['replace with stored values', () => item.replace(created, { rank: 1 })],
+      [
+        'upsert with stored values',
+        () => item.upsert({ id: created.id, name: 'v', rank: 1, note: null }),
+      ],
+      ['restore of a live row', () => item.restore(created)],
+    ];
+
+    for (const [label, write] of writes) {
+      assert.equal((await write()).version, version, label);
+      assert.equal((await readItem(created.id))?.version, version, label);
+    }
+  });
 }

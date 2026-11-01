@@ -443,7 +443,8 @@ runRepositoryConformance(
   Every other case is required, including that your driver describes the
   errors its store raises.
 - **Versions.** Every driver is checked for changing the version on each
-  write. Refusing a stale row is checked inside a transaction only.
+  write that changes a stored row, and for keeping it on one whose values
+  match what is stored. Refusing a stale row is checked inside a transaction only.
 - **Transactions.** On a store with a single connection, a call that ignores
   the run's `ctx` still lands in the open transaction, so the suite can't see
   it. Run it against a store with more than one connection too.
@@ -489,7 +490,8 @@ last read, and `update`, `replace`, `delete`, `softDelete`, and `restore`
 all reject a mismatch with `OptimisticLockException` (409 Conflict) —
 enforced once in `RepositoryAdapter`, for every driver. Every write that
 changes a stored row bumps its version, `upsert` included, so a version read
-before any of them conflicts after it.
+before any of them conflicts after it. A write whose values match what is
+already stored, such as an `update` with no data, keeps the version.
 
 ```ts
 import { OptimisticLockException } from '@concepta/nestjs-repository';
