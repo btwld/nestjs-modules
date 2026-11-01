@@ -9,7 +9,11 @@ import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
 import { AppContextHost } from '@concepta/nestjs-core';
 
-import { TypeOrmTransactionSettingsUnsupportedException } from '../../exceptions/typeorm-transaction-settings-unsupported.exception.js';
+import { TypeOrmUnsupportedDatabaseException } from '../../exceptions/typeorm-unsupported-database.exception.js';
+import { TypeOrmPostgresTransactionFactory } from '../../postgres/typeorm-postgres-transaction.factory.js';
+import { TypeOrmPostgresTransaction } from '../../postgres/typeorm-postgres-transaction.js';
+import { TypeOrmSqliteTransactionFactory } from '../../sqlite/typeorm-sqlite-transaction.factory.js';
+import { TypeOrmSqliteTransaction } from '../../sqlite/typeorm-sqlite-transaction.js';
 import { TypeOrmTransactionFactory } from '../typeorm-transaction.factory.js';
 import { TypeOrmTransaction } from '../typeorm-transaction.js';
 
@@ -49,7 +53,7 @@ describe(TypeOrmTransaction.name, () => {
       mockQueryRunner as unknown as QueryRunner,
     );
 
-    transaction = new TypeOrmTransaction(mockDataSource);
+    transaction = new TypeOrmSqliteTransaction(mockDataSource);
   });
 
   describe('isActive', () => {
@@ -167,7 +171,7 @@ describe(TypeOrmTransaction.name, () => {
     });
 
     it('should apply each setting after BEGIN, in order, skipping undefined values', async () => {
-      await new TypeOrmTransaction(mockDataSource, {
+      await new TypeOrmPostgresTransaction(mockDataSource, {
         'app.tenant_id': 't-1',
         'app.user_id': undefined,
         'app.region': 'eu',
@@ -183,7 +187,7 @@ describe(TypeOrmTransaction.name, () => {
     it('should roll back, release and rethrow when a setting fails', async () => {
       const settingError = new Error('invalid configuration parameter name');
       mockQueryRunner.query.mockRejectedValueOnce(settingError);
-      const tx = new TypeOrmTransaction(mockDataSource, {
+      const tx = new TypeOrmPostgresTransaction(mockDataSource, {
         'app.tenant_id': 't-1',
       });
 
@@ -204,7 +208,7 @@ describe(TypeOrmTransaction.name, () => {
       );
 
       await expect(
-        new TypeOrmTransaction(mockDataSource, {
+        new TypeOrmPostgresTransaction(mockDataSource, {
           'app.tenant_id': 't-1',
         }).start(),
       ).rejects.toBe(settingError);
@@ -314,12 +318,11 @@ describe(TypeOrmTransaction.name, () => {
 // so it's set via defineProperty rather than direct assignment.
 //
 // Typed on `type` alone rather than DataSourceOptions: the factory reads only
-// that field, and `sqlite` is absent from 1.x's DatabaseType while still
-// needing coverage for 0.3 consumers.
+// that field.
 function setDataSourceOptions(
   dataSource: DataSource,
   options: {
-    readonly type: DatabaseType | 'sqlite';
+    readonly type: DatabaseType;
     readonly database?: string;
   },
 ): void {
@@ -336,13 +339,18 @@ describe(TypeOrmTransactionFactory.name, () => {
   beforeEach(() => {
     mockDataSource = mockDeep<DataSource>();
     setDataSourceOptions(mockDataSource, { type: 'postgres' });
-    factory = new TypeOrmTransactionFactory(mockDataSource);
+    factory = new TypeOrmPostgresTransactionFactory(mockDataSource);
   });
 
   describe('create', () => {
-    it('should create a TypeOrmTransaction instance', () => {
+    it("should create the adapter's transaction", () => {
       const transaction = factory.create(new AppContextHost());
-      expect(transaction).toBeInstanceOf(TypeOrmTransaction);
+      expect(transaction).toBeInstanceOf(TypeOrmPostgresTransaction);
+
+      setDataSourceOptions(mockDataSource, { type: 'better-sqlite3' });
+      expect(
+        new TypeOrmSqliteTransactionFactory(mockDataSource).create(),
+      ).toBeInstanceOf(TypeOrmSqliteTransaction);
     });
 
     it('should create new transaction on each call', () => {
@@ -361,7 +369,7 @@ describe(TypeOrmTransactionFactory.name, () => {
         'app.tenant_id': 't-1',
       });
 
-      await new TypeOrmTransactionFactory(
+      await new TypeOrmPostgresTransactionFactory(
         mockDataSource,
         'primary',
         transactionSettings,
@@ -377,53 +385,35 @@ describe(TypeOrmTransactionFactory.name, () => {
     });
   });
 
-  describe('transactionSettings', () => {
-    it.each(['better-sqlite3', 'mysql'] as const)(
-      'should be refused at construction for %s',
-      (type) => {
-        setDataSourceOptions(mockDataSource, { type });
-
-        expect(
-          () =>
-            new TypeOrmTransactionFactory(mockDataSource, 'primary', vi.fn()),
-        ).toThrow(TypeOrmTransactionSettingsUnsupportedException);
-      },
-    );
-
-    it('should not be required for another database', () => {
+  describe('database', () => {
+    it('should refuse a data source of another database', () => {
       setDataSourceOptions(mockDataSource, { type: 'better-sqlite3' });
+      expect(
+        () => new TypeOrmPostgresTransactionFactory(mockDataSource, 'primary'),
+      ).toThrow(
+        'Data source "primary" uses a "better-sqlite3" data source, but its ' +
+          'TypeORM adapter accepts only "postgres"',
+      );
 
-      expect(() => new TypeOrmTransactionFactory(mockDataSource)).not.toThrow();
+      setDataSourceOptions(mockDataSource, { type: 'postgres' });
+      expect(() => new TypeOrmSqliteTransactionFactory(mockDataSource)).toThrow(
+        TypeOrmUnsupportedDatabaseException,
+      );
     });
   });
 
   describe('supportsConcurrentTransactions', () => {
     it('should be true for postgres, which gives each transaction its own connection', () => {
-      setDataSourceOptions(mockDataSource, { type: 'postgres' });
-      expect(
-        new TypeOrmTransactionFactory(mockDataSource)
-          .supportsConcurrentTransactions,
-      ).toBe(true);
+      expect(factory.supportsConcurrentTransactions).toBe(true);
     });
 
-    it('should be false for sqlite, which shares one QueryRunner per data source', () => {
-      setDataSourceOptions(mockDataSource, {
-        type: 'sqlite',
-        database: ':memory:',
-      });
-      expect(
-        new TypeOrmTransactionFactory(mockDataSource)
-          .supportsConcurrentTransactions,
-      ).toBe(false);
-    });
-
-    it('should be false for better-sqlite3', () => {
+    it('should be false for better-sqlite3, which shares one QueryRunner per data source', () => {
       setDataSourceOptions(mockDataSource, {
         type: 'better-sqlite3',
         database: ':memory:',
       });
       expect(
-        new TypeOrmTransactionFactory(mockDataSource)
+        new TypeOrmSqliteTransactionFactory(mockDataSource)
           .supportsConcurrentTransactions,
       ).toBe(false);
     });

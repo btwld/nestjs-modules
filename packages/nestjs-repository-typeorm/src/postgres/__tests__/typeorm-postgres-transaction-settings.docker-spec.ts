@@ -19,7 +19,7 @@ import {
 } from '../../__fixtures__/rls/rls-database.fixture.js';
 import { RlsOrderEntityFixture } from '../../__fixtures__/rls/rls-order.entity.fixture.js';
 import { type TypeOrmRepository } from '../../repository/typeorm-repository.js';
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { TypeOrmPostgresRepositoryModule } from '../typeorm-postgres-repository.module.js';
 
 /**
  * `transactionSettings` against a real Postgres with the README's policy
@@ -73,7 +73,7 @@ describe('transactionSettings on Postgres', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmPostgresRepositoryModule,
               entities: [{ key: ORDERS_KEY, entity: RlsOrderEntityFixture }],
               options: {
                 transactionSettings: (ctx) => {

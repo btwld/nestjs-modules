@@ -61,6 +61,14 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "default": "./dist/postgres.js"
+    },
+    "./sqlite": {
+      "types": "./dist/sqlite.d.ts",
+      "default": "./dist/sqlite.js"
+    },
     "./optional/outbox": {
       "types": "./dist/optional-outbox.d.ts",
       "default": "./dist/optional-outbox.js"

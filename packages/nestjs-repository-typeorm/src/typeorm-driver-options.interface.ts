@@ -1,4 +1,4 @@
-import { type TypeOrmTransactionSettingsResolver } from './transaction/typeorm-transaction-settings-resolver.type.js';
+import { type TypeOrmTransactionSettingsResolver } from './postgres/typeorm-postgres-transaction-settings-resolver.type.js';
 
 /**
  * Options for the TypeORM driver, given as `options` on its

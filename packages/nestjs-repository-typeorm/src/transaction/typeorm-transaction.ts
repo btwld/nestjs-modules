@@ -6,14 +6,15 @@ import { RuntimeException } from '@concepta/nestjs-core';
 import { type TransactionInterface } from '@concepta/nestjs-repository';
 
 /**
- * TypeORM implementation of a transaction.
+ * TypeORM implementation of a transaction, shared by every database's
+ * adapter.
  *
  * Wraps a TypeORM QueryRunner to manage transaction lifecycle. Each instance
  * represents a single transaction that can be started, committed, or rolled back.
  *
  * @example
  * ```typescript
- * const tx = new TypeOrmTransaction(dataSource);
+ * const tx = new TypeOrmPostgresTransaction(dataSource);
  * await tx.start();
  *
  * const manager = tx.getClient();
@@ -22,20 +23,19 @@ import { type TransactionInterface } from '@concepta/nestjs-repository';
  * await tx.commit();
  * ```
  */
-export class TypeOrmTransaction implements TransactionInterface {
+export abstract class TypeOrmTransaction implements TransactionInterface {
   private queryRunner: QueryRunner | null = null;
 
   /**
    * @param dataSource - The data source to run on
-   * @param settings - Applied with `set_config(name, value, true)` once the
-   *   transaction has begun, in order; an `undefined` value is skipped
    */
-  constructor(
-    private readonly dataSource: DataSource,
-    private readonly settings: Readonly<
-      Record<string, string | undefined>
-    > = {},
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * Runs once the transaction has begun, before it is handed out. A failure
+   * rolls the transaction back and fails `start()`.
+   */
+  protected async afterBegin(_queryRunner: QueryRunner): Promise<void> {}
 
   /**
    * Whether the transaction is currently active.
@@ -46,7 +46,7 @@ export class TypeOrmTransaction implements TransactionInterface {
 
   /**
    * Start the transaction by creating a QueryRunner, beginning a
-   * transaction and applying the settings.
+   * transaction and running `afterBegin`.
    *
    * `this.queryRunner` is only assigned once every step succeeds. A failure
    * still leaves a real, connected QueryRunner behind — it's released here
@@ -60,15 +60,7 @@ export class TypeOrmTransaction implements TransactionInterface {
     try {
       await queryRunner.connect();
       await queryRunner.startTransaction();
-
-      for (const [name, value] of Object.entries(this.settings)) {
-        if (value !== undefined) {
-          await queryRunner.query('select set_config($1, $2, true)', [
-            name,
-            value,
-          ]);
-        }
-      }
+      await this.afterBegin(queryRunner);
     } catch (error) {
       await this.abandon(queryRunner);
       throw error;

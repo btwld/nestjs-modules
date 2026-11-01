@@ -1,7 +1,6 @@
 import {
   And,
   Between,
-  type DataSource,
   Equal,
   type FindOperator,
   type FindOptionsWhere,
@@ -28,7 +27,6 @@ import {
   type AppContextLike,
   type DeepPartial,
   RuntimeException,
-  type HookResolverService,
   isObject,
 } from '@concepta/nestjs-core';
 import {
@@ -52,7 +50,6 @@ import {
   type RepositoryUpdateOptions,
   type RepositoryUpsertOptions,
   type RepositoryVersionGuardInterface,
-  type TransactionScope,
   type WhereClause,
   type WhereCondition,
   WhereOperator,
@@ -61,6 +58,7 @@ import {
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 import { TypeOrmTransaction } from '../transaction/typeorm-transaction.js';
+import { dataSourceOf } from '../typeorm-repository.util.js';
 
 import {
   buildEntity,
@@ -70,35 +68,15 @@ import {
   buildSelect,
   buildUrn,
 } from './typeorm-options.schema.js';
+import { type TypeOrmRepositoryOptions } from './typeorm-repository-options.interface.js';
 
 /**
- * The data source behind an entity manager: `dataSource` in TypeORM 1.x,
- * `connection` in 0.3.
+ * TypeORM implementation of RepositoryInterface, shared by every database's
+ * adapter. Wraps a TypeORM Repository with transaction-aware operations.
+ * Each database's adapter subclasses it, naming the database types it
+ * accepts.
  */
-function dataSourceOf(
-  manager:
-    { readonly dataSource: DataSource } | { readonly connection: DataSource },
-): DataSource {
-  return 'dataSource' in manager ? manager.dataSource : manager.connection;
-}
-
-/**
- * Options for constructing a TypeOrmRepository.
- */
-export interface TypeOrmRepositoryOptions {
-  entityKey: string;
-  transactionKey?: string;
-  /** The name of the data source this repository writes through. */
-  dataSourceName?: string;
-  hookResolver?: HookResolverService;
-  transactionScope?: TransactionScope;
-}
-
-/**
- * TypeORM implementation of RepositoryInterface.
- * Wraps a TypeORM Repository with transaction-aware operations.
- */
-export class TypeOrmRepository<
+export abstract class TypeOrmRepository<
   Entity extends PlainLiteralObject,
 > extends RepositoryAdapter<Entity> {
   readonly metadata: RepositoryMetadataInterface<Entity>;
@@ -106,9 +84,16 @@ export class TypeOrmRepository<
   /** How many parameters `like` has bound, so each gets a unique name. */
   private likeParameters = 0;
 
-  constructor(
+  /**
+   * @param repo - The TypeORM repository to wrap
+   * @param options - The repository's options
+   * @param databases - The database types the adapter accepts; a data
+   *   source of any other is refused
+   */
+  protected constructor(
     private readonly repo: Repository<Entity>,
     private readonly options: TypeOrmRepositoryOptions,
+    databases: readonly string[],
   ) {
     super(options.entityKey, options.hookResolver);
 
@@ -118,13 +103,12 @@ export class TypeOrmRepository<
       throw new TypeOrmEntityNameException();
     }
 
-    // TypeORM hands a MongoDB find its options as a native filter, with no
-    // find operators or joins, so nothing this driver builds would translate.
     const { options: dataSourceOptions, driver } = dataSourceOf(repo.manager);
-    if (dataSourceOptions.type === 'mongodb') {
+    if (!databases.includes(dataSourceOptions.type)) {
       throw new TypeOrmUnsupportedDatabaseException(
-        entityName,
+        `Entity ${entityName}`,
         dataSourceOptions.type,
+        databases,
       );
     }
 

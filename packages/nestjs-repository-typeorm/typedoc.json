@@ -1,3 +1,8 @@
 {
-  "entryPoints": ["src/index.ts"]
+  "entryPoints": [
+    "src/index.ts",
+    "src/postgres.ts",
+    "src/sqlite.ts",
+    "src/optional-outbox.ts"
+  ]
 }

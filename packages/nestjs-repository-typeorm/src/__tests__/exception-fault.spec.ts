@@ -38,7 +38,10 @@ const CASES: {
   },
   {
     name: 'TypeOrmUnsupportedDatabaseException',
-    build: () => new TypeOrmUnsupportedDatabaseException('Post', 'mongodb'),
+    build: () =>
+      new TypeOrmUnsupportedDatabaseException('Entity Post', 'mongodb', [
+        'postgres',
+      ]),
     fault: 'usage',
   },
 ];

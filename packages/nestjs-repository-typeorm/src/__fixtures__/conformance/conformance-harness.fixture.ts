@@ -5,7 +5,8 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
 
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { type TypeOrmPostgresRepositoryModule } from '../../postgres/typeorm-postgres-repository.module.js';
+import { type TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
 
 import {
   CONFORMANCE_ENTITIES,
@@ -34,20 +35,25 @@ const TABLES = [
   'conformance_plain_item',
 ];
 
+/** The adapters whose conformance this harness runs. */
+type TypeOrmAdapterModule =
+  typeof TypeOrmPostgresRepositoryModule | typeof TypeOrmSqliteRepositoryModule;
+
 /**
- * The TypeORM driver's conformance harness for one database: the
- * connection, and the driver's entity for each fixture.
+ * A TypeORM adapter's conformance harness for its database: the adapter,
+ * the connection, and the adapter's entity for each fixture.
  */
 export function typeOrmConformanceHarness(
   name: string,
+  driver: TypeOrmAdapterModule,
   connection: DataSourceOptions,
-): ConformanceHarnessInterface<typeof TypeOrmRepositoryModule> {
+): ConformanceHarnessInterface<TypeOrmAdapterModule> {
   const dataSource = (app: INestApplicationContext): DataSource =>
     app.get<DataSource>(getDataSourceToken());
 
   return {
     name,
-    driver: TypeOrmRepositoryModule,
+    driver,
     imports: [
       TypeOrmModule.forRoot({
         ...connection,

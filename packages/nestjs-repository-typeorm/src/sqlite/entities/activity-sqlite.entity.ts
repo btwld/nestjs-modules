@@ -7,10 +7,10 @@ import {
   type ActivityOperation,
 } from '@concepta/nestjs-repository';
 
-import { AppendOnlyPostgresEntity } from '../append-only/append-only-postgres.entity.js';
+import { AppendOnlySqliteEntity } from './append-only-sqlite.entity.js';
 
 /**
- * Base entity for an activity store (Postgres): every column of
+ * Base entity for an activity store (SQLite): every column of
  * `ActivityInterface`, on an append-only row.
  *
  * `actorId` is never set by the repository. Fill it, and any column you add,
@@ -19,8 +19,8 @@ import { AppendOnlyPostgresEntity } from '../append-only/append-only-postgres.en
  * Indexed on `(entityKey, recordId)`, so a row's history is one lookup.
  */
 @Index(['entityKey', 'recordId'])
-export abstract class ActivityPostgresEntity
-  extends AppendOnlyPostgresEntity
+export abstract class ActivitySqliteEntity
+  extends AppendOnlySqliteEntity
   implements ActivityInterface
 {
   @Column({ type: 'varchar' })
@@ -35,13 +35,13 @@ export abstract class ActivityPostgresEntity
   @Column({ type: 'varchar' })
   recordId!: string;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'simple-json' })
   changed!: string[];
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   values!: PlainLiteralObject | null;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'datetime' })
   occurredAt!: Date;
 
   @Column({ type: 'varchar', nullable: true })

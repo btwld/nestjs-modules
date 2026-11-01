@@ -20,7 +20,8 @@ import {
 import { TEST_ENTITY_TOKEN } from '../../__fixtures__/repository/config/test.constants.fixture.js';
 import { TestEntityFixture } from '../../__fixtures__/repository/entity/test.entity.fixture.js';
 import { AppModuleFixture } from '../../__fixtures__/repository/module/app.module.fixture.js';
-import { TypeOrmRepository } from '../../repository/typeorm-repository.js';
+import { type TypeOrmRepository } from '../../repository/typeorm-repository.js';
+import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
 import { TypeOrmDurable } from '../typeorm-durable.js';
 
 describe(TypeOrmDurable.name, () => {
@@ -66,7 +67,7 @@ describe(TypeOrmDurable.name, () => {
       const { durable, moduleRef } = durableResolving(
         new DataSource({ type: 'postgres' }),
       );
-      const named = new TypeOrmRepository<PlainLiteralObject>(
+      const named = new TypeOrmSqliteRepository<PlainLiteralObject>(
         app.get(DataSource).getRepository(TestEntityFixture),
         {
           entityKey: 'named',
@@ -111,7 +112,7 @@ describe(TypeOrmDurable.name, () => {
       const { durable } = durableResolving(
         new DataSource({ type: 'postgres' }),
       );
-      const manual = new TypeOrmRepository<PlainLiteralObject>(
+      const manual = new TypeOrmSqliteRepository<PlainLiteralObject>(
         app.get(DataSource).getRepository(TestEntityFixture),
         { entityKey: 'manual' },
       );

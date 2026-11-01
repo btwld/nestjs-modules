@@ -23,7 +23,7 @@ import {
   type WhereOperator,
 } from '@concepta/nestjs-repository';
 
-import { TypeOrmRepository } from '../typeorm-repository.js';
+import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
 
 interface TestEntity {
   id: string;
@@ -42,7 +42,7 @@ class TestEntityClass {
 /**
  * Subclass that exposes protected translation methods for unit testing.
  */
-class TestableTypeOrmRepository extends TypeOrmRepository<TestEntity> {
+class TestableTypeOrmRepository extends TypeOrmSqliteRepository<TestEntity> {
   public testToFindOperator(cond: WhereCondition) {
     return this.toFindOperator(cond);
   }

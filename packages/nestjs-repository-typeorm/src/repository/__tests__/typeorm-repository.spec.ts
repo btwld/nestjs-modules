@@ -13,6 +13,8 @@ import {
 import { ormConfig } from '../../__fixtures__/repository/config/ormconfig.fixture.js';
 import { TestEntityFixture } from '../../__fixtures__/repository/entity/test.entity.fixture.js';
 import { TypeOrmUnsupportedDatabaseException } from '../../exceptions/typeorm-unsupported-database.exception.js';
+import { TypeOrmPostgresRepository } from '../../postgres/typeorm-postgres-repository.js';
+import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
 import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
 import { type TypeOrmProviderOptionsInterface } from '../typeorm-provider-options.interface.js';
 import { TypeOrmRepository } from '../typeorm-repository.js';
@@ -168,7 +170,7 @@ describe(TypeOrmRepository, () => {
     }
 
     describe('database errors', () => {
-      class ReportingRepository extends TypeOrmRepository<TestEntityFixture> {
+      class ReportingRepository extends TypeOrmSqliteRepository<TestEntityFixture> {
         report(error: unknown) {
           return this.describeDatabaseError(error);
         }
@@ -215,7 +217,9 @@ describe(TypeOrmRepository, () => {
     it('refuses an entity target that is not a class', () => {
       const repo = sqliteRepoWith({ target: 'TestEntityFixture' });
 
-      expect(() => new TypeOrmRepository(repo, { entityKey: 'test' })).toThrow(
+      expect(
+        () => new TypeOrmSqliteRepository(repo, { entityKey: 'test' }),
+      ).toThrow(
         expect.objectContaining({
           fault: 'usage',
           message:
@@ -237,24 +241,25 @@ describe(TypeOrmRepository, () => {
       });
 
       expect(
-        new TypeOrmRepository(repo, { entityKey: 'test' }).metadata.urn,
+        new TypeOrmPostgresRepository(repo, { entityKey: 'test' }).metadata.urn,
       ).toBe(`urn:typeorm:shop:${sqliteRepo.metadata.tableName}`);
     });
 
-    it('refuses a MongoDB data source', () => {
+    it('refuses a data source of another database', () => {
       const repo = sqliteRepoWith({
-        manager: { dataSource: { options: { type: 'mongodb' } } },
+        manager: { dataSource: { options: { type: 'postgres' } } },
       });
 
-      const build = () => new TypeOrmRepository(repo, { entityKey: 'test' });
+      const build = () =>
+        new TypeOrmSqliteRepository(repo, { entityKey: 'test' });
 
       expect(build).toThrow(TypeOrmUnsupportedDatabaseException);
       expect(build).toThrow(
         expect.objectContaining({
           fault: 'usage',
           message:
-            'TestEntityFixture uses a "mongodb" data source, which ' +
-            'TypeOrmRepository does not support. It supports SQL databases only',
+            'Entity TestEntityFixture uses a "postgres" data source, but its ' +
+            'TypeORM adapter accepts only "better-sqlite3"',
         }),
       );
     });

@@ -13,6 +13,7 @@ import { TEST_ENTITY_TOKEN } from '../../__fixtures__/repository/config/test.con
 import { TestEntityFixture } from '../../__fixtures__/repository/entity/test.entity.fixture.js';
 import { TestFactoryFixture } from '../../__fixtures__/repository/factory/test.factory.fixture.js';
 import { AppModuleFixture } from '../../__fixtures__/repository/module/app.module.fixture.js';
+import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
 import { TypeOrmRepository } from '../typeorm-repository.js';
 
 /**
@@ -136,7 +137,7 @@ describe(TypeOrmRepository, () => {
 
     beforeEach(() => {
       const dataSource = moduleFixture.get(getDataSourceToken());
-      bareRepository = new TypeOrmRepository(
+      bareRepository = new TypeOrmSqliteRepository(
         dataSource.getRepository(TestEntityFixture),
         { entityKey: 'bare-test-entity' },
       );

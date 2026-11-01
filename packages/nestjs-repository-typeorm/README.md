@@ -1,9 +1,10 @@
 # @concepta/nestjs-repository-typeorm
 
-TypeORM driver for `@concepta/nestjs-repository`. Provides `TypeOrmRepository`
-(extending `RepositoryAdapter`), `TypeOrmTransaction` / `TypeOrmTransactionFactory`
-for automatic transaction management, WhereClause-to-TypeORM translation, and
-database-specific base entities for Postgres and SQLite.
+TypeORM driver for `@concepta/nestjs-repository`, with one adapter per
+database: `/postgres` and `/sqlite`. Each adapter has its own module,
+repository (extending `RepositoryAdapter`), transactions and base entities,
+and refuses a data source of any other database. WhereClause-to-TypeORM
+translation is shared.
 
 ## Project
 
@@ -38,8 +39,9 @@ yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
-SQL databases only. A repository registered on a MongoDB data source fails at
-startup.
+Postgres, and SQLite through `better-sqlite3`. A repository or transaction
+factory given a data source of a database its adapter is not for fails at
+startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### Dependencies
 
@@ -59,14 +61,16 @@ startup.
 
 ## Module Registration
 
-List `TypeOrmRepositoryModule` as a driver in `RepositoryModule.forRoot()`,
-with the entities it serves:
+List your database's adapter module as a driver in
+`RepositoryModule.forRoot()`, with the entities it serves:
+`TypeOrmPostgresRepositoryModule` from `/postgres`, or
+`TypeOrmSqliteRepositoryModule` from `/sqlite`.
 
 ```ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -78,7 +82,7 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'orders', entity: OrderEntity },
             { key: 'customers', entity: CustomerEntity, dataSource: 'secondary' },
@@ -92,7 +96,10 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 export class AppModule {}
 ```
 
-Each entity key creates a `TypeOrmRepository`. Import
+Each entity key creates the adapter's repository (`TypeOrmPostgresRepository`
+or `TypeOrmSqliteRepository`, both a `TypeOrmRepository`).
+`TypeOrmRepositoryModule`, from the package root, takes either database and
+picks the adapter by each data source's type. Import
 `RepositoryModule.forFeature(['orders'])` in a module to inject it there with
 `@InjectDynamicRepository('orders')`.
 
@@ -241,11 +248,6 @@ descriptor and hands it down as `options.versionGuard`; the driver's only
 job is running the atomic `UPDATE ... WHERE <column> = <value>` probe
 against whatever descriptor it's given.
 
-Two caveats carried over from the in-request check: on MySQL, the probe
-relies on `affected` reflecting rows *matched*, not rows *changed* — true
-by default for Postgres and sqlite, but on MySQL only with
-`CLIENT_FOUND_ROWS` enabled, so an entity with no other auto-updating
-column (e.g. no `@UpdateDateColumn`) can see a false conflict without it.
 Note how `expectedVersion` interacts with the idempotent `softDelete` of an
 already-soft-deleted row: the guard is resolved *before* the no-op, so a
 **stale** version conflicts with `OptimisticLockException` instead of quietly
@@ -422,7 +424,6 @@ Whether case matters is your database's decision:
 | --- | --- |
 | PostgreSQL | No |
 | SQLite | Yes, for ASCII letters |
-| MySQL / MariaDB | Depends on the column's collation; yes with the default collations |
 
 ### Compound Operators
 
@@ -475,15 +476,17 @@ const orders = await orderRepo.find(
 
 ## Transaction Support
 
-This module provides `TypeOrmTransaction` and `TypeOrmTransactionFactory`
-for integration with `@concepta/nestjs-repository`'s transaction layer.
+Each adapter provides a transaction and a transaction factory
+(`TypeOrmPostgresTransaction`, `TypeOrmSqliteTransaction`, …) for
+integration with `@concepta/nestjs-repository`'s transaction layer. They
+extend `TypeOrmTransaction` and `TypeOrmTransactionFactory`.
 
 ### TypeOrmTransaction
 
 Wraps a TypeORM `QueryRunner` to manage transaction lifecycle:
 
 ```ts
-const tx = new TypeOrmTransaction(dataSource);
+const tx = new TypeOrmPostgresTransaction(dataSource);
 await tx.start();
 
 const manager = tx.getClient();
@@ -502,23 +505,24 @@ await tx.commit();
 
 ### TypeOrmTransactionFactory
 
-Factory for creating `TypeOrmTransaction` instances. Automatically registered
+Factory for creating the adapter's transactions. Automatically registered
 with the `TransactionFactoryRegistry` by `RepositoryModule.forRoot()`.
 
-The transaction key follows the pattern `typeorm:<dataSourceName>` (e.g.,
-`typeorm:default`).
+The transaction key names the adapter and the data source:
+`typeorm-postgres:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
+(e.g., `typeorm-postgres:default`). `TypeOrmRepositoryModule` uses
+`typeorm:<dataSourceName>`.
 
 ### Single-Connection Drivers
 
-TypeORM hands out one shared `QueryRunner` per `DataSource` for `sqlite`,
-`better-sqlite3`, `sqljs`, `expo`, `capacitor`, `cordova`, `nativescript`, and
-`react-native` — unlike `postgres`, which gives each transaction its own
-connection. Two transactions started concurrently on one of these drivers
-would otherwise both try to `BEGIN` on the same connection, and the second
-fails with a driver-level error instead of running the version guard.
+TypeORM hands out one shared `QueryRunner` per `DataSource` for
+`better-sqlite3`, unlike `postgres`, which gives each transaction its own
+connection. Two transactions started concurrently on SQLite would otherwise
+both try to `BEGIN` on the same connection, and the second fails with a
+driver-level error instead of running the version guard.
 
-`TypeOrmTransactionFactory` declares
-`supportsConcurrentTransactions: false` for these drivers, which makes
+`TypeOrmSqliteTransactionFactory` declares
+`supportsConcurrentTransactions: false`, which makes
 `TransactionManager` queue transactions for that data source: a second,
 independent `TransactionScope.run()` (or a versioned `update`/`replace`,
 which opens one) on the same data source waits for the first to commit or
@@ -567,17 +571,18 @@ every transaction. The policies are a few lines of SQL in your migrations.
 
 ### Setting the tenant
 
-Give the driver a `transactionSettings` function. Every transaction it opens
-starts by setting those values, read from the caller's context.
+Give the Postgres adapter a `transactionSettings` function. Every
+transaction it opens starts by setting those values, read from the caller's
+context.
 
 ```ts
 import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'orders', entity: Order }],
       options: {
         transactionSettings: (ctx) => ({
@@ -593,9 +598,10 @@ RepositoryModule.forRoot({
 
 Read the tenant from the same `RowScopeCtx` overlay your row scope resolver
 reads, so the two always agree on who the caller is. The second argument is
-the data source name; return `{}` for one without policies. Every data source
-in the registration must still be Postgres: anything else stops startup with
-`TypeOrmTransactionSettingsUnsupportedException`.
+the data source name; return `{}` for one without policies. Only the
+Postgres adapter takes the option. `TypeOrmRepositoryModule` takes it too,
+and stops startup with `TypeOrmTransactionSettingsUnsupportedException` when
+a data source in the registration is not Postgres.
 
 Name each setting anything with a dot in it, and use the same name in your
 policies. An `undefined` value is skipped.
@@ -802,10 +808,9 @@ comes back as an object of bytes, and a JavaScript `bigint` fails the write.
 gives a TypeORM registration durable messaging through
 `DurableMessagingModule` (see the `nestjs-repository` README). It builds the
 [`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) store on the
-registration's own data source: `PostgresOutboxStore` for `postgres`,
-`MySqlOutboxStore` for `mysql`. Any other database, MariaDB included, fails
-startup with `UnsupportedDurableDriverException`. You never build the store
-or touch the data source.
+registration's own data source: `PostgresOutboxStore` for `postgres`. Any
+other database fails startup with `UnsupportedDurableDriverException`. You
+never build the store or touch the data source.
 
 ```bash
 npm install @nestjs/outbox
@@ -890,8 +895,7 @@ Operating it:
   no migration for them. Outside production the store creates them at
   startup. In production, startup fails until you run
   `npx nest-outbox migrate --url <database url>` in your deploy, or run
-  `PostgresOutboxStore.migrationSql()` or
-  `MySqlOutboxStore.migrationStatements()` from one of your own migrations.
+  `PostgresOutboxStore.migrationSql()` from one of your own migrations.
 - **Retention.** Nothing is pruned for you. Schedule
   `OutboxInbox.prune('30d')` and `OutboxDeadLetters.purge({ failedBefore })`;
   both are injectable from `@nestjs/outbox`.
@@ -901,7 +905,7 @@ Operating it:
 
 Requirements and limits:
 
-- Postgres or MySQL, through the registration's TypeORM data source. The
+- Postgres, through the registration's TypeORM data source. The
   outbox lives on that data source, so publish from scopes that write to it.
 - One `DurableMessagingModule.forRoot()` per application.
 - Delivery is at least once: a handler that does not use `once` must be
@@ -924,5 +928,7 @@ Requirements and limits:
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmDriverOptionsInterface`, `TypeOrmRepository`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `AuditSqliteEntity`, `CommonPostgresEntity`, `CommonSqliteEntity`, `AppendOnlyPostgresEntity`, `AppendOnlySqliteEntity`, `ActivityPostgresEntity`, `ActivitySqliteEntity` |
+| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmDriverOptionsInterface`, `TypeOrmRepository`, `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `TypeOrmTransactionSettingsResolver`, and every adapter's base entities |
+| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
+| `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

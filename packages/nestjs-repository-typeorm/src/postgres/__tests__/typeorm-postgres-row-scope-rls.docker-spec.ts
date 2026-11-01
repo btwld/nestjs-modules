@@ -29,7 +29,7 @@ import {
   RLS_TASKS_KEY,
   RlsTaskControllerFixture,
 } from '../../__fixtures__/rls/rls-task.controller.fixture.js';
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { TypeOrmPostgresRepositoryModule } from '../typeorm-postgres-repository.module.js';
 
 /**
  * Row scope and Postgres row-level security together, through HTTP: row
@@ -84,7 +84,7 @@ describe('row scope and row-level security on Postgres', () => {
           imports: [RlsRowScopeModuleFixture],
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmPostgresRepositoryModule,
               entities: [
                 {
                   key: RLS_PROJECTS_KEY,
