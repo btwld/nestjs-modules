@@ -26,6 +26,7 @@ import { type ConformanceLibraryInterface } from '../interfaces/conformance-libr
  */
 export function readTranslationSection(ctx: ConformanceContext): void {
   const { describe, it, beforeEach } = ctx.test;
+  const softDelete = ctx.capabilities.softDelete === 'supported';
 
   describe('items', () => {
     let items: ConformanceItemInterface[];
@@ -371,31 +372,33 @@ export function readTranslationSection(ctx: ConformanceContext): void {
       assert.equal(none, null);
     });
 
-    it('doFind: leaves out soft-deleted rows unless asked for them', async () => {
-      const bravo = items.find(({ name }) => name === 'bravo');
-      assert.ok(bravo);
-      await ctx.repo('item').softDelete(bravo);
+    if (softDelete) {
+      it('doFind: leaves out soft-deleted rows unless asked for them', async () => {
+        const bravo = items.find(({ name }) => name === 'bravo');
+        assert.ok(bravo);
+        await ctx.repo('item').softDelete(bravo);
 
-      const live = await ctx.repo('item').find();
-      const all = await ctx.repo('item').find({ withDeleted: true });
-      const one = await ctx.repo('item').findOne({
-        where: Where.eq('name', 'bravo'),
-      });
-      const deleted = await ctx.repo('item').findOne({
-        where: Where.eq('name', 'bravo'),
-        withDeleted: true,
-      });
+        const live = await ctx.repo('item').find();
+        const all = await ctx.repo('item').find({ withDeleted: true });
+        const one = await ctx.repo('item').findOne({
+          where: Where.eq('name', 'bravo'),
+        });
+        const deleted = await ctx.repo('item').findOne({
+          where: Where.eq('name', 'bravo'),
+          withDeleted: true,
+        });
 
-      assert.deepStrictEqual(valuesOf(live, 'name'), [
-        'alpha',
-        'charlie',
-        'delta',
-        'echo',
-      ]);
-      assert.equal(all.length, 5);
-      assert.equal(one, null);
-      assert.equal(deleted?.name, 'bravo');
-    });
+        assert.deepStrictEqual(valuesOf(live, 'name'), [
+          'alpha',
+          'charlie',
+          'delta',
+          'echo',
+        ]);
+        assert.equal(all.length, 5);
+        assert.equal(one, null);
+        assert.equal(deleted?.name, 'bravo');
+      });
+    }
 
     it('doFind: reads with deleted rows on an entity without a remove date', async () => {
       await ctx.repo('plainItem').create({ name: 'only' });
@@ -741,37 +744,41 @@ export function readTranslationSection(ctx: ConformanceContext): void {
       );
     });
 
-    it('doFind: leaves soft-deleted related rows out of a join unless asked for them', async () => {
-      await ctx.repo('book').softDelete(library.books.beta);
-      await ctx.repo('author').softDelete(library.authors.bob);
+    if (softDelete) {
+      it('doFind: leaves soft-deleted related rows out of a join unless asked for them', async () => {
+        await ctx.repo('book').softDelete(library.books.beta);
+        await ctx.repo('author').softDelete(library.authors.bob);
 
-      const books = await ctx.repo('author').findOne({
-        where: Where.eq('id', library.authors.ann.id),
-        join: [{ relation: 'books' }],
-      });
-      const author = await ctx.repo('book').findOne({
-        where: Where.eq('id', library.books.gamma.id),
-        join: [{ relation: 'author' }],
-      });
-      const allBooks = await ctx.repo('author').findOne({
-        where: Where.eq('id', library.authors.ann.id),
-        join: [{ relation: 'books' }],
-        withDeleted: true,
-      });
-      const deletedAuthor = await ctx.repo('book').findOne({
-        where: Where.eq('id', library.books.gamma.id),
-        join: [{ relation: 'author' }],
-        withDeleted: true,
-      });
+        const books = await ctx.repo('author').findOne({
+          where: Where.eq('id', library.authors.ann.id),
+          join: [{ relation: 'books' }],
+        });
+        const author = await ctx.repo('book').findOne({
+          where: Where.eq('id', library.books.gamma.id),
+          join: [{ relation: 'author' }],
+        });
+        const allBooks = await ctx.repo('author').findOne({
+          where: Where.eq('id', library.authors.ann.id),
+          join: [{ relation: 'books' }],
+          withDeleted: true,
+        });
+        const deletedAuthor = await ctx.repo('book').findOne({
+          where: Where.eq('id', library.books.gamma.id),
+          join: [{ relation: 'author' }],
+          withDeleted: true,
+        });
 
-      assert.deepStrictEqual(valuesOf(books?.books ?? [], 'title'), ['alpha']);
-      assert.equal(author?.author, null);
-      assert.deepStrictEqual(valuesOf(allBooks?.books ?? [], 'title'), [
-        'alpha',
-        'beta',
-      ]);
-      assert.equal(deletedAuthor?.author?.name, 'bob');
-    });
+        assert.deepStrictEqual(valuesOf(books?.books ?? [], 'title'), [
+          'alpha',
+        ]);
+        assert.equal(author?.author, null);
+        assert.deepStrictEqual(valuesOf(allBooks?.books ?? [], 'title'), [
+          'alpha',
+          'beta',
+        ]);
+        assert.equal(deletedAuthor?.author?.name, 'bob');
+      });
+    }
 
     it('doFind: joins many-to-many from both sides', async () => {
       const tags = await ctx.repo('tag').find({

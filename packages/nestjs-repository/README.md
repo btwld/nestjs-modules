@@ -364,8 +364,9 @@ delete for that entity. The column holds a `Date` once set and `null` until
 then. `softDelete` and `restore` set and clear it, and a read without
 `withDeleted` leaves out rows where it is set, both on the entity and on every
 relation the read joins. Restoring a row that isn't soft-deleted leaves it as
-it is. A driver that cannot do all of that reports no such column, and
-`softDelete` and `restore` then throw. On an entity without the column,
+it is. A driver that cannot do all of that refuses at startup an entity that
+declares a remove date, rather than reporting it as an ordinary column. On an
+entity without the column, `softDelete` and `restore` throw, and
 `withDeleted` changes nothing.
 
 `metadata.urn` names the rows an entity reads, and each relation's `targetUrn`
@@ -422,6 +423,7 @@ runRepositoryConformance(
       transactions: 'supported',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      softDelete: 'supported',
     },
     reset: (app) => removeEveryFixtureRow(app),
     linkBookTag: (app, { bookId, tagId }) => linkInStore(app, bookId, tagId),
@@ -436,10 +438,13 @@ runRepositoryConformance(
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
   driver's own options go in `driverOptions`.
-- **Capabilities.** Three are optional, each `'supported'` or `'refused'`:
-  `transactions`, `eagerResults`, and `referentialIntegrity` (your store
+- **Capabilities.** Four are optional, each `'supported'` or `'refused'`:
+  `transactions`, `eagerResults`, `referentialIntegrity` (your store
   refuses a book naming no author, and the delete of an author a book still
-  names). A refused one runs its refusal cases, if it has any, instead.
+  names), and `softDelete`. A refused one runs its refusal cases, if it has
+  any, instead. A driver that refuses `softDelete` must refuse at startup an
+  entity that declares a remove date, and binds the fixtures to entities
+  whose `removedAt` is an ordinary column.
   Every other case is required, including that your driver describes the
   errors its store raises.
 - **Versions.** Every driver is checked for changing the version on each

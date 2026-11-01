@@ -10,6 +10,7 @@ import { seedItems, seedLibrary } from '../conformance-seed.js';
  */
 export function countsSection(ctx: ConformanceContext): void {
   const { describe, it, beforeEach } = ctx.test;
+  const softDelete = ctx.capabilities.softDelete === 'supported';
 
   it('doCount: counts nothing when there are no rows', async () => {
     assert.equal(await ctx.repo('item').count(), 0);
@@ -50,16 +51,18 @@ export function countsSection(ctx: ConformanceContext): void {
       assert.equal(total, 5);
     });
 
-    it('doCount: counts soft-deleted rows only when asked for them', async () => {
-      const bravo = await ctx.repo('item').findOne({
-        where: Where.eq('name', 'bravo'),
-      });
-      assert.ok(bravo);
-      await ctx.repo('item').softDelete(bravo);
+    if (softDelete) {
+      it('doCount: counts soft-deleted rows only when asked for them', async () => {
+        const bravo = await ctx.repo('item').findOne({
+          where: Where.eq('name', 'bravo'),
+        });
+        assert.ok(bravo);
+        await ctx.repo('item').softDelete(bravo);
 
-      assert.equal(await ctx.repo('item').count(), 4);
-      assert.equal(await ctx.repo('item').count({ withDeleted: true }), 5);
-    });
+        assert.equal(await ctx.repo('item').count(), 4);
+        assert.equal(await ctx.repo('item').count({ withDeleted: true }), 5);
+      });
+    }
   });
 
   describe('joins', () => {
@@ -96,25 +99,27 @@ export function countsSection(ctx: ConformanceContext): void {
       assert.equal((await ctx.repo('author').findAndCount(options))[1], 2);
     });
 
-    it('doCount: a joined filter leaves out soft-deleted related rows unless asked for them', async () => {
-      const beta = await ctx.repo('book').findOne({
-        where: Where.eq('title', 'beta'),
+    if (softDelete) {
+      it('doCount: a joined filter leaves out soft-deleted related rows unless asked for them', async () => {
+        const beta = await ctx.repo('book').findOne({
+          where: Where.eq('title', 'beta'),
+        });
+        assert.ok(beta);
+        await ctx.repo('book').softDelete(beta);
+
+        const options = {
+          join: [{ relation: 'books' }],
+          where: Where.rel('books', Where.eq('title', 'beta')),
+        };
+
+        assert.equal(await ctx.repo('author').count(options), 0);
+        assert.equal((await ctx.repo('author').findAndCount(options))[1], 0);
+        assert.equal(
+          await ctx.repo('author').count({ ...options, withDeleted: true }),
+          1,
+        );
       });
-      assert.ok(beta);
-      await ctx.repo('book').softDelete(beta);
-
-      const options = {
-        join: [{ relation: 'books' }],
-        where: Where.rel('books', Where.eq('title', 'beta')),
-      };
-
-      assert.equal(await ctx.repo('author').count(options), 0);
-      assert.equal((await ctx.repo('author').findAndCount(options))[1], 0);
-      assert.equal(
-        await ctx.repo('author').count({ ...options, withDeleted: true }),
-        1,
-      );
-    });
+    }
 
     it('doCount: counts roots under a many-to-many join, not junction rows', async () => {
       const join = [{ relation: 'books' }];

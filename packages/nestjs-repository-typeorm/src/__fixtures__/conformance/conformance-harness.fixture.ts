@@ -83,6 +83,7 @@ export function typeOrmConformanceHarness(
       transactions: 'supported',
       eagerResults: 'supported',
       referentialIntegrity: 'supported',
+      softDelete: 'supported',
     },
     async reset(app) {
       for (const table of TABLES) {

@@ -10,7 +10,7 @@ import { type ConformanceBookInterface } from './conformance-book.interface.js';
 export interface ConformanceAuthorInterface {
   id: string;
   name: string;
-  /** The soft-remove date column. */
+  /** The soft-remove date column, or an ordinary one where soft delete is refused. */
   removedAt: Date | null;
   books?: ConformanceBookInterface[];
   awards?: ConformanceAwardInterface[];

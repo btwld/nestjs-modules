@@ -153,11 +153,13 @@ const ALL_SUPPORTED: ConformanceCapabilitiesInterface = {
   transactions: 'supported',
   eagerResults: 'supported',
   referentialIntegrity: 'supported',
+  softDelete: 'supported',
 };
 const ALL_REFUSED: ConformanceCapabilitiesInterface = {
   transactions: 'refused',
   eagerResults: 'refused',
   referentialIntegrity: 'refused',
+  softDelete: 'refused',
 };
 
 const caseNames = (cases: string[][], section: string): string[] =>
@@ -242,6 +244,26 @@ describe(runRepositoryConformance.name, () => {
     expect(caseNames(refused, 'errors')).toEqual([
       'doCreateMany: a key given twice is refused',
     ]);
+  });
+
+  it('leaves out exactly the soft-delete cases when soft delete is refused', () => {
+    const names = (capabilities: ConformanceCapabilitiesInterface) =>
+      register(capabilities).cases.map((path) => path.slice(1).join(' > '));
+    const supported = names(ALL_SUPPORTED);
+    const refused = names({ ...ALL_SUPPORTED, softDelete: 'refused' });
+
+    expect(supported.filter((name) => !refused.includes(name))).toEqual([
+      'read translation > items > doFind: leaves out soft-deleted rows unless asked for them',
+      'read translation > joins > doFind: leaves soft-deleted related rows out of a join unless asked for them',
+      'counts > items > doCount: counts soft-deleted rows only when asked for them',
+      'counts > joins > doCount: a joined filter leaves out soft-deleted related rows unless asked for them',
+      'writes > doSoftDelete and doRestore: set and clear the remove date',
+      'writes > doRestore: leaves a live row live',
+      'writes > doDelete and doDeleteMany: remove soft-deleted rows too',
+      'transactions > doSoftDelete: changes the version, and refuses a stale row',
+      'transactions > doRestore: changes the version, and refuses a stale row',
+    ]);
+    expect(refused.filter((name) => !supported.includes(name))).toEqual([]);
   });
 
   it('gives every case a unique name', () => {

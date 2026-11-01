@@ -15,7 +15,7 @@ export interface ConformanceBookInterface {
   id: string;
   title: string;
   authorId: string | null;
-  /** The soft-remove date column. */
+  /** The soft-remove date column, or an ordinary one where soft delete is refused. */
   removedAt: Date | null;
   author?: ConformanceAuthorInterface | null;
   tags?: ConformanceTagInterface[];

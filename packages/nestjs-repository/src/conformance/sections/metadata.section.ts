@@ -29,49 +29,53 @@ const column = (
   isVersion: flags.isVersion ?? false,
 });
 
-const BOOK_COLUMNS = [
-  column('authorId'),
-  column('id', { isPrimary: true }),
-  column('removedAt', { isRemoveDate: true }),
-  column('title'),
-];
-
-/** Every fixture's own columns and their flags, sorted by name. */
-const COLUMNS: Record<keyof ConformanceFixturesInterface, ColumnFlags[]> = {
-  item: [
-    column('id', { isPrimary: true }),
-    column('name'),
-    column('note'),
-    column('rank'),
-    column('removedAt', { isRemoveDate: true }),
-    column('version', { isVersion: true }),
-  ],
-  plainItem: [column('id', { isPrimary: true }), column('name')],
-  author: [
-    column('id', { isPrimary: true }),
-    column('name'),
-    column('removedAt', { isRemoveDate: true }),
-  ],
-  award: [
+/**
+ * Every fixture's own columns and their flags, sorted by name. `removedAt`
+ * is the remove date only where the driver supports soft delete.
+ */
+function columnsFor(
+  softDelete: boolean,
+): Record<keyof ConformanceFixturesInterface, ColumnFlags[]> {
+  const removedAt = column('removedAt', { isRemoveDate: softDelete });
+  const bookColumns = [
     column('authorId'),
     column('id', { isPrimary: true }),
-    column('name'),
-  ],
-  book: BOOK_COLUMNS,
-  bookWithEagerAuthor: BOOK_COLUMNS,
-  tag: [column('id', { isPrimary: true }), column('label')],
-  tenantOrder: [
-    column('id', { isPrimary: true }),
-    column('tenantId'),
-    column('total'),
-  ],
-  tenantOrderLine: [
-    column('id', { isPrimary: true }),
-    column('orderId'),
-    column('qty'),
-    column('tenantId'),
-  ],
-};
+    removedAt,
+    column('title'),
+  ];
+
+  return {
+    item: [
+      column('id', { isPrimary: true }),
+      column('name'),
+      column('note'),
+      column('rank'),
+      removedAt,
+      column('version', { isVersion: true }),
+    ],
+    plainItem: [column('id', { isPrimary: true }), column('name')],
+    author: [column('id', { isPrimary: true }), column('name'), removedAt],
+    award: [
+      column('authorId'),
+      column('id', { isPrimary: true }),
+      column('name'),
+    ],
+    book: bookColumns,
+    bookWithEagerAuthor: bookColumns,
+    tag: [column('id', { isPrimary: true }), column('label')],
+    tenantOrder: [
+      column('id', { isPrimary: true }),
+      column('tenantId'),
+      column('total'),
+    ],
+    tenantOrderLine: [
+      column('id', { isPrimary: true }),
+      column('orderId'),
+      column('qty'),
+      column('tenantId'),
+    ],
+  };
+}
 
 /** Every fixture's declared relations, sorted. */
 const RELATIONS: Record<keyof ConformanceFixturesInterface, string[]> = {
@@ -137,6 +141,7 @@ function joinPairs(
  */
 export function metadataSection(ctx: ConformanceContext): void {
   const { it } = ctx.test;
+  const columns = columnsFor(ctx.capabilities.softDelete === 'supported');
 
   it('metadata: names each entity by its class', () => {
     for (const key of KEYS) {
@@ -161,7 +166,7 @@ export function metadataSection(ctx: ConformanceContext): void {
     for (const key of KEYS) {
       assert.deepStrictEqual(
         flagsOf(ctx.repo(key).metadata),
-        COLUMNS[key],
+        columns[key],
         `${key} columns`,
       );
     }
@@ -206,7 +211,7 @@ export function metadataSection(ctx: ConformanceContext): void {
       );
       assert.deepStrictEqual(
         flagsOf({ name: target, columns: relation.targetColumns }),
-        COLUMNS[target],
+        columns[target],
         `${key}.${name} target columns`,
       );
     }
