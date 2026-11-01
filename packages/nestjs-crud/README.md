@@ -933,6 +933,10 @@ relation it doesn't join is refused with `400`:
 @CrudJoin([{ relation: 'author' }])
 ```
 
+A sort must be on a to-one relation, like a photo's `author`. A sort on a
+to-many relation, like an author's `photos`, is refused with `400`, since an
+author has no single photo field to sort by.
+
 ## Paginated Response
 
 List operations return a paginated response:

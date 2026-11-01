@@ -1332,67 +1332,68 @@ describe('CrudAdapter relations (e2e)', () => {
   });
 
   describe('relation sort', () => {
-    it('should sort by relation field ASC', async () => {
+    /** Users joined to their company, listed in `sort` order. */
+    async function sortedUserEmails(
+      sort: NonNullable<Parameters<typeof mockCrudParsedQuery>[0]>['sort'],
+    ): Promise<string[]> {
+      const host = new AppContextHost();
+      host.defineOverlay(CrudCtx, {
+        entity: 'UserEntity',
+        params: {},
+        query: mockCrudParsedQuery<PlainLiteralObject>({ sort }),
+        options: { query: { join: [{ relation: 'company' }] } },
+        operation: Operation.List,
+        action: ActionEnum.READ,
+      });
+      const result = await new CrudAdapter(userRepo).list(host.with(CrudCtx));
+      return result.data.map(({ email }) => email);
+    }
+
+    // Seeded in an order none of the cases expects, so a dropped sort fails.
+    beforeEach(async () => {
       const zebra = await seedCompany('Zebra Inc', 'zebra.com');
       const alpha = await seedCompany('Alpha Corp', 'alpha.com');
+      await seedUser('bob@alpha.com', alpha.id!);
       await seedUser('zara@zebra.com', zebra.id!);
       await seedUser('alice@alpha.com', alpha.id!);
+    });
 
-      const result = await adapter.list(
-        relCtx({
-          ...usersRelationCtx(),
-          query: mockCrudParsedQuery<PlainLiteralObject>({
-            sort: [{ field: 'email', order: 'ASC', relation: 'users' }],
-          }),
-        }),
-      );
+    it('should sort by relation field ASC', async () => {
+      const emails = await sortedUserEmails([
+        { field: 'name', order: 'ASC', relation: 'company' },
+      ]);
 
-      expect(result.data).toHaveLength(2);
-      expect(result.data[0].name).toBe('Alpha Corp');
-      expect(result.data[1].name).toBe('Zebra Inc');
+      expect(emails.slice(0, 2).sort()).toEqual([
+        'alice@alpha.com',
+        'bob@alpha.com',
+      ]);
+      expect(emails[2]).toBe('zara@zebra.com');
     });
 
     it('should sort by relation field DESC', async () => {
-      const zebra = await seedCompany('Zebra Inc', 'zebra.com');
-      const alpha = await seedCompany('Alpha Corp', 'alpha.com');
-      await seedUser('zara@zebra.com', zebra.id!);
-      await seedUser('alice@alpha.com', alpha.id!);
+      const emails = await sortedUserEmails([
+        { field: 'name', order: 'DESC', relation: 'company' },
+        { field: 'email', order: 'ASC' },
+      ]);
 
-      const result = await adapter.list(
-        relCtx({
-          ...usersRelationCtx(),
-          query: mockCrudParsedQuery<PlainLiteralObject>({
-            sort: [{ field: 'email', order: 'DESC', relation: 'users' }],
-          }),
-        }),
-      );
-
-      expect(result.data).toHaveLength(2);
-      expect(result.data[0].name).toBe('Zebra Inc');
-      expect(result.data[1].name).toBe('Alpha Corp');
+      expect(emails).toEqual([
+        'zara@zebra.com',
+        'alice@alpha.com',
+        'bob@alpha.com',
+      ]);
     });
 
-    it('should combine root sort with relation sort', async () => {
-      const zebra = await seedCompany('Zebra Inc', 'zebra.com');
-      const alpha = await seedCompany('Alpha Corp', 'alpha.com');
-      await seedUser('zara@zebra.com', zebra.id!);
-      await seedUser('alice@alpha.com', alpha.id!);
+    it('should combine relation sort with root sort', async () => {
+      const emails = await sortedUserEmails([
+        { field: 'name', order: 'ASC', relation: 'company' },
+        { field: 'email', order: 'DESC' },
+      ]);
 
-      const result = await adapter.list(
-        relCtx({
-          ...usersRelationCtx(),
-          query: mockCrudParsedQuery<PlainLiteralObject>({
-            sort: [
-              { field: 'name', order: 'ASC' },
-              { field: 'email', order: 'DESC', relation: 'users' },
-            ],
-          }),
-        }),
-      );
-
-      expect(result.data).toHaveLength(2);
-      expect(result.data[0].name).toBe('Alpha Corp');
-      expect(result.data[1].name).toBe('Zebra Inc');
+      expect(emails).toEqual([
+        'bob@alpha.com',
+        'alice@alpha.com',
+        'zara@zebra.com',
+      ]);
     });
   });
 });

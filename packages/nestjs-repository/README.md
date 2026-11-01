@@ -619,13 +619,17 @@ Use `OrderBy.rel()` to sort by fields on a related entity:
 
 ```ts
 const [users, total] = await userRepo.findAndCount({
-  join: [{ relation: 'posts' }],
+  join: [{ relation: 'company' }],
   ...OrderBy.order(
-    OrderBy.rel('posts', OrderBy.desc<PostEntity>('createdAt')),
+    OrderBy.rel('company', OrderBy.asc<CompanyEntity>('name')),
     OrderBy.asc<UserEntity>('name'),
   ),
 });
 ```
+
+Sort by a to-one relation only. A user holds many posts, so there is no one
+post title to sort the user by; a sort on a to-many relation is refused with
+a `400`.
 
 ### Relation Metadata
 
@@ -792,12 +796,13 @@ A read reaches another table only through a relation it names in `join`:
 | In the read options | Result |
 | --- | --- |
 | an own column in `select`, `where` or `order` | passed to the driver |
-| a relation in `join`, and a `Where.rel()` filter or relation sort on a joined relation | passed to the driver |
+| a relation in `join`, a `Where.rel()` filter on a joined relation, and a relation sort on a joined to-one relation | passed to the driver |
 | a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`) |
 | a relation that is not declared | refused (`400`) |
 | a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable`, this one holds the caller to every scope column the other does, and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
 | a `Where.rel()` filter or relation sort on a relation missing from `join` | refused (`400`); add it to `join` |
 | a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
+| a relation sort on a to-many relation | refused (`400`); a row holds many related rows, so there is no one value to sort it by |
 | a sort direction other than `ASC` or `DESC` | refused (`400`) |
 
 A read may sort by an own column it doesn't select.
@@ -1116,15 +1121,15 @@ const users = await userRepo.find(
 
 ### Relation Sorting
 
-Use `rel()` to sort by a field on a related entity (see
+Use `rel()` to sort by a field on a to-one related entity (see
 [Sorting by Relations](#sorting-by-relations)):
 
 ```ts
-// Sort users by post title, then by creation date
+// Sort users by company name, then by creation date
 const users = await userRepo.findAndCount({
-  join: [{ relation: 'posts' }],
+  join: [{ relation: 'company' }],
   ...OrderBy.order(
-    OrderBy.rel('posts', OrderBy.asc<PostEntity>('title')),
+    OrderBy.rel('company', OrderBy.asc<CompanyEntity>('name')),
     OrderBy.desc<UserEntity>('createdAt'),
   ),
 });
