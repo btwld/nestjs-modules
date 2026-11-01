@@ -6,5 +6,10 @@ export interface TransactionInterface {
   start(): Promise<void>;
   commit(): Promise<void>;
   rollback(): Promise<void>;
-  getClient<T = unknown>(): T;
+  /**
+   * The driver's client for this transaction. A driver's own transaction
+   * may declare its client type; callers holding this interface narrow it
+   * to that transaction first.
+   */
+  getClient(): unknown;
 }

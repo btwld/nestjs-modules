@@ -293,7 +293,7 @@ describe(TypeOrmTransaction.name, () => {
     it('should return entity manager when transaction is active', async () => {
       await transaction.start();
 
-      const client = transaction.getClient<EntityManager>();
+      const client = transaction.getClient();
       expect(client).toBe(mockEntityManager);
     });
 

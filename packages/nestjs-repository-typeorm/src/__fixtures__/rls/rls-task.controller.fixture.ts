@@ -1,4 +1,4 @@
-import { type EntityManager } from 'typeorm';
+import assert from 'node:assert/strict';
 
 import { Body, Controller, Get, Post } from '@nestjs/common';
 
@@ -10,6 +10,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type TypeOrmRepository } from '../../repository/typeorm-repository.js';
+import { TypeOrmTransaction } from '../../transaction/typeorm-transaction.js';
 import { resolveTransactionKey } from '../../typeorm-repository.util.js';
 
 import {
@@ -62,8 +63,9 @@ export class RlsTaskControllerFixture {
   @Transactional({ readOnly: true })
   async rawReport(@Ctx() ctx: AppContextHost): Promise<string[]> {
     const tx = await ctx.with(TrxCtx).trx.getOrStart(resolveTransactionKey());
+    assert.ok(tx instanceof TypeOrmTransaction);
     const rows: { title: string }[] = await tx
-      .getClient<EntityManager>()
+      .getClient()
       .query('select title from rls_task');
 
     return rows.map(({ title }) => title).sort();

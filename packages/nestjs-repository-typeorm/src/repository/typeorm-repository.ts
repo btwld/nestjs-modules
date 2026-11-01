@@ -16,7 +16,6 @@ import {
   type QueryDeepPartialEntity,
   Raw,
   type Repository,
-  type EntityManager,
   type FindOptionsRelations,
   type FindManyOptions,
   type FindOneOptions,
@@ -61,6 +60,7 @@ import {
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
+import { TypeOrmTransaction } from '../transaction/typeorm-transaction.js';
 
 import {
   buildEntity,
@@ -193,9 +193,14 @@ export class TypeOrmRepository<
         const { trx } = context.with(TrxCtx);
         if (trx?.isSupported) {
           const tx = await trx.getOrStart(this.options.transactionKey);
-          return tx
-            .getClient<EntityManager>()
-            .getRepository(this.metadata.type);
+          if (!(tx instanceof TypeOrmTransaction)) {
+            throw new RuntimeException({
+              message: 'Transaction "%s" is not a TypeORM transaction',
+              messageParams: [this.options.transactionKey],
+              fault: 'internal',
+            });
+          }
+          return tx.getClient().getRepository(this.metadata.type);
         }
       }
     }

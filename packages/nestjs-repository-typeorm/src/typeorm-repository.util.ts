@@ -20,6 +20,7 @@ import {
 import { HookResolverService } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
+  type TransactionFactoryDescriptor,
   TransactionScope,
 } from '@concepta/nestjs-repository';
 
@@ -225,11 +226,7 @@ export function getTypeOrmImports(
 export function createTransactionFactoryDescriptor(
   dataSource?: string,
   options?: TypeOrmDriverOptionsInterface,
-): {
-  key: string;
-  inject: ReturnType<typeof getDataSourceToken>[];
-  useFactory: (ds: DataSource) => TypeOrmTransactionFactory;
-} {
+): TransactionFactoryDescriptor {
   const dsName = resolveDataSourceName(dataSource);
   const dsToken = resolveTokenName(dsName);
 

@@ -1,4 +1,6 @@
-import { type DataSource, type EntityManager } from 'typeorm';
+import assert from 'node:assert/strict';
+
+import { type DataSource } from 'typeorm';
 
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -15,6 +17,7 @@ import { TestEntityFixture } from '../../__fixtures__/repository/entity/test.ent
 import { AppModuleFixture } from '../../__fixtures__/repository/module/app.module.fixture.js';
 import { type TypeOrmRepository } from '../../repository/typeorm-repository.js';
 import { resolveTransactionKey } from '../../typeorm-repository.util.js';
+import { TypeOrmTransaction } from '../typeorm-transaction.js';
 
 /**
  * Regression coverage for #468 against a real TypeORM stack — a second
@@ -110,7 +113,8 @@ describe('TransactionScope — commits every active transaction (defect #1)', ()
 
     await txScope.run(ctx, async (txCtx: TransactionContextInterface) => {
       const tx = await txCtx.trx.getOrStart(resolveTransactionKey());
-      const manager = tx.getClient<EntityManager>();
+      assert.ok(tx instanceof TypeOrmTransaction);
+      const manager = tx.getClient();
       await manager.save(TestEntityFixture, { firstName: 'Ghost' });
     });
 

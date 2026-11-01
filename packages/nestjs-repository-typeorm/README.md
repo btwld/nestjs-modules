@@ -486,7 +486,7 @@ Wraps a TypeORM `QueryRunner` to manage transaction lifecycle:
 const tx = new TypeOrmTransaction(dataSource);
 await tx.start();
 
-const manager = tx.getClient<EntityManager>();
+const manager = tx.getClient();
 await manager.save(entity);
 
 await tx.commit();
@@ -498,7 +498,7 @@ await tx.commit();
 | `start()` | Create a QueryRunner, begin a transaction and apply its settings |
 | `commit()` | Commit the transaction and release the QueryRunner |
 | `rollback()` | Rollback the transaction and release the QueryRunner |
-| `getClient<T>()` | Get the transactional `EntityManager` |
+| `getClient()` | Get the transactional `EntityManager` |
 
 ### TypeOrmTransactionFactory
 

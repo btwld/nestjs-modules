@@ -16,7 +16,7 @@ import { type TransactionInterface } from '@concepta/nestjs-repository';
  * const tx = new TypeOrmTransaction(dataSource);
  * await tx.start();
  *
- * const manager = tx.getClient<EntityManager>();
+ * const manager = tx.getClient();
  * await manager.save(entity);
  *
  * await tx.commit();
@@ -116,14 +116,14 @@ export class TypeOrmTransaction implements TransactionInterface {
   /**
    * Get the EntityManager for this transaction.
    */
-  getClient<T = EntityManager>(): T {
+  getClient(): EntityManager {
     if (!this.queryRunner?.manager) {
       throw new RuntimeException({
         message: 'No active transaction - cannot get client',
         fault: 'internal',
       });
     }
-    return this.queryRunner.manager as T;
+    return this.queryRunner.manager;
   }
 
   // Rolls back whenever the QueryRunner reports a transaction, even if
