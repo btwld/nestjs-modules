@@ -1,9 +1,10 @@
 # @concepta/nestjs-repository-typeorm
 
 TypeORM driver for `@concepta/nestjs-repository`. Import the adapter for your
-database from `/postgres`, `/mysql`, `/mariadb` or `/sqlite`: it gives you a
-module to register your entities with, repositories that run on your data
-source's transactions, and base entities with audit columns and a version.
+database (`/postgres`, `/mysql`, `/mariadb`, `/oracle`, `/sqlserver` or
+`/sqlite`): it gives you a module to register your entities with,
+repositories that run on your data source's transactions, and base entities
+with audit columns and a version.
 
 ## Project
 
@@ -32,51 +33,43 @@ source's transactions, and base entities with audit columns and a version.
 ## Installation
 
 ```sh
-yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
+yarn add @concepta/nestjs-repository-typeorm @nestjs/common @nestjs/core typeorm pg
 ```
+
+Replace `pg` with your database's client from
+[Choose Your Adapter](#choose-your-adapter).
 
 ### Requirements
 
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
-Postgres, MySQL 8.4, MariaDB 11.4, Oracle 23ai, SQL Server 2025, or SQLite
-through `better-sqlite3` — see [Choose Your Adapter](#choose-your-adapter).
-
-### Dependencies
-
-| Package | Notes |
-| --- | --- |
-| `@concepta/nestjs-core` | Core interfaces, utilities, and hook system |
-| `@concepta/nestjs-repository` | Abstract repository layer (`RepositoryAdapter`) |
-| `@nestjs/typeorm` | TypeORM integration for NestJS |
-| `@tsyche/membrane` | Hook pipeline (`Permeator`/`Membrane`) |
-
 ### Peer Dependencies
 
 | Package | Required | Notes |
 | --- | --- | --- |
-| `@nestjs/common` | Yes | NestJS core — install explicitly, no longer bundled |
-| `typeorm` | Yes | TypeORM `^0.3.31 \|\| ~1.0.0`. 1.1+ is not yet supported: it counts distinct values of the selected columns when find options carry a `select`, which changes what a projected paginated query reports as its total |
+| `@nestjs/common`, `@nestjs/core` | Yes | NestJS 12 |
+| `typeorm` | Yes | `^0.3.31 \|\| ~1.0.0`. 1.1+ isn't supported yet: it miscounts the total of a paginated read that has a `select` |
+| `@nestjs/outbox` | No | Only for [Durable Messaging](#durable-messaging) |
 
 ## Choose Your Adapter
 
-| Database | Import from | Register | Extend |
-| --- | --- | --- | --- |
-| Postgres | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule` | `CommonPostgresEntity`, … |
-| MySQL 8.4 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule` | `CommonMysqlEntity`, … |
-| MariaDB 11.4 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule` | `CommonMariadbEntity`, … |
-| Oracle 23ai | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule` | `CommonOracleEntity`, … |
-| SQL Server 2025 | `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule` | `CommonSqlServerEntity`, … |
-| SQLite (`better-sqlite3`) | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule` | `CommonSqliteEntity`, … |
+| Database | Client | Import from | Register | Extend |
+| --- | --- | --- | --- | --- |
+| Postgres 16 | `pg` | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule` | `CommonPostgresEntity`, … |
+| MySQL 8.4 | `mysql2` | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule` | `CommonMysqlEntity`, … |
+| MariaDB 11.4 | `mysql2` | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule` | `CommonMariadbEntity`, … |
+| Oracle 23ai | `oracledb` | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule` | `CommonOracleEntity`, … |
+| SQL Server 2025 | `mssql` | `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule` | `CommonSqlServerEntity`, … |
+| SQLite | `better-sqlite3` | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule` | `CommonSqliteEntity`, … |
 
-Every adapter's repository behaves the same, so everything else in this
-README applies to all of them. An entity registered on a data source of another
-database stops startup with `TypeOrmUnsupportedDatabaseException`. The
-sections below say what differs.
+The sections below list what differs per database; everything else in this
+README applies to all six. An entity registered on a data source of another
+database stops startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### Postgres
 
+- Dates round-trip exactly; no time-zone setting is needed.
 - `Where.contains('name', 'ali')` doesn't match `Alice`: text matching is
   case-sensitive.
 - In ascending order, `NULL`s sort last.
@@ -84,35 +77,31 @@ sections below say what differs.
 - `transactionSettings` sets values at the start of every transaction, such
   as the caller's tenant — see
   [Row-Level Security (Postgres)](#row-level-security-postgres).
-- [Durable messaging](#durable-messaging) uses `PostgresOutboxStore`.
+- [Durable messaging](#durable-messaging): supported.
 
 ### MySQL
 
 - Keep the client's default flags. Versioned writes rely on `FOUND_ROWS`,
   so a data source that turns it off (`flags` or `extra.flags` holding
   `'-FOUND_ROWS'`) stops startup with `TypeOrmMysqlFoundRowsException`.
-- Set `timezone: 'Z'` on the data source when the server runs in UTC.
-  Otherwise the client reads dates the database fills in, like
-  `dateCreated`, as your host's local time, and they come back shifted by
-  the host's UTC offset.
+- Run the server in UTC and set `timezone: 'Z'` on the data source.
+  Otherwise dates the database fills in, like `dateCreated`, come back
+  shifted by your host's UTC offset.
 - Whether text matching ignores case depends on the column's collation; the
   default collations ignore it.
 - In ascending order, `NULL`s sort first.
 - Transactions run concurrently, each on its own connection.
-- [Durable messaging](#durable-messaging) uses `MySqlOutboxStore`.
+- [Durable messaging](#durable-messaging): supported.
 
 ### MariaDB
 
-MariaDB works like [MySQL](#mysql), flags, `timezone` and collations included,
-and its transactions use `TypeOrmMysqlTransaction` and
-`TypeOrmMysqlTransactionFactory`, also exported from `/mariadb`. The one
-difference: durable messaging is refused at startup, as `@nestjs/outbox`
-doesn't support MariaDB yet.
+MariaDB works like [MySQL](#mysql), flags, `timezone` and collations
+included. The one difference: [durable messaging](#durable-messaging) is
+refused at startup.
 
 ### Oracle
 
-Uses the `oracledb` client in its default Thin mode; install it beside
-`typeorm`.
+Uses the `oracledb` client in its default Thin mode.
 
 - Oracle stores an empty string as `NULL`: `create({ note: '' })` reads back
   `note: null`, and `''` in a `NOT NULL` column fails the write.
@@ -131,12 +120,9 @@ Uses the `oracledb` client in its default Thin mode; install it beside
 - `applicationContext` sets values at the start of every transaction, such
   as the caller's tenant — see
   [Virtual Private Database (Oracle)](#virtual-private-database-oracle).
-- Durable messaging is refused at startup: `@nestjs/outbox` has no Oracle
-  store.
+- [Durable messaging](#durable-messaging): refused at startup.
 
 ### SQL Server
-
-Uses the `mssql` client; install it beside `typeorm`.
 
 - Run the server in UTC (the Linux image's default) and set
   `options: { useUTC: true }` on the data source. The database fills in
@@ -154,21 +140,20 @@ Uses the `mssql` client; install it beside `typeorm`.
   '"correctedId" IS NOT NULL' })`.
 - Generated UUIDs come back in upper case; comparisons ignore case, so a
   lower-case id still finds its row.
-- A statement takes at most 1,000 rows and 2,100 values, and the database
-  refuses more: `createMany` of an entity with 8 columns to write stops near
-  260 rows, and `Where.in` near 2,100 values.
 - `context.code` on a `RepositoryDatabaseException` is SQL Server's error
   number: `2627` or `2601` for a duplicate key (constraint or unique index),
   `547` for a foreign key, `515` for a missing value.
 - Transactions run concurrently, each on its own connection.
-- Durable messaging is refused at startup: `@nestjs/outbox` has no SQL
-  Server store.
+- No option sets `SESSION_CONTEXT` per transaction, so SQL Server's own
+  row-level security can't see the caller's tenant.
+- [Durable messaging](#durable-messaging): refused at startup.
 
 ### SQLite
 
 Use the `better-sqlite3` driver; a `sqlite` data source stops startup with
 `TypeOrmUnsupportedDatabaseException`.
 
+- Dates round-trip exactly; no time-zone setting is needed.
 - `Where.contains('name', 'ali')` matches `Alice`: text matching ignores
   case for ASCII letters.
 - In ascending order, `NULL`s sort first.
@@ -177,8 +162,7 @@ Use the `better-sqlite3` driver; a `sqlite` data source stops startup with
   which opens one) waits for the first to commit or roll back. A nested
   `run()` joins the transaction already open and never waits. Throughput on
   that data source is bounded by its longest-running transaction.
-- Durable messaging is refused at startup: `@nestjs/outbox` has no SQLite
-  store.
+- [Durable messaging](#durable-messaging): refused at startup.
 
 ## Module Registration
 
@@ -228,9 +212,10 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   entity: Type<Entity>;                                    // TypeORM entity class
   dataSource?: TypeOrmDataSourceToken;                     // Data source (default: 'default')
   factory?: (dataSource: DataSource) => Repository<Entity>; // Custom repository factory
-  relations?: Record<string, RelationConfig>;              // Per-relation federation settings
+  relations?: Record<string, RelationConfig>;              // Per-relation settings (cascade, …)
   rowScope?: RowScopeRegistration;                         // Declarations, bound by forRoot()
   writePolicy?: WritePolicyRegistration;
+  activity?: ActivityRegistration;
   allowEagerRelations?: boolean;
   hooks?: HookOption[];
 }
@@ -242,10 +227,9 @@ interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOpti
   `DataSourceOptions`; defaults to `'default'`
 - **`factory`** -- optional factory for custom TypeORM repositories; receives
   `DataSource`, returns `Repository<Entity>`
-- **`relations`**, **`rowScope`**, **`writePolicy`**, **`allowEagerRelations`**,
-  **`hooks`** -- the entity's declarations, including which relations are
-  federated. Read and bound by `RepositoryModule.forRoot()`; this driver
-  ignores them
+- **`relations`**, **`rowScope`**, **`writePolicy`**, **`activity`**,
+  **`allowEagerRelations`**, **`hooks`** -- the entity's declarations, read
+  by `RepositoryModule.forRoot()`; the driver ignores them
 
 A federated relation into an entity on another data source still needs that
 entity in its own data source's `entities`, since TypeORM resolves a relation
@@ -274,14 +258,10 @@ export class OrderService {
 
 ## TypeOrmRepository
 
-`TypeOrmRepository` extends `RepositoryAdapter` from
-`@concepta/nestjs-repository` and implements the protected `do*` template
-methods using TypeORM; the public methods below are inherited concrete
-wrappers that run the hook pipeline. Every operation is transaction-aware,
-runs repository hooks, and wraps opaque driver errors in
-`RepositoryQueryException`. Purpose-built `RuntimeException` subclasses such
-as `OptimisticLockException` propagate unwrapped so callers can catch them
-by type.
+Every method runs in the caller's transaction, runs repository hooks, and
+throws `RepositoryQueryException` for a driver error it can't describe.
+Typed exceptions such as `OptimisticLockException` reach you unwrapped, so
+catch them by type.
 
 ### Methods
 
@@ -306,86 +286,31 @@ an optional `ctx` (repository context) for transaction and hook support.
 
 ### Optimistic Locking
 
-`update`/`replace` automatically enforce optimistic locking whenever the
-target entity carries a TypeORM `@VersionColumn` — which includes every
-entity extending an `Audit*` or `Common*` base entity (see
-[Base Entities](#base-entities)), plus any entity that declares one itself.
-The check derives entirely from the `entity` argument the caller already
-passes in: its version is compared, atomically, against the row's current
-version at write time, and a stale write — one based on an `entity` fetched
-before someone else already updated it — is rejected with
-`OptimisticLockException` (HTTP 409) instead of silently overwriting the
-concurrent change. No extra API surface and no opt-in required, but two
-behaviors do change for versioned entities. First, the write is applied to
-a freshly re-read row rather than to the `entity` you passed: your `entity`
-instance is no longer mutated in place, the returned entity is a different
-object with no relations loaded, and any in-memory changes you made to
-`entity` that aren't also in `data` are discarded — read the result back
-from the return value. Second, because the guard runs inside a
-`TransactionScope.run()` (see below), a conflict dooms the enclosing
-transaction — catching `OptimisticLockException` and continuing does not
-rescue it; retry the whole transaction from outside, re-reading the entity
-first.
+`update` and `replace` on an entity with a `@VersionColumn` (every `Audit*`
+and `Common*` entity) reject a stale `entity` with `OptimisticLockException`
+(409). The call runs in a transaction, opening one if needed.
 
-The check runs inside a transaction, opening one scoped to just that call
-if the caller isn't already inside one (e.g. via `@Transactional()`), so a
-third writer can't interleave between the version check and the field
-write.
-
-A version value supplied by the caller in `data` is always ignored — only
-the version read from the `entity` argument, and the row's own
-auto-incrementing column, ever determine the real version. This is
-distinct from `options.expectedVersion`, below, which the caller *does*
-control.
-
-Every guarded write stamps your `@UpdateDateColumn`, even an update whose
-`data` changes nothing (its version stays the same). Your subscribers'
-`beforeUpdate`/`afterUpdate` also run one extra time per guarded write,
-with only the version in `event.entity` and no `databaseEntity`.
-`@BeforeUpdate`/`@AfterUpdate` methods on the entity don't run that extra
-time.
+- Use the return value: it is a fresh object with no relations, and changes
+  to `entity` that aren't in `data` are dropped.
+- A conflict dooms the enclosing transaction, so retry the whole transaction
+  from outside, after re-reading.
+- A version in `data` is ignored; pass `expectedVersion` (below) instead.
 
 ### Expected Version (cross-request optimistic locking)
 
-The check above guards a read-then-write inside one request; it can't stop
-two requests that each re-read before writing, since each compares against
-its own fresh value. Passing `expectedVersion` in `options` (see
-[nestjs-repository's Expected Version
-section](../nestjs-repository/README.md#expected-version)) extends the
-same atomic compare-and-swap mechanism to `delete`, `softDelete`, and
-`restore` as well — but, unlike `update`/`replace`, only when the caller
-actually supplies one. That's what keeps this non-breaking: an existing
-caller of those three methods that never passes `expectedVersion` inherits
-no new transaction requirement.
-
-This driver never decides *whether* a guard applies or *what* value to
-check — `RepositoryAdapter` resolves that into a `RepositoryVersionGuardInterface`
-descriptor and hands it down as `options.versionGuard`; the driver's only
-job is running the atomic `UPDATE ... WHERE <column> = <value>` probe
-against whatever descriptor it's given.
-
-Note how `expectedVersion` interacts with the idempotent `softDelete` of an
-already-soft-deleted row: the guard is resolved *before* the no-op, so a
-**stale** version conflicts with `OptimisticLockException` instead of quietly
-succeeding, while a **matching** version still no-ops — the driver is never
-reached either way, so its CAS does not run on that path. The idempotency
-guarantee is preserved; what `expectedVersion` adds is that a stale
-precondition against a row someone else already deleted is reported rather
-than swallowed. (Unreachable over HTTP anyway: `nestjs-crud`'s `getOneOrFail`
-re-reads with `withDeleted: false` before a soft-delete, so an
-already-soft-deleted row 404s first.)
+Pass `expectedVersion` in `options` to check the version a client saw, across
+requests (see
+[Expected Version](../nestjs-repository/README.md#expected-version)). It also
+guards `delete`, `softDelete` and `restore`, only when you pass it. On a row
+that is already soft-deleted, a stale `expectedVersion` throws
+`OptimisticLockException`, and a matching one is a no-op.
 
 ### Soft-Deleted Immutability
 
-`update`, `replace`, and `upsert` reject a soft-deleted target with
-`SoftDeletedImmutableException` (HTTP 409) — enforced once in
-`RepositoryAdapter` itself, so this driver has no separate opt-out logic to
-maintain. See [nestjs-repository's Soft-Deleted Immutability
-section](../nestjs-repository/README.md#soft-deleted-immutability) for the
-`softDelete()` no-op behavior.
-
-This guard depends only on the delete-date column, so it applies to entities
-with no version column too.
+`update`, `replace` and `upsert` reject a soft-deleted row with
+`SoftDeletedImmutableException` (409), with or without a version column. See
+[Soft-Deleted Immutability](../nestjs-repository/README.md#soft-deleted-immutability)
+for `softDelete()` on a row already deleted.
 
 ### Eager Relations
 
@@ -407,9 +332,14 @@ guarantees: row scope, write policy and hooks never see what it does.
   subscriber can write other tables without going through their repositories.
   Don't add a property that is not a column: depending on the call, it is
   dropped from the result or makes the call throw `RepositoryQueryException`.
-- **Write listeners** (`@BeforeInsert`, `@AfterUpdate`, …) receive an entity
-  the driver built without running its constructor, so they can't rely on
-  state the constructor sets, and reading an ES `#private` field throws.
+  Write listeners receive an entity built without running its constructor,
+  so they can't rely on state the constructor sets, and reading an ES
+  `#private` field throws.
+- **`update` and `replace` of a versioned entity** stamp your
+  `@UpdateDateColumn` even when `data` changes nothing. Your subscribers'
+  `beforeUpdate`/`afterUpdate` run one extra time, with only the version in
+  `event.entity` and no `databaseEntity`; the entity's own
+  `@BeforeUpdate`/`@AfterUpdate` methods don't.
 - **`update` and `replace` of an entity without a version column** write only
   the columns in `data`, with one `UPDATE` followed by a re-read in the same
   transaction, so a stale `entity` never overwrites a later writer's change.
@@ -421,10 +351,11 @@ guarantees: row scope, write policy and hooks never see what it does.
   dropped from a create or update without an error. An `update` or `replace`
   whose `data` names nothing else fails with `RepositoryQueryException`, since
   TypeORM is left with nothing to set.
-- **`cascade`** has nothing to act on. A write payload holds no relations (see
-  [Writing relations](../nestjs-repository/README.md#writing-relations)) and
-  only the entity's own columns reach TypeORM, so nothing cascades. `onDelete`
-  actions on a relation are the database's, and still apply.
+- **TypeORM's `cascade`** on a relation decorator never fires: only the
+  entity's own columns reach TypeORM. To write related rows with the entity,
+  mark the relation `cascade: true` in `forRoot` (see
+  [Writing relations](../nestjs-repository/README.md#writing-relations)).
+  `onDelete` actions are the database's, and still apply.
 - **Closure-table, nested-set and materialized-path trees** (`@Tree`) are not
   kept. The entity starts only with the `@TreeParent` key declared as a column
   of its own, and a write sets that column. TypeORM finds a row's parent only
@@ -494,40 +425,31 @@ Both `order` and `lines` then report both column pairs, so either side can be
 joined. See "Relations and row scope" in the `@concepta/nestjs-repository`
 README.
 
-### Transaction Awareness
-
-When a `PlainLiteralObject` context with an active `trx` is provided,
-`TypeOrmRepository` automatically:
-
-1. Resolves the TypeORM transaction via `ctx.trx.getOrStart(transactionKey)`
-2. Uses the transactional `EntityManager` for all operations
-
 ## WhereClause Translation
 
-`TypeOrmRepository` translates the ORM-agnostic `WhereClause` AST from
-`@concepta/nestjs-repository` into TypeORM `FindOptionsWhere` objects.
+Every `WhereClause` from `@concepta/nestjs-repository` translates.
 
 ### Supported Operators
 
-| WhereOperator | TypeORM Translation | Description |
-| --- | --- | --- |
-| `eq` | `Equal(value)` | Equal |
-| `ne` | `Not(Equal(value))` | Not equal |
-| `gt` | `MoreThan(value)` | Greater than |
-| `gte` | `MoreThanOrEqual(value)` | Greater than or equal |
-| `lt` | `LessThan(value)` | Less than |
-| `lte` | `LessThanOrEqual(value)` | Less than or equal |
-| `contains` | `Raw(LIKE '%value%' ESCAPE '!')` | Contains substring |
-| `ncontains` | `Not(Raw(LIKE '%value%' ESCAPE '!'))` | Does not contain substring |
-| `starts` | `Raw(LIKE 'value%' ESCAPE '!')` | Starts with |
-| `nstarts` | `Not(Raw(LIKE 'value%' ESCAPE '!'))` | Does not start with |
-| `ends` | `Raw(LIKE '%value' ESCAPE '!')` | Ends with |
-| `nends` | `Not(Raw(LIKE '%value' ESCAPE '!'))` | Does not end with |
-| `in` | `In(values)` | In array |
-| `nin` | `Not(In(values))` | Not in array |
-| `null` | `IsNull()` | Is null |
-| `nnull` | `Not(IsNull())` | Is not null |
-| `between` | `Between(from, to)` | Between range |
+| WhereOperator | Description |
+| --- | --- |
+| `eq` | Equal |
+| `ne` | Not equal |
+| `gt` | Greater than |
+| `gte` | Greater than or equal |
+| `lt` | Less than |
+| `lte` | Less than or equal |
+| `contains` | Contains substring |
+| `ncontains` | Does not contain substring |
+| `starts` | Starts with |
+| `nstarts` | Does not start with |
+| `ends` | Ends with |
+| `nends` | Does not end with |
+| `in` | In array |
+| `nin` | Not in array |
+| `null` | Is null |
+| `nnull` | Is not null |
+| `between` | Between range |
 
 ### Text Matching
 
@@ -577,48 +499,21 @@ const orders = await orderRepo.find(
 );
 ```
 
-### Translation Process
-
-1. The `WhereClause` AST is flattened into Disjunctive Normal Form (DNF)
-   using `toDnf()` from `RepositoryAdapter`
-2. Each AND-branch is translated to a TypeORM `FindOptionsWhere` object
-3. Same-field conditions within a branch are merged using TypeORM `And()`
-4. The resulting array of `FindOptionsWhere` objects represents the OR
-   of all branches
-
 ## Transaction Support
 
 Each adapter provides a transaction and a transaction factory
-(`TypeOrmPostgresTransaction`, `TypeOrmSqliteTransaction`, …) for
-`@concepta/nestjs-repository`'s transaction layer. They extend
-`TypeOrmTransaction` and `TypeOrmTransactionFactory`.
-
-### TypeOrmTransaction
-
-Wraps a TypeORM `QueryRunner` to manage transaction lifecycle:
-
-```ts
-const tx = new TypeOrmPostgresTransaction(dataSource);
-await tx.start();
-
-const manager = tx.getClient();
-await manager.save(entity);
-
-await tx.commit();
-```
+(`TypeOrmPostgresTransaction`, `TypeOrmSqliteTransaction`, …). You don't
+build these yourself: `RepositoryModule.forRoot()` registers a factory for
+each data source your entities use, and `TransactionScope.run()` and
+`@Transactional()` open transactions through it.
 
 | Property / Method | Description |
 | --- | --- |
 | `isActive` | Whether the transaction is currently active |
-| `start()` | Create a QueryRunner and begin a transaction; on Postgres, apply its `transactionSettings`; on Oracle, set its `applicationContext` |
-| `commit()` | Commit the transaction and release the QueryRunner; on Oracle, clear its `applicationContext` first |
-| `rollback()` | Rollback the transaction and release the QueryRunner; on Oracle, clear its `applicationContext` first |
-| `getClient()` | Get the transactional `EntityManager` |
-
-### TypeOrmTransactionFactory
-
-Factory for creating the adapter's transactions. Automatically registered
-with the `TransactionFactoryRegistry` by `RepositoryModule.forRoot()`.
+| `start()` | Begin the transaction; on Postgres, apply its `transactionSettings`; on Oracle, set its `applicationContext` |
+| `commit()` | Commit, then (on Oracle) clear its `applicationContext` values, and release the connection |
+| `rollback()` | Roll back, then (on Oracle) clear its `applicationContext` values, and release the connection |
+| `getClient()` | The transactional `EntityManager` |
 
 The transaction key names the adapter and the data source:
 `typeorm-postgres:<dataSourceName>`, `typeorm-mysql:<dataSourceName>`,
@@ -626,16 +521,10 @@ The transaction key names the adapter and the data source:
 `typeorm-sqlserver:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
 (e.g., `typeorm-postgres:default`).
 
-`TypeOrmSqliteTransactionFactory` declares
-`supportsConcurrentTransactions: false`, so transactions on a SQLite data
-source run one at a time (see [SQLite](#sqlite)); the other factories
-declare `true`.
+### Joining a Transaction
 
-### Automatic Transaction Integration
-
-`RepositoryModule.forRoot()` registers a transaction factory for each data
-source your entities use. The `TypeOrmRepository`
-joins transactions from the context:
+Pass the `ctx` from `TransactionScope.run()` or `@Transactional()` and the
+call joins that transaction:
 
 ```ts
 import { TransactionScope } from '@concepta/nestjs-repository';
@@ -650,7 +539,6 @@ export class OrderService {
 
   async createOrder(ctx: PlainLiteralObject, dto: DeepPartial<OrderEntity>) {
     return this.txScope.run(ctx, async (txCtx) => {
-      // TypeOrmRepository automatically uses the transactional EntityManager
       return this.orderRepo.create(dto, { ctx: txCtx });
     });
   }
@@ -1040,16 +928,18 @@ gives a TypeORM registration durable messaging through
 `DurableMessagingModule` (see the `nestjs-repository` README). It builds the
 [`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) store on the
 registration's own data source: `PostgresOutboxStore` for `postgres`,
-`MySqlOutboxStore` for `mysql`. Any other database, MariaDB, Oracle, SQL
-Server and SQLite included, fails startup with `UnsupportedDurableDriverException`
-(`@nestjs/outbox` doesn't support MariaDB yet). You never build the store or
-touch the data source.
+`MySqlOutboxStore` for `mysql`. Every other database fails startup with
+`UnsupportedDurableDriverException`. You never build the store or touch the
+data source.
 
-```bash
-npm install @nestjs/outbox
+```sh
+yarn add @nestjs/outbox
 ```
 
 ```ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { RepositoryModule } from '@concepta/nestjs-repository';
 import { DurableMessagingModule } from '@concepta/nestjs-repository/optional/outbox';
 import { TypeOrmDurable } from '@concepta/nestjs-repository-typeorm/optional/outbox';
 import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
@@ -1159,6 +1049,7 @@ Requirements and limits:
 | `EntityNotFoundException` | `@concepta/nestjs-repository` | An `update` or `replace` named a row that is no longer stored |
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
 | `TypeOrmUnsupportedDatabaseException` | Not exported; its `errorCode` is `TYPEORM_UNSUPPORTED_DATABASE` | At startup: an entity is registered on a data source of a database its adapter isn't for |
+| `TypeOrmRelationMetadataException` | Not exported; its `errorCode` is `TYPEORM_RELATION_METADATA` | At startup: a relation lacks its `@JoinColumn` or its inverse side |
 | `TypeOrmMysqlFoundRowsException` | `/mysql`, `/mariadb`; its `errorCode` is `TYPEORM_MYSQL_FOUND_ROWS` | At startup: the data source turns off the `FOUND_ROWS` client flag — see [MySQL](#mysql) |
 
 ## Entry Points

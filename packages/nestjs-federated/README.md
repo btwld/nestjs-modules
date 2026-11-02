@@ -97,7 +97,8 @@ The base class stores the user's id in a `userId` column. The relation is
 optional; declare it, joined on `userId`, to get a foreign key constraint to
 your users table.
 
-For SQLite, extend `IdentitySqliteEntity` instead.
+The base for each database is listed under
+[Optional TypeORM Exports](#optional-typeorm-exports).
 
 ### Step 2: Configure the User Port
 

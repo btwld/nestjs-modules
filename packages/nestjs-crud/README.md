@@ -391,7 +391,7 @@ request schema to accept it. See Cascading writes in
 `@concepta/nestjs-repository`.
 
 **Update / Replace and optimistic locking.** When the entity carries a
-version column (`CommonPostgresEntity`/`CommonSqliteEntity`), `update`/
+version column (every `Common*` base entity), `update`/
 `replace` are guarded by an atomic version compare-and-swap in the
 repository layer. A concurrent write that lands between this request's read
 and its write is rejected with `409 Conflict` (`OptimisticLockException`)

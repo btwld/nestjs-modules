@@ -69,11 +69,12 @@ Then import `forFeature()` with the keys each feature module injects.
 
 `forRoot()` registers every entity, grouped by the driver that serves it, and
 sets up the transaction infrastructure (factory registry, scope, runner,
-interceptor). Import it once.
+interceptor). Import it once. `YourDriverModule` in the examples stands for
+your driver's module, such as one of
+[nestjs-repository-typeorm's adapters](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -81,7 +82,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
       defaultTimeout: 30000, // transaction timeout in ms (default)
       drivers: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          driver: YourDriverModule,
           entities: [
             { key: 'orders', entity: Order },
             { key: 'customers', entity: Customer },
@@ -119,7 +120,7 @@ RepositoryModule.forRoot({
   imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         {
           key: 'orders',
@@ -142,7 +143,7 @@ Entities stay static; only the settings come from the factory.
     RepositoryModule.forRootAsync({
       drivers: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          driver: YourDriverModule,
           entities: [{ key: 'orders', entity: Order }],
         },
       ],
@@ -649,7 +650,7 @@ can also configure per-relation behavior on its `forRoot()` entry:
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [{
         key: 'users',
         entity: UserEntity,
@@ -867,7 +868,7 @@ An entity whose relations load on their own, eagerly, opts in with
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'comments', entity: CommentEntity, allowEagerRelations: true },
       ],
@@ -1639,7 +1640,6 @@ have to be true for it to run:
 import { Module } from '@nestjs/common';
 import { CoreModule } from '@concepta/nestjs-core';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -1647,7 +1647,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          driver: YourDriverModule,
           entities: [
             { key: 'orders', entity: Order, hooks: [OrderDefaultsHook] },
           ],
@@ -2360,11 +2360,13 @@ Structural only — nothing probes what a resolver decides:
 
 Row scope protects every repository call. To have the database hide other
 tenants' rows too, even from SQL that bypasses the repository, add row-level
-security behind it. This needs a driver and database that support it — today,
-`nestjs-repository-typeorm` on Postgres, which sets the caller's tenant on
-every transaction from the same `RowScopeCtx` overlay. See its
-[Row-Level Security](../nestjs-repository-typeorm/README.md#row-level-security-postgres)
-section.
+security behind it. This needs a driver and database that support it, such
+as `nestjs-repository-typeorm` on Postgres or Oracle, which sets the caller's
+tenant on every transaction from the same `RowScopeCtx` overlay. See its
+[Row-Level Security (Postgres)](../nestjs-repository-typeorm/README.md#row-level-security-postgres)
+and
+[Virtual Private Database (Oracle)](../nestjs-repository-typeorm/README.md#virtual-private-database-oracle)
+sections.
 
 ## Write Policy
 
@@ -2375,7 +2377,7 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         {
           key: 'statement-items',
@@ -2474,13 +2476,13 @@ Add `activity` to an entity to record who changed which of its rows, when, and
 which columns:
 
 ```ts
-@Entity()
-export class Activity extends ActivityPostgresEntity {}
+// Extend your driver's activity base entity.
+export class Activity extends YourDriverActivityEntity {}
 
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'invoices', entity: Invoice, activity: { store: 'activity' } },
         {
@@ -2744,7 +2746,7 @@ the registrations that conflict.
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'users', entity: UserEntity },
         { key: 'users', entity: AdminEntity }, // duplicate key!
@@ -2768,7 +2770,7 @@ and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'users', entity: UserEntity, relations: { posts: { federated: true } } },
         { key: 'posts', entity: PostEntity, dataSource: 'content' },

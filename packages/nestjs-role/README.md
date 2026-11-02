@@ -63,9 +63,10 @@ Register the module, define your entities, and wire up repositories.
 
 ### Entities
 
-Define TypeORM entities that implement the domain interfaces. Extend
-`CommonSqliteEntity`/`CommonPostgresEntity`, which carry the audit
-columns with the decorators the repository looks for:
+Define TypeORM entities that implement the domain interfaces. Extend your
+adapter's `Common*` base entity (see
+[Choose Your Adapter](../nestjs-repository-typeorm/README.md#choose-your-adapter)),
+which carries the audit columns with the decorators the repository looks for:
 
 ```ts
 import { Entity, Column } from 'typeorm';
