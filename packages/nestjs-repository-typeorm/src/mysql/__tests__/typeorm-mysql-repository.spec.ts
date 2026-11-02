@@ -63,7 +63,7 @@ describe(TypeOrmMysqlRepository.name, () => {
     expect(build({})).not.toThrow();
   });
 
-  it('gives a read that skips rows without taking a number the largest limit', () => {
+  it('sets the largest limit on a read that skips rows without a take', () => {
     const repository = new InspectedMysqlRepository(mysqlRepo(), {
       entityKey: 'test',
     });

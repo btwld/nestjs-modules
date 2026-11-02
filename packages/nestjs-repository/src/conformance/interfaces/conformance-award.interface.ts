@@ -3,8 +3,7 @@ import { type ConformanceAuthorInterface } from './conformance-author.interface.
 /**
  * An award: an author's second to-many relation, beside `books`.
  *
- * `author` is a to-one relation whose foreign key is `authorId`, a reference
- * to an author.
+ * `author` is a to-one relation by `authorId`.
  */
 export interface ConformanceAwardInterface {
   id: string;

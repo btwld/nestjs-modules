@@ -111,7 +111,7 @@ Further options for scoped, append-only or recorded entities:
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
-| `options` | The driver's own options, such as the TypeORM driver's `transactionSettings`; type-checked against the driver |
+| `options` | The driver's own options, such as per-transaction settings; type-checked against the driver |
 | `imports` | Modules exporting the row scope resolvers your entities declare |
 
 ```ts
@@ -364,8 +364,8 @@ delete for that entity. The column holds a `Date` once set and `null` until
 then. `softDelete` and `restore` set and clear it, and a read without
 `withDeleted` leaves out rows where it is set, both on the entity and on every
 relation the read joins. Restoring a row that isn't soft-deleted leaves it as
-it is. A driver that cannot do all of that refuses at startup an entity that
-declares a remove date, rather than reporting it as an ordinary column. On an
+it is. A driver that cannot do all of that must refuse, at startup, an entity
+that declares a remove date. On an
 entity without the column, `softDelete` and `restore` throw, and
 `withDeleted` changes nothing.
 
@@ -443,13 +443,14 @@ runRepositoryConformance(
   refuses a book naming no author, and the delete of an author a book still
   names), and `softDelete`. A refused one runs its refusal cases, if it has
   any, instead. A driver that refuses `softDelete` must refuse at startup an
-  entity that declares a remove date, and binds the fixtures to entities
-  whose `removedAt` is an ordinary column.
+  entity that declares a remove date; its harness binds the fixtures to
+  entities whose `removedAt` is an ordinary column.
   Every other case is required, including that your driver describes the
   errors its store raises.
 - **Versions.** Every driver is checked for changing the version on each
-  write that changes a stored row, and for keeping it on one whose values
-  match what is stored. Refusing a stale row is checked inside a transaction only.
+  write that changes a stored row, and for keeping it on a write that
+  changes nothing. Refusing a stale row is checked inside a transaction
+  only.
 - **Transactions.** On a store with a single connection, a call that ignores
   the run's `ctx` still lands in the open transaction, so the suite can't see
   it. Run it against a store with more than one connection too.
