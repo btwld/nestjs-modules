@@ -6,6 +6,7 @@ import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-prov
 import { type TypeOrmAdapterDefinitionInterface } from '../typeorm-adapter-definition.interface.js';
 import { registerTypeOrmAdapter } from '../typeorm-repository.util.js';
 
+import { type TypeOrmOracleDriverOptionsInterface } from './typeorm-oracle-driver-options.interface.js';
 import { TypeOrmOracleRepository } from './typeorm-oracle-repository.js';
 import { TypeOrmOracleTransactionFactory } from './typeorm-oracle-transaction.factory.js';
 import { TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX } from './typeorm-oracle.constants.js';
@@ -34,16 +35,22 @@ export class TypeOrmOracleRepositoryModule {
    */
   static register(
     entities: TypeOrmProviderOptionsInterface[],
+    options?: TypeOrmOracleDriverOptionsInterface,
   ): DynamicRepositoryModule {
-    return registerTypeOrmAdapter(TYPEORM_ORACLE_ADAPTER, entities);
+    return registerTypeOrmAdapter(TYPEORM_ORACLE_ADAPTER, entities, options);
   }
 }
 
-export const TYPEORM_ORACLE_ADAPTER: TypeOrmAdapterDefinitionInterface = {
-  module: TypeOrmOracleRepositoryModule,
-  transactionKeyPrefix: TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX,
-  createRepository: (repo, options) =>
-    new TypeOrmOracleRepository(repo, options),
-  createTransactionFactory: (dataSource, dataSourceKey) =>
-    new TypeOrmOracleTransactionFactory(dataSource, dataSourceKey),
-};
+export const TYPEORM_ORACLE_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmOracleDriverOptionsInterface> =
+  {
+    module: TypeOrmOracleRepositoryModule,
+    transactionKeyPrefix: TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX,
+    createRepository: (repo, options) =>
+      new TypeOrmOracleRepository(repo, options),
+    createTransactionFactory: (dataSource, dataSourceKey, options) =>
+      new TypeOrmOracleTransactionFactory(
+        dataSource,
+        dataSourceKey,
+        options?.applicationContext,
+      ),
+  };

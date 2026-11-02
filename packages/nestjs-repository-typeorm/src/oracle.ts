@@ -6,6 +6,9 @@
  */
 
 export { TypeOrmOracleRepositoryModule } from './oracle/typeorm-oracle-repository.module.js';
+export { TypeOrmOracleDriverOptionsInterface } from './oracle/typeorm-oracle-driver-options.interface.js';
+export { TypeOrmOracleApplicationContextInterface } from './oracle/typeorm-oracle-application-context.interface.js';
+export { TypeOrmOracleApplicationContextResolver } from './oracle/typeorm-oracle-application-context-resolver.type.js';
 export { TypeOrmOracleRepository } from './oracle/typeorm-oracle-repository.js';
 export { TypeOrmRepositoryOptions } from './repository/typeorm-repository-options.interface.js';
 export { TypeOrmOracleTransaction } from './oracle/typeorm-oracle-transaction.js';

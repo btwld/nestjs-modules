@@ -22,6 +22,7 @@ source's transactions, and base entities with audit columns and a version.
 - [WhereClause Translation](#whereclause-translation)
 - [Transaction Support](#transaction-support)
 - [Row-Level Security (Postgres)](#row-level-security-postgres)
+- [Virtual Private Database (Oracle)](#virtual-private-database-oracle)
 - [Repository Hooks](#repository-hooks)
 - [Base Entities](#base-entities)
 - [Durable Messaging](#durable-messaging)
@@ -126,6 +127,9 @@ Uses the `oracledb` client in its default Thin mode; install it beside
 - In ascending order, `NULL`s sort last.
 - `createMany` inserts one row per statement.
 - Transactions run concurrently, each on its own connection.
+- `applicationContext` sets values at the start of every transaction, such
+  as the caller's tenant — see
+  [Virtual Private Database (Oracle)](#virtual-private-database-oracle).
 - Durable messaging is refused at startup: `@nestjs/outbox` has no Oracle
   store.
 
@@ -575,9 +579,9 @@ await tx.commit();
 | Property / Method | Description |
 | --- | --- |
 | `isActive` | Whether the transaction is currently active |
-| `start()` | Create a QueryRunner and begin a transaction; on Postgres, apply its `transactionSettings` |
-| `commit()` | Commit the transaction and release the QueryRunner |
-| `rollback()` | Rollback the transaction and release the QueryRunner |
+| `start()` | Create a QueryRunner and begin a transaction; on Postgres, apply its `transactionSettings`; on Oracle, set its `applicationContext` |
+| `commit()` | Commit the transaction and release the QueryRunner; on Oracle, clear its `applicationContext` first |
+| `rollback()` | Rollback the transaction and release the QueryRunner; on Oracle, clear its `applicationContext` first |
 | `getClient()` | Get the transactional `EntityManager` |
 
 ### TypeOrmTransactionFactory
@@ -587,7 +591,8 @@ with the `TransactionFactoryRegistry` by `RepositoryModule.forRoot()`.
 
 The transaction key names the adapter and the data source:
 `typeorm-postgres:<dataSourceName>`, `typeorm-mysql:<dataSourceName>`,
-`typeorm-mariadb:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
+`typeorm-mariadb:<dataSourceName>`, `typeorm-oracle:<dataSourceName>` or
+`typeorm-sqlite:<dataSourceName>`
 (e.g., `typeorm-postgres:default`).
 
 `TypeOrmSqliteTransactionFactory` declares
@@ -724,6 +729,134 @@ create role app_admin login password '...' bypassrls;
   their owner and skip the policies. `security definer` functions always do.
 - **Code on the raw `DataSource`** runs outside the driver's transactions and
   has no tenant.
+
+## Virtual Private Database (Oracle)
+
+Oracle's Virtual Private Database (VPD) does on Oracle what
+[row-level security](#row-level-security-postgres) does on Postgres: the
+database hides other tenants' rows, even from SQL that bypasses the
+repository. Row scope stays the enforcement; VPD is the backstop. VPD comes
+with Oracle Enterprise Edition and Oracle Database Free, not Standard
+Edition 2.
+
+### Setting the tenant in an application context
+
+A VPD policy reads the caller's tenant from an application context, which
+only its own package can set. Give the Oracle adapter `applicationContext`:
+that package's `procedure` and a `values` function. Every transaction it
+opens starts by setting those values, read from the caller's context.
+
+```ts
+import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
+import { TypeOrmOracleRepositoryModule } from '@concepta/nestjs-repository-typeorm/oracle';
+
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmOracleRepositoryModule,
+      entities: [{ key: 'orders', entity: Order }],
+      options: {
+        applicationContext: {
+          procedure: 'app_owner.app_ctx_pkg.set_value',
+          values: (ctx) => ({
+            tenant_id: ctx.supports(RowScopeCtx)
+              ? ctx.with(RowScopeCtx).tenantId
+              : undefined,
+          }),
+        },
+      },
+    },
+  ],
+});
+```
+
+As on Postgres, read the tenant from the same `RowScopeCtx` overlay your row
+scope resolver reads. The second argument is the data source name, and an
+`undefined` value is skipped. Only the Oracle adapter takes the option.
+
+What you get: each transaction the driver opens calls
+`procedure(name, value)` for each value before any of your queries run, from
+the same places as on Postgres. An application context outlives the
+transaction on a pooled connection, so before the connection goes back to
+the pool the driver calls `procedure(name, NULL)` for each value it set, and
+the next request starts with none. If setting a value fails, the transaction
+is rolled back, what was set is cleared, and you get the error.
+
+### VPD policies
+
+The context, its package, the policies and the users are your migrations. A
+recipe for one tenant-scoped table:
+
+```sql
+-- The context, settable only through its package.
+create or replace context app_ctx using app_owner.app_ctx_pkg;
+
+create or replace package app_owner.app_ctx_pkg as
+  procedure set_value(p_name varchar2, p_value varchar2);
+end;
+/
+create or replace package body app_owner.app_ctx_pkg as
+  procedure set_value(p_name varchar2, p_value varchar2) is
+  begin
+    dbms_session.set_context('app_ctx', p_name, p_value);
+  end;
+end;
+/
+
+-- An unset tenant matches no rows: reads return nothing, writes are refused.
+create or replace function app_owner.tenant_policy(
+  p_schema varchar2, p_object varchar2
+) return varchar2 is
+begin
+  return 'tenant_id = sys_context(''app_ctx'', ''tenant_id'')';
+end;
+/
+begin
+  dbms_rls.add_policy(
+    object_schema   => 'APP_OWNER',
+    object_name     => 'ORDERS',
+    policy_name     => 'tenant_isolation',
+    function_schema => 'APP_OWNER',
+    policy_function => 'tenant_policy',
+    statement_types => 'SELECT,INSERT,UPDATE,DELETE',
+    update_check    => true
+  );
+end;
+/
+
+-- The application connects as a user that owns nothing and isn't exempt.
+create user app_user identified by "...";
+grant create session to app_user;
+grant select, insert, update, delete on app_owner.orders to app_user;
+grant execute on app_owner.app_ctx_pkg to app_user;
+```
+
+The application reaches the owner's table through a synonym
+(`create synonym app_user.orders for app_owner.orders`) or the entity's
+`schema`. A table TypeORM created with a lower-case name is quoted:
+`object_name => '"orders"'`, and `"tenant_id"` in the policy's predicate.
+
+### Before you turn VPD on
+
+- **Run every request in a transaction, reads included**, and **pass `ctx`
+  to every repository call**, as on Postgres: without either there is no
+  tenant, so reads return no rows and writes are refused or change nothing.
+- **Keep per-user rules in row scope.** The policy covers the tenant only.
+- **Serve callers who read across tenants from a user with
+  `EXEMPT ACCESS POLICY`**, such as the one your migrations run as. As on
+  Postgres, the policy still applies when `relax` lifts the tenant.
+- **Include `tenant_id` in foreign keys.** Oracle checks constraints without
+  the policies, so otherwise a row can point into another tenant.
+- **Keep the context package working.** If clearing a value fails, the
+  driver logs the error and returns the connection to the pool anyway. Until
+  the next transaction on it sets its own values, a read outside a
+  transaction on that connection can see the last caller's tenant. Running
+  every request in a transaction closes that gap.
+- **Code on the raw `DataSource`** runs outside the driver's transactions and
+  has no tenant.
+
+Views and definer's-rights code need nothing extra: VPD polices the tables
+underneath them with the caller's context.
 
 ## Repository Hooks
 
@@ -1001,6 +1134,6 @@ Requirements and limits:
 | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
-| `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
+| `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

@@ -38,6 +38,14 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
   protected async afterBegin(_queryRunner: QueryRunner): Promise<void> {}
 
   /**
+   * Hands the connection back once the transaction has ended or failed to
+   * start, after any commit or rollback.
+   */
+  protected async release(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.release();
+  }
+
+  /**
    * Whether the transaction is currently active.
    */
   get isActive(): boolean {
@@ -136,7 +144,7 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
     }
 
     try {
-      await queryRunner.release();
+      await this.release(queryRunner);
     } catch (releaseError) {
       Logger.error(
         `Failed to release QueryRunner after start() failed: ${releaseError}`,
@@ -147,7 +155,7 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
 
   private async cleanup(): Promise<void> {
     if (this.queryRunner) {
-      await this.queryRunner.release();
+      await this.release(this.queryRunner);
       this.queryRunner = null;
     }
   }
