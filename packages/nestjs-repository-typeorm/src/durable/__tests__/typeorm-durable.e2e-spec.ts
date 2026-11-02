@@ -85,17 +85,20 @@ describe(TypeOrmDurable.name, () => {
       );
     });
 
-    it('builds a MySqlOutboxStore for a mysql data source', () => {
-      const { durable } = durableResolving(new DataSource({ type: 'mysql' }));
+    it.each<'mysql' | 'mariadb'>(['mysql', 'mariadb'])(
+      'builds a MySqlOutboxStore for a %s data source',
+      (type) => {
+        const { durable } = durableResolving(new DataSource({ type }));
 
-      expect(durable.bind(repository).store).toBeInstanceOf(MySqlOutboxStore);
-    });
+        expect(durable.bind(repository).store).toBeInstanceOf(MySqlOutboxStore);
+      },
+    );
 
     it('refuses a database @nestjs/outbox has no store for', () => {
-      const { durable } = durableResolving(new DataSource({ type: 'mariadb' }));
+      const { durable } = durableResolving(new DataSource({ type: 'oracle' }));
 
       expect(() => durable.bind(repository)).toThrow(
-        '@nestjs/outbox has no store for the mariadb database',
+        '@nestjs/outbox has no store for the oracle database',
       );
     });
 

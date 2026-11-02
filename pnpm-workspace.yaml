@@ -101,3 +101,7 @@ overrides:
   # TODOs.md for the investigation to fix the hoisting logic (or confirm 4.5.x
   # is correct) and widen the range back.
   zod: 4.4.3
+
+minimumReleaseAgeExclude:
+  - '@nestjs/outbox@0.1.4'
+  - '@nestjs/store-kit@0.1.3'

@@ -95,9 +95,11 @@ database stops startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### MariaDB
 
-MariaDB works like [MySQL](#mysql), flags, `timezone` and collations
-included. The one difference: [durable messaging](#durable-messaging) is
-refused at startup.
+MariaDB works like [MySQL](#mysql), flags, `timezone`, collations and
+[durable messaging](#durable-messaging) included. The outbox store needs
+MariaDB 11.4.7 or later and refuses an earlier one at startup; for later
+MariaDB versions, see the
+[`@nestjs/outbox` README](https://www.npmjs.com/package/@nestjs/outbox).
 
 ### Oracle
 
@@ -928,9 +930,9 @@ gives a TypeORM registration durable messaging through
 `DurableMessagingModule` (see the `nestjs-repository` README). It builds the
 [`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) store on the
 registration's own data source: `PostgresOutboxStore` for `postgres`,
-`MySqlOutboxStore` for `mysql`. Every other database fails startup with
-`UnsupportedDurableDriverException`. You never build the store or touch the
-data source.
+`MySqlOutboxStore` for `mysql` and `mariadb`. Every other database fails
+startup with `UnsupportedDurableDriverException`. You never build the store
+or touch the data source.
 
 ```sh
 yarn add @nestjs/outbox
@@ -1030,8 +1032,9 @@ Operating it:
 
 Requirements and limits:
 
-- Postgres or MySQL, through the registration's TypeORM data source. The
-  outbox lives on that data source, so publish from scopes that write to it.
+- Postgres, MySQL or MariaDB, through the registration's TypeORM data
+  source. The outbox lives on that data source, so publish from scopes that
+  write to it.
 - One `DurableMessagingModule.forRoot()` per application.
 - Delivery is at least once: a handler that does not use `once` must be
   idempotent.
