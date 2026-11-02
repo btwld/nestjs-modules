@@ -158,8 +158,9 @@ export class ConformanceTagEntity implements ConformanceTagInterface {
   books?: ConformanceBookEntity[];
 }
 
+// In the order TypeORM writes the lines' foreign key, which MySQL requires.
 @Entity('conformance_tenant_order')
-@Unique(['tenantId', 'id'])
+@Unique(['id', 'tenantId'])
 export class ConformanceTenantOrderEntity implements ConformanceTenantOrderInterface {
   @PrimaryColumn({ type: 'varchar' })
   id!: string;

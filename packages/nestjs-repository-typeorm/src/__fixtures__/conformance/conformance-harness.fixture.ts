@@ -5,6 +5,7 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
 
+import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-repository.module.js';
 import { type TypeOrmPostgresRepositoryModule } from '../../postgres/typeorm-postgres-repository.module.js';
 import { type TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
 
@@ -37,7 +38,9 @@ const TABLES = [
 
 /** The adapters whose conformance this harness runs. */
 type TypeOrmAdapterModule =
-  typeof TypeOrmPostgresRepositoryModule | typeof TypeOrmSqliteRepositoryModule;
+  | typeof TypeOrmPostgresRepositoryModule
+  | typeof TypeOrmMysqlRepositoryModule
+  | typeof TypeOrmSqliteRepositoryModule;
 
 /**
  * A TypeORM adapter's conformance harness for its database: the adapter,

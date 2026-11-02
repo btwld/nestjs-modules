@@ -29,8 +29,8 @@ let status = 1;
 try {
   if (run('docker', [...compose, 'up', '-d', '--wait']) !== 0) {
     console.error(
-      'Could not start the test databases. Is Docker running, and is port ' +
-        '55432 free?',
+      'Could not start the test databases. Is Docker running, and are ports ' +
+        '55432 (Postgres) and 53306 (MySQL) free?',
     );
   } else {
     status = run('pnpm', [
