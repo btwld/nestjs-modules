@@ -72,6 +72,8 @@
     "test:all": "pnpm test && pnpm test:e2e",
     "pretest:docker": "tsc -b",
     "test:docker": "node ./scripts/test-docker.mjs",
+    "pretest:docker:oracle": "tsc -b",
+    "test:docker:oracle": "node ./scripts/test-docker.mjs oracle",
     "smoke": "node ./scripts/smoke-test.mjs",
     "doc": "rimraf ./docs && typedoc",
     "doc:cov": "pnpm doc --coverageOutputType all",
