@@ -73,7 +73,7 @@ interceptor). Import it once.
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -81,7 +81,7 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
       defaultTimeout: 30000, // transaction timeout in ms (default)
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'orders', entity: Order },
             { key: 'customers', entity: Customer },
@@ -119,7 +119,7 @@ RepositoryModule.forRoot({
   imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [
         {
           key: 'orders',
@@ -142,7 +142,7 @@ Entities stay static; only the settings come from the factory.
     RepositoryModule.forRootAsync({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'orders', entity: Order }],
         },
       ],
@@ -649,7 +649,7 @@ can also configure per-relation behavior on its `forRoot()` entry:
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [{
         key: 'users',
         entity: UserEntity,
@@ -867,7 +867,7 @@ An entity whose relations load on their own, eagerly, opts in with
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [
         { key: 'comments', entity: CommentEntity, allowEagerRelations: true },
       ],
@@ -1639,7 +1639,7 @@ have to be true for it to run:
 import { Module } from '@nestjs/common';
 import { CoreModule } from '@concepta/nestjs-core';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -1647,7 +1647,7 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'orders', entity: Order, hooks: [OrderDefaultsHook] },
           ],
@@ -2375,7 +2375,7 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [
         {
           key: 'statement-items',
@@ -2480,7 +2480,7 @@ export class Activity extends ActivityPostgresEntity {}
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [
         { key: 'invoices', entity: Invoice, activity: { store: 'activity' } },
         {
@@ -2744,7 +2744,7 @@ the registrations that conflict.
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [
         { key: 'users', entity: UserEntity },
         { key: 'users', entity: AdminEntity }, // duplicate key!
@@ -2768,7 +2768,7 @@ and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [
         { key: 'users', entity: UserEntity, relations: { posts: { federated: true } } },
         { key: 'posts', entity: PostEntity, dataSource: 'content' },

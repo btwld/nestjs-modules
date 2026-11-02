@@ -10,7 +10,7 @@ import {
   getDynamicRepositoryToken,
   RepositoryModule,
 } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { UserCredentialsMapper } from '../infrastructure/persistence/user-credentials.mapper.js';
 import { UserCredentialsRepository } from '../infrastructure/persistence/user-credentials.repository.js';
@@ -54,7 +54,7 @@ describe('UserModule repositories', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: 'user', entity: UserEntityFixture },
                 {

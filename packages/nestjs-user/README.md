@@ -69,7 +69,7 @@ Global registration. Required once per application.
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import {
   CreatePasswordCommand,
   PasswordModule,
@@ -78,16 +78,16 @@ import {
 } from '@concepta/nestjs-password';
 import { UserModule } from '@concepta/nestjs-user';
 import {
-  UserCredentialSqliteEntity,
-  UserSqliteEntity,
+  UserCredentialPostgresEntity,
+  UserPostgresEntity,
 } from '@concepta/nestjs-user/optional/typeorm';
 import { Entity } from 'typeorm';
 
 @Entity()
-export class UserEntity extends UserSqliteEntity {}
+export class UserEntity extends UserPostgresEntity {}
 
 @Entity()
-export class UserCredentialEntity extends UserCredentialSqliteEntity {}
+export class UserCredentialEntity extends UserCredentialPostgresEntity {}
 
 @Module({
   imports: [
@@ -95,7 +95,7 @@ export class UserCredentialEntity extends UserCredentialSqliteEntity {}
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'user', entity: UserEntity },
             { key: 'user-credentials', entity: UserCredentialEntity },

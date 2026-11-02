@@ -69,18 +69,18 @@ columns with the decorators the repository looks for:
 
 ```ts
 import { Entity, Column } from 'typeorm';
-import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 import { RoleEntityInterface, RoleAssignmentEntityInterface } from '@concepta/nestjs-role';
 
 @Entity()
-export class RoleEntity extends CommonSqliteEntity implements RoleEntityInterface {
+export class RoleEntity extends CommonPostgresEntity implements RoleEntityInterface {
   @Column() name!: string;
   @Column({ nullable: true }) description!: string;
 }
 
 @Entity()
 export class UserRoleEntity
-  extends CommonSqliteEntity
+  extends CommonPostgresEntity
   implements RoleAssignmentEntityInterface {
   @Column() roleId!: string;
   @Column() assigneeId!: string;
@@ -103,7 +103,7 @@ define them yourself, use `@CreateDateColumn`, `@UpdateDateColumn`,
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import { RoleModule } from '@concepta/nestjs-role';
 
 @Module({
@@ -114,7 +114,7 @@ import { RoleModule } from '@concepta/nestjs-role';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'role', entity: RoleEntity },
             { key: 'user-role', entity: UserRoleEntity },

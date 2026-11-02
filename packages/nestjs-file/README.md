@@ -66,10 +66,10 @@ register `FileModule` with your storage services:
 
 ```ts
 import { Entity } from 'typeorm';
-import { FileSqliteEntity } from '@concepta/nestjs-file/optional/typeorm';
+import { FilePostgresEntity } from '@concepta/nestjs-file/optional/typeorm';
 
 @Entity()
-export class FileEntity extends FileSqliteEntity {}
+export class FileEntity extends FilePostgresEntity {}
 ```
 
 ```ts
@@ -78,7 +78,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CoreModule } from '@concepta/nestjs-core';
 import { FileModule } from '@concepta/nestjs-file';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -87,7 +87,7 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'file', entity: FileEntity }],
         },
       ],

@@ -9,7 +9,7 @@ import {
   ValidatePasswordHistoryCommand,
 } from '@concepta/nestjs-password';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { UserModule } from '../../user.module.js';
 
@@ -31,7 +31,7 @@ const USER_CREDENTIALS_ENTITY_KEY = 'user-credentials';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: USER_ENTITY_KEY, entity: UserEntityFixture },
             {

@@ -147,7 +147,7 @@ Register your invitation entity in `RepositoryModule.forRoot()` under the key
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import { InvitationModule } from '@concepta/nestjs-invitation';
 
 @Module({
@@ -155,7 +155,7 @@ import { InvitationModule } from '@concepta/nestjs-invitation';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'invitation', entity: InvitationEntity }],
         },
       ],

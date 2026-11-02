@@ -8,7 +8,7 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { Ctx } from '@concepta/nestjs-core';
 import { RepositoryModule, Transactional } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { CrudCreateBatchHandler } from '../application/commands/handlers/crud-create-batch.handler.js';
 import { CrudCreateHandler } from '../application/commands/handlers/crud-create.handler.js';
@@ -160,7 +160,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],
@@ -241,7 +241,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],
@@ -496,7 +496,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                   { key: CRUD_TEST_DEVICE_ENTITY_NAME, entity: DeviceEntity },
@@ -1033,7 +1033,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],

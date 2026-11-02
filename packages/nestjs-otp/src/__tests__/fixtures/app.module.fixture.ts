@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { OtpModule } from '../../otp.module.js';
 
@@ -20,7 +20,7 @@ import { UserOtpEntityFixture } from './entities/user-otp-entity.fixture.js';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: 'userOtp',

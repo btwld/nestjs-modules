@@ -196,7 +196,7 @@ Register the entity once, in `RepositoryModule.forRoot()`:
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import { CrudModule } from '@concepta/nestjs-crud';
 
 @Module({
@@ -205,7 +205,7 @@ import { CrudModule } from '@concepta/nestjs-crud';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'photo', entity: PhotoEntity }],
         },
       ],
@@ -1306,12 +1306,12 @@ Prefer registering a repository hook on its entity, in
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'photo', entity: Photo, hooks: [AuditHook] }],
     },
   ],

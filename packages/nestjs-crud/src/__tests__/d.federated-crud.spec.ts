@@ -7,7 +7,7 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { Ctx } from '@concepta/nestjs-core';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { CrudListHandler } from '../application/queries/handlers/crud-list.handler.js';
 import { createQueryHandler } from '../application/utils/create-operation-handlers.js';
@@ -93,7 +93,7 @@ describe('#federated-crud', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: CRUD_TEST_COMPANY_ENTITY_NAME,

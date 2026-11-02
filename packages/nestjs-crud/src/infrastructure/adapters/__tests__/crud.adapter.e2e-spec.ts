@@ -18,11 +18,11 @@ import {
   RepositoryModule,
   Where,
 } from '@concepta/nestjs-repository';
+import { TypeOrmRepository } from '@concepta/nestjs-repository-typeorm';
 import {
   CommonSqliteEntity,
-  TypeOrmRepository,
-  TypeOrmRepositoryModule,
-} from '@concepta/nestjs-repository-typeorm';
+  TypeOrmSqliteRepositoryModule,
+} from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { mockCrudParsedQuery } from '../../../__fixtures__/crud/mocks/crud-parsed-query.mock.js';
 import { CompanyEntity } from '../../../__fixtures__/typeorm/company/company.entity.js';
@@ -83,7 +83,7 @@ describe('CrudAdapter (e2e)', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [{ key: ENTITY_TOKEN, entity: TestEntityFixture }],
             },
           ],
@@ -1165,7 +1165,7 @@ describe('CrudAdapter relations (e2e)', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: COMPANY_TOKEN, entity: CompanyEntity },
                 { key: USER_TOKEN, entity: UserEntity },

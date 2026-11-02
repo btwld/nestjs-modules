@@ -1,6 +1,6 @@
 import { Column, Unique } from 'typeorm';
 
-import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
 import { FileStatus } from '../../../domain/interfaces/file-status.type.js';
 import { type FileEntityInterface } from '../interfaces/file-entity.interface.js';

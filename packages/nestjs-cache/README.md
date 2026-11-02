@@ -452,9 +452,9 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { CoreModule, Operation } from '@concepta/nestjs-core';
 import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
-import { CacheSqliteEntity } from '@concepta/nestjs-cache/optional/typeorm';
+import { CachePostgresEntity } from '@concepta/nestjs-cache/optional/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import {
   CacheInterface,
   CacheModule,
@@ -481,7 +481,7 @@ import {
 import { Entity } from 'typeorm';
 
 @Entity()
-export class UserCacheEntity extends CacheSqliteEntity {}
+export class UserCacheEntity extends CachePostgresEntity {}
 
 // The application's root module: RepositoryModule.forRoot() is imported once.
 @Module({
@@ -491,7 +491,7 @@ export class UserCacheEntity extends CacheSqliteEntity {}
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'userCache', entity: UserCacheEntity }],
         },
       ],

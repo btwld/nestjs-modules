@@ -17,7 +17,7 @@ import {
   ValidateCurrentPasswordCommand,
 } from '@concepta/nestjs-password';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 import {
   GetUserQuery,
   GetUserByEmailQuery,
@@ -75,7 +75,7 @@ const USER_OTP_ENTITY_KEY = 'user-otp';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: INVITATION_MODULE_DEFAULT_ENTITY_KEY,
