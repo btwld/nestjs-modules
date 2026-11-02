@@ -39,6 +39,7 @@
     "@nestjs/testing": "^12.0.1",
     "@types/supertest": "^6.0.3",
     "better-sqlite3": "^12.0.0",
+    "mssql": "12.7.13",
     "mysql2": "3.24.6",
     "oracledb": "6.10.0",
     "pg": "8.23.1",
@@ -77,6 +78,10 @@
     "./oracle": {
       "types": "./dist/oracle.d.ts",
       "default": "./dist/oracle.js"
+    },
+    "./sqlserver": {
+      "types": "./dist/sqlserver.d.ts",
+      "default": "./dist/sqlserver.js"
     },
     "./sqlite": {
       "types": "./dist/sqlite.d.ts",

@@ -4,6 +4,7 @@
 //
 //   pnpm test:docker           the open-source databases (docker/compose.test.yml)
 //   pnpm test:docker:oracle    Oracle (docker/compose.test-oracle.yml)
+//   pnpm test:docker:sqlserver SQL Server (docker/compose.test-sqlserver.yml)
 //
 // Extra arguments go to vitest, e.g. `pnpm test:docker packages/nestjs-repository-typeorm`.
 //
@@ -11,6 +12,7 @@
 // rerun vitest directly while iterating:
 //   pnpm vitest run --config ./vitest.config-docker.ts                                 open-source
 //   DOCKER_TEST_DATABASES=oracle pnpm vitest run --config ./vitest.config-docker.ts    Oracle
+//   DOCKER_TEST_DATABASES=sqlserver pnpm vitest run --config ./vitest.config-docker.ts SQL Server
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +27,11 @@ const STACKS = {
     file: 'compose.test-oracle.yml',
     databases: ['oracle'],
     ports: '51521 (Oracle)',
+  },
+  sqlserver: {
+    file: 'compose.test-sqlserver.yml',
+    databases: ['sqlserver'],
+    ports: '51433 (SQL Server)',
   },
 };
 

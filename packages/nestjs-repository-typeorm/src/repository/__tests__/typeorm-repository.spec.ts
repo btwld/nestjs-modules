@@ -171,6 +171,20 @@ describe(TypeOrmRepository, () => {
       return repo;
     }
 
+    it('escapes `%`, `_` and `!` in a text match, and leaves `[` alone', () => {
+      class EscapingRepository extends TypeOrmSqliteRepository<TestEntityFixture> {
+        escape(value: string) {
+          return this.escapeLike(value);
+        }
+      }
+      const repository = new EscapingRepository(sqliteRepo, {
+        entityKey: 'test',
+      });
+
+      // Oracle refuses the escape character before anything else.
+      expect(repository.escape('[a]%_!')).toBe('[a]!%!_!!');
+    });
+
     describe('database errors', () => {
       class ReportingRepository extends TypeOrmSqliteRepository<TestEntityFixture> {
         report(error: unknown) {

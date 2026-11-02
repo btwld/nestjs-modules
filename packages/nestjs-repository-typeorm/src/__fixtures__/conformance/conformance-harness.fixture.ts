@@ -10,6 +10,7 @@ import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-rep
 import { type TypeOrmOracleRepositoryModule } from '../../oracle/typeorm-oracle-repository.module.js';
 import { type TypeOrmPostgresRepositoryModule } from '../../postgres/typeorm-postgres-repository.module.js';
 import { type TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
+import { type TypeOrmSqlServerRepositoryModule } from '../../sqlserver/typeorm-sqlserver-repository.module.js';
 
 import {
   CONFORMANCE_ENTITIES,
@@ -44,6 +45,7 @@ type TypeOrmAdapterModule =
   | typeof TypeOrmMysqlRepositoryModule
   | typeof TypeOrmMariadbRepositoryModule
   | typeof TypeOrmOracleRepositoryModule
+  | typeof TypeOrmSqlServerRepositoryModule
   | typeof TypeOrmSqliteRepositoryModule;
 
 /**

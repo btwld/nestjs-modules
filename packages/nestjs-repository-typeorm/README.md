@@ -40,8 +40,8 @@ yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
-Postgres, MySQL 8.4, MariaDB 11.4, Oracle 23ai, or SQLite through
-`better-sqlite3` — see [Choose Your Adapter](#choose-your-adapter).
+Postgres, MySQL 8.4, MariaDB 11.4, Oracle 23ai, SQL Server 2025, or SQLite
+through `better-sqlite3` — see [Choose Your Adapter](#choose-your-adapter).
 
 ### Dependencies
 
@@ -67,6 +67,7 @@ Postgres, MySQL 8.4, MariaDB 11.4, Oracle 23ai, or SQLite through
 | MySQL 8.4 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule` | `CommonMysqlEntity`, … |
 | MariaDB 11.4 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule` | `CommonMariadbEntity`, … |
 | Oracle 23ai | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule` | `CommonOracleEntity`, … |
+| SQL Server 2025 | `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule` | `CommonSqlServerEntity`, … |
 | SQLite (`better-sqlite3`) | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule` | `CommonSqliteEntity`, … |
 
 Every adapter's repository behaves the same, so everything else in this
@@ -132,6 +133,36 @@ Uses the `oracledb` client in its default Thin mode; install it beside
   [Virtual Private Database (Oracle)](#virtual-private-database-oracle).
 - Durable messaging is refused at startup: `@nestjs/outbox` has no Oracle
   store.
+
+### SQL Server
+
+Uses the `mssql` client; install it beside `typeorm`.
+
+- Run the server in UTC (the Linux image's default) and set
+  `options: { useUTC: true }` on the data source. The database fills in
+  dates like `dateCreated` from its own clock, with no offset, so on a
+  server in another time zone they're off by its offset. Without `useUTC`,
+  dates on a `datetime2` or `datetime` column (TypeORM's types for the date
+  columns and for a `Date` property) also come back shifted by your host's
+  offset; the base entities' `datetimeoffset` columns don't.
+- `Where.contains('name', 'ali')` matches `Alice`: with the default
+  collation, text matching ignores case, and so do unique keys (`'P'` and
+  `'p'` collide).
+- In ascending order, `NULL`s sort first.
+- A unique index allows only one `NULL`. For a nullable unique column, give
+  the index a filter: `@Index(['correctedId'], { unique: true, where:
+  '"correctedId" IS NOT NULL' })`.
+- Generated UUIDs come back in upper case; comparisons ignore case, so a
+  lower-case id still finds its row.
+- A statement takes at most 1,000 rows and 2,100 values, and the database
+  refuses more: `createMany` of an entity with 8 columns to write stops near
+  260 rows, and `Where.in` near 2,100 values.
+- `context.code` on a `RepositoryDatabaseException` is SQL Server's error
+  number: `2627` or `2601` for a duplicate key (constraint or unique index),
+  `547` for a foreign key, `515` for a missing value.
+- Transactions run concurrently, each on its own connection.
+- Durable messaging is refused at startup: `@nestjs/outbox` has no SQL
+  Server store.
 
 ### SQLite
 
@@ -591,8 +622,8 @@ with the `TransactionFactoryRegistry` by `RepositoryModule.forRoot()`.
 
 The transaction key names the adapter and the data source:
 `typeorm-postgres:<dataSourceName>`, `typeorm-mysql:<dataSourceName>`,
-`typeorm-mariadb:<dataSourceName>`, `typeorm-oracle:<dataSourceName>` or
-`typeorm-sqlite:<dataSourceName>`
+`typeorm-mariadb:<dataSourceName>`, `typeorm-oracle:<dataSourceName>`,
+`typeorm-sqlserver:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
 (e.g., `typeorm-postgres:default`).
 
 `TypeOrmSqliteTransactionFactory` declares
@@ -899,7 +930,8 @@ covered below.
 The audit entities use `@CreateDateColumn`, `@UpdateDateColumn`,
 `@DeleteDateColumn` (for soft deletes), and `@VersionColumn` (for optimistic
 locking). Dates are `timestamptz` on Postgres, `datetime(6)` on MySQL and
-MariaDB, `timestamp with time zone` on Oracle, and `datetime` on SQLite.
+MariaDB, `timestamp with time zone` on Oracle, `datetimeoffset` on SQL
+Server, and `datetime` on SQLite.
 
 ### Using Base Entities
 
@@ -969,8 +1001,10 @@ export class StatementItem extends AppendOnlyPostgresEntity {
 }
 ```
 
-`NULL`s are distinct in a unique index on every supported database, so
-originals coexist while a second correction of one record is refused.
+On every supported database except SQL Server, `NULL`s are distinct in a
+unique index, so originals coexist while a second correction of one record
+is refused. SQL Server allows one `NULL` in a unique index, so add
+`where: '"correctedId" IS NOT NULL'` to the index there.
 
 ### Activity Base Entities
 
@@ -993,7 +1027,8 @@ Each has every activity column, a nullable `actorId` for your store hook to
 fill, and an index on `(entityKey, recordId)` for reading a row's history.
 
 `changed` and `values` are JSON (`jsonb` on Postgres, `json` on MySQL and
-MariaDB, `simple-json` on Oracle and SQLite), so `values` reads back as JSON:
+MariaDB, `simple-json` on Oracle, SQL Server and SQLite), so `values` reads
+back as JSON:
 a date comes back as an ISO string, a `Buffer` comes back as an object of
 bytes, and a JavaScript `bigint` fails the write.
 `omit` binary and `bigint` columns.
@@ -1005,8 +1040,8 @@ gives a TypeORM registration durable messaging through
 `DurableMessagingModule` (see the `nestjs-repository` README). It builds the
 [`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) store on the
 registration's own data source: `PostgresOutboxStore` for `postgres`,
-`MySqlOutboxStore` for `mysql`. Any other database, MariaDB, Oracle and
-SQLite included, fails startup with `UnsupportedDurableDriverException`
+`MySqlOutboxStore` for `mysql`. Any other database, MariaDB, Oracle, SQL
+Server and SQLite included, fails startup with `UnsupportedDurableDriverException`
 (`@nestjs/outbox` doesn't support MariaDB yet). You never build the store or
 touch the data source.
 
@@ -1117,7 +1152,7 @@ Requirements and limits:
 | Exception | Package | Description |
 | --- | --- | --- |
 | `RepositoryQueryException` | `@concepta/nestjs-repository` | Repository query error (wraps original error) |
-| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` is the data source `type` (`postgres`, `mysql`, `mariadb`, `oracle`, `better-sqlite3`); `context.code` is the database client's `code` (`'ORA-00001'` on Oracle), or its `errno` when it has no `code` |
+| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` is the data source `type` (`postgres`, `mysql`, `mariadb`, `oracle`, `mssql`, `better-sqlite3`); `context.code` is the database client's `code` (`'ORA-00001'` on Oracle), or its `errno` when it has no `code`; on SQL Server, the error number (`2627`, `2601`) |
 | `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
 | `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |
@@ -1135,5 +1170,6 @@ Requirements and limits:
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
 | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
+| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

@@ -74,6 +74,8 @@
     "test:docker": "node ./scripts/test-docker.mjs",
     "pretest:docker:oracle": "tsc -b",
     "test:docker:oracle": "node ./scripts/test-docker.mjs oracle",
+    "pretest:docker:sqlserver": "tsc -b",
+    "test:docker:sqlserver": "node ./scripts/test-docker.mjs sqlserver",
     "smoke": "node ./scripts/smoke-test.mjs",
     "doc": "rimraf ./docs && typedoc",
     "doc:cov": "pnpm doc --coverageOutputType all",

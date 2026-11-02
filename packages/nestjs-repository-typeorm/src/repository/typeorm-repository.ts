@@ -343,8 +343,8 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * `LIKE` matching `value` between `before` and `after`, with `%`, `_` and
-   * the escape character in `value` matched as themselves. TypeORM's `Like`
+   * `LIKE` matching `value` between `before` and `after`, with every
+   * character `escapeLike` marks matched as itself. TypeORM's `Like`
    * cannot name an escape character, and SQLite has no default one. `!`
    * escapes, because a backslash reads differently across SQL dialects.
    *
@@ -357,10 +357,17 @@ export abstract class TypeOrmRepository<
     after: string,
   ): FindOperator<unknown> {
     const name = `like${++this.likeParameters}`;
-    const escaped = value.replace(/[!%_]/g, '!$&');
     return Raw((column) => `${column} LIKE :${name} ESCAPE '!'`, {
-      [name]: `${before}${escaped}${after}`,
+      [name]: `${before}${this.escapeLike(value)}${after}`,
     });
+  }
+
+  /**
+   * `value` with each character `LIKE` reads as a pattern preceded by `!`:
+   * `%`, `_` and `!` itself.
+   */
+  protected escapeLike(value: string): string {
+    return value.replace(/[!%_]/g, '!$&');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

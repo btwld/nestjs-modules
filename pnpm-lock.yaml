@@ -221,7 +221,7 @@ importers:
         version: 3.4.1(typedoc@0.25.13(typescript@5.9.3))
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
@@ -285,7 +285,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-federated':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-jwt':
         specifier: ^7.0.0-alpha.10
         version: 7.0.0-alpha.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -321,23 +321,23 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
       '@concepta/nestjs-auth-jwt':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-crud':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-password':
         specifier: ^7.0.0-alpha.10
         version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-typeorm-ext':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-user':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/testing':
         specifier: ^11.1.9
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
@@ -355,7 +355,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-federated':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/common':
         specifier: ^11.1.9
         version: 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -385,14 +385,14 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
       '@concepta/nestjs-auth-jwt':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-crud':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-jwt':
         specifier: ^7.0.0-alpha.10
         version: 7.0.0-alpha.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -401,10 +401,10 @@ importers:
         version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-typeorm-ext':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-user':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/testing':
         specifier: ^11.1.9
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
@@ -422,7 +422,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-federated':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/common':
         specifier: ^11.1.9
         version: 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -452,14 +452,14 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
       '@concepta/nestjs-auth-jwt':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-crud':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-jwt':
         specifier: ^7.0.0-alpha.10
         version: 7.0.0-alpha.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -468,10 +468,10 @@ importers:
         version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-typeorm-ext':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-user':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/testing':
         specifier: ^11.1.9
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
@@ -583,7 +583,7 @@ importers:
         version: link:../nestjs-repository
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -596,7 +596,7 @@ importers:
         version: link:../nestjs-repository-typeorm
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -620,7 +620,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
@@ -746,7 +746,7 @@ importers:
         version: link:../nestjs-repository-typeorm
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -770,7 +770,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@types/qs':
         specifier: ^6.15.1
         version: 6.15.1
@@ -779,7 +779,7 @@ importers:
         version: 6.3.4(supports-color@7.2.0)
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       vitest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
@@ -844,7 +844,7 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -884,7 +884,7 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -894,7 +894,7 @@ importers:
         version: link:../nestjs-repository-typeorm
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -915,7 +915,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       vitest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
@@ -933,7 +933,7 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -955,7 +955,7 @@ importers:
         version: link:../nestjs-user
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -979,7 +979,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       supertest:
         specifier: ^6.3.4
         version: 6.3.4(supports-color@7.2.0)
@@ -1108,7 +1108,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-crud':
         specifier: ^7.0.0-alpha.3
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-event':
         specifier: ^7.0.0-alpha.10
         version: link:../nestjs-event
@@ -1129,23 +1129,23 @@ importers:
         version: 0.15.1
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
       '@concepta/nestjs-invitation':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-password':
         specifier: ^7.0.0-alpha.10
         version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-typeorm-ext':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-user':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -1154,7 +1154,7 @@ importers:
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^11.0.0
-        version: 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       supertest:
         specifier: ^6.3.4
         version: 6.3.4(supports-color@7.2.0)
@@ -1175,7 +1175,7 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -1185,7 +1185,7 @@ importers:
         version: link:../nestjs-repository-typeorm
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -1206,7 +1206,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       vitest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
@@ -1255,7 +1255,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-file':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/common':
         specifier: ^11.1.9
         version: 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -1276,14 +1276,14 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
       '@concepta/nestjs-typeorm-ext':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-user':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/testing':
         specifier: ^11.1.9
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
@@ -1332,14 +1332,14 @@ importers:
         version: link:../nestjs-repository
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@tsyche/membrane':
         specifier: ^0.8.1
         version: 0.8.1
     devDependencies:
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -1361,6 +1361,9 @@ importers:
       better-sqlite3:
         specifier: ^12.0.0
         version: 12.11.1
+      mssql:
+        specifier: 12.7.13
+        version: 12.7.13(supports-color@7.2.0)
       mysql2:
         specifier: 3.24.6
         version: 3.24.6(@types/node@20.19.43)
@@ -1375,7 +1378,7 @@ importers:
         version: 6.3.4(supports-color@7.2.0)
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       vitest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
@@ -1390,7 +1393,7 @@ importers:
         version: link:../nestjs-repository
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -1403,7 +1406,7 @@ importers:
         version: link:../nestjs-repository-typeorm
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -1424,7 +1427,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       supertest:
         specifier: ^6.3.4
         version: 6.3.4(supports-color@7.2.0)
@@ -1436,7 +1439,7 @@ importers:
     dependencies:
       '@concepta/nestjs-auth-jwt':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-auth-local':
         specifier: ^7.0.0-alpha.10
         version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -1451,7 +1454,7 @@ importers:
         version: link:../nestjs-common
       '@concepta/nestjs-crud':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-email':
         specifier: ^7.0.0-alpha.10
         version: link:../nestjs-email
@@ -1469,10 +1472,10 @@ importers:
         version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-typeorm-ext':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@concepta/nestjs-user':
         specifier: ^7.0.0-alpha.10
-        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/common':
         specifier: ^11.1.9
         version: 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -1490,7 +1493,7 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
       '@nestjs-modules/mailer':
         specifier: ^1.11.2
@@ -1500,7 +1503,7 @@ importers:
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)
       '@nestjs/typeorm':
         specifier: ^11.0.0
-        version: 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
@@ -1546,7 +1549,7 @@ importers:
         version: link:../nestjs-repository
       typeorm:
         specifier: ~1.0.0
-        version: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+        version: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -1559,7 +1562,7 @@ importers:
         version: link:../nestjs-repository-typeorm
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
-        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@faker-js/faker':
         specifier: ^8.4.1
         version: 8.4.1
@@ -1583,7 +1586,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
       '@nestjs/typeorm':
         specifier: ^12.0.1
-        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       accesscontrol:
         specifier: ^2.2.1
         version: 2.2.1
@@ -1632,6 +1635,74 @@ packages:
     resolution: {integrity: sha512-e5mJoswsnAX0jG+J09xHFYQXb/bUc5S3pLpMxUuRUA2H8T2kni3yEoyz2R3Dltw5f4A6j6rPNMpWTK+iVDFlng==}
     peerDependencies:
       openapi-types: '>=7'
+
+  '@azure-rest/core-client@2.9.0':
+    resolution: {integrity: sha512-6933vNLqh06RR7rumnrq3UZIeBtRLeBHDPMrieDPIljiCaMMwt0nRw++nd3TOxiohtasNtm29rC+b/9ZVKCOqg==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/abort-controller@2.2.0':
+    resolution: {integrity: sha512-fNAjWnA/nZ2jz31kxR/AqRaUT8ewHBw/WuBIosK0moMy1C9e5ValbDfFdIxJzVOOYaYkV/b2F1S4H/aHiqfVQg==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-auth@1.11.0':
+    resolution: {integrity: sha512-IUZydyTUkDnYdstOW9pFOOUQlBjAepK5teihDE3x6yxsPJs/hsAaaYpeGxdxrgtOiJbBKSjKW7MDk7AEhb4LRg==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-client@1.11.1':
+    resolution: {integrity: sha512-2QygG2F76ZpMP2eMztiJvAiFMu71M9rDeU7vO/QKg5Css7MgM4frUOslFjhVjRhbGaCNPtz/S8M6y46/fFKVuQ==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-lro@2.7.2':
+    resolution: {integrity: sha512-0YIpccoX8m/k00O7mDDMdJpbr6mf1yWo2dfmxt5A8XVZVVMz2SSKaEbMCeJRvgQ0IaSlqhjT47p4hVIRRy90xw==}
+    engines: {node: '>=18.0.0'}
+
+  '@azure/core-paging@1.7.0':
+    resolution: {integrity: sha512-7GEAoIsaoBr6KELNRb8nypowCqvk8dnCHFCYg4XD4lOQGY2GqjQg5IhkRjyBFRO18CGSMq05PaNqSOE9GQro3g==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-process@1.0.0':
+    resolution: {integrity: sha512-/shnJ+ooO8WPxDhPEeI/2oRQuubn16gZ6CvlbpWbEswZfzwI9tI/sMAHmF3x1LuQ9yZYXfLW3TjzGMLEC5blKg==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-rest-pipeline@1.25.0':
+    resolution: {integrity: sha512-bMs8ekJLjX8wPV+9IPBges1SLPyuDtE9g5gLDWOpxzKcoOFQnpLGkbcT1tdw3FaAmDS1gnPmMmJ6y/T5B96kIA==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-tracing@1.4.0':
+    resolution: {integrity: sha512-eGwxD0AtncrxeBM4tG8R55Pc3rdX1hNW2WibJAgYpCVA6E93mvvVH+LcssoVjOBrSKWS55yEIHsk0X8ctHmfOQ==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/core-util@1.14.0':
+    resolution: {integrity: sha512-9n2pWK61veAuN0V20t9lOuoV4CFMdyAZ1ygZzvBGk/pBBJRib/PjL9PLXa/aI2CcPpyHfqVsxxqLCYl6uZlfDw==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/identity@4.14.1':
+    resolution: {integrity: sha512-HHuuFrmN1uuF9D5A6aAo5eHzNFNX4Q+P4SksZqDKse5YaJFFy/zDLG3wXHEV2FVGgetZ3QM8jGURNBtnQYf1NQ==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/keyvault-common@2.1.1':
+    resolution: {integrity: sha512-SxpomJRTBfDTQnuii3w10WnZNQJGPNi15tRPdPUQz7BqyB3yk976knEueS7R0H9kSLtXbP0wJZXRh0EbRTQ0lw==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/keyvault-keys@4.10.2':
+    resolution: {integrity: sha512-VmUSLbXRAbSzDD8grXHGPaknYs0SKr3yuf6U+d4XMpX4XuVYskNqbTTwXce0zR1LyxfTZm9rWEBcvs3vdYwCmQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@azure/logger@1.4.0':
+    resolution: {integrity: sha512-rbAE25KUfjU/s3XHUdJgceoCP5dEOpMx85J04kF+QMdta73XkuG9JGHHinch+XIoKpBdqljin+KqURpJriSzLA==}
+    engines: {node: '>=22.0.0'}
+
+  '@azure/msal-browser@5.27.0':
+    resolution: {integrity: sha512-i2CKKyuCuOZEBZJiAoFK/viYZAP6CRaqqlkeHl3ViteDHOUE/tkI/Slq1cdGnwhkIB+k1OE0g00QGl9O0gAFNQ==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-common@16.15.0':
+    resolution: {integrity: sha512-lwdLb1B9Q5nEhPLVIKe78XH5wFMN15fCiDkY7ylPDSWZuWcD93G3jpJajrKhO3CQld8SLKz0sHiOi24mxdvtsg==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-node@7.1.2':
+    resolution: {integrity: sha512-52hKQLGpEQzwNufIXG1SPVU+wQ3RIe7Rp2+g+VdAmZojCAZ6yCdGEffzQEQ6RnBZGBEs40nl14rWBmfJpCoHsg==}
+    engines: {node: '>=20'}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -2400,6 +2471,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@js-joda/core@6.3.2':
+    resolution: {integrity: sha512-BVsYu84Gut8YTNR1v5/PnifmqXv4SVcfA/hVIM/mXADZfIocip/DfNppBtv+4am5hGH1XuH6FSoU8OHkBvZMeA==}
 
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
@@ -3245,6 +3319,9 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@tediousjs/connection-string@1.1.0':
+    resolution: {integrity: sha512-z9ZBWEG+8pIB5V1zYzlRPXx0oRJ5H7coPnMQK8EZOw03UTPI9Umn6viL36f5w+CuqkKsnCM50RVStpjZmR0Bng==}
+
   '@tokenizer/inflate@0.4.1':
     resolution: {integrity: sha512-2mAv+8pkG6GIZiF1kNg1jAjh27IDxEPKwdGul3snfztFerfPGI1LjDezZp3i7BElXompqEtPmoPx6c2wgtWsOA==}
     engines: {node: '>=18'}
@@ -3349,6 +3426,9 @@ packages:
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
 
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
+
   '@types/nodemailer@6.4.24':
     resolution: {integrity: sha512-Ww4u0rT9wQNXh4JiQaIwx3QWdcOFXzOjQA2zc+jtFYNmQiT4mIUqcDin51bDFdkzKubFnQCZNK7FIHlPKQ/q9w==}
 
@@ -3396,6 +3476,9 @@ packages:
 
   '@types/range-parser@1.2.7':
     resolution: {integrity: sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==}
+
+  '@types/readable-stream@4.0.25':
+    resolution: {integrity: sha512-7GsxL8Wd5X3jh73/qgW7WCnbBvGSdD8U3E4Jiuus3/8I+PN20DtlkJtwFhr/sImXfDDQ2Z03i/9wNiIF3TVSsw==}
 
   '@types/send@0.17.6':
     resolution: {integrity: sha512-Uqt8rPBE8SY0RK8JB1EzVOIZ32uqy8HwdxCnoCOsYrvnswqmFZ/k+9Ikidlk/ImhsdvBsloHbAlewb2IEBV/Og==}
@@ -3528,6 +3611,10 @@ packages:
   '@typescript-eslint/visitor-keys@8.70.0':
     resolution: {integrity: sha512-BoC8PiO4Hkdo0TVJh9Ntxr5MxPDI7/oFsrygN5ADelFSeXG/qgNuucIGA+L5Z6JpPTE/uRfcTWtscjbUaufepQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@typespec/ts-http-runtime@0.3.9':
+    resolution: {integrity: sha512-edSdeAqkdxBVzA1yL1LrLCml1YjyCVvPMtMqJpbF+6K609tHe8V6sQUzFQSGcYNhcuhOceZtjvN32+mpIth30A==}
+    engines: {node: '>=22.0.0'}
 
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
@@ -3707,6 +3794,10 @@ packages:
     resolution: {integrity: sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apAf5oB7UB7E19ol2R2LKH8hQ==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
+  abort-controller@3.0.0:
+    resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
+    engines: {node: '>=6.5'}
+
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
 
@@ -3747,6 +3838,10 @@ packages:
   agent-base@6.0.2:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
     engines: {node: '>= 6.0.0'}
+
+  agent-base@7.1.4:
+    resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
+    engines: {node: '>= 14'}
 
   ajv-draft-04@1.0.0:
     resolution: {integrity: sha512-mv00Te6nmYbRp5DCwclxtt7yV/joXJPGS7nM+97GdxvuttCOfgI3K4U25zboyeX0O+myI8ERluxQe5wljMmVIw==}
@@ -3988,6 +4083,9 @@ packages:
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
 
+  bl@6.1.6:
+    resolution: {integrity: sha512-jLsPgN/YSvPUg9UX0Kd73CXpm2Psg9FxMeCSXnk3WBO3CMT10JMwijubhGfHCnFu6TPn1ei3b975dxv7K2pWVg==}
+
   body-parser@1.20.8:
     resolution: {integrity: sha512-JNcyFQ64OiijEkPzUBTCe+hyPXUD/3LEldGQ6iF5LR1w00mx9o7xtDWHXBY2iItjdCFGoilOLNQbH943ut7pHA==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
@@ -4029,6 +4127,13 @@ packages:
 
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
+
+  buffer@6.0.3:
+    resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
+
+  bundle-name@4.1.1:
+    resolution: {integrity: sha512-DdH81/zPLVS11EUgWq3tEu/xn+EzljlMYooDNdzWEnFha3R3NBMpMV1UqYIpjYHV/SgpFKMIX1Oh7o06SjM/oA==}
+    engines: {node: '>=18'}
 
   busboy@1.6.0:
     resolution: {integrity: sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA==}
@@ -4221,6 +4326,10 @@ packages:
   commander@10.0.1:
     resolution: {integrity: sha512-y4Mg2tXshplEbSGzx7amzPwKKOCGuoSRP/CjEdwwk0FOGlUbq6lKuoyDZTNZkmxHdJtp54hdfY/JUrdL7Xfdug==}
     engines: {node: '>=14'}
+
+  commander@11.1.0:
+    resolution: {integrity: sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==}
+    engines: {node: '>=16'}
 
   commander@12.1.0:
     resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
@@ -4532,12 +4641,24 @@ packages:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
 
+  default-browser-id@5.0.1:
+    resolution: {integrity: sha512-x1VCxdX4t+8wVfd1so/9w+vQ4vx7lKd2Qp5tDRutErwmR85OgmfX7RlLRMWafRMY7hbEiXIbudNrjOAPa/hL8Q==}
+    engines: {node: '>=18'}
+
+  default-browser@5.5.1:
+    resolution: {integrity: sha512-m1pAzaJgZ/gssEqlOhJkPJp8Xly7QyW6xcrkUa2KKcDeDSEMP7X8xipU3snUcfisTQx0w1AGae+9UtJSfVnXGw==}
+    engines: {node: '>=18'}
+
   defaults@1.0.4:
     resolution: {integrity: sha512-eFuaLoy/Rxalv2kr+lqMlUnrDWV+3j4pljOIJgLIhI058IQfWJ7vXhyEIHu+HtC738klGALYxOKDO0bQP3tg8A==}
 
   define-data-property@1.1.4:
     resolution: {integrity: sha512-rBMvIzlpA8v6E+SJZoo++HAYqsLrkg7MSfIinMPFhmkorw7X+dOXVJQs+QT69zGkzMyfDnIMN2Wid1+NbL3T+A==}
     engines: {node: '>= 0.4'}
+
+  define-lazy-prop@3.0.0:
+    resolution: {integrity: sha512-N+MeXYoqr3pOgn8xfyRPREN7gHakLYjhsHhWGT3fWAiL4IkAt0iDw14QiiEm2bE30c5XX5q0FtAA3CK5f9/BUg==}
+    engines: {node: '>=12'}
 
   define-properties@1.2.1:
     resolution: {integrity: sha512-8QmQKqEASLd5nx0U1B1okLElbUuuttJ/AnYmRXbbbGDWh6uS208EjD4Xqq/I9wK7u0v6O08XhTWnt5XtEbR6Dg==}
@@ -4984,8 +5105,16 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
+  event-target-shim@5.0.1:
+    resolution: {integrity: sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==}
+    engines: {node: '>=6'}
+
   eventemitter2@6.4.9:
     resolution: {integrity: sha512-JEPTiaOt9f04oa6NOkc4aH+nVp5I3wEjpHbIPqfgCdD5v5bUzy7xQqwcVO2aDQgOWhI28da57HksMrzK9HlRxg==}
+
+  events@3.3.0:
+    resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
+    engines: {node: '>=0.8.x'}
 
   execa@0.10.0:
     resolution: {integrity: sha512-7XOMnz8Ynx1gGo/3hyV9loYNPWM94jG3+3T3Y8tsfSstFmETmENCMU/A/zj8Lyaj1lkgEepKepvd6240tBRvlw==}
@@ -5462,9 +5591,17 @@ packages:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
 
+  http-proxy-agent@7.0.2:
+    resolution: {integrity: sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==}
+    engines: {node: '>= 14'}
+
   https-proxy-agent@5.0.1:
     resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
     engines: {node: '>= 6'}
+
+  https-proxy-agent@7.0.6:
+    resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
+    engines: {node: '>= 14'}
 
   human-signals@2.1.0:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
@@ -5591,6 +5728,11 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  is-docker@3.0.0:
+    resolution: {integrity: sha512-eljcgEDlEns/7AXFosB5K/2nCM4P7FQPkGc/DWLy5rmFEWvZayGrik1d9/QIY5nJ4f9YsVvBkA6kJpHn9rISdQ==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+    hasBin: true
+
   is-document.all@1.0.0:
     resolution: {integrity: sha512-+XSoyS05OdBbhFuELhgTCpFNHkpBOJqtsZfUFFpe5QTw+9Sjbh8zitxhQkYAo6wV7e1Vb8cAPvpCk9jGam/82g==}
     engines: {node: '>= 0.4'}
@@ -5621,6 +5763,15 @@ packages:
   is-glob@4.0.3:
     resolution: {integrity: sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==}
     engines: {node: '>=0.10.0'}
+
+  is-in-ssh@1.0.0:
+    resolution: {integrity: sha512-jYa6Q9rH90kR1vKB6NM7qqd1mge3Fx4Dhw5TVlK1MUBqhEOuCagrEHMevNuCcbECmXZ0ThXkRm+Ymr51HwEPAw==}
+    engines: {node: '>=20'}
+
+  is-inside-container@1.0.0:
+    resolution: {integrity: sha512-KIYLCCJghfHZxqjYBE7rEy0OBuTd5xCHS7tHVgvCLkx7StIoaxwNW3hCALgEUjFfeRk+MG/Qxmp/vtETEF3tRA==}
+    engines: {node: '>=14.16'}
+    hasBin: true
 
   is-interactive@1.0.0:
     resolution: {integrity: sha512-2HvIEKRoqS62guEC+qBjpvRubdX910WCMuJTZ+I9yvqKU2/12eSL549HMwtabb4oupdj2sMP50k+XJfB/8JE6w==}
@@ -5726,6 +5877,10 @@ packages:
   is-wsl@2.2.0:
     resolution: {integrity: sha512-fKzAra0rGJUUBwGBgNkHZuToZcn+TtXHpeCgmkMJMMYx1sQDYaCSyjJBSCa2nH1DGm7s3n1oBnohoVTBaN7Lww==}
     engines: {node: '>=8'}
+
+  is-wsl@3.1.1:
+    resolution: {integrity: sha512-e6rvdUCiQCAuumZslxRJWR/Doq4VpPR82kqclvcS0efgt430SlGIk05vdCN58+VrzgtIcfNODjozVielycD4Sw==}
+    engines: {node: '>=16'}
 
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
@@ -5931,6 +6086,9 @@ packages:
 
   js-cookie@3.0.8:
     resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
+
+  js-md4@0.3.2:
+    resolution: {integrity: sha512-/GDnfQYsltsjRswQhN9fhv3EMw2sCpUdrdxyWDOUK7eyD++r3gRhzgiQgc/x4MAv2i1iuQ4lxO5mvqM3vj4bwA==}
 
   js-stringify@1.0.2:
     resolution: {integrity: sha512-rtS5ATOo2Q5k1G+DADISilDA6lv79zIiwFd6CcjuIxGKLFm5C+RLImRscVap9k55i+MOZwgliw+NejvkLuGD5g==}
@@ -6570,6 +6728,11 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
+  mssql@12.7.13:
+    resolution: {integrity: sha512-RwNhOEU1A7vCbKmkZapbfLk31fKFByrEnK2eDPIw/rlloLUxNhuCcWj4CmXvyHiyjIjI0TMZWid20PAGoRX4xA==}
+    engines: {node: '>=18.19.0'}
+    hasBin: true
+
   multer@2.2.0:
     resolution: {integrity: sha512-6rdyFg2kLrMh9Jee7/BMPuV9lEAd7lLW2YUpF9/YxR7njyoUwwQ0ZPh3TaIY50Sw6vlyD2HW3wGOkTS4P79xrQ==}
     engines: {node: '>= 10.16.0'}
@@ -6600,6 +6763,9 @@ packages:
     resolution: {integrity: sha512-PHI5f1O0EP5xJ9gQmFGMS6IZcrVvTjpXjz7Na41gTE7eE2hK11lg04CECCYEEjdc17EV4DO+fkGEtt7TpTaTiQ==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     hasBin: true
+
+  native-duplexpair@1.0.0:
+    resolution: {integrity: sha512-E7QQoM+3jvNtlmyfqRZ0/U75VFgCls+fSkbml2MpgWkWyz3ox8Y58gNhfuziuQYGNNQAbFZJQck55LHCnCK6CA==}
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
@@ -6761,6 +6927,10 @@ packages:
   onetime@7.0.0:
     resolution: {integrity: sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==}
     engines: {node: '>=18'}
+
+  open@11.0.4:
+    resolution: {integrity: sha512-++Zlftm0kVLPmzC06t6epuWmcRMDbI4z5P3NNX979WA/k23+NtSOynEGzsVfZwguKw2mi5umVgnBlJQMwRz4Pg==}
+    engines: {node: '>=20'}
 
   open@7.4.2:
     resolution: {integrity: sha512-MVHddDVweXZF3awtlAS+6pgKLlm/JgxZ90+/NBurBoQctVOOB/zDdVjcyPzQ+0laDGbsWgrRkflI65sQeOgT9Q==}
@@ -7073,6 +7243,10 @@ packages:
     resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
     engines: {node: '>=0.10.0'}
 
+  powershell-utils@0.2.1:
+    resolution: {integrity: sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A==}
+    engines: {node: '>=20'}
+
   prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
     engines: {node: '>=10'}
@@ -7109,6 +7283,10 @@ packages:
 
   process-warning@1.0.0:
     resolution: {integrity: sha512-du4wfLyj4yCZq1VupnVSZmRsPJsNuxoDQFdCFHLaYiEbFBD7QE0a+I4D7hOxrVnh78QE/YipFAj9lXHiXocV+Q==}
+
+  process@0.11.10:
+    resolution: {integrity: sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==}
+    engines: {node: '>= 0.6.0'}
 
   promise@7.3.1:
     resolution: {integrity: sha512-nolQXZ/4L+bP/UGlkfaIujX9BKxGwmQ9OT4mOt5yvy8iK1h3wqTEJCijzGANTCCl9nWjY41juyAn2K3Q1hLLTg==}
@@ -7255,6 +7433,10 @@ packages:
     resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
     engines: {node: '>= 6'}
 
+  readable-stream@4.8.0:
+    resolution: {integrity: sha512-2jhTTU3Eilp/2DMT71gbcoqC35eQHasMJH0RHkYxwlxIv3+FR6Y5xAFZIwEGLxKkjZYEFlsiMNIdwUqjK2lLHQ==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
   readdirp@3.6.0:
     resolution: {integrity: sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==}
     engines: {node: '>=8.10.0'}
@@ -7359,6 +7541,10 @@ packages:
   run-applescript@3.2.0:
     resolution: {integrity: sha512-Ep0RsvAjnRcBX1p5vogbaBdAGu/8j/ewpvGqnQYunnLd9SM0vWcPJewPKNnWFggf0hF0pwIgwV5XK7qQ7UZ8Qg==}
     engines: {node: '>=4'}
+
+  run-applescript@7.1.0:
+    resolution: {integrity: sha512-DPe5pVFaAsinSaV6QjQ6gdiedWDcRCbUuiQfQa2wmWV7+xC9bGulGI8+TdRmoFkAPaBXk8CrAbnlY2ISniJ47Q==}
+    engines: {node: '>=18'}
 
   run-con@1.3.3:
     resolution: {integrity: sha512-Lb7OKM9aaykzyoNiHGhSVCjZsvbyy6qDMp2vDXL+MoCfz3GfNJtHYH7uYsU3QNMyInBk++xx+EZ8xZ8Sxs5fNQ==}
@@ -7739,6 +7925,14 @@ packages:
     engines: {node: '>=10'}
     deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
+  tarn@3.1.2:
+    resolution: {integrity: sha512-3RTvqKZcK/17jnJ8rMKFXbyNogywTs1z0gVPPwFsJGX46rkmUHOdIaSQ/aVO1rS7nH+soiXiWk7rvUXxndm8Dg==}
+    engines: {node: '>=8.0.0'}
+
+  tedious@20.3.8:
+    resolution: {integrity: sha512-ZrJiwyGn340Sa0V0g37Xqj5bvmJ1riYwvEtg7zdm/lpw70f2ZNIQ2fvHmntU5fEOorWDa48Jo1oKYAuUP+rh7Q==}
+    engines: {node: '>=22'}
+
   test-exclude@7.0.2:
     resolution: {integrity: sha512-u9E6A+ZDYdp7a4WnarkXPZOx8Ilz46+kby6p1yZ8zsGTz9gYa6FIS7lj2oezzNKmtdyyJNNmmXDppga5GB7kSw==}
     engines: {node: '>=18'}
@@ -8001,6 +8195,9 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
+
   unicode-emoji-modifier-base@1.0.0:
     resolution: {integrity: sha512-yLSH4py7oFH3oG/9K+XWrz1pSi3dfUrWEnInbxMfArOfc1+33BlGPQtLsOYwvdMy11AwUBetYuaRxSPqgkq+8g==}
     engines: {node: '>=4'}
@@ -8235,6 +8432,10 @@ packages:
     resolution: {integrity: sha512-+QU2zd6OTD8XWIJCbffaiQeH9U73qIqafo1x6V1snCWYGJf6cVE0cDR4D8xRzcEnfI21IFrUPzPGtcPf8AC+Rw==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
+  wsl-utils@1.0.1:
+    resolution: {integrity: sha512-c16PKLIRxBYpR3jSWsdS7SFp0COm5SOQdiFjY818dYFHJbMGuLBszpF07LBWmOS1uzrHa9VGdynsEgoeKy0oOQ==}
+    engines: {node: '>=20'}
+
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -8341,6 +8542,144 @@ snapshots:
       ajv-draft-04: 1.0.0(ajv@8.20.0)
       call-me-maybe: 1.0.2
       openapi-types: 12.1.3
+
+  '@azure-rest/core-client@2.9.0(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/abort-controller@2.2.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@azure/core-auth@1.11.0(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/core-client@1.11.1(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/core-lro@2.7.2(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/core-paging@1.7.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@azure/core-process@1.0.0': {}
+
+  '@azure/core-rest-pipeline@1.25.0(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/core-tracing@1.4.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@azure/core-util@1.14.0(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/identity@4.14.1(supports-color@7.2.0)':
+    dependencies:
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-client': 1.11.1(supports-color@7.2.0)
+      '@azure/core-process': 1.0.0
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      '@azure/msal-browser': 5.27.0
+      '@azure/msal-node': 7.1.2
+      open: 11.0.4
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/keyvault-common@2.1.1(supports-color@7.2.0)':
+    dependencies:
+      '@azure-rest/core-client': 2.9.0(supports-color@7.2.0)
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/keyvault-keys@4.10.2(supports-color@7.2.0)':
+    dependencies:
+      '@azure-rest/core-client': 2.9.0(supports-color@7.2.0)
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-lro': 2.7.2(supports-color@7.2.0)
+      '@azure/core-paging': 1.7.0
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/keyvault-common': 2.1.1(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/logger@1.4.0(supports-color@7.2.0)':
+    dependencies:
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/msal-browser@5.27.0':
+    dependencies:
+      '@azure/msal-common': 16.15.0
+
+  '@azure/msal-common@16.15.0': {}
+
+  '@azure/msal-node@7.1.2':
+    dependencies:
+      '@azure/msal-common': 16.15.0
+      jsonwebtoken: 9.0.3
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -8702,7 +9041,7 @@ snapshots:
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-auth-jwt@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-auth-jwt@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-authentication': 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-common': link:packages/nestjs-common
@@ -8712,7 +9051,7 @@ snapshots:
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       class-validator: 0.15.1
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -8722,7 +9061,7 @@ snapshots:
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-auth-jwt@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-auth-jwt@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-authentication': 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@concepta/nestjs-common': link:packages/nestjs-common
@@ -8732,7 +9071,7 @@ snapshots:
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       class-validator: 0.15.1
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -8828,7 +9167,7 @@ snapshots:
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-crud@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-crud@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-common': link:packages/nestjs-common
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -8841,7 +9180,7 @@ snapshots:
       deepmerge: 3.3.0
       qs: 6.16.0
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -8850,7 +9189,7 @@ snapshots:
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-crud@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-crud@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-common': link:packages/nestjs-common
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -8863,7 +9202,7 @@ snapshots:
       deepmerge: 3.3.0
       qs: 6.16.0
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -8872,7 +9211,7 @@ snapshots:
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-federated@7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-federated@7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-common': link:packages/nestjs-common
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -8881,31 +9220,31 @@ snapshots:
       class-transformer: 0.5.1
       class-validator: 0.15.1
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/core'
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-file@7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-file@7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-common': link:packages/nestjs-common
-      '@concepta/nestjs-typeorm-ext': 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+      '@concepta/nestjs-typeorm-ext': 7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@nestjs/config': 4.0.4(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(rxjs@7.8.2)
       '@nestjs/swagger': 11.2.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
       class-transformer: 0.5.1
       class-validator: 0.15.1
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/core'
       - reflect-metadata
       - supports-color
 
-  '@concepta/nestjs-invitation@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-invitation@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-access-control': 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(supports-color@7.2.0)
       '@concepta/nestjs-common': link:packages/nestjs-common
@@ -8917,7 +9256,7 @@ snapshots:
       class-transformer: 0.5.1
       class-validator: 0.15.1
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -8982,35 +9321,35 @@ snapshots:
       - rxjs
       - supports-color
 
-  '@concepta/nestjs-typeorm-ext@7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-typeorm-ext@7.0.0-alpha.10(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-common': link:packages/nestjs-common
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
-      '@nestjs/typeorm': 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+      '@nestjs/typeorm': 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       class-transformer: 0.5.1
       class-validator: 0.15.1
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@nestjs/core'
       - reflect-metadata
       - rxjs
       - supports-color
 
-  '@concepta/nestjs-typeorm-ext@7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-typeorm-ext@7.0.0-alpha.10(@nestjs/core@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-common': link:packages/nestjs-common
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
-      '@nestjs/typeorm': 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
+      '@nestjs/typeorm': 11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       class-transformer: 0.5.1
       class-validator: 0.15.1
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@nestjs/core'
       - reflect-metadata
       - rxjs
       - supports-color
 
-  '@concepta/nestjs-user@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-user@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-access-control': 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(supports-color@7.2.0)
       '@concepta/nestjs-common': link:packages/nestjs-common
@@ -9022,7 +9361,7 @@ snapshots:
       '@nestjs/swagger': 11.2.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
       class-transformer: 0.5.1
       class-validator: 0.15.1
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -9033,7 +9372,7 @@ snapshots:
       - rxjs
       - supports-color
 
-  '@concepta/nestjs-user@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/nestjs-user@7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(encoding@0.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@concepta/nestjs-access-control': 7.0.0-alpha.10(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(supports-color@7.2.0)
       '@concepta/nestjs-common': link:packages/nestjs-common
@@ -9045,7 +9384,7 @@ snapshots:
       '@nestjs/swagger': 11.2.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
       class-transformer: 0.5.1
       class-validator: 0.15.1
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@fastify/static'
       - '@nestjs/microservices'
@@ -9060,13 +9399,13 @@ snapshots:
     dependencies:
       prettier: 3.9.6
 
-  '@concepta/typeorm-seeding@4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@concepta/typeorm-seeding@4.0.0(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       chalk: 4.1.2
       glob: 7.2.3
       ora: 5.4.1
       reflect-metadata: 0.2.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       yargs: 17.7.3
 
   '@css-inline/css-inline-darwin-arm64@0.13.0':
@@ -9574,6 +9913,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@js-joda/core@6.3.2': {}
+
   '@lukeed/csprng@1.1.0': {}
 
   '@mapbox/node-pre-gyp@1.0.11(encoding@0.1.13)(supports-color@7.2.0)':
@@ -9971,29 +10312,29 @@ snapshots:
       '@nestjs/microservices': 12.0.4(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express': 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(supports-color@7.2.0)
 
-  '@nestjs/typeorm@11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@nestjs/typeorm@11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
 
-  '@nestjs/typeorm@11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@nestjs/typeorm@11.0.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@nestjs/core': 12.0.1(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
 
-  '@nestjs/typeorm@12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
+  '@nestjs/typeorm@12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))':
     dependencies:
       '@nestjs/common': 12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@nestjs/core': 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      typeorm: 1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
+      typeorm: 1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
 
   '@noble/hashes@1.8.0': {}
 
@@ -10498,6 +10839,8 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@tediousjs/connection-string@1.1.0': {}
+
   '@tokenizer/inflate@0.4.1(supports-color@7.2.0)':
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
@@ -10626,6 +10969,10 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/node@26.6.6':
+    dependencies:
+      undici-types: 8.9.0
+
   '@types/nodemailer@6.4.24':
     dependencies:
       '@types/node': 20.19.43
@@ -10695,6 +11042,10 @@ snapshots:
   '@types/qs@6.15.1': {}
 
   '@types/range-parser@1.2.7': {}
+
+  '@types/readable-stream@4.0.25':
+    dependencies:
+      '@types/node': 20.19.43
 
   '@types/send@0.17.6':
     dependencies:
@@ -10883,6 +11234,14 @@ snapshots:
       '@typescript-eslint/types': 8.70.0
       eslint-visitor-keys: 5.0.1
 
+  '@typespec/ts-http-runtime@0.3.9(supports-color@7.2.0)':
+    dependencies:
+      http-proxy-agent: 7.0.2(supports-color@7.2.0)
+      https-proxy-agent: 7.0.6(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@ungap/structured-clone@1.4.0': {}
 
   '@unrs/resolver-binding-android-arm-eabi@1.12.2':
@@ -11027,6 +11386,10 @@ snapshots:
 
   abbrev@2.0.0: {}
 
+  abort-controller@3.0.0:
+    dependencies:
+      event-target-shim: 5.0.1
+
   abstract-logging@2.0.1: {}
 
   accepts@1.3.8:
@@ -11062,6 +11425,8 @@ snapshots:
       debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
+
+  agent-base@7.1.4: {}
 
   ajv-draft-04@1.0.0(ajv@8.20.0):
     optionalDependencies:
@@ -11342,6 +11707,13 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
+  bl@6.1.6:
+    dependencies:
+      '@types/readable-stream': 4.0.25
+      buffer: 6.0.3
+      inherits: 2.0.4
+      readable-stream: 4.8.0
+
   body-parser@1.20.8(supports-color@7.2.0):
     dependencies:
       bytes: 3.1.2
@@ -11412,6 +11784,15 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
+
+  buffer@6.0.3:
+    dependencies:
+      base64-js: 1.5.1
+      ieee754: 1.2.1
+
+  bundle-name@4.1.1:
+    dependencies:
+      run-applescript: 7.1.0
 
   busboy@1.6.0:
     dependencies:
@@ -11607,6 +11988,8 @@ snapshots:
       delayed-stream: 1.0.0
 
   commander@10.0.1: {}
+
+  commander@11.1.0: {}
 
   commander@12.1.0: {}
 
@@ -11927,6 +12310,13 @@ snapshots:
 
   deepmerge@4.3.1: {}
 
+  default-browser-id@5.0.1: {}
+
+  default-browser@5.5.1:
+    dependencies:
+      bundle-name: 4.1.1
+      default-browser-id: 5.0.1
+
   defaults@1.0.4:
     dependencies:
       clone: 1.0.4
@@ -11936,6 +12326,8 @@ snapshots:
       es-define-property: 1.0.1
       es-errors: 1.3.0
       gopd: 1.2.0
+
+  define-lazy-prop@3.0.0: {}
 
   define-properties@1.2.1:
     dependencies:
@@ -12451,7 +12843,11 @@ snapshots:
 
   etag@1.8.1: {}
 
+  event-target-shim@5.0.1: {}
+
   eventemitter2@6.4.9: {}
+
+  events@3.3.0: {}
 
   execa@0.10.0:
     dependencies:
@@ -13082,9 +13478,23 @@ snapshots:
       statuses: 2.0.2
       toidentifier: 1.0.1
 
+  http-proxy-agent@7.0.2(supports-color@7.2.0):
+    dependencies:
+      agent-base: 7.1.4
+      debug: 4.4.3(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - supports-color
+
   https-proxy-agent@5.0.1(supports-color@7.2.0):
     dependencies:
       agent-base: 6.0.2(supports-color@7.2.0)
+      debug: 4.4.3(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - supports-color
+
+  https-proxy-agent@7.0.6(supports-color@7.2.0):
+    dependencies:
+      agent-base: 7.1.4
       debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
@@ -13204,6 +13614,8 @@ snapshots:
 
   is-docker@2.2.1: {}
 
+  is-docker@3.0.0: {}
+
   is-document.all@1.0.0:
     dependencies:
       call-bound: 1.0.4
@@ -13234,6 +13646,12 @@ snapshots:
   is-glob@4.0.3:
     dependencies:
       is-extglob: 2.1.1
+
+  is-in-ssh@1.0.0: {}
+
+  is-inside-container@1.0.0:
+    dependencies:
+      is-docker: 3.0.0
 
   is-interactive@1.0.0: {}
 
@@ -13318,6 +13736,10 @@ snapshots:
   is-wsl@2.2.0:
     dependencies:
       is-docker: 2.2.1
+
+  is-wsl@3.1.1:
+    dependencies:
+      is-inside-container: 1.0.0
 
   isarray@1.0.0: {}
 
@@ -13727,6 +14149,8 @@ snapshots:
       nopt: 7.2.1
 
   js-cookie@3.0.8: {}
+
+  js-md4@0.3.2: {}
 
   js-stringify@1.0.2: {}
 
@@ -14511,6 +14935,16 @@ snapshots:
 
   ms@2.1.3: {}
 
+  mssql@12.7.13(supports-color@7.2.0):
+    dependencies:
+      '@tediousjs/connection-string': 1.1.0
+      commander: 11.1.0
+      debug: 4.4.3(supports-color@7.2.0)
+      tarn: 3.1.2
+      tedious: 20.3.8(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - supports-color
+
   multer@2.2.0:
     dependencies:
       append-field: 1.0.0
@@ -14540,6 +14974,8 @@ snapshots:
   napi-build-utils@2.0.0: {}
 
   napi-postinstall@0.3.4: {}
+
+  native-duplexpair@1.0.0: {}
 
   natural-compare@1.4.0: {}
 
@@ -14703,6 +15139,15 @@ snapshots:
   onetime@7.0.0:
     dependencies:
       mimic-function: 5.0.1
+
+  open@11.0.4:
+    dependencies:
+      default-browser: 5.5.1
+      define-lazy-prop: 3.0.0
+      is-in-ssh: 1.0.0
+      is-inside-container: 1.0.0
+      powershell-utils: 0.2.1
+      wsl-utils: 1.0.1
 
   open@7.4.2:
     dependencies:
@@ -15013,6 +15458,8 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
+  powershell-utils@0.2.1: {}
+
   prebuild-install@7.1.3:
     dependencies:
       detect-libc: 2.1.2
@@ -15066,6 +15513,8 @@ snapshots:
   process-nextick-args@2.0.1: {}
 
   process-warning@1.0.0: {}
+
+  process@0.11.10: {}
 
   promise@7.3.1:
     dependencies:
@@ -15249,6 +15698,14 @@ snapshots:
       string_decoder: 1.3.0
       util-deprecate: 1.0.2
 
+  readable-stream@4.8.0:
+    dependencies:
+      abort-controller: 3.0.0
+      buffer: 6.0.3
+      events: 3.3.0
+      process: 0.11.10
+      string_decoder: 1.3.0
+
   readdirp@3.6.0:
     dependencies:
       picomatch: 2.3.2
@@ -15378,6 +15835,8 @@ snapshots:
   run-applescript@3.2.0:
     dependencies:
       execa: 0.10.0
+
+  run-applescript@7.1.0: {}
 
   run-con@1.3.3:
     dependencies:
@@ -15834,6 +16293,22 @@ snapshots:
       mkdirp: 1.0.4
       yallist: 4.0.0
 
+  tarn@3.1.2: {}
+
+  tedious@20.3.8(supports-color@7.2.0):
+    dependencies:
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/identity': 4.14.1(supports-color@7.2.0)
+      '@azure/keyvault-keys': 4.10.2(supports-color@7.2.0)
+      '@js-joda/core': 6.3.2
+      '@types/node': 26.6.6
+      bl: 6.1.6
+      iconv-lite: 0.7.3
+      js-md4: 0.3.2
+      native-duplexpair: 1.0.0
+    transitivePeerDependencies:
+      - supports-color
+
   test-exclude@7.0.2:
     dependencies:
       '@istanbuljs/schema': 0.1.6
@@ -15996,7 +16471,7 @@ snapshots:
       shiki: 0.14.7
       typescript: 5.9.3
 
-  typeorm@1.0.0(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0):
+  typeorm@1.0.0(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0):
     dependencies:
       '@sqltools/formatter': 1.2.5
       ansis: 4.3.1
@@ -16010,6 +16485,7 @@ snapshots:
       yargs: 18.2.0
     optionalDependencies:
       better-sqlite3: 12.11.1
+      mssql: 12.7.13(supports-color@7.2.0)
       mysql2: 3.24.6(@types/node@20.19.43)
       oracledb: 6.10.0
       pg: 8.23.1
@@ -16052,6 +16528,8 @@ snapshots:
       which-boxed-primitive: 1.1.1
 
   undici-types@6.21.0: {}
+
+  undici-types@8.9.0: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 
@@ -16289,6 +16767,11 @@ snapshots:
     dependencies:
       imurmurhash: 0.1.4
       signal-exit: 4.1.0
+
+  wsl-utils@1.0.1:
+    dependencies:
+      is-wsl: 3.1.1
+      powershell-utils: 0.2.1
 
   xtend@4.0.2: {}
 
