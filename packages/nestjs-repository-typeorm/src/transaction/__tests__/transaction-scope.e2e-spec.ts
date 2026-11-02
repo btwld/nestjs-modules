@@ -112,7 +112,9 @@ describe('TransactionScope — commits every active transaction (defect #1)', ()
     const ctx = new AppContextHost();
 
     await txScope.run(ctx, async (txCtx: TransactionContextInterface) => {
-      const tx = await txCtx.trx.getOrStart(resolveTransactionKey('typeorm'));
+      const tx = await txCtx.trx.getOrStart(
+        resolveTransactionKey('typeorm-sqlite'),
+      );
       assert.ok(tx instanceof TypeOrmTransaction);
       const manager = tx.getClient();
       await manager.save(TestEntityFixture, { firstName: 'Ghost' });

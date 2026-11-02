@@ -11,7 +11,7 @@ import {
 
 import { AuditedStatementItemEntityFixture } from '../../__fixtures__/repository/entity/audited-statement-item.entity.fixture.js';
 import { StatementItemEntityFixture } from '../../__fixtures__/repository/entity/statement-item.entity.fixture.js';
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
 import { type TypeOrmRepository } from '../typeorm-repository.js';
 
 const STATEMENT_ITEM_TOKEN = 'statement-item';
@@ -43,7 +43,7 @@ describe('TypeOrmRepository append-only (e2e)', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: STATEMENT_ITEM_TOKEN,

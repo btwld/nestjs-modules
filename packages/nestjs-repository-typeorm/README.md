@@ -100,8 +100,7 @@ export class AppModule {}
 
 Each entity key gets a `TypeOrmRepository` for your database. Import
 `RepositoryModule.forFeature(['orders'])` in a module to inject it there with
-`@InjectDynamicRepository('orders')`. `TypeOrmRepositoryModule`, from the
-package root, takes a Postgres or SQLite data source.
+`@InjectDynamicRepository('orders')`.
 
 On MySQL and MariaDB, keep the client's default flags. Versioned writes rely on
 `FOUND_ROWS`, so a data source that turns it off (`flags` or `extra.flags`
@@ -517,7 +516,6 @@ The transaction key names the adapter and the data source:
 `typeorm-postgres:<dataSourceName>`, `typeorm-mysql:<dataSourceName>`,
 `typeorm-mariadb:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
 (e.g., `typeorm-postgres:default`).
-`TypeOrmRepositoryModule` uses `typeorm:<dataSourceName>`.
 
 ### Single-Connection Drivers
 
@@ -605,9 +603,7 @@ RepositoryModule.forRoot({
 Read the tenant from the same `RowScopeCtx` overlay your row scope resolver
 reads, so the two always agree on who the caller is. The second argument is
 the data source name; return `{}` for one without policies. Only the
-Postgres adapter takes the option. `TypeOrmRepositoryModule` takes it too,
-and stops startup with `TypeOrmTransactionSettingsUnsupportedException` when
-a data source in the registration is not Postgres.
+Postgres adapter takes the option.
 
 Name each setting anything with a dot in it, and use the same name in your
 policies. An `undefined` value is skipped.
@@ -716,7 +712,7 @@ optimistic locking). The Postgres variant uses `timestamptz` column types.
 
 ```ts
 import { Entity, Column } from 'typeorm';
-import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Entity()
 export class OrderEntity extends CommonPostgresEntity {
@@ -742,7 +738,7 @@ their `dateDeleted` column could never be set.
 
 ```ts
 import { Entity, Column } from 'typeorm';
-import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Entity()
 export class StatementItemEntity extends AppendOnlyPostgresEntity {
@@ -761,7 +757,7 @@ give `correctedId` a unique index and a self-referencing foreign key:
 
 ```ts
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
-import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+import { AppendOnlyPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Entity()
 @Index(['correctedId'], { unique: true })
@@ -791,7 +787,7 @@ For an activity store (see
 
 ```ts
 import { Column, Entity } from 'typeorm';
-import { ActivityPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+import { ActivityPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Entity()
 export class Activity extends ActivityPostgresEntity {
@@ -827,6 +823,7 @@ npm install @nestjs/outbox
 ```ts
 import { DurableMessagingModule } from '@concepta/nestjs-repository/optional/outbox';
 import { TypeOrmDurable } from '@concepta/nestjs-repository-typeorm/optional/outbox';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
   imports: [
@@ -834,7 +831,7 @@ import { TypeOrmDurable } from '@concepta/nestjs-repository-typeorm/optional/out
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'orders', entity: OrderEntity }],
         },
       ],
@@ -937,7 +934,7 @@ Requirements and limits:
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmDriverOptionsInterface`, `TypeOrmRepository`, `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `TypeOrmTransactionSettingsResolver`, and the Postgres and SQLite base entities |
+| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepository`, `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory` |
 | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |

@@ -15,7 +15,7 @@ import { TestEntityFixture } from '../../__fixtures__/repository/entity/test.ent
 import { TypeOrmUnsupportedDatabaseException } from '../../exceptions/typeorm-unsupported-database.exception.js';
 import { TypeOrmPostgresRepository } from '../../postgres/typeorm-postgres-repository.js';
 import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
 import { type TypeOrmProviderOptionsInterface } from '../typeorm-provider-options.interface.js';
 import { TypeOrmRepository } from '../typeorm-repository.js';
 
@@ -50,7 +50,9 @@ const compileRegistration = (
     imports: [
       TypeOrmModule.forRoot(ormConfig),
       RepositoryModule.forRoot({
-        drivers: [{ driver: TypeOrmRepositoryModule, entities: [entity] }],
+        drivers: [
+          { driver: TypeOrmSqliteRepositoryModule, entities: [entity] },
+        ],
       }),
     ],
   }).compile();

@@ -31,7 +31,7 @@ const ROOT = join(__dirname, '..');
 const PACKAGES = [
   { dir: 'nestjs-core', export: 'CoreModule' },
   { dir: 'nestjs-repository', export: 'RepositoryModule' },
-  { dir: 'nestjs-repository-typeorm', export: 'TypeOrmRepositoryModule' },
+  { dir: 'nestjs-repository-typeorm', export: 'TypeOrmRepository' },
   { dir: 'nestjs-crud', export: 'CrudModule' },
   { dir: 'nestjs-cache', export: 'CacheModule' },
   { dir: 'nestjs-otp', export: 'OtpModule' },

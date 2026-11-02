@@ -57,7 +57,7 @@ describe(TypeOrmDurable.name, () => {
       const bound = durable.bind(repository);
 
       expect(bound.store).toBeInstanceOf(PostgresOutboxStore);
-      expect(bound.transactionKey).toBe('typeorm:default');
+      expect(bound.transactionKey).toBe('typeorm-sqlite:default');
       expect(moduleRef.get).toHaveBeenCalledWith(getDataSourceToken(), {
         strict: false,
       });
@@ -71,12 +71,14 @@ describe(TypeOrmDurable.name, () => {
         app.get(DataSource).getRepository(TestEntityFixture),
         {
           entityKey: 'named',
-          transactionKey: 'typeorm:secondary',
+          transactionKey: 'typeorm-sqlite:secondary',
           dataSourceName: 'secondary',
         },
       );
 
-      expect(durable.bind(named).transactionKey).toBe('typeorm:secondary');
+      expect(durable.bind(named).transactionKey).toBe(
+        'typeorm-sqlite:secondary',
+      );
       expect(moduleRef.get).toHaveBeenCalledWith(
         getDataSourceToken('secondary'),
         { strict: false },
