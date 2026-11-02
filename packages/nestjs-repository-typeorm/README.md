@@ -24,6 +24,7 @@ with audit columns and a version.
 - [Transaction Support](#transaction-support)
 - [Row-Level Security (Postgres)](#row-level-security-postgres)
 - [Virtual Private Database (Oracle)](#virtual-private-database-oracle)
+- [Row-Level Security (SQL Server)](#row-level-security-sql-server)
 - [Repository Hooks](#repository-hooks)
 - [Base Entities](#base-entities)
 - [Durable Messaging](#durable-messaging)
@@ -146,8 +147,9 @@ Uses the `oracledb` client in its default Thin mode.
   number: `2627` or `2601` for a duplicate key (constraint or unique index),
   `547` for a foreign key, `515` for a missing value.
 - Transactions run concurrently, each on its own connection.
-- No option sets `SESSION_CONTEXT` per transaction, so SQL Server's own
-  row-level security can't see the caller's tenant.
+- `sessionContext` sets values at the start of every transaction, such as
+  the caller's tenant — see
+  [Row-Level Security (SQL Server)](#row-level-security-sql-server).
 - [Durable messaging](#durable-messaging): refused at startup.
 
 ### SQLite
@@ -512,7 +514,7 @@ each data source your entities use, and `TransactionScope.run()` and
 | Property / Method | Description |
 | --- | --- |
 | `isActive` | Whether the transaction is currently active |
-| `start()` | Begin the transaction; on Postgres, apply its `transactionSettings`; on Oracle, set its `applicationContext` |
+| `start()` | Begin the transaction; on Postgres, apply its `transactionSettings`; on Oracle, set its `applicationContext`; on SQL Server, set its `sessionContext` |
 | `commit()` | Commit, then (on Oracle) clear its `applicationContext` values, and release the connection |
 | `rollback()` | Roll back, then (on Oracle) clear its `applicationContext` values, and release the connection |
 | `getClient()` | The transactional `EntityManager` |
@@ -778,6 +780,104 @@ The application reaches the owner's table through a synonym
 
 Views and definer's-rights code need nothing extra: VPD polices the tables
 underneath them with the caller's context.
+
+## Row-Level Security (SQL Server)
+
+SQL Server's row-level security does what
+[row-level security](#row-level-security-postgres) does on Postgres: the
+database hides other tenants' rows, even from SQL that bypasses the
+repository. Row scope stays the enforcement; RLS is the backstop.
+
+### Setting the tenant in the session context
+
+Give the SQL Server adapter a `sessionContext` function. Every transaction
+it opens starts by setting those values in the session context, read from
+the caller's context.
+
+```ts
+import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
+import { TypeOrmSqlServerRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlserver';
+
+RepositoryModule.forRoot({
+  drivers: [
+    {
+      driver: TypeOrmSqlServerRepositoryModule,
+      entities: [{ key: 'orders', entity: Order }],
+      options: {
+        sessionContext: (ctx) => ({
+          tenant_id: ctx.supports(RowScopeCtx)
+            ? ctx.with(RowScopeCtx).tenantId
+            : undefined,
+        }),
+      },
+    },
+  ],
+});
+```
+
+As on Postgres, read the tenant from the same `RowScopeCtx` overlay your row
+scope resolver reads, and the second argument is the data source name.
+An `undefined` value, or a name an earlier transaction set and this one
+leaves out, is set to `NULL`, so a caller without a tenant sees nothing.
+
+What you get: each transaction the driver opens calls
+`sp_set_session_context` for each value before any of your queries run,
+from the same places as on Postgres, and sets `rockets.transaction_id`
+(`TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`) to the transaction's id. The
+session context outlives the transaction on a pooled connection, so your
+predicate compares that id with `CURRENT_TRANSACTION_ID()`: whatever a
+transaction leaves on a connection matches nothing once it ends, even when
+the server aborts it. If setting a value fails, the transaction is rolled
+back and you get the error.
+
+### Security policies
+
+The predicate function, the policy and the users are your migrations. A
+recipe for one tenant-scoped table:
+
+```sql
+create schema rls;
+go
+
+-- Rows of the caller's tenant, set by the transaction now running.
+-- An unset tenant matches no rows: reads return nothing, writes are refused.
+create function rls.tenant_predicate(@tenant_id nvarchar(36))
+returns table with schemabinding as return
+  select 1 as allowed
+  where @tenant_id = cast(session_context(N'tenant_id') as nvarchar(36))
+    and cast(session_context(N'rockets.transaction_id') as bigint)
+      = current_transaction_id();
+go
+
+create security policy rls.tenant_isolation
+  add filter predicate rls.tenant_predicate(tenant_id) on dbo.orders,
+  add block predicate rls.tenant_predicate(tenant_id) on dbo.orders after insert,
+  add block predicate rls.tenant_predicate(tenant_id) on dbo.orders after update
+  with (state = on);
+go
+
+-- The application connects as a user that can't alter the policy.
+create user app_user for login app_login;
+grant select, insert, update, delete on dbo.orders to app_user;
+```
+
+Keep the `current_transaction_id()` comparison: without it, a connection
+the pool hands to the next request still carries the last caller's tenant.
+
+### Before you turn RLS on
+
+- **Run every request in a transaction, reads included**, and **pass `ctx`
+  to every repository call**, as on Postgres: without either there is no
+  tenant, so reads return no rows and writes are refused or change nothing.
+- **Keep per-user rules in row scope.** The policy covers the tenant only.
+- **Serve callers who read across tenants through an exemption in the
+  predicate**, such as `or is_rolemember('rls_exempt') = 1` for the user your
+  migrations run as: the policy applies to every user, `sa` included. As on
+  Postgres, it still applies when `relax` lifts the tenant.
+- **Include `tenant_id` in foreign keys.** SQL Server checks constraints
+  without the policy, so otherwise a row can point into another tenant.
+- **Code on the raw `DataSource`** runs outside the driver's transactions and
+  has no tenant.
 
 ## Repository Hooks
 
@@ -1064,6 +1164,6 @@ Requirements and limits:
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
 | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
-| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
+| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerDriverOptionsInterface`, `TypeOrmSqlServerSessionContextResolver`, `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

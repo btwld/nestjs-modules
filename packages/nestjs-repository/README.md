@@ -2361,12 +2361,9 @@ Structural only — nothing probes what a resolver decides:
 Row scope protects every repository call. To have the database hide other
 tenants' rows too, even from SQL that bypasses the repository, add row-level
 security behind it. This needs a driver and database that support it, such
-as `nestjs-repository-typeorm` on Postgres or Oracle, which sets the caller's
-tenant on every transaction from the same `RowScopeCtx` overlay. See its
-[Row-Level Security (Postgres)](../nestjs-repository-typeorm/README.md#row-level-security-postgres)
-and
-[Virtual Private Database (Oracle)](../nestjs-repository-typeorm/README.md#virtual-private-database-oracle)
-sections.
+as `nestjs-repository-typeorm` on Postgres, Oracle or SQL Server, which sets
+the caller's tenant on every transaction from the same `RowScopeCtx` overlay.
+See its [adapter sections](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
 ## Write Policy
 
