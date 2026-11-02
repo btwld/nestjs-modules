@@ -66,10 +66,7 @@ export class RlsTaskControllerFixture {
     const tx = await ctx
       .with(TrxCtx)
       .trx.getOrStart(
-        resolveTransactionKey(
-          undefined,
-          TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX,
-        ),
+        resolveTransactionKey(TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX),
       );
     assert.ok(tx instanceof TypeOrmTransaction);
     const rows: { title: string }[] = await tx

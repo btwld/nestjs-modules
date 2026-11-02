@@ -3,11 +3,9 @@ import { type DataSource } from 'typeorm';
 import { type AppContextHost } from '@concepta/nestjs-core';
 
 import { TypeOrmTransactionFactory } from '../transaction/typeorm-transaction.factory.js';
-import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../typeorm-repository.constants.js';
 
 import { type TypeOrmTransactionSettingsResolver } from './typeorm-postgres-transaction-settings-resolver.type.js';
 import { TypeOrmPostgresTransaction } from './typeorm-postgres-transaction.js';
-import { TYPEORM_POSTGRES_DATABASES } from './typeorm-postgres.constants.js';
 
 /**
  * Creates transactions on a Postgres data source. Transactions run
@@ -24,10 +22,10 @@ export class TypeOrmPostgresTransactionFactory extends TypeOrmTransactionFactory
    */
   constructor(
     dataSource: DataSource,
-    dataSourceKey: string = TYPEORM_DEFAULT_DATA_SOURCE_NAME,
+    dataSourceKey: string,
     private readonly transactionSettings?: TypeOrmTransactionSettingsResolver,
   ) {
-    super(dataSource, dataSourceKey, TYPEORM_POSTGRES_DATABASES);
+    super(dataSource, dataSourceKey);
   }
 
   create(ctx: AppContextHost): TypeOrmPostgresTransaction {

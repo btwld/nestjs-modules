@@ -246,54 +246,54 @@ function versionGuard(ctx: ConformanceContext): void {
     assert.equal((await stored())?.rank, 2);
   });
 
-  if (ctx.capabilities.softDelete === 'refused') return;
+  if (ctx.capabilities.softDelete === 'supported') {
+    it('doSoftDelete: changes the version, and refuses a stale row', async () => {
+      const stale = await create();
+      const updated = await run(ctx, (txCtx) =>
+        item().update(stale, { rank: 2 }, { ctx: txCtx }),
+      );
 
-  it('doSoftDelete: changes the version, and refuses a stale row', async () => {
-    const stale = await create();
-    const updated = await run(ctx, (txCtx) =>
-      item().update(stale, { rank: 2 }, { ctx: txCtx }),
-    );
+      await assert.rejects(
+        run(ctx, (txCtx) =>
+          item().softDelete(stale, {
+            ctx: txCtx,
+            expectedVersion: stale.version,
+          }),
+        ),
+        OptimisticLockException,
+      );
+      assert.equal((await stored())?.removedAt, null);
 
-    await assert.rejects(
-      run(ctx, (txCtx) =>
-        item().softDelete(stale, {
-          ctx: txCtx,
-          expectedVersion: stale.version,
-        }),
-      ),
-      OptimisticLockException,
-    );
-    assert.equal((await stored())?.removedAt, null);
+      const removed = await run(ctx, (txCtx) =>
+        item().softDelete(updated, { ctx: txCtx }),
+      );
+      changed(updated, removed);
+    });
 
-    const removed = await run(ctx, (txCtx) =>
-      item().softDelete(updated, { ctx: txCtx }),
-    );
-    changed(updated, removed);
-  });
+    it('doRestore: changes the version, and refuses a stale row', async () => {
+      const created = await create();
+      const stale = await run(ctx, (txCtx) =>
+        item().softDelete(created, { ctx: txCtx }),
+      );
+      const restored = await run(ctx, (txCtx) =>
+        item().restore(stale, { ctx: txCtx }),
+      );
+      changed(stale, restored);
 
-  it('doRestore: changes the version, and refuses a stale row', async () => {
-    const created = await create();
-    const stale = await run(ctx, (txCtx) =>
-      item().softDelete(created, { ctx: txCtx }),
-    );
-    const restored = await run(ctx, (txCtx) =>
-      item().restore(stale, { ctx: txCtx }),
-    );
-    changed(stale, restored);
+      await run(ctx, (txCtx) => item().softDelete(restored, { ctx: txCtx }));
 
-    await run(ctx, (txCtx) => item().softDelete(restored, { ctx: txCtx }));
-
-    await assert.rejects(
-      run(ctx, (txCtx) =>
-        item().restore(stale, {
-          ctx: txCtx,
-          expectedVersion: stale.version,
-        }),
-      ),
-      OptimisticLockException,
-    );
-    assert.ok((await stored())?.removedAt instanceof Date);
-  });
+      await assert.rejects(
+        run(ctx, (txCtx) =>
+          item().restore(stale, {
+            ctx: txCtx,
+            expectedVersion: stale.version,
+          }),
+        ),
+        OptimisticLockException,
+      );
+      assert.ok((await stored())?.removedAt instanceof Date);
+    });
+  }
 }
 
 function refused(ctx: ConformanceContext): void {

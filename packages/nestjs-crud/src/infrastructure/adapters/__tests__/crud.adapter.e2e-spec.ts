@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+
 import { Column, Entity } from 'typeorm';
 
 import {
@@ -1353,9 +1355,11 @@ describe('CrudAdapter relations (e2e)', () => {
     beforeEach(async () => {
       const zebra = await seedCompany('Zebra Inc', 'zebra.com');
       const alpha = await seedCompany('Alpha Corp', 'alpha.com');
-      await seedUser('bob@alpha.com', alpha.id!);
-      await seedUser('zara@zebra.com', zebra.id!);
-      await seedUser('alice@alpha.com', alpha.id!);
+      assert.ok(alpha.id);
+      assert.ok(zebra.id);
+      await seedUser('bob@alpha.com', alpha.id);
+      await seedUser('zara@zebra.com', zebra.id);
+      await seedUser('alice@alpha.com', alpha.id);
     });
 
     it('should sort by relation field ASC', async () => {

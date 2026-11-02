@@ -87,13 +87,13 @@ export abstract class TypeOrmRepository<
   /**
    * @param repo - The TypeORM repository to wrap
    * @param options - The repository's options
-   * @param databases - The database types the adapter accepts; a data
+   * @param databaseType - The database type the adapter is for; a data
    *   source of any other is refused
    */
   protected constructor(
     private readonly repo: Repository<Entity>,
     private readonly options: TypeOrmRepositoryOptions,
-    databases: readonly string[],
+    databaseType: string,
   ) {
     super(options.entityKey, options.hookResolver);
 
@@ -104,11 +104,11 @@ export abstract class TypeOrmRepository<
     }
 
     const { options: dataSourceOptions, driver } = dataSourceOf(repo.manager);
-    if (!databases.includes(dataSourceOptions.type)) {
+    if (dataSourceOptions.type !== databaseType) {
       throw new TypeOrmUnsupportedDatabaseException(
-        `Entity ${entityName}`,
+        entityName,
         dataSourceOptions.type,
-        databases,
+        databaseType,
       );
     }
 

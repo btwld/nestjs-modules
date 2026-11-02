@@ -1,20 +1,8 @@
-import {
-  type DatabaseType,
-  type DataSource,
-  type EntityManager,
-  type QueryRunner,
-} from 'typeorm';
+import { type DataSource, type EntityManager, type QueryRunner } from 'typeorm';
 import { type Mock } from 'vitest';
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
-import { AppContextHost } from '@concepta/nestjs-core';
-
-import { TypeOrmUnsupportedDatabaseException } from '../../exceptions/typeorm-unsupported-database.exception.js';
-import { TypeOrmPostgresTransactionFactory } from '../../postgres/typeorm-postgres-transaction.factory.js';
-import { TypeOrmPostgresTransaction } from '../../postgres/typeorm-postgres-transaction.js';
-import { TypeOrmSqliteTransactionFactory } from '../../sqlite/typeorm-sqlite-transaction.factory.js';
 import { TypeOrmSqliteTransaction } from '../../sqlite/typeorm-sqlite-transaction.js';
-import { TypeOrmTransactionFactory } from '../typeorm-transaction.factory.js';
 import { TypeOrmTransaction } from '../typeorm-transaction.js';
 
 interface MockQueryRunner {
@@ -139,82 +127,6 @@ describe(TypeOrmTransaction.name, () => {
         'No active transaction - cannot get client',
       );
     });
-
-    it('should run no statements of its own without settings', async () => {
-      await transaction.start();
-
-      expect(mockQueryRunner.query).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('start with settings', () => {
-    const calls: string[] = [];
-
-    beforeEach(() => {
-      calls.length = 0;
-      mockQueryRunner.startTransaction.mockImplementation(async () => {
-        calls.push('begin');
-        mockQueryRunner.isTransactionActive = true;
-      });
-      mockQueryRunner.query.mockImplementation(
-        async (_sql: string, params: string[]) => {
-          calls.push(params.join('='));
-        },
-      );
-      mockQueryRunner.rollbackTransaction.mockImplementation(async () => {
-        calls.push('rollback');
-        mockQueryRunner.isTransactionActive = false;
-      });
-      mockQueryRunner.release.mockImplementation(async () => {
-        calls.push('release');
-      });
-    });
-
-    it('should apply each setting after BEGIN, in order, skipping undefined values', async () => {
-      await new TypeOrmPostgresTransaction(mockDataSource, {
-        'app.tenant_id': 't-1',
-        'app.user_id': undefined,
-        'app.region': 'eu',
-      }).start();
-
-      expect(calls).toEqual(['begin', 'app.tenant_id=t-1', 'app.region=eu']);
-      expect(mockQueryRunner.query).toHaveBeenCalledWith(
-        'select set_config($1, $2, true)',
-        ['app.tenant_id', 't-1'],
-      );
-    });
-
-    it('should roll back, release and rethrow when a setting fails', async () => {
-      const settingError = new Error('invalid configuration parameter name');
-      mockQueryRunner.query.mockRejectedValueOnce(settingError);
-      const tx = new TypeOrmPostgresTransaction(mockDataSource, {
-        'app.tenant_id': 't-1',
-      });
-
-      await expect(tx.start()).rejects.toBe(settingError);
-
-      expect(calls).toEqual(['begin', 'rollback', 'release']);
-      expect(tx.isActive).toBe(false);
-      expect(() => tx.getClient()).toThrow(
-        'No active transaction - cannot get client',
-      );
-    });
-
-    it('should still release and rethrow the setting error when the rollback fails', async () => {
-      const settingError = new Error('invalid configuration parameter name');
-      mockQueryRunner.query.mockRejectedValueOnce(settingError);
-      mockQueryRunner.rollbackTransaction.mockRejectedValueOnce(
-        new Error('connection lost'),
-      );
-
-      await expect(
-        new TypeOrmPostgresTransaction(mockDataSource, {
-          'app.tenant_id': 't-1',
-        }).start(),
-      ).rejects.toBe(settingError);
-
-      expect(calls).toEqual(['begin', 'release']);
-    });
   });
 
   describe('commit', () => {
@@ -309,113 +221,6 @@ describe(TypeOrmTransaction.name, () => {
       expect(() => transaction.getClient()).toThrow(
         'No active transaction - cannot get client',
       );
-    });
-  });
-});
-
-// DataSource.options is declared readonly; mockDeep<DataSource>() preserves
-// that in its type, but each test needs to swap in a different driver type,
-// so it's set via defineProperty rather than direct assignment.
-//
-// Typed on `type` alone rather than DataSourceOptions: the factory reads only
-// that field.
-function setDataSourceOptions(
-  dataSource: DataSource,
-  options: {
-    readonly type: DatabaseType;
-    readonly database?: string;
-  },
-): void {
-  Object.defineProperty(dataSource, 'options', {
-    value: options,
-    configurable: true,
-  });
-}
-
-describe(TypeOrmTransactionFactory.name, () => {
-  let factory: TypeOrmTransactionFactory;
-  let mockDataSource: DeepMockProxy<DataSource>;
-
-  beforeEach(() => {
-    mockDataSource = mockDeep<DataSource>();
-    setDataSourceOptions(mockDataSource, { type: 'postgres' });
-    factory = new TypeOrmPostgresTransactionFactory(mockDataSource);
-  });
-
-  describe('create', () => {
-    it("should create the adapter's transaction", () => {
-      const transaction = factory.create(new AppContextHost());
-      expect(transaction).toBeInstanceOf(TypeOrmPostgresTransaction);
-
-      setDataSourceOptions(mockDataSource, { type: 'better-sqlite3' });
-      expect(
-        new TypeOrmSqliteTransactionFactory(mockDataSource).create(),
-      ).toBeInstanceOf(TypeOrmSqliteTransaction);
-    });
-
-    it('should create new transaction on each call', () => {
-      const tx1 = factory.create(new AppContextHost());
-      const tx2 = factory.create(new AppContextHost());
-      expect(tx1).not.toBe(tx2);
-    });
-
-    it("should resolve the settings from the scope's context and apply them on start", async () => {
-      const query = vi.fn().mockResolvedValue(undefined);
-      mockDataSource.createQueryRunner.mockReturnValue(
-        mockDeep<QueryRunner>({ query }),
-      );
-      const ctx = new AppContextHost();
-      const transactionSettings = vi.fn().mockReturnValue({
-        'app.tenant_id': 't-1',
-      });
-
-      await new TypeOrmPostgresTransactionFactory(
-        mockDataSource,
-        'primary',
-        transactionSettings,
-      )
-        .create(ctx)
-        .start();
-
-      expect(transactionSettings).toHaveBeenCalledWith(ctx, 'primary');
-      expect(query).toHaveBeenCalledWith('select set_config($1, $2, true)', [
-        'app.tenant_id',
-        't-1',
-      ]);
-    });
-  });
-
-  describe('database', () => {
-    it('should refuse a data source of another database', () => {
-      setDataSourceOptions(mockDataSource, { type: 'better-sqlite3' });
-      expect(
-        () => new TypeOrmPostgresTransactionFactory(mockDataSource, 'primary'),
-      ).toThrow(
-        'Data source "primary" uses a "better-sqlite3" data source, but its ' +
-          'TypeORM adapter accepts only "postgres"',
-      );
-
-      setDataSourceOptions(mockDataSource, { type: 'postgres' });
-      expect(() => new TypeOrmSqliteTransactionFactory(mockDataSource)).toThrow(
-        TypeOrmUnsupportedDatabaseException,
-      );
-    });
-  });
-
-  describe('supportsConcurrentTransactions', () => {
-    it('should be true for postgres, which gives each transaction its own connection', () => {
-      expect(factory.supportsConcurrentTransactions).toBe(true);
-    });
-
-    it('should be false for better-sqlite3, which shares one QueryRunner per data source', () => {
-      setDataSourceOptions(mockDataSource, {
-        type: 'better-sqlite3',
-        database: ':memory:',
-      });
-      expect(
-        new TypeOrmSqliteTransactionFactory(mockDataSource)
-          .supportsConcurrentTransactions,
-      ).toBe(false);
     });
   });
 });

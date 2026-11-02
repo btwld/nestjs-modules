@@ -6,8 +6,6 @@ import {
   type TransactionInterface,
 } from '@concepta/nestjs-repository';
 
-import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
-
 /**
  * Factory for TypeORM transactions, shared by every database's adapter.
  *
@@ -20,22 +18,11 @@ export abstract class TypeOrmTransactionFactory implements TransactionFactoryInt
   /**
    * @param dataSource - The data source transactions run on
    * @param dataSourceKey - Its name
-   * @param databases - The database types the adapter accepts; a data
-   *   source of any other is refused
    */
   protected constructor(
     protected readonly dataSource: DataSource,
     protected readonly dataSourceKey: string,
-    databases: readonly string[],
-  ) {
-    if (!databases.includes(dataSource.options.type)) {
-      throw new TypeOrmUnsupportedDatabaseException(
-        `Data source "${dataSourceKey}"`,
-        dataSource.options.type,
-        databases,
-      );
-    }
-  }
+  ) {}
 
   /**
    * Create a new transaction bound to this factory's data source.

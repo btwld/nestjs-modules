@@ -72,24 +72,24 @@ describe('typeorm-repository.util', () => {
   });
 
   describe('resolveTransactionKey', () => {
-    it('should return typeorm:default for no dataSource', () => {
-      const result = resolveTransactionKey();
-      expect(result).toBe(`typeorm:${TYPEORM_DEFAULT_DATA_SOURCE_NAME}`);
+    it('should return <prefix>:default for no dataSource', () => {
+      const result = resolveTransactionKey('typeorm-postgres');
+      expect(result).toBe(
+        `typeorm-postgres:${TYPEORM_DEFAULT_DATA_SOURCE_NAME}`,
+      );
     });
 
-    it('should return typeorm:<name> for named dataSource', () => {
-      const result = resolveTransactionKey('secondary');
-      expect(result).toBe('typeorm:secondary');
+    it('should return <prefix>:<name> for named dataSource', () => {
+      const result = resolveTransactionKey('typeorm-postgres', 'secondary');
+      expect(result).toBe('typeorm-postgres:secondary');
     });
 
     it('should handle DataSource object', () => {
-      const result = resolveTransactionKey(namedDataSourceOptions('custom-ds'));
-      expect(result).toBe('typeorm:custom-ds');
-    });
-
-    it("should prefix the key with the adapter's prefix", () => {
-      const result = resolveTransactionKey('secondary', 'typeorm-postgres');
-      expect(result).toBe('typeorm-postgres:secondary');
+      const result = resolveTransactionKey(
+        'typeorm-postgres',
+        namedDataSourceOptions('custom-ds'),
+      );
+      expect(result).toBe('typeorm-postgres:custom-ds');
     });
   });
 

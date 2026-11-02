@@ -39,9 +39,9 @@ yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
-Postgres, MySQL 8.4, and SQLite through `better-sqlite3`. A repository or
-transaction factory given a data source of a database its adapter is not for
-fails at startup with `TypeOrmUnsupportedDatabaseException`.
+Postgres, MySQL 8.4, and SQLite through `better-sqlite3`. An entity
+registered on a data source of a database its adapter is not for fails at
+startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### Dependencies
 

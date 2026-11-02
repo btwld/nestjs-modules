@@ -9,7 +9,7 @@ import { TypeOrmRepository } from '../repository/typeorm-repository.js';
 import { dataSourceOf } from '../typeorm-repository.util.js';
 
 import { TypeOrmMysqlFoundRowsException } from './typeorm-mysql-found-rows.exception.js';
-import { TYPEORM_MYSQL_DATABASES } from './typeorm-mysql.constants.js';
+import { TYPEORM_MYSQL_DATABASE } from './typeorm-mysql.constants.js';
 
 /**
  * A repository on a MySQL data source. Refuses a data source that turns off
@@ -19,7 +19,7 @@ export class TypeOrmMysqlRepository<
   Entity extends PlainLiteralObject,
 > extends TypeOrmRepository<Entity> {
   constructor(repo: Repository<Entity>, options: TypeOrmRepositoryOptions) {
-    super(repo, options, TYPEORM_MYSQL_DATABASES);
+    super(repo, options, TYPEORM_MYSQL_DATABASE);
 
     if (
       clientFlags(dataSourceOf(repo.manager).options).includes('-FOUND_ROWS')

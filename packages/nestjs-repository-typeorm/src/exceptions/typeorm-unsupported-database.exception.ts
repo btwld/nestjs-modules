@@ -10,36 +10,31 @@ import {
  */
 export class TypeOrmUnsupportedDatabaseException extends RuntimeException {
   declare context: RuntimeException['context'] & {
-    subject: string;
+    entityName: string;
     database: string;
-    accepted: readonly string[];
+    accepted: string;
   };
 
   /**
-   * @param subject - What was given the data source, e.g. `'Entity Post'`
-   *   or `'Data source "default"'`
+   * @param entityName - The entity registered on the data source
    * @param database - The data source's database type
-   * @param accepted - The database types the adapter accepts
+   * @param accepted - The database type the adapter is for
    */
   constructor(
-    subject: string,
+    entityName: string,
     database: string,
-    accepted: readonly string[],
+    accepted: string,
     options?: RuntimeExceptionOptions,
   ) {
     super({
       message:
-        '%s uses a "%s" data source, but its TypeORM adapter accepts only %s',
-      messageParams: [
-        subject,
-        database,
-        accepted.map((type) => `"${type}"`).join(', '),
-      ],
+        'Entity %s uses a "%s" data source, but its TypeORM adapter is for "%s"',
+      messageParams: [entityName, database, accepted],
       fault: 'usage',
       ...options,
     });
 
-    this.context = { ...this.context, subject, database, accepted };
+    this.context = { ...this.context, entityName, database, accepted };
     this.errorCode = 'TYPEORM_UNSUPPORTED_DATABASE';
   }
 }

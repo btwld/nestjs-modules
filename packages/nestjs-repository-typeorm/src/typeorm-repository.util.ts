@@ -85,12 +85,12 @@ export function resolveDataSourceName(
 /**
  * Resolve transaction key for a data source.
  *
- * @param dataSource - The data source, or its name
  * @param prefix - The adapter's transaction key prefix
+ * @param dataSource - The data source, or its name
  */
 export function resolveTransactionKey(
+  prefix: string,
   dataSource?: TypeOrmDataSourceToken,
-  prefix = 'typeorm',
 ): string {
   return `${prefix}:${resolveDataSourceName(dataSource)}`;
 }
@@ -116,8 +116,8 @@ export function createTypeOrmRepository<E extends PlainLiteralObject, Options>(
   return definition.createRepository(repo, {
     entityKey,
     transactionKey: resolveTransactionKey(
-      dataSource,
       definition.transactionKeyPrefix,
+      dataSource,
     ),
     dataSourceName: resolveDataSourceName(dataSource),
     hookResolver,
@@ -154,54 +154,39 @@ export function createTypeOrmProvider<E extends PlainLiteralObject, Options>(
   const { key, entity, dataSource, factory } = options;
   const dsName = resolveDataSourceName(dataSource);
   const dsToken = resolveTokenName(dsName);
+  const optional = [
+    OPTIONAL_HOOK_RESOLVER_INJECT,
+    OPTIONAL_TRANSACTION_SCOPE_INJECT,
+  ];
+  const build = (
+    repo: Repository<E>,
+    hookResolver?: HookResolverService,
+    transactionScope?: TransactionScope,
+  ) =>
+    createTypeOrmRepository(
+      definition,
+      repo,
+      key,
+      dsName,
+      hookResolver,
+      transactionScope,
+    );
 
-  if (factory) {
-    return {
-      provide: getDynamicRepositoryToken(key),
-      inject: [
-        getDataSourceToken(dsToken),
-        OPTIONAL_HOOK_RESOLVER_INJECT,
-        OPTIONAL_TRANSACTION_SCOPE_INJECT,
-      ],
-      useFactory: (
-        ds: DataSource,
-        hookResolver?: HookResolverService,
-        transactionScope?: TransactionScope,
-      ) => {
-        return createTypeOrmRepository(
-          definition,
-          factory(ds),
-          key,
-          dsName,
-          hookResolver,
-          transactionScope,
-        );
-      },
-    };
-  } else {
-    return {
-      provide: getDynamicRepositoryToken(key),
-      inject: [
-        getRepositoryToken(entity, dsToken),
-        OPTIONAL_HOOK_RESOLVER_INJECT,
-        OPTIONAL_TRANSACTION_SCOPE_INJECT,
-      ],
-      useFactory: (
-        repo: Repository<E>,
-        hookResolver?: HookResolverService,
-        transactionScope?: TransactionScope,
-      ) => {
-        return createTypeOrmRepository(
-          definition,
-          repo,
-          key,
-          dsName,
-          hookResolver,
-          transactionScope,
-        );
-      },
-    };
-  }
+  return factory
+    ? {
+        provide: getDynamicRepositoryToken(key),
+        inject: [getDataSourceToken(dsToken), ...optional],
+        useFactory: (
+          ds: DataSource,
+          hookResolver?: HookResolverService,
+          transactionScope?: TransactionScope,
+        ) => build(factory(ds), hookResolver, transactionScope),
+      }
+    : {
+        provide: getDynamicRepositoryToken(key),
+        inject: [getRepositoryToken(entity, dsToken), ...optional],
+        useFactory: build,
+      };
 }
 
 /**
@@ -255,7 +240,7 @@ export function createTransactionFactoryDescriptor<Options>(
   const dsToken = resolveTokenName(dsName);
 
   return {
-    key: resolveTransactionKey(dataSource, definition.transactionKeyPrefix),
+    key: resolveTransactionKey(definition.transactionKeyPrefix, dataSource),
     inject: [getDataSourceToken(dsToken)],
     useFactory: (ds: DataSource) =>
       definition.createTransactionFactory(ds, dsName, options),

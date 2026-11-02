@@ -50,8 +50,8 @@ describe('TypeORM adapter modules', () => {
 
   it('refuses at startup a data source of another database', async () => {
     await expect(compile(TypeOrmPostgresRepositoryModule)).rejects.toThrow(
-      'uses a "better-sqlite3" data source, but its TypeORM adapter accepts ' +
-        'only "postgres"',
+      'uses a "better-sqlite3" data source, but its TypeORM adapter is for ' +
+        '"postgres"',
     );
   });
 });

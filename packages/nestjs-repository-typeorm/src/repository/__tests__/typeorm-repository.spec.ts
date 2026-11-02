@@ -259,7 +259,7 @@ describe(TypeOrmRepository, () => {
           fault: 'usage',
           message:
             'Entity TestEntityFixture uses a "postgres" data source, but its ' +
-            'TypeORM adapter accepts only "better-sqlite3"',
+            'TypeORM adapter is for "better-sqlite3"',
         }),
       );
     });
