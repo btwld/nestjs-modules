@@ -1,10 +1,9 @@
 # @concepta/nestjs-repository-typeorm
 
-TypeORM driver for `@concepta/nestjs-repository`, with one adapter per
-database: `/postgres`, `/mysql`, `/mariadb` and `/sqlite`. Each adapter has
-its own module, repository (extending `RepositoryAdapter`) and base
-entities, and refuses a data source of any other database. MariaDB runs
-MySQL's transactions. WhereClause-to-TypeORM translation is shared.
+TypeORM driver for `@concepta/nestjs-repository`. Import the adapter for your
+database from `/postgres`, `/mysql`, `/mariadb` or `/sqlite`: it gives you a
+module to register your entities with, repositories that run on your data
+source's transactions, and base entities with audit columns and a version.
 
 ## Project
 
@@ -17,6 +16,7 @@ MySQL's transactions. WhereClause-to-TypeORM translation is shared.
 ## Table of Contents
 
 - [Installation](#installation)
+- [Choose Your Adapter](#choose-your-adapter)
 - [Module Registration](#module-registration)
 - [TypeOrmRepository](#typeormrepository)
 - [WhereClause Translation](#whereclause-translation)
@@ -39,9 +39,8 @@ yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
-Postgres, MySQL 8.4, MariaDB 11.4, and SQLite through `better-sqlite3`. An
-entity registered on a data source of a database its adapter is not for
-fails at startup with `TypeOrmUnsupportedDatabaseException`.
+Postgres, MySQL 8.4, MariaDB 11.4, or SQLite through `better-sqlite3` — see
+[Choose Your Adapter](#choose-your-adapter).
 
 ### Dependencies
 
@@ -59,14 +58,74 @@ fails at startup with `TypeOrmUnsupportedDatabaseException`.
 | `@nestjs/common` | Yes | NestJS core — install explicitly, no longer bundled |
 | `typeorm` | Yes | TypeORM `^0.3.31 \|\| ~1.0.0`. 1.1+ is not yet supported: it counts distinct values of the selected columns when find options carry a `select`, which changes what a projected paginated query reports as its total |
 
+## Choose Your Adapter
+
+| Database | Import from | Register | Extend |
+| --- | --- | --- | --- |
+| Postgres | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule` | `CommonPostgresEntity`, … |
+| MySQL 8.4 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule` | `CommonMysqlEntity`, … |
+| MariaDB 11.4 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule` | `CommonMariadbEntity`, … |
+| SQLite (`better-sqlite3`) | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule` | `CommonSqliteEntity`, … |
+
+Every adapter's repository behaves the same, so everything else in this
+README applies to all of them. An entity registered on a data source of another
+database stops startup with `TypeOrmUnsupportedDatabaseException`. The
+sections below say what differs.
+
+### Postgres
+
+- `Where.contains('name', 'ali')` doesn't match `Alice`: text matching is
+  case-sensitive.
+- In ascending order, `NULL`s sort last.
+- Transactions run concurrently, each on its own connection.
+- `transactionSettings` sets values at the start of every transaction, such
+  as the caller's tenant — see
+  [Row-Level Security (Postgres)](#row-level-security-postgres).
+- [Durable messaging](#durable-messaging) uses `PostgresOutboxStore`.
+
+### MySQL
+
+- Keep the client's default flags. Versioned writes rely on `FOUND_ROWS`,
+  so a data source that turns it off (`flags` or `extra.flags` holding
+  `'-FOUND_ROWS'`) stops startup with `TypeOrmMysqlFoundRowsException`.
+- Set `timezone: 'Z'` on the data source when the server runs in UTC.
+  Otherwise the client reads dates the database fills in, like
+  `dateCreated`, as your host's local time, and they come back shifted by
+  the host's UTC offset.
+- Whether text matching ignores case depends on the column's collation; the
+  default collations ignore it.
+- In ascending order, `NULL`s sort first.
+- Transactions run concurrently, each on its own connection.
+- [Durable messaging](#durable-messaging) uses `MySqlOutboxStore`.
+
+### MariaDB
+
+MariaDB works like [MySQL](#mysql), flags, `timezone` and collations included,
+and its transactions use `TypeOrmMysqlTransaction` and
+`TypeOrmMysqlTransactionFactory`, also exported from `/mariadb`. The one
+difference: durable messaging is refused at startup, as `@nestjs/outbox`
+doesn't support MariaDB yet.
+
+### SQLite
+
+Use the `better-sqlite3` driver; a `sqlite` data source stops startup with
+`TypeOrmUnsupportedDatabaseException`.
+
+- `Where.contains('name', 'ali')` matches `Alice`: text matching ignores
+  case for ASCII letters.
+- In ascending order, `NULL`s sort first.
+- Transactions run one at a time. A data source has one connection, so a
+  second `TransactionScope.run()` (or a versioned `update` or `replace`,
+  which opens one) waits for the first to commit or roll back. A nested
+  `run()` joins the transaction already open and never waits. Throughput on
+  that data source is bounded by its longest-running transaction.
+- Durable messaging is refused at startup: `@nestjs/outbox` has no SQLite
+  store.
+
 ## Module Registration
 
-List your database's adapter module as a driver in
-`RepositoryModule.forRoot()`, with the entities it serves:
-`TypeOrmPostgresRepositoryModule` from `/postgres`,
-`TypeOrmMysqlRepositoryModule` from `/mysql`,
-`TypeOrmMariadbRepositoryModule` from `/mariadb`, or
-`TypeOrmSqliteRepositoryModule` from `/sqlite`.
+List your adapter's module as a driver in `RepositoryModule.forRoot()`, with
+the entities it serves:
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -98,13 +157,10 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
 export class AppModule {}
 ```
 
-Each entity key gets a `TypeOrmRepository` for your database. Import
-`RepositoryModule.forFeature(['orders'])` in a module to inject it there with
-`@InjectDynamicRepository('orders')`.
-
-On MySQL and MariaDB, keep the client's default flags. Versioned writes rely on
-`FOUND_ROWS`, so a data source that turns it off (`flags` or `extra.flags`
-holding `'-FOUND_ROWS'`) stops startup with `TypeOrmMysqlFoundRowsException`.
+Each entity key gets a repository from your adapter
+(`TypeOrmPostgresRepository`, …); inject it typed as `TypeOrmRepository`.
+Import `RepositoryModule.forFeature(['orders'])` in a module to inject it
+there with `@InjectDynamicRepository('orders')`.
 
 ### Provider Options
 
@@ -194,8 +250,7 @@ an optional `ctx` (repository context) for transaction and hook support.
 
 `update`/`replace` automatically enforce optimistic locking whenever the
 target entity carries a TypeORM `@VersionColumn` — which includes every
-entity extending `AuditPostgresEntity`, `AuditSqliteEntity`,
-`CommonPostgresEntity`, or `CommonSqliteEntity` (see
+entity extending an `Audit*` or `Common*` base entity (see
 [Base Entities](#base-entities)), plus any entity that declares one itself.
 The check derives entirely from the `entity` argument the caller already
 passes in: its version is compared, atomically, against the row's current
@@ -421,13 +476,8 @@ When a `PlainLiteralObject` context with an active `trx` is provided,
 The text operators match your value as written: `Where.contains('code', '50%')`
 finds codes containing `50%`, and `_` matches only an underscore.
 
-Whether case matters is your database's decision:
-
-| Database | `Where.contains('name', 'ali')` matches `Alice` |
-| --- | --- |
-| PostgreSQL | No |
-| SQLite | Yes, for ASCII letters |
-| MySQL, MariaDB | Depends on the column's collation; yes with the default collations |
+Whether case matters is your database's decision — see
+[Choose Your Adapter](#choose-your-adapter).
 
 ### Compound Operators
 
@@ -482,8 +532,8 @@ const orders = await orderRepo.find(
 
 Each adapter provides a transaction and a transaction factory
 (`TypeOrmPostgresTransaction`, `TypeOrmSqliteTransaction`, …) for
-integration with `@concepta/nestjs-repository`'s transaction layer. They
-extend `TypeOrmTransaction` and `TypeOrmTransactionFactory`.
+`@concepta/nestjs-repository`'s transaction layer. They extend
+`TypeOrmTransaction` and `TypeOrmTransactionFactory`.
 
 ### TypeOrmTransaction
 
@@ -502,7 +552,7 @@ await tx.commit();
 | Property / Method | Description |
 | --- | --- |
 | `isActive` | Whether the transaction is currently active |
-| `start()` | Create a QueryRunner, begin a transaction and apply its settings |
+| `start()` | Create a QueryRunner and begin a transaction; on Postgres, apply its `transactionSettings` |
 | `commit()` | Commit the transaction and release the QueryRunner |
 | `rollback()` | Rollback the transaction and release the QueryRunner |
 | `getClient()` | Get the transactional `EntityManager` |
@@ -517,26 +567,10 @@ The transaction key names the adapter and the data source:
 `typeorm-mariadb:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
 (e.g., `typeorm-postgres:default`).
 
-### Single-Connection Drivers
-
-TypeORM hands out one shared `QueryRunner` per `DataSource` for
-`better-sqlite3`, unlike `postgres`, which gives each transaction its own
-connection. Two transactions started concurrently on SQLite would otherwise
-both try to `BEGIN` on the same connection, and the second fails with a
-driver-level error instead of running the version guard.
-
 `TypeOrmSqliteTransactionFactory` declares
-`supportsConcurrentTransactions: false`, which makes
-`TransactionManager` queue transactions for that data source: a second,
-independent `TransactionScope.run()` (or a versioned `update`/`replace`,
-which opens one) on the same data source waits for the first to commit or
-roll back rather than racing it — a nested/joining `run()` on the same scope
-shares the already-started transaction and never waits. A real conflict
-still surfaces as `OptimisticLockException`; it just can't be mistaken for a
-driver error anymore. This trades write concurrency for correctness on that
-data source: transactions against it run one at a time, so its throughput is
-bounded by the longest-running scope rather than by the connection pool it
-doesn't have.
+`supportsConcurrentTransactions: false`, so transactions on a SQLite data
+source run one at a time (see [SQLite](#sqlite)); the other factories
+declare `true`.
 
 ### Automatic Transaction Integration
 
@@ -692,21 +726,24 @@ fine-grained hooks fire automatically.
 
 ## Base Entities
 
-The module provides abstract base entities for Postgres and SQLite with
-audit fields and optimistic locking.
+Each adapter exports four abstract base entities named for its database:
+`Audit<Database>Entity`, `Common<Database>Entity`,
+`AppendOnly<Database>Entity` and `Activity<Database>Entity` (for example
+`CommonPostgresEntity`). The audit and common entities carry audit fields and
+a version for optimistic locking; the append-only and activity entities are
+covered below.
 
 ### Core Base Entities
 
-| Entity | Database | Extends | Key Fields |
-| --- | --- | --- | --- |
-| `AuditPostgresEntity` | Postgres | -- | dateCreated, dateUpdated, dateDeleted (`timestamptz`), version |
-| `AuditSqliteEntity` | SQLite | -- | dateCreated, dateUpdated, dateDeleted, version |
-| `CommonPostgresEntity` | Postgres | `AuditPostgresEntity` | id (UUID primary key) |
-| `CommonSqliteEntity` | SQLite | `AuditSqliteEntity` | id (UUID primary key) |
+| Entity | Extends | Key Fields |
+| --- | --- | --- |
+| `Audit<Database>Entity` | -- | dateCreated, dateUpdated, dateDeleted, version |
+| `Common<Database>Entity` | `Audit<Database>Entity` | id (UUID primary key) |
 
-`AuditPostgresEntity` uses `@CreateDateColumn`, `@UpdateDateColumn`,
-`@DeleteDateColumn` (for soft deletes), and `@VersionColumn` (for
-optimistic locking). The Postgres variant uses `timestamptz` column types.
+The audit entities use `@CreateDateColumn`, `@UpdateDateColumn`,
+`@DeleteDateColumn` (for soft deletes), and `@VersionColumn` (for optimistic
+locking). Dates are `timestamptz` on Postgres, `datetime(6)` on MySQL and
+MariaDB, and `datetime` on SQLite.
 
 ### Using Base Entities
 
@@ -730,8 +767,8 @@ This gives `OrderEntity` the `id`, `dateCreated`, `dateUpdated`,
 ### Append-Only Base Entities
 
 For an entity registered with an append-only `writePolicy` (see Write Policy
-in the `@concepta/nestjs-repository` README), extend `AppendOnlyPostgresEntity`
-or `AppendOnlySqliteEntity` instead. Each has a generated UUID `id` and
+in the `@concepta/nestjs-repository` README), extend your adapter's
+`AppendOnly<Database>Entity` instead. Each has a generated UUID `id` and
 `dateCreated`, and nothing that implies a row can change. The `Audit*` and
 `Common*` entities are refused at startup on an append-only entity, because
 their `dateDeleted` column could never be set.
@@ -776,14 +813,14 @@ export class StatementItem extends AppendOnlyPostgresEntity {
 }
 ```
 
-`NULL`s are distinct in a unique index on Postgres and SQLite, so originals
-coexist while a second correction of one record is refused.
+`NULL`s are distinct in a unique index on every supported database, so
+originals coexist while a second correction of one record is refused.
 
 ### Activity Base Entities
 
 For an activity store (see
-[Activity Log](../nestjs-repository/README.md#activity-log)), extend
-`ActivityPostgresEntity` or `ActivitySqliteEntity` and register it append-only:
+[Activity Log](../nestjs-repository/README.md#activity-log)), extend your
+adapter's `Activity<Database>Entity` and register it append-only:
 
 ```ts
 import { Column, Entity } from 'typeorm';
@@ -799,9 +836,10 @@ export class Activity extends ActivityPostgresEntity {
 Each has every activity column, a nullable `actorId` for your store hook to
 fill, and an index on `(entityKey, recordId)` for reading a row's history.
 
-`changed` and `values` are JSON (`jsonb` on Postgres, `simple-json` on SQLite),
-so `values` reads back as JSON: a date comes back as an ISO string, a `Buffer`
-comes back as an object of bytes, and a JavaScript `bigint` fails the write.
+`changed` and `values` are JSON (`jsonb` on Postgres, `json` on MySQL and
+MariaDB, `simple-json` on SQLite), so `values` reads back as JSON: a date
+comes back as an ISO string, a `Buffer` comes back as an object of bytes,
+and a JavaScript `bigint` fails the write.
 `omit` binary and `bigint` columns.
 
 ## Durable Messaging
@@ -923,20 +961,22 @@ Requirements and limits:
 | Exception | Package | Description |
 | --- | --- | --- |
 | `RepositoryQueryException` | `@concepta/nestjs-repository` | Repository query error (wraps original error) |
-| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` is the data source `type` (`postgres`, `better-sqlite3`); `context.code` is the database client's `code`, or its `errno` when it has no `code` |
+| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` is the data source `type` (`postgres`, `mysql`, `mariadb`, `better-sqlite3`); `context.code` is the database client's `code`, or its `errno` when it has no `code` |
 | `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
 | `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |
 | `EntityNotFoundException` | `@concepta/nestjs-repository` | An `update` or `replace` named a row that is no longer stored |
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
+| `TypeOrmUnsupportedDatabaseException` | Not exported; its `errorCode` is `TYPEORM_UNSUPPORTED_DATABASE` | At startup: an entity is registered on a data source of a database its adapter isn't for |
+| `TypeOrmMysqlFoundRowsException` | `/mysql`, `/mariadb`; its `errorCode` is `TYPEORM_MYSQL_FOUND_ROWS` | At startup: the data source turns off the `FOUND_ROWS` client flag — see [MySQL](#mysql) |
 
 ## Entry Points
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | `TypeOrmRepository`, `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory` |
-| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
-| `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
-| `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
-| `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
+| `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions` and `TypeOrmProviderOptionsInterface` |
+| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
+| `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
+| `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
+| `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |
