@@ -5,7 +5,7 @@ import { TypeOrmTransactionFactory } from '../transaction/typeorm-transaction.fa
 import { TypeOrmMysqlTransaction } from './typeorm-mysql-transaction.js';
 
 /**
- * Creates transactions on a MySQL data source. Transactions run
+ * Creates transactions on a MySQL or MariaDB data source. Transactions run
  * concurrently, each on its own connection.
  */
 export class TypeOrmMysqlTransactionFactory extends TypeOrmTransactionFactory {

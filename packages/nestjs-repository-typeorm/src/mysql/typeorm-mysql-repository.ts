@@ -18,8 +18,18 @@ import { TYPEORM_MYSQL_DATABASE } from './typeorm-mysql.constants.js';
 export class TypeOrmMysqlRepository<
   Entity extends PlainLiteralObject,
 > extends TypeOrmRepository<Entity> {
-  constructor(repo: Repository<Entity>, options: TypeOrmRepositoryOptions) {
-    super(repo, options, TYPEORM_MYSQL_DATABASE);
+  /**
+   * @param repo - The TypeORM repository to wrap
+   * @param options - The repository's options
+   * @param databaseType - The database type the adapter is for: `mysql`,
+   *   or `mariadb` for the MariaDB adapter, which shares this client
+   */
+  constructor(
+    repo: Repository<Entity>,
+    options: TypeOrmRepositoryOptions,
+    databaseType: string = TYPEORM_MYSQL_DATABASE,
+  ) {
+    super(repo, options, databaseType);
 
     if (
       clientFlags(dataSourceOf(repo.manager).options).includes('-FOUND_ROWS')

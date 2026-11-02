@@ -1,10 +1,10 @@
 # @concepta/nestjs-repository-typeorm
 
 TypeORM driver for `@concepta/nestjs-repository`, with one adapter per
-database: `/postgres`, `/mysql` and `/sqlite`. Each adapter has its own module,
-repository (extending `RepositoryAdapter`), transactions and base entities,
-and refuses a data source of any other database. WhereClause-to-TypeORM
-translation is shared.
+database: `/postgres`, `/mysql`, `/mariadb` and `/sqlite`. Each adapter has
+its own module, repository (extending `RepositoryAdapter`) and base
+entities, and refuses a data source of any other database. MariaDB runs
+MySQL's transactions. WhereClause-to-TypeORM translation is shared.
 
 ## Project
 
@@ -39,9 +39,9 @@ yarn add @concepta/nestjs-repository-typeorm @nestjs/common typeorm
 ESM-only — no CJS build is published. Requires Node `>= 22.12` and
 NestJS 12.
 
-Postgres, MySQL 8.4, and SQLite through `better-sqlite3`. An entity
-registered on a data source of a database its adapter is not for fails at
-startup with `TypeOrmUnsupportedDatabaseException`.
+Postgres, MySQL 8.4, MariaDB 11.4, and SQLite through `better-sqlite3`. An
+entity registered on a data source of a database its adapter is not for
+fails at startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### Dependencies
 
@@ -64,7 +64,8 @@ startup with `TypeOrmUnsupportedDatabaseException`.
 List your database's adapter module as a driver in
 `RepositoryModule.forRoot()`, with the entities it serves:
 `TypeOrmPostgresRepositoryModule` from `/postgres`,
-`TypeOrmMysqlRepositoryModule` from `/mysql`, or
+`TypeOrmMysqlRepositoryModule` from `/mysql`,
+`TypeOrmMariadbRepositoryModule` from `/mariadb`, or
 `TypeOrmSqliteRepositoryModule` from `/sqlite`.
 
 ```ts
@@ -102,7 +103,7 @@ Each entity key gets a `TypeOrmRepository` for your database. Import
 `@InjectDynamicRepository('orders')`. `TypeOrmRepositoryModule`, from the
 package root, takes a Postgres or SQLite data source.
 
-On MySQL, keep the client's default flags. Versioned writes rely on
+On MySQL and MariaDB, keep the client's default flags. Versioned writes rely on
 `FOUND_ROWS`, so a data source that turns it off (`flags` or `extra.flags`
 holding `'-FOUND_ROWS'`) stops startup with `TypeOrmMysqlFoundRowsException`.
 
@@ -427,7 +428,7 @@ Whether case matters is your database's decision:
 | --- | --- |
 | PostgreSQL | No |
 | SQLite | Yes, for ASCII letters |
-| MySQL | Depends on the column's collation; yes with the default collations |
+| MySQL, MariaDB | Depends on the column's collation; yes with the default collations |
 
 ### Compound Operators
 
@@ -513,8 +514,9 @@ Factory for creating the adapter's transactions. Automatically registered
 with the `TransactionFactoryRegistry` by `RepositoryModule.forRoot()`.
 
 The transaction key names the adapter and the data source:
-`typeorm-postgres:<dataSourceName>`, `typeorm-mysql:<dataSourceName>` or
-`typeorm-sqlite:<dataSourceName>` (e.g., `typeorm-postgres:default`).
+`typeorm-postgres:<dataSourceName>`, `typeorm-mysql:<dataSourceName>`,
+`typeorm-mariadb:<dataSourceName>` or `typeorm-sqlite:<dataSourceName>`
+(e.g., `typeorm-postgres:default`).
 `TypeOrmRepositoryModule` uses `typeorm:<dataSourceName>`.
 
 ### Single-Connection Drivers
@@ -813,9 +815,10 @@ gives a TypeORM registration durable messaging through
 `DurableMessagingModule` (see the `nestjs-repository` README). It builds the
 [`@nestjs/outbox`](https://www.npmjs.com/package/@nestjs/outbox) store on the
 registration's own data source: `PostgresOutboxStore` for `postgres`,
-`MySqlOutboxStore` for `mysql`. Any other database fails startup with
-`UnsupportedDurableDriverException`. You never build the store or touch the
-data source.
+`MySqlOutboxStore` for `mysql`. Any other database, MariaDB and SQLite
+included, fails startup with `UnsupportedDurableDriverException`
+(`@nestjs/outbox` doesn't support MariaDB yet). You never build the store or
+touch the data source.
 
 ```bash
 npm install @nestjs/outbox
@@ -937,5 +940,6 @@ Requirements and limits:
 | `@concepta/nestjs-repository-typeorm` | `TypeOrmRepositoryModule`, `TypeOrmDriverOptionsInterface`, `TypeOrmRepository`, `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, `TypeOrmTransactionSettingsResolver`, and the Postgres and SQLite base entities |
 | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
+| `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

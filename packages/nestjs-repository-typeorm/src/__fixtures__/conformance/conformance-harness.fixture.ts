@@ -5,6 +5,7 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
 
+import { type TypeOrmMariadbRepositoryModule } from '../../mariadb/typeorm-mariadb-repository.module.js';
 import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-repository.module.js';
 import { type TypeOrmPostgresRepositoryModule } from '../../postgres/typeorm-postgres-repository.module.js';
 import { type TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
@@ -40,6 +41,7 @@ const TABLES = [
 type TypeOrmAdapterModule =
   | typeof TypeOrmPostgresRepositoryModule
   | typeof TypeOrmMysqlRepositoryModule
+  | typeof TypeOrmMariadbRepositoryModule
   | typeof TypeOrmSqliteRepositoryModule;
 
 /**

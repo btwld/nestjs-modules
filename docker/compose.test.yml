@@ -34,3 +34,18 @@ services:
       interval: 1s
       timeout: 3s
       retries: 60
+
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: mariadb
+      MARIADB_DATABASE: rockets_test
+    ports:
+      - '53307:3306'
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 1s
+      timeout: 3s
+      retries: 60

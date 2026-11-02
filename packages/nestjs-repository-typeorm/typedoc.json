@@ -3,6 +3,7 @@
     "src/index.ts",
     "src/postgres.ts",
     "src/mysql.ts",
+    "src/mariadb.ts",
     "src/sqlite.ts",
     "src/optional-outbox.ts"
   ]

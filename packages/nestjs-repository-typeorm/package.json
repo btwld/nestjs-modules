@@ -69,6 +69,10 @@
       "types": "./dist/mysql.d.ts",
       "default": "./dist/mysql.js"
     },
+    "./mariadb": {
+      "types": "./dist/mariadb.d.ts",
+      "default": "./dist/mariadb.js"
+    },
     "./sqlite": {
       "types": "./dist/sqlite.d.ts",
       "default": "./dist/sqlite.js"
