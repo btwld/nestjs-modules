@@ -10,9 +10,11 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { AppContextHost, HookResolverService } from '@concepta/nestjs-core';
 import { getDynamicRepositoryToken } from '@concepta/nestjs-repository';
 
+import { TYPEORM_POSTGRES_ADAPTER } from '../postgres/typeorm-postgres-repository.module.js';
 import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-provider-options.interface.js';
-import { TypeOrmRepository } from '../repository/typeorm-repository.js';
-import { TypeOrmTransactionFactory } from '../transaction/typeorm-transaction.factory.js';
+import { TypeOrmSqliteRepository } from '../sqlite/typeorm-sqlite-repository.js';
+import { TYPEORM_SQLITE_ADAPTER } from '../sqlite/typeorm-sqlite-repository.module.js';
+import { TypeOrmSqliteTransactionFactory } from '../sqlite/typeorm-sqlite-transaction.factory.js';
 import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../typeorm-repository.constants.js';
 import {
   resolveDataSourceName,
@@ -70,19 +72,24 @@ describe('typeorm-repository.util', () => {
   });
 
   describe('resolveTransactionKey', () => {
-    it('should return typeorm:default for no dataSource', () => {
-      const result = resolveTransactionKey();
-      expect(result).toBe(`typeorm:${TYPEORM_DEFAULT_DATA_SOURCE_NAME}`);
+    it('should return <prefix>:default for no dataSource', () => {
+      const result = resolveTransactionKey('typeorm-postgres');
+      expect(result).toBe(
+        `typeorm-postgres:${TYPEORM_DEFAULT_DATA_SOURCE_NAME}`,
+      );
     });
 
-    it('should return typeorm:<name> for named dataSource', () => {
-      const result = resolveTransactionKey('secondary');
-      expect(result).toBe('typeorm:secondary');
+    it('should return <prefix>:<name> for named dataSource', () => {
+      const result = resolveTransactionKey('typeorm-postgres', 'secondary');
+      expect(result).toBe('typeorm-postgres:secondary');
     });
 
     it('should handle DataSource object', () => {
-      const result = resolveTransactionKey(namedDataSourceOptions('custom-ds'));
-      expect(result).toBe('typeorm:custom-ds');
+      const result = resolveTransactionKey(
+        'typeorm-postgres',
+        namedDataSourceOptions('custom-ds'),
+      );
+      expect(result).toBe('typeorm-postgres:custom-ds');
     });
   });
 
@@ -113,9 +120,13 @@ describe('typeorm-repository.util', () => {
         },
       } as unknown as Repository<TestEntity>;
 
-      const result = createTypeOrmRepository(mockRepo, 'test-entity');
+      const result = createTypeOrmRepository(
+        TYPEORM_SQLITE_ADAPTER,
+        mockRepo,
+        'test-entity',
+      );
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
       expect(result.metadata.type).toBe(TestEntity);
     });
 
@@ -129,12 +140,13 @@ describe('typeorm-repository.util', () => {
       } as unknown as Repository<TestEntity>;
 
       const result = createTypeOrmRepository(
+        TYPEORM_SQLITE_ADAPTER,
         mockRepo,
         'test-entity',
         'secondary',
       );
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
 
     it('should create TypeOrmRepository with hookResolver', () => {
@@ -148,13 +160,14 @@ describe('typeorm-repository.util', () => {
       const mockHookResolver = {} as HookResolverService;
 
       const result = createTypeOrmRepository(
+        TYPEORM_SQLITE_ADAPTER,
         mockRepo,
         'test-entity',
         undefined,
         mockHookResolver,
       );
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
   });
 
@@ -172,7 +185,7 @@ describe('typeorm-repository.util', () => {
         entity: TestEntity,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
 
       expect(provider).toHaveProperty('provide');
       expect(provider).toHaveProperty('inject');
@@ -190,7 +203,7 @@ describe('typeorm-repository.util', () => {
         dataSource: 'secondary',
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
 
       expect(provider).toHaveProperty('provide');
       expect((provider as { inject: unknown[] }).inject).toBeDefined();
@@ -204,7 +217,7 @@ describe('typeorm-repository.util', () => {
         factory: mockFactory,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
 
       expect(provider).toHaveProperty('provide');
       expect(provider).toHaveProperty('useFactory');
@@ -218,7 +231,7 @@ describe('typeorm-repository.util', () => {
         factory: mockFactory,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const inject = (provider as { inject: unknown[] }).inject;
 
       // When using factory, should inject DataSource
@@ -231,7 +244,7 @@ describe('typeorm-repository.util', () => {
         entity: TestEntity,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const inject = (provider as { inject: unknown[] }).inject;
 
       expect(inject).toContainEqual(OPTIONAL_HOOK_RESOLVER_INJECT);
@@ -245,7 +258,7 @@ describe('typeorm-repository.util', () => {
         factory: mockFactory,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const inject = (provider as { inject: unknown[] }).inject;
 
       expect(inject).toContainEqual(OPTIONAL_HOOK_RESOLVER_INJECT);
@@ -267,7 +280,7 @@ describe('typeorm-repository.util', () => {
         factory: mockFactory,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const useFactory = (
         provider as { useFactory: (ds: DataSource) => unknown }
       ).useFactory;
@@ -276,7 +289,7 @@ describe('typeorm-repository.util', () => {
       const result = useFactory(mockDataSource);
 
       expect(mockFactory).toHaveBeenCalledWith(mockDataSource);
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
 
     it('standard useFactory should create repository with hookResolver', () => {
@@ -285,7 +298,7 @@ describe('typeorm-repository.util', () => {
         entity: TestEntity,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const useFactory = (
         provider as {
           useFactory: (
@@ -306,7 +319,7 @@ describe('typeorm-repository.util', () => {
 
       const result = useFactory(mockRepo, mockHookResolver);
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
 
     it('standard useFactory should work without hookResolver', () => {
@@ -315,7 +328,7 @@ describe('typeorm-repository.util', () => {
         entity: TestEntity,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const useFactory = (
         provider as {
           useFactory: (
@@ -335,7 +348,7 @@ describe('typeorm-repository.util', () => {
 
       const result = useFactory(mockRepo, undefined);
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
 
     it('factory useFactory should pass hookResolver to repository', () => {
@@ -354,7 +367,7 @@ describe('typeorm-repository.util', () => {
         factory: mockFactory,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const useFactory = (
         provider as {
           useFactory: (
@@ -368,7 +381,7 @@ describe('typeorm-repository.util', () => {
 
       const result = useFactory(mockDataSource, mockHookResolver);
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
 
     it('factory useFactory should work without hookResolver', () => {
@@ -387,7 +400,7 @@ describe('typeorm-repository.util', () => {
         factory: mockFactory,
       };
 
-      const provider = createTypeOrmProvider(options);
+      const provider = createTypeOrmProvider(TYPEORM_SQLITE_ADAPTER, options);
       const useFactory = (
         provider as {
           useFactory: (
@@ -400,7 +413,7 @@ describe('typeorm-repository.util', () => {
 
       const result = useFactory(mockDataSource, undefined);
 
-      expect(result).toBeInstanceOf(TypeOrmRepository);
+      expect(result).toBeInstanceOf(TypeOrmSqliteRepository);
     });
   });
 
@@ -446,44 +459,54 @@ describe('typeorm-repository.util', () => {
   });
 
   describe('createTransactionFactoryDescriptor', () => {
-    it('should create descriptor for default data source', () => {
-      const descriptor = createTransactionFactoryDescriptor();
+    const dataSourceOfType = (type: string): DataSource => {
+      const dataSource = mockDeep<DataSource>();
+      Object.defineProperty(dataSource, 'options', { value: { type } });
+      return dataSource;
+    };
+
+    it("should key the default data source's descriptor by the adapter", () => {
+      const descriptor = createTransactionFactoryDescriptor(
+        TYPEORM_SQLITE_ADAPTER,
+      );
 
       expect(descriptor.key).toBe(
-        `typeorm:${TYPEORM_DEFAULT_DATA_SOURCE_NAME}`,
+        `typeorm-sqlite:${TYPEORM_DEFAULT_DATA_SOURCE_NAME}`,
       );
       expect(descriptor.inject).toContain(getDataSourceToken());
       expect(descriptor.useFactory).toBeInstanceOf(Function);
     });
 
     it('should create descriptor for named data source', () => {
-      const descriptor = createTransactionFactoryDescriptor('secondary');
+      const descriptor = createTransactionFactoryDescriptor(
+        TYPEORM_SQLITE_ADAPTER,
+        'secondary',
+      );
 
-      expect(descriptor.key).toBe('typeorm:secondary');
+      expect(descriptor.key).toBe('typeorm-sqlite:secondary');
       expect(descriptor.inject).toContain(getDataSourceToken('secondary'));
     });
 
-    it('useFactory should return TypeOrmTransactionFactory', () => {
-      const descriptor = createTransactionFactoryDescriptor();
-      const mockDataSource = mockDeep<DataSource>();
+    it("useFactory should return the adapter's factory", () => {
+      const descriptor = createTransactionFactoryDescriptor(
+        TYPEORM_SQLITE_ADAPTER,
+      );
 
-      const factory = descriptor.useFactory(mockDataSource);
+      const factory = descriptor.useFactory(dataSourceOfType('better-sqlite3'));
 
-      expect(factory).toBeInstanceOf(TypeOrmTransactionFactory);
+      expect(factory).toBeInstanceOf(TypeOrmSqliteTransactionFactory);
     });
 
     it('useFactory should hand the driver options and data source name to the factory', () => {
       const transactionSettings = vi.fn().mockReturnValue({});
-      const descriptor = createTransactionFactoryDescriptor('secondary', {
-        transactionSettings,
-      });
-      const mockDataSource = mockDeep<DataSource>();
-      Object.defineProperty(mockDataSource, 'options', {
-        value: { type: 'postgres' },
-      });
+      const descriptor = createTransactionFactoryDescriptor(
+        TYPEORM_POSTGRES_ADAPTER,
+        'secondary',
+        { transactionSettings },
+      );
       const ctx = new AppContextHost();
 
-      descriptor.useFactory(mockDataSource).create(ctx);
+      descriptor.useFactory(dataSourceOfType('postgres')).create(ctx);
 
       expect(transactionSettings).toHaveBeenCalledWith(ctx, 'secondary');
     });

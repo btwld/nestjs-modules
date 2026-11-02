@@ -2,7 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { type OtpRepositoryResolverInterface } from '../domain/repositories/otp-repository-resolver.interface.js';
 import { OtpRepository } from '../infrastructure/persistence/otp.repository.js';
@@ -101,7 +101,7 @@ describe(OtpModule.name, () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [{ key: 'userOtp', entity: UserOtpEntityFixture }],
               },
             ],

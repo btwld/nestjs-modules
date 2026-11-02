@@ -69,11 +69,12 @@ Then import `forFeature()` with the keys each feature module injects.
 
 `forRoot()` registers every entity, grouped by the driver that serves it, and
 sets up the transaction infrastructure (factory registry, scope, runner,
-interceptor). Import it once.
+interceptor). Import it once. `YourDriverModule` in the examples stands for
+your driver's module, such as one of
+[nestjs-repository-typeorm's adapters](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
 @Module({
   imports: [
@@ -81,7 +82,7 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
       defaultTimeout: 30000, // transaction timeout in ms (default)
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: YourDriverModule,
           entities: [
             { key: 'orders', entity: Order },
             { key: 'customers', entity: Customer },
@@ -111,7 +112,7 @@ Further options for scoped, append-only or recorded entities:
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
-| `options` | The driver's own options, such as the TypeORM driver's `transactionSettings`; type-checked against the driver |
+| `options` | The driver's own options, such as per-transaction settings; type-checked against the driver |
 | `imports` | Modules exporting the row scope resolvers your entities declare |
 
 ```ts
@@ -119,7 +120,7 @@ RepositoryModule.forRoot({
   imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         {
           key: 'orders',
@@ -142,7 +143,7 @@ Entities stay static; only the settings come from the factory.
     RepositoryModule.forRootAsync({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: YourDriverModule,
           entities: [{ key: 'orders', entity: Order }],
         },
       ],
@@ -364,8 +365,9 @@ delete for that entity. The column holds a `Date` once set and `null` until
 then. `softDelete` and `restore` set and clear it, and a read without
 `withDeleted` leaves out rows where it is set, both on the entity and on every
 relation the read joins. Restoring a row that isn't soft-deleted leaves it as
-it is. A driver that cannot do all of that reports no such column, and
-`softDelete` and `restore` then throw. On an entity without the column,
+it is. A driver that cannot do all of that must refuse, at startup, an entity
+that declares a remove date. On an
+entity without the column, `softDelete` and `restore` throw, and
 `withDeleted` changes nothing.
 
 `metadata.urn` names the rows an entity reads, and each relation's `targetUrn`
@@ -422,6 +424,7 @@ runRepositoryConformance(
       transactions: 'supported',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      softDelete: 'supported',
     },
     reset: (app) => removeEveryFixtureRow(app),
     linkBookTag: (app, { bookId, tagId }) => linkInStore(app, bookId, tagId),
@@ -436,14 +439,19 @@ runRepositoryConformance(
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
   driver's own options go in `driverOptions`.
-- **Capabilities.** Three are optional, each `'supported'` or `'refused'`:
-  `transactions`, `eagerResults`, and `referentialIntegrity` (your store
+- **Capabilities.** Four are optional, each `'supported'` or `'refused'`:
+  `transactions`, `eagerResults`, `referentialIntegrity` (your store
   refuses a book naming no author, and the delete of an author a book still
-  names). A refused one runs its refusal cases, if it has any, instead.
+  names), and `softDelete`. A refused one runs its refusal cases, if it has
+  any, instead. A driver that refuses `softDelete` must refuse at startup an
+  entity that declares a remove date; its harness binds the fixtures to
+  entities whose `removedAt` is an ordinary column.
   Every other case is required, including that your driver describes the
   errors its store raises.
 - **Versions.** Every driver is checked for changing the version on each
-  write. Refusing a stale row is checked inside a transaction only.
+  write that changes a stored row, and for keeping it on a write that
+  changes nothing. Refusing a stale row is checked inside a transaction
+  only.
 - **Transactions.** On a store with a single connection, a call that ignores
   the run's `ctx` still lands in the open transaction, so the suite can't see
   it. Run it against a store with more than one connection too.
@@ -489,7 +497,8 @@ last read, and `update`, `replace`, `delete`, `softDelete`, and `restore`
 all reject a mismatch with `OptimisticLockException` (409 Conflict) —
 enforced once in `RepositoryAdapter`, for every driver. Every write that
 changes a stored row bumps its version, `upsert` included, so a version read
-before any of them conflicts after it.
+before any of them conflicts after it. A write whose values match what is
+already stored, such as an `update` with no data, keeps the version.
 
 ```ts
 import { OptimisticLockException } from '@concepta/nestjs-repository';
@@ -609,7 +618,10 @@ A relation condition combines with the entity's own in an `or` too, e.g.
 users who are admins or have a published post:
 `Where.or(Where.eq('role', 'admin'), Where.rel('posts', Where.eq('published', true)))`.
 A related row is kept when the whole condition holds with it, so an admin
-holds all its posts and anyone else only the published ones.
+holds all its posts and anyone else only the published ones. The same goes
+for two relations: with `posts` and `comments` joined, a user that matches
+`Where.or(Where.rel('posts', …), Where.rel('comments', …))` through a post
+holds every comment.
 
 ### Sorting by Relations
 
@@ -617,13 +629,17 @@ Use `OrderBy.rel()` to sort by fields on a related entity:
 
 ```ts
 const [users, total] = await userRepo.findAndCount({
-  join: [{ relation: 'posts' }],
+  join: [{ relation: 'company' }],
   ...OrderBy.order(
-    OrderBy.rel('posts', OrderBy.desc<PostEntity>('createdAt')),
+    OrderBy.rel('company', OrderBy.asc<CompanyEntity>('name')),
     OrderBy.asc<UserEntity>('name'),
   ),
 });
 ```
+
+Sort by a to-one relation only. A user holds many posts, so there is no one
+post title to sort the user by; a sort on a to-many relation is refused with
+a `400`.
 
 ### Relation Metadata
 
@@ -634,7 +650,7 @@ can also configure per-relation behavior on its `forRoot()` entry:
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [{
         key: 'users',
         entity: UserEntity,
@@ -790,12 +806,13 @@ A read reaches another table only through a relation it names in `join`:
 | In the read options | Result |
 | --- | --- |
 | an own column in `select`, `where` or `order` | passed to the driver |
-| a relation in `join`, and a `Where.rel()` filter or relation sort on a joined relation | passed to the driver |
+| a relation in `join`, a `Where.rel()` filter on a joined relation, and a relation sort on a joined to-one relation | passed to the driver |
 | a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`) |
 | a relation that is not declared | refused (`400`) |
 | a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable`, this one holds the caller to every scope column the other does, and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
 | a `Where.rel()` filter or relation sort on a relation missing from `join` | refused (`400`); add it to `join` |
 | a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
+| a relation sort on a to-many relation | refused (`400`); a row holds many related rows, so there is no one value to sort it by |
 | a sort direction other than `ASC` or `DESC` | refused (`400`) |
 
 A read may sort by an own column it doesn't select.
@@ -851,7 +868,7 @@ An entity whose relations load on their own, eagerly, opts in with
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'comments', entity: CommentEntity, allowEagerRelations: true },
       ],
@@ -1114,15 +1131,15 @@ const users = await userRepo.find(
 
 ### Relation Sorting
 
-Use `rel()` to sort by a field on a related entity (see
+Use `rel()` to sort by a field on a to-one related entity (see
 [Sorting by Relations](#sorting-by-relations)):
 
 ```ts
-// Sort users by post title, then by creation date
+// Sort users by company name, then by creation date
 const users = await userRepo.findAndCount({
-  join: [{ relation: 'posts' }],
+  join: [{ relation: 'company' }],
   ...OrderBy.order(
-    OrderBy.rel('posts', OrderBy.asc<PostEntity>('title')),
+    OrderBy.rel('company', OrderBy.asc<CompanyEntity>('name')),
     OrderBy.desc<UserEntity>('createdAt'),
   ),
 });
@@ -1436,7 +1453,7 @@ data source, not per transaction) should declare `false`: `TransactionManager`
 then queues transactions for that factory's key, so a second transaction on
 the same connection waits for the first to commit or roll back instead of
 racing its `BEGIN` — see
-[nestjs-repository-typeorm's Single-Connection Drivers](../nestjs-repository-typeorm/README.md#single-connection-drivers)
+[nestjs-repository-typeorm's SQLite adapter](../nestjs-repository-typeorm/README.md#sqlite)
 for the concrete case this exists for. A queued wait still counts against
 `run()`'s own `timeout` (see Cancellation and timeouts, above): a scope can
 time out while still queued, before its own transaction ever starts, and it
@@ -1623,7 +1640,6 @@ have to be true for it to run:
 import { Module } from '@nestjs/common';
 import { CoreModule } from '@concepta/nestjs-core';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
 
 @Module({
   imports: [
@@ -1631,7 +1647,7 @@ import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: YourDriverModule,
           entities: [
             { key: 'orders', entity: Order, hooks: [OrderDefaultsHook] },
           ],
@@ -2344,11 +2360,10 @@ Structural only — nothing probes what a resolver decides:
 
 Row scope protects every repository call. To have the database hide other
 tenants' rows too, even from SQL that bypasses the repository, add row-level
-security behind it. This needs a driver and database that support it — today,
-`nestjs-repository-typeorm` on Postgres, which sets the caller's tenant on
-every transaction from the same `RowScopeCtx` overlay. See its
-[Row-Level Security](../nestjs-repository-typeorm/README.md#row-level-security-postgres)
-section.
+security behind it. This needs a driver and database that support it, such
+as `nestjs-repository-typeorm` on Postgres, Oracle or SQL Server, which sets
+the caller's tenant on every transaction from the same `RowScopeCtx` overlay.
+See its [adapter sections](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
 ## Write Policy
 
@@ -2359,7 +2374,7 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         {
           key: 'statement-items',
@@ -2458,13 +2473,13 @@ Add `activity` to an entity to record who changed which of its rows, when, and
 which columns:
 
 ```ts
-@Entity()
-export class Activity extends ActivityPostgresEntity {}
+// Extend your driver's activity base entity.
+export class Activity extends YourDriverActivityEntity {}
 
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'invoices', entity: Invoice, activity: { store: 'activity' } },
         {
@@ -2728,7 +2743,7 @@ the registrations that conflict.
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'users', entity: UserEntity },
         { key: 'users', entity: AdminEntity }, // duplicate key!
@@ -2752,7 +2767,7 @@ and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: YourDriverModule,
       entities: [
         { key: 'users', entity: UserEntity, relations: { posts: { federated: true } } },
         { key: 'posts', entity: PostEntity, dataSource: 'content' },

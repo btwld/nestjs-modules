@@ -11,7 +11,7 @@ import {
   getDynamicRepositoryToken,
   RepositoryModule,
 } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { CrudUpdateHandler } from '../application/commands/handlers/crud-update.handler.js';
 import { CrudListHandler } from '../application/queries/handlers/crud-list.handler.js';
@@ -59,7 +59,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -250,7 +250,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -416,7 +416,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -640,7 +640,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -791,7 +791,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -852,7 +852,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -928,7 +928,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,

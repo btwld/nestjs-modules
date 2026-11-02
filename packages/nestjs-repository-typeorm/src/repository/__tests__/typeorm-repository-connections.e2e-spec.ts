@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { relationOrmConfig } from '../../__fixtures__/repository/config/relation-ormconfig.fixture.js';
 import { AuthorEntityFixture } from '../../__fixtures__/repository/entity/author.entity.fixture.js';
 import { PostEntityFixture } from '../../__fixtures__/repository/entity/post.entity.fixture.js';
-import { TypeOrmRepository } from '../typeorm-repository.js';
+import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
 
 /**
  * One entity on two connections, as when a relation's target lives in
@@ -40,11 +40,11 @@ describe('TypeOrmRepository (two connections)', () => {
   });
 
   it('names a relation target as its repository on another connection does', () => {
-    const authors = new TypeOrmRepository(
+    const authors = new TypeOrmSqliteRepository(
       app.getRepository(AuthorEntityFixture),
       { entityKey: 'authors' },
     );
-    const posts = new TypeOrmRepository(
+    const posts = new TypeOrmSqliteRepository(
       content.getRepository(PostEntityFixture),
       { entityKey: 'posts' },
     );

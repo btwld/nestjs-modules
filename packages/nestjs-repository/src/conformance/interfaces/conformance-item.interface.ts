@@ -9,7 +9,7 @@ export interface ConformanceItemInterface {
   name: string;
   rank: number | null;
   note: string | null;
-  /** The soft-remove date column. */
+  /** The remove date, or an ordinary one where soft delete is refused. */
   removedAt: Date | null;
   /** The optimistic-locking version column. */
   version: number;

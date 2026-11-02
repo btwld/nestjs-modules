@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { CrudModule } from '../crud.module.js';
 import { CrudOperationResolver } from '../infrastructure/resolvers/crud-operation.resolver.js';
@@ -15,7 +15,7 @@ import { PhotoCcbModuleFixture } from './photo-ccb/photo-ccb.module.fixture.js';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CRUD_TEST_PHOTO_CCB_ENTITY_NAME, entity: PhotoFixture },
           ],

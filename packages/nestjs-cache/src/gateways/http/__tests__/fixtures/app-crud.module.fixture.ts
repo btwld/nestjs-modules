@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CoreModule, Operation } from '@concepta/nestjs-core';
 import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { UserCacheEntityFixture } from '../../../../__tests__/fixtures/entities/user-cache-entity.fixture.js';
 import { UserEntityFixture } from '../../../../__tests__/fixtures/entities/user-entity.fixture.js';
@@ -42,7 +42,7 @@ import { ReadCacheRequest } from '../../queries/impl/read-cache.request.js';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: CACHE_MODULE_CACHE_ENTITY_KEY,

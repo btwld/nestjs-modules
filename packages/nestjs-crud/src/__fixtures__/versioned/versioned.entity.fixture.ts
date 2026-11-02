@@ -1,6 +1,6 @@
 import { Column, Entity } from 'typeorm';
 
-import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { type VersionedEntityInterfaceFixture } from './interfaces/versioned-entity.interface.fixture.js';
 

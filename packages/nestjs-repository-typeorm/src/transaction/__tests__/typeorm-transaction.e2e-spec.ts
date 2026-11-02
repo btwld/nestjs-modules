@@ -4,7 +4,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
 import { AppModuleFixture } from '../../__fixtures__/repository/module/app.module.fixture.js';
-import { TypeOrmTransaction } from '../typeorm-transaction.js';
+import { TypeOrmSqliteTransaction } from '../../sqlite/typeorm-sqlite-transaction.js';
 
 /**
  * Root-cause pin for #476: TypeORM's SqliteDriver returns one shared
@@ -33,8 +33,8 @@ describe('TypeOrmTransaction — unserialized concurrent start() on a shared SQL
   });
 
   it('should let one of two concurrent, unserialized transactions fail with a driver-level nested-transaction error', async () => {
-    const txA = new TypeOrmTransaction(dataSource);
-    const txB = new TypeOrmTransaction(dataSource);
+    const txA = new TypeOrmSqliteTransaction(dataSource);
+    const txB = new TypeOrmSqliteTransaction(dataSource);
 
     const results = await Promise.allSettled([txA.start(), txB.start()]);
 

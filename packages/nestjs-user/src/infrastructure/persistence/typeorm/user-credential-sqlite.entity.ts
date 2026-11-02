@@ -1,7 +1,7 @@
 import { Column } from 'typeorm';
 
 import { ReferenceId } from '@concepta/nestjs-core';
-import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { UserCredentialEntityInterface } from '../../../domain/interfaces/user-credential-entity.interface.js';
 

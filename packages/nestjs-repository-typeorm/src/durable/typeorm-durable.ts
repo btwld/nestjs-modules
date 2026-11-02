@@ -24,8 +24,8 @@ import { resolveTokenName } from '../typeorm-repository.util.js';
 /**
  * Durable messaging for TypeORM registrations: an `@nestjs/outbox` store on
  * the registration's own data source, `PostgresOutboxStore` for `postgres`
- * and `MySqlOutboxStore` for `mysql`. Any other database, MariaDB included,
- * has no store and is refused.
+ * and `MySqlOutboxStore` for `mysql` and `mariadb`. Any other database has
+ * no store and is refused.
  *
  * Pass the class to `DurableMessagingModule.forRoot({ driver })`; the module
  * provides it. The data source is resolved from the TypeORM module's own
@@ -69,6 +69,7 @@ export class TypeOrmDurable implements DurableDriverInterface {
           }),
         };
       case 'mysql':
+      case 'mariadb':
         return {
           transactionKey,
           store: new MySqlOutboxStore({ executor: mySqlExecutor(dataSource) }),

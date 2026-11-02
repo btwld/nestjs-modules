@@ -8,8 +8,8 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
 import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation-metadata.exception.js';
-import { TypeOrmTransactionSettingsUnsupportedException } from '../exceptions/typeorm-transaction-settings-unsupported.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
+import { TypeOrmMysqlFoundRowsException } from '../mysql/typeorm-mysql-found-rows.exception.js';
 
 /**
  * Anti-drift check: every `RuntimeException` subclass in this package states
@@ -31,14 +31,14 @@ const CASES: {
     fault: 'usage',
   },
   {
-    name: 'TypeOrmTransactionSettingsUnsupportedException',
-    build: () =>
-      new TypeOrmTransactionSettingsUnsupportedException('default', 'mysql'),
+    name: 'TypeOrmMysqlFoundRowsException',
+    build: () => new TypeOrmMysqlFoundRowsException('Post'),
     fault: 'usage',
   },
   {
     name: 'TypeOrmUnsupportedDatabaseException',
-    build: () => new TypeOrmUnsupportedDatabaseException('Post', 'mongodb'),
+    build: () =>
+      new TypeOrmUnsupportedDatabaseException('Post', 'mongodb', 'postgres'),
     fault: 'usage',
   },
 ];

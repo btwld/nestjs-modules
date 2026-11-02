@@ -1,6 +1,6 @@
 import { Column, Entity } from 'typeorm';
 
-import { CommonPostgresEntity } from '../../entities/common/common-postgres.entity.js';
+import { CommonPostgresEntity } from '../../postgres/entities/common-postgres.entity.js';
 
 @Entity('rls_order')
 export class RlsOrderEntityFixture extends CommonPostgresEntity {

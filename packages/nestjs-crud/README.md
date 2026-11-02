@@ -196,7 +196,7 @@ Register the entity once, in `RepositoryModule.forRoot()`:
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import { CrudModule } from '@concepta/nestjs-crud';
 
 @Module({
@@ -205,7 +205,7 @@ import { CrudModule } from '@concepta/nestjs-crud';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'photo', entity: PhotoEntity }],
         },
       ],
@@ -391,7 +391,7 @@ request schema to accept it. See Cascading writes in
 `@concepta/nestjs-repository`.
 
 **Update / Replace and optimistic locking.** When the entity carries a
-version column (`CommonPostgresEntity`/`CommonSqliteEntity`), `update`/
+version column (every `Common*` base entity), `update`/
 `replace` are guarded by an atomic version compare-and-swap in the
 repository layer. A concurrent write that lands between this request's read
 and its write is rejected with `409 Conflict` (`OptimisticLockException`)
@@ -933,6 +933,10 @@ relation it doesn't join is refused with `400`:
 @CrudJoin([{ relation: 'author' }])
 ```
 
+A sort must be on a to-one relation, like a photo's `author`. A sort on a
+to-many relation, like an author's `photos`, is refused with `400`, since an
+author has no single photo field to sort by.
+
 ## Paginated Response
 
 List operations return a paginated response:
@@ -1302,12 +1306,12 @@ Prefer registering a repository hook on its entity, in
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'photo', entity: Photo, hooks: [AuditHook] }],
     },
   ],

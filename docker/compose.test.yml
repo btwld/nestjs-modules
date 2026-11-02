@@ -17,3 +17,35 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_DATABASE: rockets_test
+    ports:
+      - '53306:3306'
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      # TCP, so it passes only once the server that init starts with
+      # networking off has been replaced by the real one.
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -pmysql --silent']
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: mariadb
+      MARIADB_DATABASE: rockets_test
+    ports:
+      - '53307:3306'
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 1s
+      timeout: 3s
+      retries: 60

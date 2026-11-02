@@ -28,4 +28,13 @@ export interface ConformanceCapabilitiesInterface {
    * still names.
    */
   referentialIntegrity: ConformanceCapability;
+
+  /**
+   * The driver supports soft delete: it reports the remove date an entity
+   * declares, sets and clears it, and leaves soft-deleted rows out of reads.
+   * A driver that refuses it must refuse at startup an entity that declares
+   * a remove date; its harness binds every fixture to an entity whose
+   * `removedAt` is an ordinary column.
+   */
+  softDelete: ConformanceCapability;
 }

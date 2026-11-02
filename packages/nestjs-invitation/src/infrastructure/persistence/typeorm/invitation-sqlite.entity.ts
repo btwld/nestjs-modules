@@ -3,7 +3,7 @@ import { Column } from 'typeorm';
 import { PlainLiteralObject } from '@nestjs/common';
 
 import { ReferenceActive, ReferenceId } from '@concepta/nestjs-core';
-import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { InvitationEntityInterface } from '../interfaces/invitation-entity.interface.js';
 

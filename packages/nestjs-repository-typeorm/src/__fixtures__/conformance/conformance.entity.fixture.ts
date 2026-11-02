@@ -15,6 +15,7 @@ import {
 
 import {
   type ConformanceAuthorInterface,
+  type ConformanceAwardInterface,
   type ConformanceBookInterface,
   type ConformanceBookWithEagerAuthorInterface,
   type ConformanceItemInterface,
@@ -69,6 +70,27 @@ export class ConformanceAuthorEntity implements ConformanceAuthorInterface {
 
   @OneToMany(() => ConformanceBookEntity, (book) => book.author)
   books?: ConformanceBookEntity[];
+
+  @OneToMany(() => ConformanceAwardEntity, (award) => award.author)
+  awards?: ConformanceAwardEntity[];
+}
+
+@Entity('conformance_award')
+export class ConformanceAwardEntity implements ConformanceAwardInterface {
+  @PrimaryColumn({ type: 'varchar' })
+  id!: string;
+
+  @Column({ type: 'varchar' })
+  name!: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  authorId!: string | null;
+
+  @ManyToOne(() => ConformanceAuthorEntity, (author) => author.awards, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'authorId' })
+  author?: ConformanceAuthorEntity | null;
 }
 
 /**
@@ -136,8 +158,9 @@ export class ConformanceTagEntity implements ConformanceTagInterface {
   books?: ConformanceBookEntity[];
 }
 
+// In the order TypeORM writes the lines' foreign key, which MySQL requires.
 @Entity('conformance_tenant_order')
-@Unique(['tenantId', 'id'])
+@Unique(['id', 'tenantId'])
 export class ConformanceTenantOrderEntity implements ConformanceTenantOrderInterface {
   @PrimaryColumn({ type: 'varchar' })
   id!: string;
@@ -178,6 +201,7 @@ export const CONFORMANCE_ENTITIES = [
   ConformanceItemEntity,
   ConformancePlainItemEntity,
   ConformanceAuthorEntity,
+  ConformanceAwardEntity,
   ConformanceBookEntity,
   ConformanceBookWithEagerAuthorEntity,
   ConformanceTagEntity,

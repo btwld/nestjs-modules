@@ -82,11 +82,11 @@ optional TypeORM subpath:
 
 ```ts
 import { Entity, ManyToOne, JoinColumn } from 'typeorm';
-import { IdentitySqliteEntity } from '@concepta/nestjs-federated/optional/typeorm';
+import { IdentityPostgresEntity } from '@concepta/nestjs-federated/optional/typeorm';
 import { UserEntity } from '../user/user.entity';
 
 @Entity()
-export class IdentityEntity extends IdentitySqliteEntity {
+export class IdentityEntity extends IdentityPostgresEntity {
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'userId' })
   user?: UserEntity;
@@ -97,7 +97,8 @@ The base class stores the user's id in a `userId` column. The relation is
 optional; declare it, joined on `userId`, to get a foreign key constraint to
 your users table.
 
-For PostgreSQL, extend `IdentityPostgresEntity` instead.
+The base for each database is listed under
+[Optional TypeORM Exports](#optional-typeorm-exports).
 
 ### Step 2: Configure the User Port
 
@@ -123,7 +124,7 @@ Register the identity entity in `RepositoryModule.forRoot()`, and give
 ```ts
 import { Module } from '@nestjs/common';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 import { FederatedModule } from '@concepta/nestjs-federated';
 import { IdentityEntity } from './identity/identity.entity';
 import { GetUserQuery } from './user/queries/get-user.query';
@@ -135,7 +136,7 @@ import { CreateUserCommand } from './user/commands/create-user.command';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'identity', entity: IdentityEntity }],
         },
       ],

@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
 
-import { TypeOrmRepositoryModule } from '../../../typeorm-repository.module.js';
+import { TypeOrmSqliteRepositoryModule } from '../../../sqlite/typeorm-sqlite-repository.module.js';
 import { ormConfig } from '../config/ormconfig.fixture.js';
 import { TEST_ENTITY_TOKEN } from '../config/test.constants.fixture.js';
 import { TestEntityFixture } from '../entity/test.entity.fixture.js';
@@ -14,7 +14,7 @@ import { TestEntityFixture } from '../entity/test.entity.fixture.js';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [{ key: TEST_ENTITY_TOKEN, entity: TestEntityFixture }],
         },
       ],

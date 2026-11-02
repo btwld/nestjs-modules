@@ -1,6 +1,6 @@
 import { Column, Unique } from 'typeorm';
 
-import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { FileStatus } from '../../../domain/interfaces/file-status.type.js';
 import { type FileEntityInterface } from '../interfaces/file-entity.interface.js';

@@ -29,6 +29,7 @@ export {
 export {
   RepositoryDriverInterface,
   DynamicRepositoryModule,
+  TransactionFactoryDescriptor,
 } from './interfaces/repository-module.interface.js';
 export {
   RepositoryDriverRegistration,

@@ -48,10 +48,13 @@ export class OrderBy<Entity extends PlainLiteralObject = PlainLiteralObject> {
   /**
    * Tag an OrderSortKey with a relation name.
    *
+   * The relation must be joined and to-one: a sort on a to-many relation is
+   * refused, since a row holds many rows of a to-many relation.
+   *
    * @example
    * ```typescript
-   * OrderBy.rel('posts', OrderBy.asc('title'))
-   * // => { field: 'title', order: 'ASC', relation: 'posts' }
+   * OrderBy.rel('company', OrderBy.asc('name'))
+   * // => { field: 'name', order: 'ASC', relation: 'company' }
    * ```
    */
   static rel<
@@ -63,6 +66,7 @@ export class OrderBy<Entity extends PlainLiteralObject = PlainLiteralObject> {
 
   /**
    * Parse a dot-notation field and tag the key with the extracted relation.
+   * As with `rel`, the relation must be joined and to-one.
    *
    * @example
    * ```typescript

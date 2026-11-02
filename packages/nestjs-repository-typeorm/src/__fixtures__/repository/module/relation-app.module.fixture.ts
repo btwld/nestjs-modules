@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
 
-import { TypeOrmRepositoryModule } from '../../../typeorm-repository.module.js';
+import { TypeOrmSqliteRepositoryModule } from '../../../sqlite/typeorm-sqlite-repository.module.js';
 import { relationOrmConfig } from '../config/relation-ormconfig.fixture.js';
 import {
   AUTHOR_ENTITY_TOKEN,
@@ -32,7 +32,7 @@ import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: AUTHOR_ENTITY_TOKEN, entity: AuthorEntityFixture },
             { key: POST_ENTITY_TOKEN, entity: PostEntityFixture },
@@ -42,7 +42,7 @@ import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
         },
       ],
     }),
-    TypeOrmRepositoryModule.register([
+    TypeOrmSqliteRepositoryModule.register([
       { key: COMMENT_ENTITY_TOKEN, entity: CommentEntityFixture },
       { key: EAGER_COMMENT_ENTITY_TOKEN, entity: CommentEntityFixture },
     ]),

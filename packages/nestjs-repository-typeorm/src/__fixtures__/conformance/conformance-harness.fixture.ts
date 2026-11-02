@@ -5,11 +5,17 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
 import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
 
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { type TypeOrmMariadbRepositoryModule } from '../../mariadb/typeorm-mariadb-repository.module.js';
+import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-repository.module.js';
+import { type TypeOrmOracleRepositoryModule } from '../../oracle/typeorm-oracle-repository.module.js';
+import { type TypeOrmPostgresRepositoryModule } from '../../postgres/typeorm-postgres-repository.module.js';
+import { type TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
+import { type TypeOrmSqlServerRepositoryModule } from '../../sqlserver/typeorm-sqlserver-repository.module.js';
 
 import {
   CONFORMANCE_ENTITIES,
   ConformanceAuthorEntity,
+  ConformanceAwardEntity,
   ConformanceBookEntity,
   ConformanceBookWithEagerAuthorEntity,
   ConformanceItemEntity,
@@ -26,26 +32,37 @@ const TABLES = [
   'conformance_tenant_order',
   'conformance_book',
   'conformance_book_with_eager_author',
+  'conformance_award',
   'conformance_tag',
   'conformance_author',
   'conformance_item',
   'conformance_plain_item',
 ];
 
+/** The adapters whose conformance this harness runs. */
+type TypeOrmAdapterModule =
+  | typeof TypeOrmPostgresRepositoryModule
+  | typeof TypeOrmMysqlRepositoryModule
+  | typeof TypeOrmMariadbRepositoryModule
+  | typeof TypeOrmOracleRepositoryModule
+  | typeof TypeOrmSqlServerRepositoryModule
+  | typeof TypeOrmSqliteRepositoryModule;
+
 /**
- * The TypeORM driver's conformance harness for one database: the
- * connection, and the driver's entity for each fixture.
+ * A TypeORM adapter's conformance harness for its database: the adapter,
+ * the connection, and the adapter's entity for each fixture.
  */
 export function typeOrmConformanceHarness(
   name: string,
+  driver: TypeOrmAdapterModule,
   connection: DataSourceOptions,
-): ConformanceHarnessInterface<typeof TypeOrmRepositoryModule> {
+): ConformanceHarnessInterface<TypeOrmAdapterModule> {
   const dataSource = (app: INestApplicationContext): DataSource =>
     app.get<DataSource>(getDataSourceToken());
 
   return {
     name,
-    driver: TypeOrmRepositoryModule,
+    driver,
     imports: [
       TypeOrmModule.forRoot({
         ...connection,
@@ -60,6 +77,7 @@ export function typeOrmConformanceHarness(
         entity: ConformancePlainItemEntity,
       },
       author: { key: 'conformance-author', entity: ConformanceAuthorEntity },
+      award: { key: 'conformance-award', entity: ConformanceAwardEntity },
       book: { key: 'conformance-book', entity: ConformanceBookEntity },
       bookWithEagerAuthor: {
         key: 'conformance-book-with-eager-author',
@@ -80,6 +98,7 @@ export function typeOrmConformanceHarness(
       transactions: 'supported',
       eagerResults: 'supported',
       referentialIntegrity: 'supported',
+      softDelete: 'supported',
     },
     async reset(app) {
       for (const table of TABLES) {

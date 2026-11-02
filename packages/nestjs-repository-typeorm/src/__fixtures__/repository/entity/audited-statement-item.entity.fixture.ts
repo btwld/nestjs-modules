@@ -1,6 +1,6 @@
 import { Column, Entity } from 'typeorm';
 
-import { CommonSqliteEntity } from '../../../entities/common/common-sqlite.entity.js';
+import { CommonSqliteEntity } from '../../../sqlite/entities/common-sqlite.entity.js';
 
 /**
  * An append-only candidate built on the audited base, which brings a

@@ -621,17 +621,17 @@ in a parent module for `forFeature()` to resolve its dependencies, and the
 
 ```ts
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
-import { OtpSqliteEntity } from '@concepta/nestjs-otp/optional/typeorm';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
+import { OtpPostgresEntity } from '@concepta/nestjs-otp/optional/typeorm';
 import { Entity } from 'typeorm';
 
 @Entity()
-export class UserOtpEntity extends OtpSqliteEntity {}
+export class UserOtpEntity extends OtpPostgresEntity {}
 
 RepositoryModule.forRoot({
   drivers: [
     {
-      driver: TypeOrmRepositoryModule,
+      driver: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'userOtp', entity: UserOtpEntity }],
     },
   ],

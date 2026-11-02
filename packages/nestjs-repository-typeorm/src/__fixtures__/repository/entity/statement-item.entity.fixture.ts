@@ -1,6 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
-import { AppendOnlySqliteEntity } from '../../../entities/append-only/append-only-sqlite.entity.js';
+import { AppendOnlySqliteEntity } from '../../../sqlite/entities/append-only-sqlite.entity.js';
 
 @Entity()
 @Index(['correctedId'], { unique: true })

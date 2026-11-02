@@ -537,6 +537,8 @@ export abstract class RepositoryAdapter<
    * - A relation tagged on a filter or sort must also be joined, so a read
    *   only ever reaches the relations it names in `join`, and its field must
    *   be one of that relation's own columns.
+   * - A sort on a relation is on a to-one relation: a row holds many rows of
+   *   a to-many relation, so there is no one value to sort it by.
    * - A sort direction is ascending or descending.
    * - A filter stays within the complexity every driver can translate.
    */
@@ -666,6 +668,29 @@ export abstract class RepositoryAdapter<
     }
 
     this.assertFederatedReadable(options, joined, operation);
+
+    const toMany = order.find(
+      (key) =>
+        key.relation !== undefined &&
+        this.metadata.relations?.find(({ name }) => name === key.relation)
+          ?.cardinality === 'many',
+    );
+    if (toMany?.relation !== undefined) {
+      throw new RuntimeException({
+        message:
+          'Cannot sort %s by "%s.%s": each row holds many %s, so there is ' +
+          'no one value to sort it by. Sort by a to-one relation or an own ' +
+          'column',
+        messageParams: [
+          this.metadata.name,
+          toMany.relation,
+          toMany.field,
+          toMany.relation,
+        ],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
 
     // Read untyped: the type admits only the two directions, a caller's
     // runtime value need not.

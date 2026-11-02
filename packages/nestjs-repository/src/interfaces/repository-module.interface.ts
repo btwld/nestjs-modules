@@ -8,7 +8,7 @@ import { type RepositoryProviderOptions } from './repository-provider-options.in
 import { type TransactionFactoryInterface } from './transaction-factory.interface.js';
 
 /**
- * Descriptor for a transaction factory that a respository module wants to register.
+ * Descriptor for a transaction factory that a repository module wants to register.
  * RepositoryModule handles the actual registration with the registry.
  */
 export interface TransactionFactoryDescriptor {

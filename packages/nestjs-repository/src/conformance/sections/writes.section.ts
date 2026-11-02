@@ -14,6 +14,7 @@ import { ownAuthor, ownBook, seedLibrary } from '../conformance-seed.js';
  */
 export function writesSection(ctx: ConformanceContext): void {
   const { it } = ctx.test;
+  const softDelete = ctx.capabilities.softDelete === 'supported';
 
   const readItem = (id: string | number) =>
     ctx.repo('item').findOne({ where: Where.eq('id', id), withDeleted: true });
@@ -200,53 +201,55 @@ export function writesSection(ctx: ConformanceContext): void {
     ]);
   });
 
-  it('doSoftDelete and doRestore: set and clear the remove date', async () => {
-    const created = await ctx
-      .repo('item')
-      .create({ name: 'soft', rank: null, note: null });
+  if (softDelete) {
+    it('doSoftDelete and doRestore: set and clear the remove date', async () => {
+      const created = await ctx
+        .repo('item')
+        .create({ name: 'soft', rank: null, note: null });
 
-    const removed = await ctx.repo('item').softDelete(created);
+      const removed = await ctx.repo('item').softDelete(created);
 
-    assert.ok(removed.removedAt instanceof Date);
-    assert.equal(await ctx.repo('item').count(), 0);
-    assert.equal(await ctx.repo('item').count({ withDeleted: true }), 1);
+      assert.ok(removed.removedAt instanceof Date);
+      assert.equal(await ctx.repo('item').count(), 0);
+      assert.equal(await ctx.repo('item').count({ withDeleted: true }), 1);
 
-    const restored = await ctx.repo('item').restore(removed);
+      const restored = await ctx.repo('item').restore(removed);
 
-    assert.equal(restored.removedAt, null);
-    assert.equal(await ctx.repo('item').count(), 1);
-  });
+      assert.equal(restored.removedAt, null);
+      assert.equal(await ctx.repo('item').count(), 1);
+    });
 
-  it('doRestore: leaves a live row live', async () => {
-    const created = await ctx
-      .repo('item')
-      .create({ name: 'live', rank: null, note: null });
+    it('doRestore: leaves a live row live', async () => {
+      const created = await ctx
+        .repo('item')
+        .create({ name: 'live', rank: null, note: null });
 
-    const restored = await ctx.repo('item').restore(created);
+      const restored = await ctx.repo('item').restore(created);
 
-    assert.equal(restored.removedAt, null);
-    assert.equal(restored.name, 'live');
-    assert.equal(await ctx.repo('item').count(), 1);
-  });
+      assert.equal(restored.removedAt, null);
+      assert.equal(restored.name, 'live');
+      assert.equal(await ctx.repo('item').count(), 1);
+    });
 
-  it('doDelete and doDeleteMany: remove soft-deleted rows too', async () => {
-    const [one, two, three] = await ctx.repo('item').createMany(
-      ['one', 'two', 'three'].map((name) => ({
-        name,
-        rank: null,
-        note: null,
-      })),
-    );
-    assert.ok(one && two && three);
-    const removedOne = await ctx.repo('item').softDelete(one);
-    const removedTwo = await ctx.repo('item').softDelete(two);
-    const removedThree = await ctx.repo('item').softDelete(three);
+    it('doDelete and doDeleteMany: remove soft-deleted rows too', async () => {
+      const [one, two, three] = await ctx.repo('item').createMany(
+        ['one', 'two', 'three'].map((name) => ({
+          name,
+          rank: null,
+          note: null,
+        })),
+      );
+      assert.ok(one && two && three);
+      const removedOne = await ctx.repo('item').softDelete(one);
+      const removedTwo = await ctx.repo('item').softDelete(two);
+      const removedThree = await ctx.repo('item').softDelete(three);
 
-    await ctx.repo('item').delete(removedOne);
-    await ctx.repo('item').deleteMany([removedTwo, removedThree]);
+      await ctx.repo('item').delete(removedOne);
+      await ctx.repo('item').deleteMany([removedTwo, removedThree]);
 
-    assert.equal(await ctx.repo('item').count({ withDeleted: true }), 0);
-  });
+      assert.equal(await ctx.repo('item').count({ withDeleted: true }), 0);
+    });
+  }
 
   it('every write that changes a stored row changes its version', async () => {
     const versions: number[] = [];
@@ -260,11 +263,39 @@ export function writesSection(ctx: ConformanceContext): void {
     versions.push(replaced.version);
     const upserted = await item.upsert({ id: replaced.id, name: 'v', rank: 4 });
     versions.push(upserted.version);
-    const removed = await item.softDelete(upserted);
-    versions.push(removed.version);
-    const restored = await item.restore(removed);
-    versions.push(restored.version);
+    if (softDelete) {
+      const removed = await item.softDelete(upserted);
+      versions.push(removed.version);
+      const restored = await item.restore(removed);
+      versions.push(restored.version);
+    }
 
     assert.equal(new Set(versions).size, versions.length, String(versions));
+  });
+
+  it('a write that changes nothing keeps the version', async () => {
+    const item = ctx.repo('item');
+    const created = await item.create({ name: 'v', rank: 1, note: null });
+    const { version } = created;
+
+    type Write = [string, () => Promise<{ version: number }>];
+    const restore: Write[] = softDelete
+      ? [['restore of a live row', () => item.restore(created)]]
+      : [];
+    const writes: Write[] = [
+      ['update with no data', () => item.update(created, {})],
+      ['update with stored values', () => item.update(created, { rank: 1 })],
+      ['replace with stored values', () => item.replace(created, { rank: 1 })],
+      [
+        'upsert with stored values',
+        () => item.upsert({ id: created.id, name: 'v', rank: 1, note: null }),
+      ],
+      ...restore,
+    ];
+
+    for (const [label, write] of writes) {
+      assert.equal((await write()).version, version, label);
+      assert.equal((await readItem(created.id))?.version, version, label);
+    }
   });
 }

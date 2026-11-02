@@ -176,6 +176,16 @@ describe('what a read may name', () => {
         'Cannot filter or sort on relation "department" of Employee ' +
           'without joining it. Add it to join.',
       ],
+      [
+        'a sort on a to-many relation',
+        {
+          join: [{ relation: 'reports' }],
+          order: [{ field: 'name', order: SortOrder.ASC, relation: 'reports' }],
+        },
+        'Cannot sort Employee by "reports.name": each row holds many ' +
+          'reports, so there is no one value to sort it by. Sort by a ' +
+          'to-one relation or an own column',
+      ],
     ])('refuses %s', async (_case, options, message) => {
       const repo = new ReadRecordingFixture('employees');
       repo.bind({});

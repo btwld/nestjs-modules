@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CoreModule } from '@concepta/nestjs-core';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { FileLifecycleService } from '../domain/services/file-lifecycle.service.js';
 import { FileStorageService } from '../domain/services/file-storage.service.js';
@@ -33,7 +33,7 @@ function withFileEntity(fileModule: DynamicModule) {
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [{ key: 'file', entity: FileEntityFixture }],
         },
       ],

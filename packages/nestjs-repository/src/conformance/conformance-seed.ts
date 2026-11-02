@@ -1,5 +1,6 @@
 import { type ConformanceContext } from './conformance-context.js';
 import { type ConformanceAuthorInterface } from './interfaces/conformance-author.interface.js';
+import { type ConformanceAwardInterface } from './interfaces/conformance-award.interface.js';
 import { type ConformanceBookInterface } from './interfaces/conformance-book.interface.js';
 import { type ConformanceItemInterface } from './interfaces/conformance-item.interface.js';
 import { type ConformanceLibraryInterface } from './interfaces/conformance-library.interface.js';
@@ -22,8 +23,9 @@ export function seedItems(
 }
 
 /**
- * Three authors (cat has no books), four books (delta has no author), and
- * two tags: tech on alpha and beta, news on alpha only.
+ * Three authors (cat has no books), four books (delta has no author), two
+ * tags (tech on alpha and beta, news on alpha only), and four awards
+ * (copper and silver to ann, bronze and gold to bob).
  */
 export async function seedLibrary(
   ctx: ConformanceContext,
@@ -50,10 +52,18 @@ export async function seedLibrary(
   await ctx.linkBookTag('book-beta', 'tag-tech');
   await ctx.linkBookTag('book-alpha', 'tag-news');
 
+  const [copper, silver, bronze, gold] = await ctx.repo('award').createMany([
+    { id: 'award-copper', name: 'copper', authorId: 'author-ann' },
+    { id: 'award-silver', name: 'silver', authorId: 'author-ann' },
+    { id: 'award-bronze', name: 'bronze', authorId: 'author-bob' },
+    { id: 'award-gold', name: 'gold', authorId: 'author-bob' },
+  ]);
+
   return {
     authors: { ann, bob, cat },
     books: { alpha, beta, gamma, delta },
     tags: { news, tech },
+    awards: { copper, silver, bronze, gold },
   };
 }
 
@@ -74,6 +84,15 @@ export function ownAuthor({
   removedAt,
 }: ConformanceAuthorInterface): ConformanceAuthorInterface {
   return { id, name, removedAt };
+}
+
+/** An award's own columns, without relations. */
+export function ownAward({
+  id,
+  name,
+  authorId,
+}: ConformanceAwardInterface): ConformanceAwardInterface {
+  return { id, name, authorId };
 }
 
 /** A tag's own columns, without relations. */

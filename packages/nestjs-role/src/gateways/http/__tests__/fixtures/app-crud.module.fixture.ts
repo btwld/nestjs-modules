@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CoreModule, Operation } from '@concepta/nestjs-core';
 import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { RoleEntityFixture } from '../../../../__tests__/fixtures/entities/role-entity.fixture.js';
 import { UserEntityFixture } from '../../../../__tests__/fixtures/entities/user-entity.fixture.js';
@@ -57,7 +57,7 @@ const USER_ROLE_ENTITY_KEY = 'userRole';
     RepositoryModule.forRoot({
       drivers: [
         {
-          driver: TypeOrmRepositoryModule,
+          driver: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: ROLE_ENTITY_KEY, entity: RoleEntityFixture },
             { key: USER_ROLE_ENTITY_KEY, entity: UserRoleEntityFixture },

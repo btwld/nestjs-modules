@@ -2,7 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { CACHE_REPOSITORY_RESOLVER_TOKEN } from '../cache.constants.js';
 import { CacheModule } from '../cache.module.js';
@@ -101,7 +101,7 @@ describe(CacheModule.name, () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: TypeOrmRepositoryModule,
+                driver: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: 'userCache', entity: UserCacheEntityFixture },
                 ],

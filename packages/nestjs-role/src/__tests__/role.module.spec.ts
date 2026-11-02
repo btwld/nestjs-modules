@@ -2,7 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RepositoryModule } from '@concepta/nestjs-repository';
-import { TypeOrmRepositoryModule } from '@concepta/nestjs-repository-typeorm';
+import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { type RoleAssignmentRepositoryResolverInterface } from '../domain/repositories/role-assignment-repository-resolver.interface.js';
 import { type RoleRepositoryResolverInterface } from '../domain/repositories/role-repository-resolver.interface.js';
@@ -38,7 +38,7 @@ describe(RoleModule.name, () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: 'role', entity: RoleEntityFixture },
                 { key: 'userRole', entity: UserRoleEntityFixture },

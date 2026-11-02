@@ -14,7 +14,7 @@ import {
 
 import { ActivityEntityFixture } from '../../__fixtures__/repository/entity/activity.entity.fixture.js';
 import { AuditedStatementItemEntityFixture } from '../../__fixtures__/repository/entity/audited-statement-item.entity.fixture.js';
-import { TypeOrmRepositoryModule } from '../../typeorm-repository.module.js';
+import { TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
 import { type TypeOrmRepository } from '../typeorm-repository.js';
 
 const ITEM_TOKEN = 'statement-item';
@@ -47,7 +47,7 @@ describe('TypeOrmRepository activity (e2e)', () => {
         RepositoryModule.forRoot({
           drivers: [
             {
-              driver: TypeOrmRepositoryModule,
+              driver: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: ITEM_TOKEN,

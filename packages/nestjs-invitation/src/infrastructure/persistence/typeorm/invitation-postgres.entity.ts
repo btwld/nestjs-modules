@@ -3,7 +3,7 @@ import { Column } from 'typeorm';
 import { PlainLiteralObject } from '@nestjs/common';
 
 import { ReferenceActive, ReferenceId } from '@concepta/nestjs-core';
-import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm';
+import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
 import { InvitationEntityInterface } from '../interfaces/invitation-entity.interface.js';
 

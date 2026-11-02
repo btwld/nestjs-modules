@@ -26,7 +26,7 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  *     RepositoryModule.forRoot({
  *       drivers: [
  *         {
- *           driver: TypeOrmRepositoryModule,
+ *           driver: TypeOrmPostgresRepositoryModule,
  *           entities: [
  *             { key: 'orders', entity: Order },
  *             { key: 'customers', entity: Customer },
