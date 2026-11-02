@@ -75,6 +75,7 @@ allowBuilds:
   '@parcel/watcher': false
   unrs-resolver: false
   sqlite3: false
+  oracledb: false
 
 # TypeORM and reflect-metadata must be single instances or decorator metadata
 # splits across copies and you get "No metadata for X was found" at runtime.

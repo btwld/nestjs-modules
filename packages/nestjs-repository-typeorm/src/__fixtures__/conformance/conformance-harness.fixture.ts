@@ -7,6 +7,7 @@ import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/co
 
 import { type TypeOrmMariadbRepositoryModule } from '../../mariadb/typeorm-mariadb-repository.module.js';
 import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-repository.module.js';
+import { type TypeOrmOracleRepositoryModule } from '../../oracle/typeorm-oracle-repository.module.js';
 import { type TypeOrmPostgresRepositoryModule } from '../../postgres/typeorm-postgres-repository.module.js';
 import { type TypeOrmSqliteRepositoryModule } from '../../sqlite/typeorm-sqlite-repository.module.js';
 
@@ -42,6 +43,7 @@ type TypeOrmAdapterModule =
   | typeof TypeOrmPostgresRepositoryModule
   | typeof TypeOrmMysqlRepositoryModule
   | typeof TypeOrmMariadbRepositoryModule
+  | typeof TypeOrmOracleRepositoryModule
   | typeof TypeOrmSqliteRepositoryModule;
 
 /**

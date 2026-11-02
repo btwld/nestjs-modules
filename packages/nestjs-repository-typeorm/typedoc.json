@@ -4,6 +4,7 @@
     "src/postgres.ts",
     "src/mysql.ts",
     "src/mariadb.ts",
+    "src/oracle.ts",
     "src/sqlite.ts",
     "src/optional-outbox.ts"
   ]
