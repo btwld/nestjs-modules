@@ -70,6 +70,7 @@ export function toDrizzlePostgresClient(
   return db;
 }
 
+/** The Postgres adapter's definition, for the shared registration. */
 export const DRIZZLE_POSTGRES_ADAPTER: DrizzleAdapterDefinitionInterface<DrizzlePostgresClient> =
   {
     module: DrizzlePostgresRepositoryModule,

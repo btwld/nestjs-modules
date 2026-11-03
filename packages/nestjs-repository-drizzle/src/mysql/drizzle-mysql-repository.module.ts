@@ -74,6 +74,7 @@ export function toDrizzleMysqlClient(
   return db;
 }
 
+/** The MySQL adapter's definition, for the shared registration. */
 export const DRIZZLE_MYSQL_ADAPTER: DrizzleAdapterDefinitionInterface<DrizzleMysqlClient> =
   {
     module: DrizzleMysqlRepositoryModule,
