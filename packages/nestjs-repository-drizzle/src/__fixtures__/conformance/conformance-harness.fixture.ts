@@ -12,19 +12,19 @@ import { type DrizzleClient } from '../../drizzle-repository.types.js';
 import { toDrizzleClient } from '../../drizzle-repository.util.js';
 
 import {
-  bookTagTable,
   ConformanceAuthorEntity,
+  ConformanceAwardEntity,
   ConformanceBookEntity,
   ConformanceBookWithEagerAuthorEntity,
   ConformanceItemEntity,
   ConformancePlainItemEntity,
-  conformanceRelations,
   ConformanceTagEntity,
   ConformanceTenantOrderEntity,
   ConformanceTenantOrderLineEntity,
   CONFORMANCE_TABLES,
   createConformanceSchema,
   authorTable,
+  awardTable,
   bookTable,
   bookWithEagerAuthorTable,
   itemTable,
@@ -54,10 +54,7 @@ export function drizzleConformanceHarness(): ConformanceHarnessInterface<
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: async () => {
-          const db = drizzle({
-            client: new PGlite(),
-            relations: conformanceRelations,
-          });
+          const db = drizzle({ client: new PGlite() });
           await createConformanceSchema(
             toDrizzleClient(db, DRIZZLE_DEFAULT_CONNECTION_NAME),
           );
@@ -83,6 +80,11 @@ export function drizzleConformanceHarness(): ConformanceHarnessInterface<
         entity: ConformanceAuthorEntity,
         table: authorTable,
         removeDate: 'removedAt',
+      },
+      award: {
+        key: 'conformance-award',
+        entity: ConformanceAwardEntity,
+        table: awardTable,
       },
       book: {
         key: 'conformance-book',
@@ -115,17 +117,16 @@ export function drizzleConformanceHarness(): ConformanceHarnessInterface<
     },
     capabilities: {
       transactions: 'supported',
+      relations: 'refused',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      softDelete: 'supported',
     },
     async reset(app) {
       const db = database(app);
       for (const table of CONFORMANCE_TABLES) {
         await db.delete(table);
       }
-    },
-    async linkBookTag(app, { bookId, tagId }) {
-      await database(app).insert(bookTagTable).values({ bookId, tagId });
     },
   };
 }

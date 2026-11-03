@@ -1,13 +1,10 @@
 import {
-  aliasedTable,
   and,
   between,
   type Column,
   count,
-  countDistinct,
   DrizzleQueryError,
   eq,
-  getColumns,
   gt,
   gte,
   inArray,
@@ -25,7 +22,7 @@ import {
 } from 'drizzle-orm';
 import { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
-import { type PlainLiteralObject, type Type } from '@nestjs/common';
+import { type PlainLiteralObject } from '@nestjs/common';
 
 import {
   AppContextHost,
@@ -63,8 +60,7 @@ import {
 import { type DrizzleClient } from '../drizzle-repository.types.js';
 import { DrizzleTransaction } from '../transaction/drizzle-transaction.js';
 
-import { keyOf } from './drizzle-key.util.js';
-import { columnOf, type DrizzleRelation } from './drizzle-metadata.js';
+import { columnOf } from './drizzle-metadata.js';
 
 /**
  * Options for constructing a DrizzleRepository.
@@ -74,17 +70,8 @@ export interface DrizzleRepositoryOptions<Entity extends PlainLiteralObject> {
   db: DrizzleClient;
   table: Table;
   metadata: RepositoryMetadataInterface<Entity>;
-  relations: DrizzleRelation[];
-  /** The class each related row is built as, by relation name. */
-  relationTypes: ReadonlyMap<string, Type>;
   transactionKey?: string;
   hookResolver?: HookResolverService;
-}
-
-/** A relation a read joins to filter or order its roots. */
-interface FilterJoin {
-  table: Table;
-  on: SQL;
 }
 
 /** A row as the database returned it. */
@@ -95,6 +82,21 @@ function isRow(value: unknown): value is PlainLiteralObject {
 /** Rows as the database returned them. */
 function toRows(values: unknown): PlainLiteralObject[] {
   return Array.isArray(values) ? values.filter(isRow) : [];
+}
+
+/**
+ * A value as Drizzle read it, as one string, for telling whether a write
+ * changed it. A `bigint` is kept apart from a string holding the same
+ * digits, and `NaN` and the infinities from `null`.
+ */
+function asStored(value: unknown): string | undefined {
+  return JSON.stringify(value, (_key, each: unknown) => {
+    if (typeof each === 'bigint') return { bigint: each.toString() };
+    if (typeof each === 'number' && !Number.isFinite(each)) {
+      return { number: String(each) };
+    }
+    return each;
+  });
 }
 
 /** A Postgres column, as every column of a Postgres table is. */
@@ -127,12 +129,10 @@ function pgTableOf(table: Table): PgTable {
 /**
  * Drizzle implementation of RepositoryInterface, for Postgres.
  *
- * A read runs as at most three kinds of query. When its `where` or `order`
- * names a relation, the first left joins those relations and picks the page
- * of root keys. The roots are then read by those keys, or directly when no
- * relation is named. Each joined relation is read last, one query per
- * relation, and attached to its roots. A join therefore never multiplies or
- * narrows the roots, and `skip` and `take` page the roots only.
+ * Every read and unversioned write is one statement on the entity's own
+ * table. A write to a versioned row reads the row first, in a transaction of
+ * its own or a savepoint, so the version moves on only when the row changes.
+ * The driver reports no relations, so no read it is given joins one.
  */
 export class DrizzleRepository<
   Entity extends PlainLiteralObject,
@@ -180,6 +180,13 @@ export class DrizzleRepository<
    * The database to run on: the caller's transaction when it has one.
    */
   private async client(ctx?: AppContextLike): Promise<DrizzleClient> {
+    return (await this.transaction(ctx)) ?? this.options.db;
+  }
+
+  /** The caller's transaction on this connection, when it has one. */
+  private async transaction(
+    ctx?: AppContextLike,
+  ): Promise<DrizzleClient | undefined> {
     const { transactionKey } = this.options;
     if (transactionKey) {
       const context = AppContextHost.from(ctx);
@@ -191,11 +198,24 @@ export class DrizzleRepository<
         }
       }
     }
-    return this.options.db;
+    return undefined;
+  }
+
+  /**
+   * Run `work` in the caller's transaction, or in one of its own when the
+   * caller has none. Never in a savepoint: a failure fails the caller's
+   * transaction, as any other failed statement in it does.
+   */
+  private async atomically<T>(
+    ctx: AppContextLike | undefined,
+    work: (tx: DrizzleClient) => Promise<T>,
+  ): Promise<T> {
+    const open = await this.transaction(ctx);
+    return open ? work(open) : this.options.db.transaction(work);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Columns and relations
+  // Columns
   // ═══════════════════════════════════════════════════════════════════════════
 
   private column(key: string): PgColumn {
@@ -217,118 +237,36 @@ export class DrizzleRepository<
     return { key, column: this.column(key) };
   }
 
-  private relation(name: string): DrizzleRelation {
-    const found = this.options.relations.find(
-      ({ metadata }) => metadata.name === name,
-    );
-    if (!found) {
-      throw new RuntimeException({
-        message: 'Entity "%s" has no relation "%s"',
-        messageParams: [this.metadata.name, name],
-        fault: 'internal',
-      });
-    }
-    return found;
-  }
-
-  /** `table`'s rows that are not soft deleted, unless the read wants them. */
-  private live(
-    table: Table,
-    removeDate: string | undefined,
-    withDeleted: boolean | undefined,
-  ): SQL | undefined {
+  /** The rows that are not soft deleted, unless the read wants them. */
+  private live(withDeleted: boolean | undefined): SQL | undefined {
+    const removeDate = this.getDeleteDateColumn();
     if (withDeleted || removeDate === undefined) return undefined;
-    return isNull(columnOf(table, removeDate));
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Filtering joins
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /** The relations a `where` or `order` names. */
-  private namedRelations(
-    where: WhereClause | undefined,
-    order: RepositoryFindOptions<Entity>['order'],
-  ): Set<string> {
-    const names = new Set<string>();
-    const visit = (clause: WhereClause): void => {
-      if (isWhereNever(clause)) return;
-      if (isWhereCompound(clause)) {
-        clause.conditions.forEach(visit);
-        return;
-      }
-      if (clause.relation !== undefined) names.add(clause.relation);
-    };
-    if (where) visit(where);
-    for (const key of order ?? []) {
-      if (key.relation !== undefined) names.add(key.relation);
-    }
-    return names;
+    return isNull(this.column(removeDate));
   }
 
   /**
-   * Left joins for each named relation, under an alias of its own, and the
-   * table its columns are read from.
+   * A read's `where` and order hold only own columns: the driver reports no
+   * relations, so the repository refuses a read naming one before it gets
+   * here.
    */
-  private filterJoins(
-    names: Set<string>,
-    withDeleted: boolean | undefined,
-  ): { joins: FilterJoin[]; aliases: Map<string, Table> } {
-    const joins: FilterJoin[] = [];
-    const aliases = new Map<string, Table>();
-
-    for (const name of names) {
-      const relation = this.relation(name);
-      const target = aliasedTable(relation.target, `j_${name}`);
-      const live = this.live(target, relation.targetRemoveDate, withDeleted);
-
-      if (relation.through) {
-        const { fromKey, toKey } = relation.through;
-        const junction = aliasedTable(relation.through.table, `jt_${name}`);
-        const [on] = relation.pairs;
-        if (!on) continue;
-        joins.push({
-          table: junction,
-          on: eq(columnOf(junction, fromKey), this.column(on.from)),
-        });
-        joins.push({
-          table: target,
-          on:
-            and(eq(columnOf(target, on.to), columnOf(junction, toKey)), live) ??
-            sql`1 = 1`,
-        });
-      } else {
-        joins.push({
-          table: target,
-          on:
-            and(
-              ...relation.pairs.map((pair) =>
-                eq(columnOf(target, pair.to), this.column(pair.from)),
-              ),
-              live,
-            ) ?? sql`1 = 1`,
-        });
-      }
-
-      aliases.set(name, target);
-    }
-
-    return { joins, aliases };
+  private unjoinable(relation: string): RuntimeException {
+    return new RuntimeException({
+      message: 'Relation "%s" of "%s" reached the Drizzle driver',
+      messageParams: [relation, this.metadata.name],
+      fault: 'internal',
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // WhereClause → SQL
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private translateWhere(
-    clause: WhereClause,
-    aliases: Map<string, Table>,
-  ): SQL {
+  private translateWhere(clause: WhereClause): SQL {
     if (isWhereNever(clause)) return sql`1 = 0`;
 
     if (isWhereCompound(clause)) {
       const parts = clause.conditions.map((condition) =>
-        this.translateWhere(condition, aliases),
+        this.translateWhere(condition),
       );
       const joined =
         clause.operator === WhereCompoundOperator.AND
@@ -342,24 +280,9 @@ export class DrizzleRepository<
       );
     }
 
-    const column =
-      clause.relation === undefined
-        ? this.column(clause.field)
-        : columnOf(this.aliasOf(clause.relation, aliases), clause.field);
+    if (clause.relation !== undefined) throw this.unjoinable(clause.relation);
 
-    return this.translateCondition(column, clause);
-  }
-
-  private aliasOf(relation: string, aliases: Map<string, Table>): Table {
-    const alias = aliases.get(relation);
-    if (!alias) {
-      throw new RuntimeException({
-        message: 'Relation "%s" of "%s" is filtered on without being joined',
-        messageParams: [relation, this.metadata.name],
-        fault: 'internal',
-      });
-    }
-    return alias;
+    return this.translateCondition(this.column(clause.field), clause);
   }
 
   private translateCondition(column: Column, cond: WhereCondition): SQL {
@@ -432,298 +355,47 @@ export class DrizzleRepository<
   // Reads
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * The rows a read selects, in order and paged, each holding every own
-   * column. `withPage` false leaves out `skip` and `take`.
-   */
-  private async selectRoots(
-    client: DrizzleClient,
-    options: RepositoryFindOptions<Entity>,
-    withPage: boolean,
-  ): Promise<PlainLiteralObject[]> {
-    const names = this.namedRelations(options.where, options.order);
-    const { joins, aliases } = this.filterJoins(names, options.withDeleted);
-    const where = and(
-      this.live(this.table, this.getDeleteDateColumn(), options.withDeleted),
-      options.where && this.translateWhere(options.where, aliases),
+  /** A read's `where`, with soft-deleted rows left out unless it wants them. */
+  private whereOf(options: RepositoryCountOptions): SQL | undefined {
+    return and(
+      this.live(options.withDeleted),
+      options.where && this.translateWhere(options.where),
     );
-    const skip = withPage ? options.skip : undefined;
-    const take = withPage ? options.take : undefined;
-
-    if (joins.length === 0) {
-      const order = (options.order ?? []).map(({ field, order }) =>
-        order === SortOrder.DESC
-          ? sql`${this.column(field)} desc`
-          : sql`${this.column(field)} asc`,
-      );
-      let query = client.select().from(this.table).where(where).$dynamic();
-      if (order.length) query = query.orderBy(...order);
-      if (take !== undefined) query = query.limit(take);
-      if (skip) query = query.offset(skip);
-      return toRows(await query);
-    }
-
-    // Grouped by root, so a to-many join cannot repeat one. A root is
-    // ordered by the least of its related values ascending, the greatest
-    // descending.
-    const primary = this.primaryColumn('read with a joined filter');
-    const order = (options.order ?? []).map(({ field, order, relation }) => {
-      const column =
-        relation === undefined
-          ? this.column(field)
-          : columnOf(this.aliasOf(relation, aliases), field);
-      return order === SortOrder.DESC
-        ? sql`max(${column}) desc`
-        : sql`min(${column}) asc`;
-    });
-
-    let keyQuery = client
-      .select({ key: primary.column })
-      .from(this.table)
-      .$dynamic();
-    for (const join of joins) {
-      keyQuery = keyQuery.leftJoin(pgTableOf(join.table), join.on);
-    }
-    keyQuery = keyQuery.where(where).groupBy(primary.column);
-    if (order.length) keyQuery = keyQuery.orderBy(...order);
-    if (take !== undefined) keyQuery = keyQuery.limit(take);
-    if (skip) keyQuery = keyQuery.offset(skip);
-
-    const keys = (await keyQuery).map(({ key }) => key);
-    if (keys.length === 0) return [];
-
-    const rows = toRows(
-      await client
-        .select()
-        .from(this.table)
-        .where(inArray(primary.column, keys)),
-    );
-    const position = new Map(keys.map((key, index) => [key, index]));
-    return rows.sort(
-      (a, b) =>
-        (position.get(a[primary.key]) ?? 0) -
-        (position.get(b[primary.key]) ?? 0),
-    );
-  }
-
-  /**
-   * Read each joined relation's rows for `roots` and attach them, keyed by
-   * relation name.
-   */
-  private async attachJoined(
-    client: DrizzleClient,
-    roots: PlainLiteralObject[],
-    options: RepositoryFindOneOptions<Entity>,
-  ): Promise<Map<PlainLiteralObject, PlainLiteralObject>> {
-    const joined = new Map<PlainLiteralObject, PlainLiteralObject>(
-      roots.map((root) => [root, {}]),
-    );
-
-    const filtered = this.namedRelations(options.where, undefined);
-
-    for (const { relation: name } of options.join ?? []) {
-      const relation = this.relation(name);
-      const many = relation.metadata.cardinality === 'many';
-      const related = relation.through
-        ? await this.readThrough(client, roots, relation, options.withDeleted)
-        : await this.readDirect(client, roots, relation, options.withDeleted);
-      const kept = filtered.has(name)
-        ? await this.keptRelated(client, roots, relation, options)
-        : undefined;
-
-      for (const root of roots) {
-        const found = (related.get(root) ?? []).filter(
-          (row) => !kept || kept(root, row),
-        );
-        const values = joined.get(root);
-        if (!values) continue;
-        values[name] = many ? found : (found[0] ?? null);
-      }
-    }
-
-    return joined;
-  }
-
-  /**
-   * Which of a filtered relation's rows the read's `where` keeps for each
-   * root: those it holds for, joined as the roots were selected.
-   */
-  private async keptRelated(
-    client: DrizzleClient,
-    roots: PlainLiteralObject[],
-    relation: DrizzleRelation,
-    options: RepositoryFindOneOptions<Entity>,
-  ): Promise<(root: PlainLiteralObject, row: PlainLiteralObject) => boolean> {
-    const primary = this.primaryColumn('filter a joined relation');
-    const targetKey = relation.metadata.targetColumns.find(
-      ({ isPrimary }) => isPrimary,
-    )?.name;
-    if (targetKey === undefined) {
-      throw new RuntimeException({
-        message:
-          'Cannot filter relation "%s" of "%s": its target has no primary key',
-        messageParams: [relation.metadata.name, this.metadata.name],
-        fault: 'usage',
-      });
-    }
-
-    if (roots.length === 0) return () => false;
-
-    const names = this.namedRelations(options.where, undefined);
-    const { joins, aliases } = this.filterJoins(names, options.withDeleted);
-    const target = this.aliasOf(relation.metadata.name, aliases);
-
-    let query = client
-      .select({
-        root: primary.column,
-        related: pgColumnOf(target, targetKey),
-      })
-      .from(this.table)
-      .$dynamic();
-    for (const join of joins) {
-      query = query.leftJoin(pgTableOf(join.table), join.on);
-    }
-    const found = await query.where(
-      and(
-        inArray(
-          primary.column,
-          roots.map((root) => root[primary.key]),
-        ),
-        options.where && this.translateWhere(options.where, aliases),
-      ),
-    );
-
-    const pairOf = (root: unknown, related: unknown) => keyOf([root, related]);
-    const kept = new Set(
-      found
-        .filter(({ related }) => related != null)
-        .map(({ root, related }) => pairOf(root, related)),
-    );
-    return (root, row) => kept.has(pairOf(root[primary.key], row[targetKey]));
-  }
-
-  /** The related rows of a relation this table or the target holds keys for. */
-  private async readDirect(
-    client: DrizzleClient,
-    roots: PlainLiteralObject[],
-    relation: DrizzleRelation,
-    withDeleted: boolean | undefined,
-  ): Promise<Map<PlainLiteralObject, PlainLiteralObject[]>> {
-    const { pairs, target } = relation;
-    const tupleOf = (row: PlainLiteralObject, side: 'from' | 'to') =>
-      pairs.map((pair) => row[pair[side]]);
-
-    const tuples = roots
-      .map((root) => tupleOf(root, 'from'))
-      .filter((values) => values.every((value) => value != null));
-
-    const result = new Map<PlainLiteralObject, PlainLiteralObject[]>();
-    if (tuples.length === 0) return result;
-
-    const [single] = pairs;
-    const match =
-      pairs.length === 1 && single
-        ? inArray(
-            columnOf(target, single.to),
-            tuples.map(([value]) => value),
-          )
-        : or(
-            ...tuples.map((values) =>
-              and(
-                ...pairs.map((pair, index) =>
-                  eq(columnOf(target, pair.to), values[index]),
-                ),
-              ),
-            ),
-          );
-
-    const rows = toRows(
-      await client
-        .select()
-        .from(pgTableOf(target))
-        .where(
-          and(match, this.live(target, relation.targetRemoveDate, withDeleted)),
-        ),
-    );
-
-    const byKey = new Map<string, PlainLiteralObject[]>();
-    for (const row of rows) {
-      const key = keyOf(tupleOf(row, 'to'));
-      byKey.set(key, [...(byKey.get(key) ?? []), row]);
-    }
-    for (const root of roots) {
-      result.set(root, byKey.get(keyOf(tupleOf(root, 'from'))) ?? []);
-    }
-    return result;
-  }
-
-  /** The related rows of a many-to-many relation, through its junction. */
-  private async readThrough(
-    client: DrizzleClient,
-    roots: PlainLiteralObject[],
-    relation: DrizzleRelation,
-    withDeleted: boolean | undefined,
-  ): Promise<Map<PlainLiteralObject, PlainLiteralObject[]>> {
-    const result = new Map<PlainLiteralObject, PlainLiteralObject[]>();
-    const [on] = relation.pairs;
-    const through = relation.through;
-    if (!on || !through) return result;
-
-    const values = roots
-      .map((root) => root[on.from])
-      .filter((value) => value != null);
-    if (values.length === 0) return result;
-
-    const junction = pgTableOf(through.table);
-    const target = pgTableOf(relation.target);
-    const link = pgColumnOf(junction, through.fromKey);
-    const rows = await client
-      .select({ link, row: getColumns(target) })
-      .from(junction)
-      .innerJoin(
-        target,
-        and(
-          eq(columnOf(target, on.to), columnOf(junction, through.toKey)),
-          this.live(target, relation.targetRemoveDate, withDeleted),
-        ) ?? sql`1 = 1`,
-      )
-      .where(inArray(link, values));
-
-    for (const root of roots) {
-      result.set(
-        root,
-        toRows(
-          rows
-            .filter((found) => found.link === root[on.from])
-            .map((found) => found.row),
-        ),
-      );
-    }
-    return result;
   }
 
   private async read(
     options: RepositoryFindOptions<Entity>,
-    withPage: boolean,
   ): Promise<Entity[]> {
     const client = await this.client(options.ctx);
-    const roots = await this.selectRoots(client, options, withPage);
-    const joined = await this.attachJoined(client, roots, options);
-    return roots.map((root) =>
-      this.toResult(root, joined.get(root) ?? {}, options),
-    );
+    const order = (options.order ?? []).map(({ field, order, relation }) => {
+      if (relation !== undefined) throw this.unjoinable(relation);
+      return order === SortOrder.DESC
+        ? sql`${this.column(field)} desc`
+        : sql`${this.column(field)} asc`;
+    });
+
+    let query = client
+      .select()
+      .from(this.table)
+      .where(this.whereOf(options))
+      .$dynamic();
+    if (order.length) query = query.orderBy(...order);
+    if (options.take !== undefined) query = query.limit(options.take);
+    if (options.skip) query = query.offset(options.skip);
+
+    return toRows(await query).map((row) => this.toResult(row, options));
   }
 
   protected async doFind(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<Entity[]> {
-    return this.read(options, true);
+    return this.read(options);
   }
 
   protected async doFindOne(
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
-    const [row] = await this.read({ ...options, take: 1 }, true);
+    const [row] = await this.read({ ...options, take: 1 });
     return row ?? null;
   }
 
@@ -731,40 +403,19 @@ export class DrizzleRepository<
     options: RepositoryCountOptions = {},
   ): Promise<number> {
     const client = await this.client(options.ctx);
-    const names = this.namedRelations(options.where, undefined);
-    const { joins, aliases } = this.filterJoins(names, options.withDeleted);
-    const where = and(
-      this.live(this.table, this.getDeleteDateColumn(), options.withDeleted),
-      options.where && this.translateWhere(options.where, aliases),
-    );
-
-    if (joins.length === 0) {
-      const [counted] = await client
-        .select({ total: count() })
-        .from(this.table)
-        .where(where);
-      return Number(counted?.total ?? 0);
-    }
-
-    const primary = this.primaryColumn('count with a joined filter');
-    let query = client
-      .select({ total: countDistinct(primary.column) })
+    const [counted] = await client
+      .select({ total: count() })
       .from(this.table)
-      .$dynamic();
-    for (const join of joins) {
-      query = query.leftJoin(pgTableOf(join.table), join.on);
-    }
-    const [counted] = await query.where(where);
+      .where(this.whereOf(options));
     return Number(counted?.total ?? 0);
   }
 
   protected async doFindAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
-    const rows = await this.read(options, true);
+    const rows = await this.read(options);
     const total = await this.doCount({
       where: options.where,
-      join: options.join,
       withDeleted: options.withDeleted,
       ctx: options.ctx,
     });
@@ -785,14 +436,55 @@ export class DrizzleRepository<
     return values;
   }
 
-  /** The values to set on a stored row: its version moves on. */
-  private toSet(data: PlainLiteralObject): PlainLiteralObject {
-    const values: PlainLiteralObject = { ...data };
+  /** The row `key` names, locked until the transaction ends. */
+  private async lockRow(
+    tx: DrizzleClient,
+    key: unknown,
+  ): Promise<PlainLiteralObject | undefined> {
+    if (key === undefined) return undefined;
+    const primary = this.primaryColumn('lock a row');
+    const [row] = toRows(
+      await tx
+        .select()
+        .from(this.table)
+        .where(eq(primary.column, key))
+        .for('update'),
+    );
+    return row;
+  }
+
+  /**
+   * `after`, with its version moved on when it holds a different value in
+   * one of `keys` than `before`, the same row read before the write.
+   *
+   * Both rows are as the database stored them, so a value it rounds or
+   * normalizes on the way in (`numeric(10,2)`, `timestamp(0)`, `jsonb`)
+   * compares as stored, whatever the caller sent.
+   */
+  private async bumpIfChanged(
+    tx: DrizzleClient,
+    before: PlainLiteralObject,
+    after: PlainLiteralObject,
+    keys: string[],
+  ): Promise<PlainLiteralObject> {
     const version = this.getVersionColumn();
-    if (version !== undefined) {
-      values[version] = sql`${this.column(version)} + 1`;
+    if (
+      version === undefined ||
+      keys.every((key) => asStored(before[key]) === asStored(after[key]))
+    ) {
+      return after;
     }
-    return values;
+
+    const primary = this.primaryColumn('version a row');
+    const column = this.column(version);
+    const [bumped] = toRows(
+      await tx
+        .update(this.table)
+        .set({ [version]: sql`${column} + 1` })
+        .where(eq(primary.column, after[primary.key]))
+        .returning(),
+    );
+    return bumped ?? after;
   }
 
   protected async doCreate(
@@ -826,7 +518,7 @@ export class DrizzleRepository<
   }
 
   /**
-   * One `UPDATE` of the row `entity`'s primary key names, at the guarded
+   * An `UPDATE` of the row `entity`'s primary key names, at the guarded
    * version when there is a guard, returning the row as stored. No row
    * matched means the row is gone, or, under a guard, written since.
    */
@@ -841,22 +533,44 @@ export class DrizzleRepository<
     const client = await this.client(options?.ctx);
     const primary = this.primaryColumn(operation);
     const guard = options?.versionGuard;
+    const key = entity[primary.key];
     const where = and(
-      eq(primary.column, entity[primary.key]),
+      eq(primary.column, key),
       guard && eq(this.column(guard.column), guard.value),
     );
+    const keys = Object.keys(data);
+    const version = this.getVersionColumn();
 
-    const rows = toRows(
-      Object.keys(data).length === 0 && !guard
-        ? await client.select().from(this.table).where(where)
-        : await client
-            .update(this.table)
-            .set(this.toSet(data))
-            .where(where)
-            .returning(),
-    );
-
-    const [row] = rows;
+    const [row] =
+      keys.length === 0 && !guard
+        ? toRows(await client.select().from(this.table).where(where))
+        : version === undefined
+          ? toRows(
+              await client
+                .update(this.table)
+                .set(data)
+                .where(where)
+                .returning(),
+            )
+          : [
+              await this.atomically(options?.ctx, async (tx) => {
+                const before = await this.lockRow(tx, key);
+                const [after] = toRows(
+                  await tx
+                    .update(this.table)
+                    .set(
+                      keys.length > 0
+                        ? data
+                        : { [version]: sql`${this.column(version)}` },
+                    )
+                    .where(where)
+                    .returning(),
+                );
+                return before && after
+                  ? this.bumpIfChanged(tx, before, after, keys)
+                  : after;
+              }),
+            ];
     if (row) return this.toEntity(row);
 
     if (guard) throw new OptimisticLockException(this.metadata.name);
@@ -888,33 +602,26 @@ export class DrizzleRepository<
   }
 
   /**
-   * Inserts, or updates the row the payload's primary key names, in one
-   * statement.
+   * Inserts, or updates the row the payload's primary key names: in one
+   * statement, or, for a versioned row, by locking the row, writing it, and
+   * moving the version on when that changed it.
    */
   protected async doUpsert(
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
-    const client = await this.client(options?.ctx);
     const primary = this.primaryColumn('upsert');
     const data = this.withoutVersion(entity);
-    const { [primary.key]: _key, ...changes } = data;
-    // A payload of only its key still updates, so the row is returned.
-    const set = this.toSet(
-      Object.keys(changes).length > 0
-        ? changes
-        : {
-            [primary.key]: sql`excluded.${sql.identifier(primary.column.name)}`,
-          },
-    );
+    const { [primary.key]: key, ...changes } = data;
 
-    const [row] = toRows(
-      await client
-        .insert(this.table)
-        .values(this.toInsert(data))
-        .onConflictDoUpdate({ target: primary.column, set })
-        .returning(),
-    );
+    const [row] =
+      this.getVersionColumn() === undefined
+        ? await this.upsertOnce(await this.client(options?.ctx), data, changes)
+        : [
+            await this.atomically(options?.ctx, (tx) =>
+              this.upsertVersioned(tx, data, key, changes),
+            ),
+          ];
     if (!row) {
       throw new RuntimeException({
         message: 'Upsert of "%s" returned no row',
@@ -923,6 +630,67 @@ export class DrizzleRepository<
       });
     }
     return this.toEntity(row);
+  }
+
+  /** An unversioned upsert: one `INSERT … ON CONFLICT DO UPDATE`. */
+  private async upsertOnce(
+    client: DrizzleClient,
+    data: PlainLiteralObject,
+    changes: PlainLiteralObject,
+  ): Promise<PlainLiteralObject[]> {
+    const primary = this.primaryColumn('upsert');
+    // A payload of only its key still updates, so the row is returned.
+    const set =
+      Object.keys(changes).length > 0
+        ? changes
+        : {
+            [primary.key]: sql`excluded.${sql.identifier(primary.column.name)}`,
+          };
+    return toRows(
+      await client
+        .insert(this.table)
+        .values(data)
+        .onConflictDoUpdate({ target: primary.column, set })
+        .returning(),
+    );
+  }
+
+  /**
+   * A versioned upsert: the row `key` names is locked and updated when it
+   * exists; otherwise inserted, unless another transaction inserted it
+   * first, which is then locked and updated in turn.
+   */
+  private async upsertVersioned(
+    tx: DrizzleClient,
+    data: PlainLiteralObject,
+    key: unknown,
+    changes: PlainLiteralObject,
+  ): Promise<PlainLiteralObject | undefined> {
+    const primary = this.primaryColumn('upsert');
+    let before = await this.lockRow(tx, key);
+    if (!before) {
+      const [inserted] = toRows(
+        await tx
+          .insert(this.table)
+          .values(this.toInsert(data))
+          .onConflictDoNothing({ target: primary.column })
+          .returning(),
+      );
+      if (inserted) return inserted;
+      before = await this.lockRow(tx, key);
+      if (!before) return undefined;
+    }
+
+    const keys = Object.keys(changes);
+    if (keys.length === 0) return before;
+    const [after] = toRows(
+      await tx
+        .update(this.table)
+        .set(changes)
+        .where(eq(primary.column, key))
+        .returning(),
+    );
+    return after && this.bumpIfChanged(tx, before, after, keys);
   }
 
   protected async doDelete(
@@ -1009,11 +777,10 @@ export class DrizzleRepository<
 
   /**
    * `row` holding only what the read asked for: the columns it selected, or
-   * all own columns, and each joined relation.
+   * all own columns.
    */
   private toResult(
     row: PlainLiteralObject,
-    joined: PlainLiteralObject,
     options: RepositoryFindOneOptions<Entity>,
   ): Entity {
     const keys = options.select?.length
@@ -1022,24 +789,7 @@ export class DrizzleRepository<
     const result: Entity = Object.create(this.metadata.type.prototype);
     const values: PlainLiteralObject = result;
     for (const key of keys) values[key] = row[key];
-
-    for (const [name, value] of Object.entries(joined)) {
-      const type = this.options.relationTypes.get(name);
-      values[name] = Array.isArray(value)
-        ? value.map((related) => this.instance(type, related))
-        : value === null
-          ? null
-          : this.instance(type, value);
-    }
     return result;
-  }
-
-  private instance(type: Type | undefined, values: unknown): unknown {
-    if (typeof values !== 'object' || values === null) return values;
-    const instance: PlainLiteralObject = Object.create(
-      type?.prototype ?? Object.prototype,
-    );
-    return Object.assign(instance, values);
   }
 
   /** `values` as an instance of the entity class, holding nothing else. */

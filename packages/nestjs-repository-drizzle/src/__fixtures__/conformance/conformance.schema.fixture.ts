@@ -1,8 +1,9 @@
-import { defineRelations, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 import {
   type ConformanceAuthorInterface,
+  type ConformanceAwardInterface,
   type ConformanceBookInterface,
   type ConformanceBookWithEagerAuthorInterface,
   type ConformanceItemInterface,
@@ -36,6 +37,12 @@ export const authorTable = pgTable('conformance_author', {
   removedAt: timestamp(),
 });
 
+export const awardTable = pgTable('conformance_award', {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  authorId: text(),
+});
+
 export const bookTable = pgTable('conformance_book', {
   id: text().primaryKey(),
   title: text().notNull(),
@@ -58,11 +65,6 @@ export const tagTable = pgTable('conformance_tag', {
   label: text().notNull(),
 });
 
-export const bookTagTable = pgTable('conformance_book_tag', {
-  bookId: text().notNull(),
-  tagId: text().notNull(),
-});
-
 export const tenantOrderTable = pgTable('conformance_tenant_order', {
   id: text().primaryKey(),
   tenantId: text().notNull(),
@@ -76,54 +78,11 @@ export const tenantOrderLineTable = pgTable('conformance_tenant_order_line', {
   qty: integer().notNull(),
 });
 
-const schema = {
-  item: itemTable,
-  plainItem: plainItemTable,
-  author: authorTable,
-  book: bookTable,
-  bookWithEagerAuthor: bookWithEagerAuthorTable,
-  tag: tagTable,
-  bookTag: bookTagTable,
-  tenantOrder: tenantOrderTable,
-  tenantOrderLine: tenantOrderLineTable,
-};
-
-export const conformanceRelations = defineRelations(schema, (r) => ({
-  author: {
-    books: r.many.book(),
-  },
-  book: {
-    author: r.one.author({ from: r.book.authorId, to: r.author.id }),
-    tags: r.many.tag({
-      from: r.book.id.through(r.bookTag.bookId),
-      to: r.tag.id.through(r.bookTag.tagId),
-    }),
-  },
-  bookWithEagerAuthor: {
-    author: r.one.author({
-      from: r.bookWithEagerAuthor.authorId,
-      to: r.author.id,
-    }),
-  },
-  tag: {
-    books: r.many.book(),
-  },
-  tenantOrder: {
-    lines: r.many.tenantOrderLine(),
-  },
-  tenantOrderLine: {
-    order: r.one.tenantOrder({
-      from: [r.tenantOrderLine.tenantId, r.tenantOrderLine.orderId],
-      to: [r.tenantOrder.tenantId, r.tenantOrder.id],
-    }),
-  },
-}));
-
 /** Every table, children before the rows they refer to. */
 export const CONFORMANCE_TABLES = [
-  bookTagTable,
   tenantOrderLineTable,
   tenantOrderTable,
+  awardTable,
   bookTable,
   bookWithEagerAuthorTable,
   tagTable,
@@ -157,6 +116,11 @@ export async function createConformanceSchema(
       name text not null,
       "removedAt" timestamp
     )`,
+    sql`create table conformance_award (
+      id text primary key,
+      name text not null,
+      "authorId" text references conformance_author (id)
+    )`,
     sql`create table conformance_book (
       id text primary key,
       title text not null,
@@ -172,11 +136,6 @@ export async function createConformanceSchema(
     sql`create table conformance_tag (
       id text primary key,
       label text not null
-    )`,
-    sql`create table conformance_book_tag (
-      "bookId" text not null references conformance_book (id),
-      "tagId" text not null references conformance_tag (id),
-      primary key ("bookId", "tagId")
     )`,
     sql`create table conformance_tenant_order (
       id text primary key,
@@ -216,7 +175,12 @@ export class ConformanceAuthorEntity implements ConformanceAuthorInterface {
   declare id: string;
   declare name: string;
   declare removedAt: Date | null;
-  declare books?: ConformanceBookEntity[];
+}
+
+export class ConformanceAwardEntity implements ConformanceAwardInterface {
+  declare id: string;
+  declare name: string;
+  declare authorId: string | null;
 }
 
 export class ConformanceBookEntity implements ConformanceBookInterface {
@@ -224,8 +188,6 @@ export class ConformanceBookEntity implements ConformanceBookInterface {
   declare title: string;
   declare authorId: string | null;
   declare removedAt: Date | null;
-  declare author?: ConformanceAuthorEntity | null;
-  declare tags?: ConformanceTagEntity[];
 }
 
 export class ConformanceBookWithEagerAuthorEntity implements ConformanceBookWithEagerAuthorInterface {
@@ -233,20 +195,17 @@ export class ConformanceBookWithEagerAuthorEntity implements ConformanceBookWith
   declare title: string;
   declare authorId: string | null;
   declare removedAt: Date | null;
-  declare author?: ConformanceAuthorEntity | null;
 }
 
 export class ConformanceTagEntity implements ConformanceTagInterface {
   declare id: string;
   declare label: string;
-  declare books?: ConformanceBookEntity[];
 }
 
 export class ConformanceTenantOrderEntity implements ConformanceTenantOrderInterface {
   declare id: string;
   declare tenantId: string;
   declare total: number;
-  declare lines?: ConformanceTenantOrderLineEntity[];
 }
 
 export class ConformanceTenantOrderLineEntity implements ConformanceTenantOrderLineInterface {
@@ -254,5 +213,4 @@ export class ConformanceTenantOrderLineEntity implements ConformanceTenantOrderL
   declare tenantId: string;
   declare orderId: string;
   declare qty: number;
-  declare order?: ConformanceTenantOrderEntity | null;
 }

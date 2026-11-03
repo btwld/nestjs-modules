@@ -33,13 +33,13 @@
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/drizzle": "0.0.2",
-    "drizzle-orm": "1.0.0-rc.5"
+    "drizzle-orm": "^0.45.4"
   },
   "peerDependencies": {
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/drizzle": "^0.0.2",
-    "drizzle-orm": "^1.0.0-rc.5"
+    "drizzle-orm": "^0.45.0"
   },
   "exports": {
     ".": {

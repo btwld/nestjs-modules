@@ -1,5 +1,5 @@
 import { is } from 'drizzle-orm';
-import { PgAsyncDatabase } from 'drizzle-orm/pg-core';
+import { PgDatabase } from 'drizzle-orm/pg-core';
 
 import { type PlainLiteralObject, type Provider } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
@@ -9,10 +9,7 @@ import { getDynamicRepositoryToken } from '@concepta/nestjs-repository';
 
 import { DRIZZLE_DEFAULT_CONNECTION_NAME } from './drizzle-repository.constants.js';
 import { type DrizzleClient } from './drizzle-repository.types.js';
-import {
-  buildMetadata,
-  buildRelations,
-} from './repository/drizzle-metadata.js';
+import { buildMetadata } from './repository/drizzle-metadata.js';
 import { type DrizzleProviderOptionsInterface } from './repository/drizzle-provider-options.interface.js';
 import { DrizzleRepository } from './repository/drizzle-repository.js';
 import { DrizzleTransactionFactory } from './transaction/drizzle-transaction.factory.js';
@@ -29,16 +26,16 @@ export function resolveTransactionKey(connection?: string): string {
 
 /**
  * The database `@nestjs/drizzle` registered for a connection, which must be
- * an async Postgres one.
+ * a Postgres one.
  */
 export function toDrizzleClient(
   db: unknown,
   connection: string,
 ): DrizzleClient {
-  if (!is(db, PgAsyncDatabase)) {
+  if (!is(db, PgDatabase)) {
     throw new RuntimeException({
       message:
-        'The Drizzle connection "%s" is not an async Postgres database, ' +
+        'The Drizzle connection "%s" is not a Postgres database, ' +
         'which is all the Drizzle repository driver supports',
       messageParams: [connection],
       fault: 'usage',
@@ -49,17 +46,12 @@ export function toDrizzleClient(
 
 /**
  * A provider for one entity's repository, built from the database of its
- * connection. `registered` is every entity this driver serves, so a relation
- * can name the entity registered for its target table.
+ * connection.
  */
 export function createDrizzleProvider<Entity extends PlainLiteralObject>(
   options: DrizzleProviderOptionsInterface<Entity>,
-  registered: DrizzleProviderOptionsInterface[],
 ): Provider {
   const connection = resolveConnectionName(options.connection);
-  const sameConnection = registered.filter(
-    (entry) => resolveConnectionName(entry.connection) === connection,
-  );
 
   return {
     provide: getDynamicRepositoryToken(options.key),
@@ -67,30 +59,15 @@ export function createDrizzleProvider<Entity extends PlainLiteralObject>(
       getDrizzleToken(connection),
       { token: HookResolverService, optional: true },
     ],
-    useFactory: (db: unknown, hookResolver?: HookResolverService) => {
-      const client = toDrizzleClient(db, connection);
-      const relations = buildRelations(
-        options.table,
-        client._.relations,
-        sameConnection,
-        connection,
-      );
-      return new DrizzleRepository<Entity>({
+    useFactory: (db: unknown, hookResolver?: HookResolverService) =>
+      new DrizzleRepository<Entity>({
         entityKey: options.key,
-        db: client,
+        db: toDrizzleClient(db, connection),
         table: options.table,
-        metadata: buildMetadata(options, relations, connection),
-        relations,
-        relationTypes: new Map(
-          relations.flatMap(({ metadata, target }) => {
-            const entry = sameConnection.find(({ table }) => table === target);
-            return entry ? [[metadata.name, entry.entity]] : [];
-          }),
-        ),
+        metadata: buildMetadata(options, connection),
         transactionKey: resolveTransactionKey(connection),
         hookResolver,
-      });
-    },
+      }),
   };
 }
 

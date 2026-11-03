@@ -17,7 +17,7 @@ import { type DrizzleProviderOptionsInterface } from './repository/drizzle-provi
  * ```typescript
  * @Module({
  *   imports: [
- *     DrizzleModule.forRoot({ drizzle, connection, relations }),
+ *     DrizzleModule.forRoot({ drizzle, connection }),
  *     RepositoryModule.forRoot({
  *       drivers: [
  *         {
@@ -48,9 +48,7 @@ export class DrizzleRepositoryModule {
 
     return {
       module: DrizzleRepositoryModule,
-      providers: entities.map((entity) =>
-        createDrizzleProvider(entity, entities),
-      ),
+      providers: entities.map((entity) => createDrizzleProvider(entity)),
       transactionFactories: Array.from(connections).map((connection) =>
         createTransactionFactoryDescriptor(connection),
       ),
