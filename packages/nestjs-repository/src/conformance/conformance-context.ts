@@ -69,6 +69,12 @@ export class ConformanceContext {
   }
 
   async linkBookTag(bookId: string, tagId: string): Promise<void> {
+    if (!this.options.linkBookTag) {
+      throw new Error(
+        `The conformance harness "${this.name}" supports relations, so it ` +
+          `needs linkBookTag`,
+      );
+    }
     await this.options.linkBookTag(this.app, { bookId, tagId });
   }
 }

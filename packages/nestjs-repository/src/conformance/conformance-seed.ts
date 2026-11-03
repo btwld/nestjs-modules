@@ -24,8 +24,9 @@ export function seedItems(
 
 /**
  * Three authors (cat has no books), four books (delta has no author), two
- * tags (tech on alpha and beta, news on alpha only), and four awards
- * (copper and silver to ann, bronze and gold to bob).
+ * tags (tech on alpha and beta, news on alpha only, linked only when the
+ * driver supports relations), and four awards (copper and silver to ann,
+ * bronze and gold to bob).
  */
 export async function seedLibrary(
   ctx: ConformanceContext,
@@ -48,9 +49,11 @@ export async function seedLibrary(
     { id: 'tag-tech', label: 'tech' },
   ]);
 
-  await ctx.linkBookTag('book-alpha', 'tag-tech');
-  await ctx.linkBookTag('book-beta', 'tag-tech');
-  await ctx.linkBookTag('book-alpha', 'tag-news');
+  if (ctx.capabilities.relations === 'supported') {
+    await ctx.linkBookTag('book-alpha', 'tag-tech');
+    await ctx.linkBookTag('book-beta', 'tag-tech');
+    await ctx.linkBookTag('book-alpha', 'tag-news');
+  }
 
   const [copper, silver, bronze, gold] = await ctx.repo('award').createMany([
     { id: 'award-copper', name: 'copper', authorId: 'author-ann' },

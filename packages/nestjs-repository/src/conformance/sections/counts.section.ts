@@ -85,6 +85,10 @@ export function countsSection(ctx: ConformanceContext): void {
     }
   });
 
+  if (ctx.capabilities.relations === 'refused') {
+    return;
+  }
+
   describe('joins', () => {
     beforeEach(async () => {
       await seedLibrary(ctx);

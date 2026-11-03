@@ -97,7 +97,7 @@ export function runRepositoryConformance<
           { abortOnError: false },
         ),
       reset: (app) => harness.reset(app),
-      linkBookTag: (app, link) => harness.linkBookTag(app, link),
+      linkBookTag: harness.linkBookTag?.bind(harness),
     },
     test,
   );

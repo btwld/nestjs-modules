@@ -96,6 +96,7 @@ export function typeOrmConformanceHarness(
     },
     capabilities: {
       transactions: 'supported',
+      relations: 'supported',
       eagerResults: 'supported',
       referentialIntegrity: 'supported',
       softDelete: 'supported',
