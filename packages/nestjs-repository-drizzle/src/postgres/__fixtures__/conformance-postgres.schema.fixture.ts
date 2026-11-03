@@ -5,7 +5,7 @@ import { type DrizzlePostgresClient } from '../drizzle-postgres.types.js';
 
 // The conformance suite's fixtures as Drizzle tables.
 
-export const itemTable = pgTable('conformance_item', {
+export const itemTable = pgTable('drizzle_conformance_item', {
   id: serial().primaryKey(),
   name: text().notNull(),
   rank: integer(),
@@ -14,24 +14,24 @@ export const itemTable = pgTable('conformance_item', {
   version: integer().notNull(),
 });
 
-export const plainItemTable = pgTable('conformance_plain_item', {
+export const plainItemTable = pgTable('drizzle_conformance_plain_item', {
   id: serial().primaryKey(),
   name: text().notNull(),
 });
 
-export const authorTable = pgTable('conformance_author', {
+export const authorTable = pgTable('drizzle_conformance_author', {
   id: text().primaryKey(),
   name: text().notNull(),
   removedAt: timestamp(),
 });
 
-export const awardTable = pgTable('conformance_award', {
+export const awardTable = pgTable('drizzle_conformance_award', {
   id: text().primaryKey(),
   name: text().notNull(),
   authorId: text(),
 });
 
-export const bookTable = pgTable('conformance_book', {
+export const bookTable = pgTable('drizzle_conformance_book', {
   id: text().primaryKey(),
   title: text().notNull(),
   authorId: text(),
@@ -39,7 +39,7 @@ export const bookTable = pgTable('conformance_book', {
 });
 
 export const bookWithEagerAuthorTable = pgTable(
-  'conformance_book_with_eager_author',
+  'drizzle_conformance_book_with_eager_author',
   {
     id: text().primaryKey(),
     title: text().notNull(),
@@ -48,23 +48,26 @@ export const bookWithEagerAuthorTable = pgTable(
   },
 );
 
-export const tagTable = pgTable('conformance_tag', {
+export const tagTable = pgTable('drizzle_conformance_tag', {
   id: text().primaryKey(),
   label: text().notNull(),
 });
 
-export const tenantOrderTable = pgTable('conformance_tenant_order', {
+export const tenantOrderTable = pgTable('drizzle_conformance_tenant_order', {
   id: text().primaryKey(),
   tenantId: text().notNull(),
   total: integer().notNull(),
 });
 
-export const tenantOrderLineTable = pgTable('conformance_tenant_order_line', {
-  id: text().primaryKey(),
-  tenantId: text().notNull(),
-  orderId: text().notNull(),
-  qty: integer().notNull(),
-});
+export const tenantOrderLineTable = pgTable(
+  'drizzle_conformance_tenant_order_line',
+  {
+    id: text().primaryKey(),
+    tenantId: text().notNull(),
+    orderId: text().notNull(),
+    qty: integer().notNull(),
+  },
+);
 
 /** Every table, children before the rows they refer to. */
 export const CONFORMANCE_TABLES = [
@@ -80,14 +83,18 @@ export const CONFORMANCE_TABLES = [
 ];
 
 /**
- * Create the fixture tables. The implementer owns its schema, so the
+ * Create the fixture tables afresh. The implementer owns its schema, so the
  * harness writes its own.
  */
 export async function createConformanceSchema(
   db: DrizzlePostgresClient,
 ): Promise<void> {
   const statements = [
-    sql`create table conformance_item (
+    sql`drop table if exists drizzle_conformance_tenant_order_line,
+      drizzle_conformance_tenant_order, drizzle_conformance_award, drizzle_conformance_book,
+      drizzle_conformance_book_with_eager_author, drizzle_conformance_tag,
+      drizzle_conformance_author, drizzle_conformance_item, drizzle_conformance_plain_item`,
+    sql`create table drizzle_conformance_item (
       id serial primary key,
       name text not null,
       rank integer,
@@ -95,49 +102,49 @@ export async function createConformanceSchema(
       "removedAt" timestamp,
       version integer not null
     )`,
-    sql`create table conformance_plain_item (
+    sql`create table drizzle_conformance_plain_item (
       id serial primary key,
       name text not null
     )`,
-    sql`create table conformance_author (
+    sql`create table drizzle_conformance_author (
       id text primary key,
       name text not null,
       "removedAt" timestamp
     )`,
-    sql`create table conformance_award (
+    sql`create table drizzle_conformance_award (
       id text primary key,
       name text not null,
-      "authorId" text references conformance_author (id)
+      "authorId" text references drizzle_conformance_author (id)
     )`,
-    sql`create table conformance_book (
+    sql`create table drizzle_conformance_book (
       id text primary key,
       title text not null,
-      "authorId" text references conformance_author (id),
+      "authorId" text references drizzle_conformance_author (id),
       "removedAt" timestamp
     )`,
-    sql`create table conformance_book_with_eager_author (
+    sql`create table drizzle_conformance_book_with_eager_author (
       id text primary key,
       title text not null,
-      "authorId" text references conformance_author (id),
+      "authorId" text references drizzle_conformance_author (id),
       "removedAt" timestamp
     )`,
-    sql`create table conformance_tag (
+    sql`create table drizzle_conformance_tag (
       id text primary key,
       label text not null
     )`,
-    sql`create table conformance_tenant_order (
+    sql`create table drizzle_conformance_tenant_order (
       id text primary key,
       "tenantId" text not null,
       total integer not null,
       unique ("tenantId", id)
     )`,
-    sql`create table conformance_tenant_order_line (
+    sql`create table drizzle_conformance_tenant_order_line (
       id text primary key,
       "tenantId" text not null,
       "orderId" text not null,
       qty integer not null,
       foreign key ("tenantId", "orderId")
-        references conformance_tenant_order ("tenantId", id)
+        references drizzle_conformance_tenant_order ("tenantId", id)
     )`,
   ];
   for (const statement of statements) {

@@ -1,6 +1,3 @@
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-
 import { type INestApplicationContext } from '@nestjs/common';
 import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
@@ -37,6 +34,7 @@ import {
   tenantOrderLineTable,
   tenantOrderTable,
 } from './conformance-postgres.schema.fixture.js';
+import { type DrizzlePostgresConnect } from './drizzle-postgres-connect.type.js';
 
 function database(app: INestApplicationContext): DrizzlePostgresClient {
   return toDrizzlePostgresClient(
@@ -46,19 +44,20 @@ function database(app: INestApplicationContext): DrizzlePostgresClient {
 }
 
 /**
- * The Drizzle Postgres adapter's conformance harness on PGlite: an
- * in-process Postgres, with the fixture tables created on startup.
+ * The Drizzle Postgres adapter's conformance harness on the database
+ * `connect` creates, with the fixture tables created afresh on startup.
  */
-export function drizzlePostgresConformanceHarness(): ConformanceHarnessInterface<
-  typeof DrizzlePostgresRepositoryModule
-> {
+export function drizzlePostgresConformanceHarness(
+  name: string,
+  connect: DrizzlePostgresConnect,
+): ConformanceHarnessInterface<typeof DrizzlePostgresRepositoryModule> {
   return {
-    name: 'drizzle-postgres/pglite',
+    name,
     driver: DrizzlePostgresRepositoryModule,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: async () => {
-          const db = drizzle({ client: new PGlite() });
+          const db = connect({});
           await createConformanceSchema(
             toDrizzlePostgresClient(db, DRIZZLE_DEFAULT_CONNECTION_NAME),
           );

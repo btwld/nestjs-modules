@@ -1343,12 +1343,18 @@ importers:
       '@nestjs/drizzle':
         specifier: 0.0.2
         version: 0.0.2(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1))(reflect-metadata@0.2.2)
+      '@types/pg':
+        specifier: 8.6.1
+        version: 8.6.1
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)
       mysql2:
         specifier: 3.24.6
         version: 3.24.6(@types/node@20.19.43)
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
 
   packages/nestjs-repository-typeorm:
     dependencies:

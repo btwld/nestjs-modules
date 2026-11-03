@@ -14,7 +14,7 @@ import { type DrizzleMysqlClient } from '../drizzle-mysql.types.js';
 const key = () => varchar({ length: 64 });
 const removedAt = () => datetime({ fsp: 3 });
 
-export const itemTable = mysqlTable('conformance_item', {
+export const itemTable = mysqlTable('drizzle_conformance_item', {
   id: int().autoincrement().primaryKey(),
   name: text().notNull(),
   rank: int(),
@@ -23,24 +23,24 @@ export const itemTable = mysqlTable('conformance_item', {
   version: int().notNull(),
 });
 
-export const plainItemTable = mysqlTable('conformance_plain_item', {
+export const plainItemTable = mysqlTable('drizzle_conformance_plain_item', {
   id: int().autoincrement().primaryKey(),
   name: text().notNull(),
 });
 
-export const authorTable = mysqlTable('conformance_author', {
+export const authorTable = mysqlTable('drizzle_conformance_author', {
   id: key().primaryKey(),
   name: text().notNull(),
   removedAt: removedAt(),
 });
 
-export const awardTable = mysqlTable('conformance_award', {
+export const awardTable = mysqlTable('drizzle_conformance_award', {
   id: key().primaryKey(),
   name: text().notNull(),
   authorId: key(),
 });
 
-export const bookTable = mysqlTable('conformance_book', {
+export const bookTable = mysqlTable('drizzle_conformance_book', {
   id: key().primaryKey(),
   title: text().notNull(),
   authorId: key(),
@@ -48,7 +48,7 @@ export const bookTable = mysqlTable('conformance_book', {
 });
 
 export const bookWithEagerAuthorTable = mysqlTable(
-  'conformance_book_with_eager_author',
+  'drizzle_conformance_book_with_eager_author',
   {
     id: key().primaryKey(),
     title: text().notNull(),
@@ -57,19 +57,19 @@ export const bookWithEagerAuthorTable = mysqlTable(
   },
 );
 
-export const tagTable = mysqlTable('conformance_tag', {
+export const tagTable = mysqlTable('drizzle_conformance_tag', {
   id: key().primaryKey(),
   label: text().notNull(),
 });
 
-export const tenantOrderTable = mysqlTable('conformance_tenant_order', {
+export const tenantOrderTable = mysqlTable('drizzle_conformance_tenant_order', {
   id: key().primaryKey(),
   tenantId: key().notNull(),
   total: int().notNull(),
 });
 
 export const tenantOrderLineTable = mysqlTable(
-  'conformance_tenant_order_line',
+  'drizzle_conformance_tenant_order_line',
   {
     id: key().primaryKey(),
     tenantId: key().notNull(),
@@ -99,11 +99,11 @@ export async function createConformanceSchema(
   db: DrizzleMysqlClient,
 ): Promise<void> {
   const statements = [
-    sql`drop table if exists conformance_tenant_order_line,
-      conformance_tenant_order, conformance_award, conformance_book,
-      conformance_book_with_eager_author, conformance_tag,
-      conformance_author, conformance_item, conformance_plain_item`,
-    sql`create table conformance_item (
+    sql`drop table if exists drizzle_conformance_tenant_order_line,
+      drizzle_conformance_tenant_order, drizzle_conformance_award, drizzle_conformance_book,
+      drizzle_conformance_book_with_eager_author, drizzle_conformance_tag,
+      drizzle_conformance_author, drizzle_conformance_item, drizzle_conformance_plain_item`,
+    sql`create table drizzle_conformance_item (
       id int auto_increment primary key,
       name text not null,
       \`rank\` int,
@@ -111,51 +111,51 @@ export async function createConformanceSchema(
       removedAt datetime(3),
       version int not null
     )`,
-    sql`create table conformance_plain_item (
+    sql`create table drizzle_conformance_plain_item (
       id int auto_increment primary key,
       name text not null
     )`,
-    sql`create table conformance_author (
+    sql`create table drizzle_conformance_author (
       id varchar(64) primary key,
       name text not null,
       removedAt datetime(3)
     )`,
-    sql`create table conformance_award (
+    sql`create table drizzle_conformance_award (
       id varchar(64) primary key,
       name text not null,
-      authorId varchar(64) references conformance_author (id)
+      authorId varchar(64) references drizzle_conformance_author (id)
     )`,
-    sql`create table conformance_book (
+    sql`create table drizzle_conformance_book (
       id varchar(64) primary key,
       title text not null,
       authorId varchar(64),
       removedAt datetime(3),
-      foreign key (authorId) references conformance_author (id)
+      foreign key (authorId) references drizzle_conformance_author (id)
     )`,
-    sql`create table conformance_book_with_eager_author (
+    sql`create table drizzle_conformance_book_with_eager_author (
       id varchar(64) primary key,
       title text not null,
       authorId varchar(64),
       removedAt datetime(3),
-      foreign key (authorId) references conformance_author (id)
+      foreign key (authorId) references drizzle_conformance_author (id)
     )`,
-    sql`create table conformance_tag (
+    sql`create table drizzle_conformance_tag (
       id varchar(64) primary key,
       label text not null
     )`,
-    sql`create table conformance_tenant_order (
+    sql`create table drizzle_conformance_tenant_order (
       id varchar(64) primary key,
       tenantId varchar(64) not null,
       total int not null,
       unique (tenantId, id)
     )`,
-    sql`create table conformance_tenant_order_line (
+    sql`create table drizzle_conformance_tenant_order_line (
       id varchar(64) primary key,
       tenantId varchar(64) not null,
       orderId varchar(64) not null,
       qty int not null,
       foreign key (tenantId, orderId)
-        references conformance_tenant_order (tenantId, id)
+        references drizzle_conformance_tenant_order (tenantId, id)
     )`,
   ];
   for (const statement of statements) {
