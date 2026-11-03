@@ -1,5 +1,6 @@
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import { OrderBy } from '../../repository/order-by.helpers.js';
+import { WhereCompoundOperator } from '../../repository/repository.types.js';
 import { Where } from '../../repository/where.helpers.js';
 import {
   assert,
@@ -300,6 +301,29 @@ export function readTranslationSection(ctx: ConformanceContext): void {
         await names(Where.or(Where.eq('name', 'alpha'), Where.never())),
         ['alpha'],
       );
+    });
+
+    it('doFind: an empty and or or matches nothing, alone or inside a compound', async () => {
+      // Only a hand-built clause can be empty, so failing it closed stops a
+      // condition list that ended up empty from reading every row.
+      for (const operator of [
+        WhereCompoundOperator.AND,
+        WhereCompoundOperator.OR,
+      ]) {
+        const empty: WhereClause = { operator, conditions: [] };
+
+        assert.deepStrictEqual(await names(empty), [], operator);
+        assert.deepStrictEqual(
+          await names(Where.and(Where.eq('name', 'alpha'), empty)),
+          [],
+          operator,
+        );
+        assert.deepStrictEqual(
+          await names(Where.or(Where.eq('name', 'alpha'), empty)),
+          ['alpha'],
+          operator,
+        );
+      }
     });
 
     it('doFindOne: never finds nothing', async () => {
