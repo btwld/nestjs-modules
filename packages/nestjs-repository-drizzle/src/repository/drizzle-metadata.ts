@@ -13,6 +13,10 @@ import {
   getTableConfig as getPgTableConfig,
   PgTable,
 } from 'drizzle-orm/pg-core';
+import {
+  getTableConfig as getSqliteTableConfig,
+  SQLiteTable,
+} from 'drizzle-orm/sqlite-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
@@ -76,7 +80,9 @@ function primaryKeysOf(table: Table): string[] {
     ? getPgTableConfig(table).primaryKeys
     : is(table, MySqlTable)
       ? getMysqlTableConfig(table).primaryKeys
-      : [];
+      : is(table, SQLiteTable)
+        ? getSqliteTableConfig(table).primaryKeys
+        : [];
   const declared = primaryKeys.flatMap(({ columns }) =>
     columns.map(({ name }) => name),
   );

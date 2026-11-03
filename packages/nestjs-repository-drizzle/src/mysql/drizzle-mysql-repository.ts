@@ -2,6 +2,7 @@ import {
   count,
   DrizzleQueryError,
   eq,
+  getTableName,
   inArray,
   is,
   SQL,
@@ -31,7 +32,7 @@ function mysqlTableOf(table: Table, database: string): MySqlTable {
   if (!is(table, MySqlTable)) {
     throw new RuntimeException({
       message: 'The Drizzle %s adapter supports MySQL tables only, not "%s"',
-      messageParams: [database, String(table)],
+      messageParams: [database, getTableName(table)],
       fault: 'usage',
     });
   }

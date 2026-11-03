@@ -186,14 +186,21 @@ export abstract class DrizzleRepository<
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * The database to run on: the caller's transaction when it has one.
+   * Run `work` on the database: the caller's transaction when it has one,
+   * else the connection's database. A database with one connection
+   * overrides this to wait while another caller's transaction holds it.
    */
-  protected async client(ctx?: AppContextLike): Promise<Client> {
-    return (await this.transaction(ctx)) ?? this.options.db;
+  protected async withClient<T>(
+    ctx: AppContextLike | undefined,
+    work: (client: Client) => Promise<T>,
+  ): Promise<T> {
+    return work((await this.transaction(ctx)) ?? this.options.db);
   }
 
   /** The caller's transaction on this connection, when it has one. */
-  private async transaction(ctx?: AppContextLike): Promise<Client | undefined> {
+  protected async transaction(
+    ctx?: AppContextLike,
+  ): Promise<Client | undefined> {
     const { transactionKey } = this.options;
     if (transactionKey) {
       const context = AppContextHost.from(ctx);
@@ -239,7 +246,7 @@ export abstract class DrizzleRepository<
     work: (client: Client) => Promise<T>,
   ): Promise<T> {
     return this.returnsWrittenRows
-      ? work(await this.client(ctx))
+      ? this.withClient(ctx, work)
       : this.atomically(ctx, work);
   }
 
@@ -401,13 +408,16 @@ export abstract class DrizzleRepository<
         : asc(this.column(field));
     });
 
-    const rows = await this.selectRows(await this.client(options.ctx), {
+    const query = {
       select: options.select?.map(String) ?? [],
       where: this.whereOf(options),
       order,
       take: options.take,
       skip: options.skip,
-    });
+    };
+    const rows = await this.withClient(options.ctx, (client) =>
+      this.selectRows(client, query),
+    );
     return rows.map((row) => this.toEntity(row));
   }
 
@@ -427,9 +437,9 @@ export abstract class DrizzleRepository<
   protected async doCount(
     options: RepositoryCountOptions = {},
   ): Promise<number> {
-    return this.countRows(
-      await this.client(options.ctx),
-      this.whereOf(options),
+    const where = this.whereOf(options);
+    return this.withClient(options.ctx, (client) =>
+      this.countRows(client, where),
     );
   }
 
@@ -569,7 +579,9 @@ export abstract class DrizzleRepository<
 
     let row: PlainLiteralObject | undefined;
     if (Object.keys(data).length === 0 && !guard) {
-      row = await this.readRow(await this.client(options?.ctx), where);
+      row = await this.withClient(options?.ctx, (client) =>
+        this.readRow(client, where),
+      );
     } else if (version === undefined) {
       row = await this.writing(options?.ctx, (client) =>
         this.updateRow(client, data, where),
@@ -714,15 +726,14 @@ export abstract class DrizzleRepository<
     options?: RepositoryDeleteOneOptions &
       RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
-    const client = await this.client(options?.ctx);
     const primary = this.primaryColumn('delete');
     const guard = options?.versionGuard;
-    const deleted = await this.deleteRows(
-      client,
-      and(
-        eq(primary.column, entity[primary.key]),
-        guard && eq(this.column(guard.column), guard.value),
-      ),
+    const where = and(
+      eq(primary.column, entity[primary.key]),
+      guard && eq(this.column(guard.column), guard.value),
+    );
+    const deleted = await this.withClient(options?.ctx, (client) =>
+      this.deleteRows(client, where),
     );
     if (deleted === 0 && guard) {
       throw new OptimisticLockException(this.metadata.name);
@@ -735,14 +746,13 @@ export abstract class DrizzleRepository<
     options?: RepositoryDeleteOptions,
   ): Promise<Entity[]> {
     if (entities.length === 0) return [];
-    const client = await this.client(options?.ctx);
     const primary = this.primaryColumn('deleteMany');
-    await this.deleteRows(
-      client,
-      inArray(
-        primary.column,
-        entities.map((entity) => entity[primary.key]),
-      ),
+    const where = inArray(
+      primary.column,
+      entities.map((entity) => entity[primary.key]),
+    );
+    await this.withClient(options?.ctx, (client) =>
+      this.deleteRows(client, where),
     );
     return entities.map((entity) => this.toEntity(entity));
   }

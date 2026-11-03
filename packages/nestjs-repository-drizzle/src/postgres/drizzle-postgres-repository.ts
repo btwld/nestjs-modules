@@ -1,4 +1,11 @@
-import { count, is, type SQL, sql, type Table } from 'drizzle-orm';
+import {
+  count,
+  getTableName,
+  is,
+  type SQL,
+  sql,
+  type Table,
+} from 'drizzle-orm';
 import { type PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
@@ -22,7 +29,7 @@ function pgTableOf(table: Table): PgTable {
       message:
         'The Drizzle Postgres adapter supports Postgres tables only, ' +
         'not "%s"',
-      messageParams: [String(table)],
+      messageParams: [getTableName(table)],
       fault: 'usage',
     });
   }
