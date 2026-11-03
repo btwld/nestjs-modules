@@ -1,4 +1,6 @@
+import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
 import { OrderBy } from '../../repository/order-by.helpers.js';
+import { WhereCompoundOperator } from '../../repository/repository.types.js';
 import { Where } from '../../repository/where.helpers.js';
 import { assert, inOrder } from '../conformance-assert.js';
 import { type ConformanceContext } from '../conformance-context.js';
@@ -38,6 +40,22 @@ export function countsSection(ctx: ConformanceContext): void {
         await ctx.repo('item').findAndCount({ where: Where.never() }),
         [[], 0],
       );
+    });
+
+    it('doCount: counts nothing for an empty and or or', async () => {
+      for (const operator of [
+        WhereCompoundOperator.AND,
+        WhereCompoundOperator.OR,
+      ]) {
+        const where: WhereClause = { operator, conditions: [] };
+
+        assert.equal(await ctx.repo('item').count({ where }), 0, operator);
+        assert.deepStrictEqual(
+          await ctx.repo('item').findAndCount({ where }),
+          [[], 0],
+          operator,
+        );
+      }
     });
 
     it('doFindAndCount: counts every match, whatever the page', async () => {
