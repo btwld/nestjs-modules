@@ -40,26 +40,6 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
-  4. **TypeORM is pinned below 1.1, so consumers cannot use `typeorm@latest`** (M) — the
-      driver's peer range is `^0.3.31 || ~1.0.0`, but `typeorm@latest` is 1.1.x and 0.3 is
-      tagged `legacy` upstream, so `npm i typeorm` gets a version we refuse. The blocker is
-      deliberate upstream behaviour rather than a bug: from 1.1.0, `count` and `findAndCount`
-      count DISTINCT values of the *selected* columns whenever find options carry a `select`
-      (typeorm PR #11965, "feat: support distinct count"), so a projected paginated query
-      reports a distinct count where it used to report a total — measured on better-sqlite3,
-      100 rows with `select: { isActive }` counted as 2. crud's list passes `select` into
-      `findAndCount`, so its totals break. The fix keeps the projection out of the count:
-      the driver splits `doFindAndCount` into a find plus a count without `select`.
-      After that, widening the range is a change of its own. Re-check on each TypeORM release whether
-      `findAndCount`'s documented entity-count contract is restored.
-
-      The `~1.0.0` pin also accepts a known advisory: GHSA-2rp8-mm9q-fp49 /
-      CVE-2026-73651 (medium) affects `>= 1.0.0, < 1.1.0`, and 1.1.0 is the only patched
-      1.x. Accepted deliberately — the vector is template-literal injection in
-      `migration:generate`, a dev-time codegen command that nothing in this repo invokes,
-      so the exposure is a consumer who runs it against an untrusted schema. Landing the
-      count fix above is what clears it.
-
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.

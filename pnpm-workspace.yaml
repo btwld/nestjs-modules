@@ -81,17 +81,12 @@ allowBuilds:
 # splits across copies and you get "No metadata for X was found" at runtime.
 # Yarn's flat hoist guaranteed this structurally; pnpm does not.
 #
-# Held at 1.0.x deliberately, not for lack of attention. 1.1.0 made `count` and
-# `findAndCount` count distinct values of the selected columns when find options
-# carry a `select` (typeorm PR #11965), so a projected paginated query returns a
-# distinct count where it used to return a total. Our `select` is a projection,
-# so supporting 1.1 means keeping it out of the count query — deferred, with
-# ~1.0.0 the newest line our suite passes on. 0.3.x also passes and the
-# published peer range admits both; CI runs a leg for each. The install-only v7
-# packages peer on ^0.3.0 and warn under this override; they are never built or
-# tested, and strictPeerDependencies is off.
+# The lockfile runs the 1.x line; 0.3.x also passes and the published peer
+# range admits both (^0.3.31 || ^1.1.0), so CI runs a leg for each. The
+# install-only v7 packages peer on ^0.3.0 and warn under this override; they
+# are never built or tested, and strictPeerDependencies is off.
 overrides:
-  typeorm: ~1.0.0
+  typeorm: ^1.1.0
   reflect-metadata: ^0.2.2
   # Pinned to the exact version yarn.lock had resolved. zod 4.5.0 changes $ref
   # hoisting in z.toJSONSchema() output and breaks nestjs-crud's OpenAPI tests
