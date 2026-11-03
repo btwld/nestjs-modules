@@ -5,7 +5,14 @@ import {
   is,
   type Table,
 } from 'drizzle-orm';
-import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
+import {
+  getTableConfig as getMysqlTableConfig,
+  MySqlTable,
+} from 'drizzle-orm/mysql-core';
+import {
+  getTableConfig as getPgTableConfig,
+  PgTable,
+} from 'drizzle-orm/pg-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
@@ -65,11 +72,14 @@ export function buildColumns<Entity extends PlainLiteralObject>(
  * or with `primaryKey()` in the table's config.
  */
 function primaryKeysOf(table: Table): string[] {
-  const declared = is(table, PgTable)
-    ? getTableConfig(table).primaryKeys.flatMap(({ columns }) =>
-        columns.map(({ name }) => name),
-      )
-    : [];
+  const primaryKeys = is(table, PgTable)
+    ? getPgTableConfig(table).primaryKeys
+    : is(table, MySqlTable)
+      ? getMysqlTableConfig(table).primaryKeys
+      : [];
+  const declared = primaryKeys.flatMap(({ columns }) =>
+    columns.map(({ name }) => name),
+  );
   return Object.entries(getTableColumns(table))
     .filter(([, column]) => column.primary || declared.includes(column.name))
     .map(([key]) => key);

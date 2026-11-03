@@ -6,13 +6,6 @@ import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
 import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
 
-import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
-import {
-  DrizzlePostgresRepositoryModule,
-  toDrizzlePostgresClient,
-} from '../drizzle-postgres-repository.module.js';
-import { type DrizzlePostgresClient } from '../drizzle-postgres.types.js';
-
 import {
   ConformanceAuthorEntity,
   ConformanceAwardEntity,
@@ -23,6 +16,15 @@ import {
   ConformanceTagEntity,
   ConformanceTenantOrderEntity,
   ConformanceTenantOrderLineEntity,
+} from '../../__fixtures__/conformance/conformance.entity.fixture.js';
+import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
+import {
+  DrizzlePostgresRepositoryModule,
+  toDrizzlePostgresClient,
+} from '../drizzle-postgres-repository.module.js';
+import { type DrizzlePostgresClient } from '../drizzle-postgres.types.js';
+
+import {
   CONFORMANCE_TABLES,
   createConformanceSchema,
   authorTable,
