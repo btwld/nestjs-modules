@@ -70,8 +70,9 @@ export interface ConformanceHarnessInterface<
   /**
    * Link a book to a tag through the driver's many-to-many junction. A
    * repository refuses many-to-many writes, so seeding goes around it.
+   * Needed only when the driver supports `relations`.
    */
-  linkBookTag(
+  linkBookTag?(
     app: INestApplicationContext,
     link: { bookId: string; tagId: string },
   ): Promise<void>;

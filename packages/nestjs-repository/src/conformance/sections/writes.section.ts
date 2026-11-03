@@ -144,17 +144,19 @@ export function writesSection(ctx: ConformanceContext): void {
     );
   });
 
-  it('doUpdate: a new foreign key shows in a later join', async () => {
-    const { books, authors } = await seedLibrary(ctx);
-    await ctx.repo('book').update(books.delta, { authorId: authors.cat.id });
+  if (ctx.capabilities.relations === 'supported') {
+    it('doUpdate: a new foreign key shows in a later join', async () => {
+      const { books, authors } = await seedLibrary(ctx);
+      await ctx.repo('book').update(books.delta, { authorId: authors.cat.id });
 
-    const found = await ctx.repo('book').findOne({
-      where: Where.eq('id', books.delta.id),
-      join: [{ relation: 'author' }],
+      const found = await ctx.repo('book').findOne({
+        where: Where.eq('id', books.delta.id),
+        join: [{ relation: 'author' }],
+      });
+
+      assertRows(found?.author, ownAuthor(authors.cat));
     });
-
-    assertRows(found?.author, ownAuthor(authors.cat));
-  });
+  }
 
   it('doUpsert: inserts without a key, inserts for an unknown key, updates for a known one', async () => {
     const generated = await ctx

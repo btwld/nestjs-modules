@@ -50,7 +50,7 @@ NestJS 12.
 | Package | Required | Notes |
 | --- | --- | --- |
 | `@nestjs/common`, `@nestjs/core` | Yes | NestJS 12 |
-| `typeorm` | Yes | `^0.3.31 \|\| ~1.0.0`. 1.1+ isn't supported yet: it miscounts the total of a paginated read that has a `select` |
+| `typeorm` | Yes | `^0.3.31 \|\| ^1.1.0` |
 | `@nestjs/outbox` | No | Only for [Durable Messaging](#durable-messaging) |
 
 ## Choose Your Adapter
@@ -287,6 +287,11 @@ catch them by type.
 
 All query and mutation methods accept an `options` parameter that includes
 an optional `ctx` (repository context) for transaction and hook support.
+
+A `select` whose columns are all `NULL` in a row loses that row (a TypeORM
+bug): `find` and `findAndCount` return fewer rows and a smaller total, and
+`findOne` can return `null`. Include a column that is never `NULL`, such as
+the primary key.
 
 ### Optimistic Locking
 

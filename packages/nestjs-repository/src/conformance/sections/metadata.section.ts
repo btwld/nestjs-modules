@@ -172,6 +172,19 @@ export function metadataSection(ctx: ConformanceContext): void {
     }
   });
 
+  if (ctx.capabilities.relations === 'refused') {
+    it('metadata: reports no relations', () => {
+      for (const key of KEYS) {
+        assert.deepStrictEqual(
+          ctx.repo(key).metadata.relations ?? [],
+          [],
+          `${key} relations`,
+        );
+      }
+    });
+    return;
+  }
+
   it('metadata: reports exactly the declared relations', () => {
     for (const key of KEYS) {
       const names = (ctx.repo(key).metadata.relations ?? [])

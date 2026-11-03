@@ -67,6 +67,7 @@ import {
   buildRelations,
   buildSelect,
   buildUrn,
+  totalFromPage,
 } from './typeorm-options.schema.js';
 import { type TypeOrmRepositoryOptions } from './typeorm-repository-options.interface.js';
 
@@ -470,27 +471,42 @@ export abstract class TypeOrmRepository<
     options: RepositoryCountOptions = {},
   ): Promise<number> {
     const repo = await this.getRepo(options.ctx);
-    // Joins as a find with the same options does, eager ones included, so a
-    // page and its total always describe the same rows.
-    return repo.count({
-      where: this.translateWhere(options.where),
-      relations: this.translateJoin(options.join),
-      withDeleted: options.withDeleted,
-      loadEagerRelations: this.allowsEagerRelations,
-    });
+    return repo.count(this.buildNativeCountOptions(options));
   }
 
+  /**
+   * A find for the page, then a count of the rows it matches unless the
+   * page already tells the total. A select shapes the page and never the
+   * count.
+   */
   protected async doFindAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
     const repo = await this.getRepo(options.ctx);
-    const [rows, total] = await repo.findAndCount(
-      this.buildNativeFindManyOptions(options),
-    );
+    const findOptions = this.buildNativeFindManyOptions(options);
+    const rows = await repo.find(findOptions);
+    const total =
+      totalFromPage(rows.length, findOptions.skip, findOptions.take) ??
+      (await repo.count(this.buildNativeCountOptions(options)));
     return [
       rows.map((row) => this.toResult(row, options, this.allowsEagerRelations)),
       total,
     ];
+  }
+
+  /**
+   * Joins as a find with the same options does, eager ones included, so a
+   * page and its total always describe the same rows.
+   */
+  private buildNativeCountOptions(
+    options: RepositoryCountOptions,
+  ): FindManyOptions<Entity> {
+    return {
+      where: this.translateWhere(options.where),
+      relations: this.translateJoin(options.join),
+      withDeleted: options.withDeleted,
+      loadEagerRelations: this.allowsEagerRelations,
+    };
   }
 
   // Create operations

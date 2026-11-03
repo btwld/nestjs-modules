@@ -43,7 +43,7 @@
     "supertest": "^6.3.4",
     "typedoc": "^0.25.13",
     "typedoc-plugin-coverage": "^3.3.0",
-    "typeorm": "~1.0.0",
+    "typeorm": "^1.1.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.46.4",
     "vitest": "^4.1.9",

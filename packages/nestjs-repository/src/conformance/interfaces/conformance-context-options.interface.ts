@@ -15,7 +15,7 @@ export interface ConformanceContextOptionsInterface {
   >;
   createApp(): Promise<INestApplicationContext>;
   reset(app: INestApplicationContext): Promise<void>;
-  linkBookTag(
+  linkBookTag?(
     app: INestApplicationContext,
     link: { bookId: string; tagId: string },
   ): Promise<void>;

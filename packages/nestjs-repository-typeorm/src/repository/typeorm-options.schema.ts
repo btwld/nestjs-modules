@@ -414,3 +414,23 @@ export function buildSelect<Entity extends PlainLiteralObject>(
 
   return Object.assign<FindOptionsSelect<Entity>, typeof result>({}, result);
 }
+
+/**
+ * The total a page already tells, without a count: every row past `skip`
+ * when the page came back short of `take`. `undefined` when only a count can
+ * tell — a full page, or an empty one past rows `skip` may have overshot.
+ * The same shortcut TypeORM's `findAndCount` takes.
+ *
+ * @param rows - How many rows the page holds
+ * @param skip - Rows skipped before the page
+ * @param take - The page size, if any
+ */
+export function totalFromPage(
+  rows: number,
+  skip = 0,
+  take?: number,
+): number | undefined {
+  if (take !== undefined && rows === take) return undefined;
+  if (skip > 0 && rows === 0) return undefined;
+  return skip + rows;
+}

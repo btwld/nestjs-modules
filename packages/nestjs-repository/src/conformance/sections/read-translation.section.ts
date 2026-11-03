@@ -409,6 +409,10 @@ export function readTranslationSection(ctx: ConformanceContext): void {
     });
   });
 
+  if (ctx.capabilities.relations === 'refused') {
+    return;
+  }
+
   describe('joins', () => {
     let library: ConformanceLibraryInterface;
 

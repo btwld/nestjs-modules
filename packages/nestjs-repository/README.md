@@ -422,6 +422,7 @@ runRepositoryConformance(
     },
     capabilities: {
       transactions: 'supported',
+      relations: 'supported',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
       softDelete: 'supported',
@@ -439,13 +440,15 @@ runRepositoryConformance(
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
   driver's own options go in `driverOptions`.
-- **Capabilities.** Four are optional, each `'supported'` or `'refused'`:
-  `transactions`, `eagerResults`, `referentialIntegrity` (your store
-  refuses a book naming no author, and the delete of an author a book still
-  names), and `softDelete`. A refused one runs its refusal cases, if it has
-  any, instead. A driver that refuses `softDelete` must refuse at startup an
-  entity that declares a remove date; its harness binds the fixtures to
-  entities whose `removedAt` is an ordinary column.
+- **Capabilities.** Five are optional, each `'supported'` or `'refused'`:
+  `transactions`, `relations`, `eagerResults` (needs `relations`),
+  `referentialIntegrity` (your store refuses a book naming no author, and
+  the delete of an author a book still names), and `softDelete`. A refused
+  one runs its refusal cases, if it has any, instead. A driver that refuses
+  `relations` reports none, so the repository refuses every read that joins,
+  filters on or sorts by one. A driver that refuses `softDelete` must refuse
+  at startup an entity that declares a remove date; its harness binds the
+  fixtures to entities whose `removedAt` is an ordinary column.
   Every other case is required, including that your driver describes the
   errors its store raises.
 - **Versions.** Every driver is checked for changing the version on each
@@ -456,7 +459,8 @@ runRepositoryConformance(
   the run's `ctx` still lands in the open transaction, so the suite can't see
   it. Run it against a store with more than one connection too.
 - **`reset`** removes every fixture's rows before each case. **`linkBookTag`**
-  writes one many-to-many link, since a repository refuses those writes.
+  writes one many-to-many link, since a repository refuses those writes;
+  it's needed only when you support `relations`.
 
 The suite builds one application per harness and imports nothing from a
 test runner. Test your driver's own options and behaviour in your own specs,

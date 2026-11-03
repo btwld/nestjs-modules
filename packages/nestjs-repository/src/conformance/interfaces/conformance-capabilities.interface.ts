@@ -17,8 +17,16 @@ export interface ConformanceCapabilitiesInterface {
   transactions: ConformanceCapability;
 
   /**
+   * The driver reports the relations an entity declares, and translates
+   * reads that join them, filter on them and sort by them. A driver that
+   * refuses it reports no relations, so the repository refuses every such
+   * read.
+   */
+  relations: ConformanceCapability;
+
+  /**
    * The driver loads relations an entity declares eager when the entity is
-   * registered with `allowEagerRelations`.
+   * registered with `allowEagerRelations`. Needs `relations`.
    */
   eagerResults: ConformanceCapability;
 

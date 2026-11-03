@@ -151,12 +151,14 @@ function register(capabilities: ConformanceCapabilitiesInterface): {
 
 const ALL_SUPPORTED: ConformanceCapabilitiesInterface = {
   transactions: 'supported',
+  relations: 'supported',
   eagerResults: 'supported',
   referentialIntegrity: 'supported',
   softDelete: 'supported',
 };
 const ALL_REFUSED: ConformanceCapabilitiesInterface = {
   transactions: 'refused',
+  relations: 'refused',
   eagerResults: 'refused',
   referentialIntegrity: 'refused',
   softDelete: 'refused',
@@ -264,6 +266,33 @@ describe(runRepositoryConformance.name, () => {
       'transactions > doRestore: changes the version, and refuses a stale row',
     ]);
     expect(refused.filter((name) => !supported.includes(name))).toEqual([]);
+  });
+
+  it('leaves out exactly the relation cases when relations are refused', () => {
+    const names = (capabilities: ConformanceCapabilitiesInterface) =>
+      register(capabilities).cases.map((path) => path.slice(1).join(' > '));
+    const supported = names(ALL_SUPPORTED);
+    const refused = names({ ...ALL_SUPPORTED, relations: 'refused' });
+    const joined = supported.filter((name) =>
+      /^(read translation|counts) > (joins|composite foreign keys) > /.test(
+        name,
+      ),
+    );
+
+    expect(joined).toHaveLength(31);
+    expect(supported.filter((name) => !refused.includes(name))).toEqual([
+      'metadata > metadata: reports exactly the declared relations',
+      "metadata > metadata: reports each relation's target by its URN and own columns",
+      'metadata > metadata: reports a to-one relation by the foreign key it holds',
+      'metadata > metadata: reports the to-many side of a foreign key swapped, holding none',
+      'metadata > metadata: reports both sides of a many-to-many relation through one junction',
+      'metadata > metadata: reports every column pair of a composite foreign key',
+      ...joined,
+      'writes > doUpdate: a new foreign key shows in a later join',
+    ]);
+    expect(refused.filter((name) => !supported.includes(name))).toEqual([
+      'metadata > metadata: reports no relations',
+    ]);
   });
 
   it('gives every case a unique name', () => {
