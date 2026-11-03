@@ -288,6 +288,11 @@ catch them by type.
 All query and mutation methods accept an `options` parameter that includes
 an optional `ctx` (repository context) for transaction and hook support.
 
+A `select` whose columns are all `NULL` in a row loses that row (a TypeORM
+bug): `find` and `findAndCount` return fewer rows and a smaller total, and
+`findOne` can return `null`. Include a column that is never `NULL`, such as
+the primary key.
+
 ### Optimistic Locking
 
 `update` and `replace` on an entity with a `@VersionColumn` (every `Audit*`

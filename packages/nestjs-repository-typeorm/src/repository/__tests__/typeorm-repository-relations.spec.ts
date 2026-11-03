@@ -7,6 +7,7 @@ import {
   buildOrder,
   buildRelations,
   buildSelect,
+  totalFromPage,
 } from '../typeorm-options.schema.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -474,5 +475,24 @@ describe('buildSelect', () => {
 
   it('should return undefined for an empty list, meaning all columns', () => {
     expect(buildSelect<SelectableEntity>([])).toBeUndefined();
+  });
+});
+
+describe('totalFromPage', () => {
+  it.each([
+    ['no page size', 7, 0, undefined, 7],
+    ['a short page', 3, 0, 5, 3],
+    ['a short page past skipped rows', 3, 10, 5, 13],
+    ['an empty first page', 0, 0, 5, 0],
+  ])('should tell the total from %s', (_, rows, skip, take, total) => {
+    expect(totalFromPage(rows, skip, take)).toBe(total);
+  });
+
+  it.each([
+    ['a full page', 5, 0, 5],
+    ['an empty page past skipped rows', 0, 10, 5],
+    ['an empty page past skipped rows without a page size', 0, 10, undefined],
+  ])('should leave the total to a count for %s', (_, rows, skip, take) => {
+    expect(totalFromPage(rows, skip, take)).toBeUndefined();
   });
 });

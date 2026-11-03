@@ -51,6 +51,26 @@ export function countsSection(ctx: ConformanceContext): void {
       assert.equal(total, 5);
     });
 
+    it('doFindAndCount: counts every match, whatever the select', async () => {
+      // A page, so the total is counted rather than taken from the rows;
+      // `rank` holds a NULL, which a count of distinct values would skip.
+      const [page, total] = await ctx.repo('item').findAndCount({
+        select: ['name', 'rank'],
+        order: [OrderBy.asc('name')],
+        take: 2,
+      });
+
+      assert.deepStrictEqual(inOrder(page, 'name'), ['alpha', 'bravo']);
+      assert.equal(total, 5);
+
+      const [, ranks] = await ctx.repo('item').findAndCount({
+        select: ['rank'],
+        order: [OrderBy.asc('name')],
+        take: 2,
+      });
+      assert.equal(ranks, 5);
+    });
+
     if (softDelete) {
       it('doCount: counts soft-deleted rows only when asked for them', async () => {
         const bravo = await ctx.repo('item').findOne({
