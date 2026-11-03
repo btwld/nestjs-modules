@@ -18,18 +18,14 @@ import {
 import { type DrizzleProviderOptionsInterface } from './drizzle-provider-options.interface.js';
 
 /**
- * The table's own columns by property key.
+ * The column a table holds under `key`, as its dialect's column.
  */
-export function columnsOf(table: Table): Record<string, Column> {
-  return getTableColumns(table);
-}
-
-/**
- * The column a table holds under `key`.
- */
-export function columnOf(table: Table, key: string): Column {
-  const column = columnsOf(table)[key];
-  if (!column) {
+export function columnOf<C extends Column>(
+  table: Table & { _: { columns: Record<string, C> } },
+  key: string,
+): C {
+  const column = getTableColumns(table)[key];
+  if (column === undefined) {
     throw new RuntimeException({
       message: 'Table "%s" has no column "%s"',
       messageParams: [getTableUniqueName(table), key],
@@ -56,7 +52,7 @@ export function buildColumns<Entity extends PlainLiteralObject>(
   flags: Pick<DrizzleProviderOptionsInterface, 'removeDate' | 'version'>,
 ): RepositoryColumnMetadataInterface<Entity>[] {
   const primary = primaryKeysOf(table);
-  return Object.keys(columnsOf(table)).map((key) => ({
+  return Object.keys(getTableColumns(table)).map((key) => ({
     name: key,
     isPrimary: primary.includes(key),
     isRemoveDate: key === flags.removeDate,
@@ -74,7 +70,7 @@ function primaryKeysOf(table: Table): string[] {
         columns.map(({ name }) => name),
       )
     : [];
-  return Object.entries(columnsOf(table))
+  return Object.entries(getTableColumns(table))
     .filter(([, column]) => column.primary || declared.includes(column.name))
     .map(([key]) => key);
 }

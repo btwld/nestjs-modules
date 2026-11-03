@@ -7,9 +7,11 @@ import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
 
 import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
-import { DrizzleRepositoryModule } from '../../drizzle-repository.module.js';
-import { type DrizzleClient } from '../../drizzle-repository.types.js';
-import { toDrizzleClient } from '../../drizzle-repository.util.js';
+import {
+  DrizzlePostgresRepositoryModule,
+  toDrizzlePostgresClient,
+} from '../drizzle-postgres-repository.module.js';
+import { type DrizzlePostgresClient } from '../drizzle-postgres.types.js';
 
 import {
   ConformanceAuthorEntity,
@@ -32,31 +34,31 @@ import {
   tagTable,
   tenantOrderLineTable,
   tenantOrderTable,
-} from './conformance.schema.fixture.js';
+} from './conformance-postgres.schema.fixture.js';
 
-function database(app: INestApplicationContext): DrizzleClient {
-  return toDrizzleClient(
+function database(app: INestApplicationContext): DrizzlePostgresClient {
+  return toDrizzlePostgresClient(
     app.get(getDrizzleToken()),
     DRIZZLE_DEFAULT_CONNECTION_NAME,
   );
 }
 
 /**
- * The Drizzle driver's conformance harness on PGlite: an in-process
- * Postgres, with the fixture tables created on startup.
+ * The Drizzle Postgres adapter's conformance harness on PGlite: an
+ * in-process Postgres, with the fixture tables created on startup.
  */
-export function drizzleConformanceHarness(): ConformanceHarnessInterface<
-  typeof DrizzleRepositoryModule
+export function drizzlePostgresConformanceHarness(): ConformanceHarnessInterface<
+  typeof DrizzlePostgresRepositoryModule
 > {
   return {
-    name: 'drizzle/pglite',
-    driver: DrizzleRepositoryModule,
+    name: 'drizzle-postgres/pglite',
+    driver: DrizzlePostgresRepositoryModule,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: async () => {
           const db = drizzle({ client: new PGlite() });
           await createConformanceSchema(
-            toDrizzleClient(db, DRIZZLE_DEFAULT_CONNECTION_NAME),
+            toDrizzlePostgresClient(db, DRIZZLE_DEFAULT_CONNECTION_NAME),
           );
           return { db };
         },

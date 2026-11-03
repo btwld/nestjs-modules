@@ -1,6 +1,6 @@
 import { pgTable, primaryKey, text } from 'drizzle-orm/pg-core';
 
-import { buildColumns } from '../repository/drizzle-metadata.js';
+import { buildColumns } from '../drizzle-metadata.js';
 
 describe('drizzle metadata', () => {
   describe('buildColumns', () => {

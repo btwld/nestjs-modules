@@ -13,9 +13,9 @@ import {
   type ConformanceTenantOrderLineInterface,
 } from '@concepta/nestjs-repository/conformance';
 
-import { type DrizzleClient } from '../../drizzle-repository.types.js';
+import { type DrizzlePostgresClient } from '../drizzle-postgres.types.js';
 
-/** The conformance suite's fixtures as Drizzle tables. */
+// The conformance suite's fixtures as Drizzle tables.
 
 export const itemTable = pgTable('conformance_item', {
   id: serial().primaryKey(),
@@ -96,7 +96,7 @@ export const CONFORMANCE_TABLES = [
  * harness writes its own.
  */
 export async function createConformanceSchema(
-  db: DrizzleClient,
+  db: DrizzlePostgresClient,
 ): Promise<void> {
   const statements = [
     sql`create table conformance_item (

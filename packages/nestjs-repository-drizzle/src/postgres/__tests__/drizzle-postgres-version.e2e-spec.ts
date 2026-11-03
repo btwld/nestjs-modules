@@ -25,7 +25,7 @@ import {
   type RepositoryInterface,
 } from '@concepta/nestjs-repository';
 
-import { DrizzleRepositoryModule } from '../drizzle-repository.module.js';
+import { DrizzlePostgresRepositoryModule } from '../drizzle-postgres-repository.module.js';
 
 /** Postgres compares two boxes by their area. */
 const box = customType<{ data: string }>({
@@ -66,7 +66,7 @@ class ShapeEntity {
 @Module({})
 class VersionRootModule {}
 
-describe('DrizzleRepository version', () => {
+describe('DrizzlePostgresRepository version', () => {
   let app: INestApplicationContext;
   let shapes: RepositoryInterface<ShapeEntity>;
 
@@ -115,7 +115,7 @@ describe('DrizzleRepository version', () => {
           RepositoryModule.forRoot({
             drivers: [
               {
-                driver: DrizzleRepositoryModule,
+                driver: DrizzlePostgresRepositoryModule,
                 entities: [
                   {
                     key: 'shape',

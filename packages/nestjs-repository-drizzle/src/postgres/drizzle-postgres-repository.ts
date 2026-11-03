@@ -1,7 +1,9 @@
 import {
   and,
+  asc,
   between,
   type Column,
+  desc,
   count,
   DrizzleQueryError,
   eq,
@@ -20,7 +22,7 @@ import {
   sql,
   type Table,
 } from 'drizzle-orm';
-import { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { type PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
@@ -28,7 +30,6 @@ import {
   AppContextHost,
   type AppContextLike,
   type DeepPartial,
-  type HookResolverService,
   RuntimeException,
 } from '@concepta/nestjs-core';
 import {
@@ -57,22 +58,12 @@ import {
   WhereOperator,
 } from '@concepta/nestjs-repository';
 
-import { type DrizzleClient } from '../drizzle-repository.types.js';
-import { DrizzleTransaction } from '../transaction/drizzle-transaction.js';
+import { columnOf } from '../repository/drizzle-metadata.js';
+import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
 
-import { columnOf } from './drizzle-metadata.js';
-
-/**
- * Options for constructing a DrizzleRepository.
- */
-export interface DrizzleRepositoryOptions<Entity extends PlainLiteralObject> {
-  entityKey: string;
-  db: DrizzleClient;
-  table: Table;
-  metadata: RepositoryMetadataInterface<Entity>;
-  transactionKey?: string;
-  hookResolver?: HookResolverService;
-}
+import { DrizzlePostgresTransaction } from './drizzle-postgres-transaction.js';
+import { DRIZZLE_POSTGRES_DATABASE } from './drizzle-postgres.constants.js';
+import { type DrizzlePostgresClient } from './drizzle-postgres.types.js';
 
 /** A row as the database returned it. */
 function isRow(value: unknown): value is PlainLiteralObject {
@@ -99,25 +90,12 @@ function asStored(value: unknown): string | undefined {
   });
 }
 
-/** A Postgres column, as every column of a Postgres table is. */
-function pgColumnOf(table: Table, key: string): PgColumn {
-  const column = columnOf(table, key);
-  if (!is(column, PgColumn)) {
-    throw new RuntimeException({
-      message: 'Column "%s" is not a Postgres column',
-      messageParams: [key],
-      fault: 'internal',
-    });
-  }
-  return column;
-}
-
 /** A Postgres table, or a refusal naming the table that is not one. */
 function pgTableOf(table: Table): PgTable {
   if (!is(table, PgTable)) {
     throw new RuntimeException({
       message:
-        'The Drizzle repository driver supports Postgres tables only, ' +
+        'The Drizzle Postgres adapter supports Postgres tables only, ' +
         'not "%s"',
       messageParams: [String(table)],
       fault: 'usage',
@@ -130,18 +108,24 @@ function pgTableOf(table: Table): PgTable {
  * Drizzle implementation of RepositoryInterface, for Postgres.
  *
  * Every read and unversioned write is one statement on the entity's own
- * table. A write to a versioned row reads the row first, in a transaction of
- * its own or a savepoint, so the version moves on only when the row changes.
- * The driver reports no relations, so no read it is given joins one.
+ * table. A write to a versioned row reads the row first, in the caller's
+ * transaction or one of its own, so the version moves on only when the row
+ * changes. The driver reports no relations, so no read it is given joins
+ * one.
  */
-export class DrizzleRepository<
+export class DrizzlePostgresRepository<
   Entity extends PlainLiteralObject,
 > extends RepositoryAdapter<Entity> {
   readonly metadata: RepositoryMetadataInterface<Entity>;
 
   private readonly table: PgTable;
 
-  constructor(private readonly options: DrizzleRepositoryOptions<Entity>) {
+  constructor(
+    private readonly options: DrizzleRepositoryOptions<
+      Entity,
+      DrizzlePostgresClient
+    >,
+  ) {
     super(options.entityKey, options.hookResolver);
     this.metadata = options.metadata;
     this.table = pgTableOf(options.table);
@@ -170,7 +154,7 @@ export class DrizzleRepository<
         ? reported.code
         : undefined;
     return {
-      database: 'postgres',
+      database: DRIZZLE_POSTGRES_DATABASE,
       code,
       message: reported?.message ?? error.message,
     };
@@ -179,14 +163,14 @@ export class DrizzleRepository<
   /**
    * The database to run on: the caller's transaction when it has one.
    */
-  private async client(ctx?: AppContextLike): Promise<DrizzleClient> {
+  private async client(ctx?: AppContextLike): Promise<DrizzlePostgresClient> {
     return (await this.transaction(ctx)) ?? this.options.db;
   }
 
   /** The caller's transaction on this connection, when it has one. */
   private async transaction(
     ctx?: AppContextLike,
-  ): Promise<DrizzleClient | undefined> {
+  ): Promise<DrizzlePostgresClient | undefined> {
     const { transactionKey } = this.options;
     if (transactionKey) {
       const context = AppContextHost.from(ctx);
@@ -194,7 +178,14 @@ export class DrizzleRepository<
         const { trx } = context.with(TrxCtx);
         if (trx?.isSupported) {
           const tx = await trx.getOrStart(transactionKey);
-          if (tx instanceof DrizzleTransaction) return tx.client;
+          if (!(tx instanceof DrizzlePostgresTransaction)) {
+            throw new RuntimeException({
+              message: 'Transaction "%s" is not a Drizzle Postgres transaction',
+              messageParams: [transactionKey],
+              fault: 'internal',
+            });
+          }
+          return tx.getClient();
         }
       }
     }
@@ -208,7 +199,7 @@ export class DrizzleRepository<
    */
   private async atomically<T>(
     ctx: AppContextLike | undefined,
-    work: (tx: DrizzleClient) => Promise<T>,
+    work: (tx: DrizzlePostgresClient) => Promise<T>,
   ): Promise<T> {
     const open = await this.transaction(ctx);
     return open ? work(open) : this.options.db.transaction(work);
@@ -219,7 +210,7 @@ export class DrizzleRepository<
   // ═══════════════════════════════════════════════════════════════════════════
 
   private column(key: string): PgColumn {
-    return pgColumnOf(this.table, key);
+    return columnOf(this.table, key);
   }
 
   private primaryColumn(operation: string): {
@@ -245,9 +236,9 @@ export class DrizzleRepository<
   }
 
   /**
-   * A read's `where` and order hold only own columns: the driver reports no
-   * relations, so the repository refuses a read naming one before it gets
-   * here.
+   * A read's join, `where` and order hold only own columns: the driver
+   * reports no relations, so the repository refuses a read naming one before
+   * it gets here.
    */
   private unjoinable(relation: string): RuntimeException {
     return new RuntimeException({
@@ -265,6 +256,8 @@ export class DrizzleRepository<
     if (isWhereNever(clause)) return sql`1 = 0`;
 
     if (isWhereCompound(clause)) {
+      // An empty AND matches nothing, as an empty OR does: the repository
+      // fails a hand-built clause with no conditions closed, never open.
       const parts = clause.conditions.map((condition) =>
         this.translateWhere(condition),
       );
@@ -272,12 +265,7 @@ export class DrizzleRepository<
         clause.operator === WhereCompoundOperator.AND
           ? and(...parts)
           : or(...parts);
-      return (
-        joined ??
-        (clause.operator === WhereCompoundOperator.AND
-          ? sql`1 = 1`
-          : sql`1 = 0`)
-      );
+      return joined ?? sql`1 = 0`;
     }
 
     if (clause.relation !== undefined) throw this.unjoinable(clause.relation);
@@ -357,6 +345,8 @@ export class DrizzleRepository<
 
   /** A read's `where`, with soft-deleted rows left out unless it wants them. */
   private whereOf(options: RepositoryCountOptions): SQL | undefined {
+    const [join] = options.join ?? [];
+    if (join) throw this.unjoinable(join.relation);
     return and(
       this.live(options.withDeleted),
       options.where && this.translateWhere(options.where),
@@ -370,12 +360,18 @@ export class DrizzleRepository<
     const order = (options.order ?? []).map(({ field, order, relation }) => {
       if (relation !== undefined) throw this.unjoinable(relation);
       return order === SortOrder.DESC
-        ? sql`${this.column(field)} desc`
-        : sql`${this.column(field)} asc`;
+        ? desc(this.column(field))
+        : asc(this.column(field));
     });
+    const select = options.select?.map(String) ?? [];
 
-    let query = client
-      .select()
+    let query = (
+      select.length > 0
+        ? client.select(
+            Object.fromEntries(select.map((key) => [key, this.column(key)])),
+          )
+        : client.select()
+    )
       .from(this.table)
       .where(this.whereOf(options))
       .$dynamic();
@@ -383,7 +379,7 @@ export class DrizzleRepository<
     if (options.take !== undefined) query = query.limit(options.take);
     if (options.skip) query = query.offset(options.skip);
 
-    return toRows(await query).map((row) => this.toResult(row, options));
+    return toRows(await query).map((row) => this.toEntity(row));
   }
 
   protected async doFind(
@@ -407,7 +403,7 @@ export class DrizzleRepository<
       .select({ total: count() })
       .from(this.table)
       .where(this.whereOf(options));
-    return Number(counted?.total ?? 0);
+    return counted?.total ?? 0;
   }
 
   protected async doFindAndCount(
@@ -438,7 +434,7 @@ export class DrizzleRepository<
 
   /** The row `key` names, locked until the transaction ends. */
   private async lockRow(
-    tx: DrizzleClient,
+    tx: DrizzlePostgresClient,
     key: unknown,
   ): Promise<PlainLiteralObject | undefined> {
     if (key === undefined) return undefined;
@@ -462,7 +458,7 @@ export class DrizzleRepository<
    * compares as stored, whatever the caller sent.
    */
   private async bumpIfChanged(
-    tx: DrizzleClient,
+    tx: DrizzlePostgresClient,
     before: PlainLiteralObject,
     after: PlainLiteralObject,
     keys: string[],
@@ -530,7 +526,6 @@ export class DrizzleRepository<
       | (RepositoryVersionGuardOptions<Entity> & { ctx?: AppContextLike })
       | undefined,
   ): Promise<Entity> {
-    const client = await this.client(options?.ctx);
     const primary = this.primaryColumn(operation);
     const guard = options?.versionGuard;
     const key = entity[primary.key];
@@ -538,43 +533,67 @@ export class DrizzleRepository<
       eq(primary.column, key),
       guard && eq(this.column(guard.column), guard.value),
     );
-    const keys = Object.keys(data);
     const version = this.getVersionColumn();
 
-    const [row] =
-      keys.length === 0 && !guard
-        ? toRows(await client.select().from(this.table).where(where))
-        : version === undefined
-          ? toRows(
-              await client
-                .update(this.table)
-                .set(data)
-                .where(where)
-                .returning(),
-            )
-          : [
-              await this.atomically(options?.ctx, async (tx) => {
-                const before = await this.lockRow(tx, key);
-                const [after] = toRows(
-                  await tx
-                    .update(this.table)
-                    .set(
-                      keys.length > 0
-                        ? data
-                        : { [version]: sql`${this.column(version)}` },
-                    )
-                    .where(where)
-                    .returning(),
-                );
-                return before && after
-                  ? this.bumpIfChanged(tx, before, after, keys)
-                  : after;
-              }),
-            ];
+    let row: PlainLiteralObject | undefined;
+    if (Object.keys(data).length === 0 && !guard) {
+      row = await this.readRow(await this.client(options?.ctx), where);
+    } else if (version === undefined) {
+      row = await this.updateRow(await this.client(options?.ctx), data, where);
+    } else {
+      row = await this.atomically(options?.ctx, (tx) =>
+        this.updateVersioned(tx, key, data, where, version),
+      );
+    }
     if (row) return this.toEntity(row);
 
     if (guard) throw new OptimisticLockException(this.metadata.name);
     throw new EntityNotFoundException(this.metadata.name, operation);
+  }
+
+  /** The row `where` matches, unwritten: a write of nothing, unguarded. */
+  private async readRow(
+    client: DrizzlePostgresClient,
+    where: SQL | undefined,
+  ): Promise<PlainLiteralObject | undefined> {
+    const [row] = toRows(await client.select().from(this.table).where(where));
+    return row;
+  }
+
+  /** An `UPDATE` of the row `where` matches, returning it as stored. */
+  private async updateRow(
+    client: DrizzlePostgresClient,
+    data: PlainLiteralObject,
+    where: SQL | undefined,
+  ): Promise<PlainLiteralObject | undefined> {
+    const [row] = toRows(
+      await client.update(this.table).set(data).where(where).returning(),
+    );
+    return row;
+  }
+
+  /**
+   * The `UPDATE` of a versioned row: locked and read first, so the version
+   * moves on only when the write changed it. With nothing to write it still
+   * runs, so a guard is checked.
+   */
+  private async updateVersioned(
+    tx: DrizzlePostgresClient,
+    key: unknown,
+    data: PlainLiteralObject,
+    where: SQL | undefined,
+    version: string,
+  ): Promise<PlainLiteralObject | undefined> {
+    const keys = Object.keys(data);
+    const before = await this.lockRow(tx, key);
+    const after = await this.updateRow(
+      tx,
+      keys.length > 0 ? data : { [version]: sql`${this.column(version)}` },
+      where,
+    );
+    return before && after
+      ? this.bumpIfChanged(tx, before, after, keys)
+      : after;
   }
 
   protected async doUpdate(
@@ -614,14 +633,12 @@ export class DrizzleRepository<
     const data = this.withoutVersion(entity);
     const { [primary.key]: key, ...changes } = data;
 
-    const [row] =
+    const row =
       this.getVersionColumn() === undefined
         ? await this.upsertOnce(await this.client(options?.ctx), data, changes)
-        : [
-            await this.atomically(options?.ctx, (tx) =>
-              this.upsertVersioned(tx, data, key, changes),
-            ),
-          ];
+        : await this.atomically(options?.ctx, (tx) =>
+            this.upsertVersioned(tx, data, key, changes),
+          );
     if (!row) {
       throw new RuntimeException({
         message: 'Upsert of "%s" returned no row',
@@ -634,10 +651,10 @@ export class DrizzleRepository<
 
   /** An unversioned upsert: one `INSERT … ON CONFLICT DO UPDATE`. */
   private async upsertOnce(
-    client: DrizzleClient,
+    client: DrizzlePostgresClient,
     data: PlainLiteralObject,
     changes: PlainLiteralObject,
-  ): Promise<PlainLiteralObject[]> {
+  ): Promise<PlainLiteralObject | undefined> {
     const primary = this.primaryColumn('upsert');
     // A payload of only its key still updates, so the row is returned.
     const set =
@@ -646,13 +663,14 @@ export class DrizzleRepository<
         : {
             [primary.key]: sql`excluded.${sql.identifier(primary.column.name)}`,
           };
-    return toRows(
+    const [row] = toRows(
       await client
         .insert(this.table)
         .values(data)
         .onConflictDoUpdate({ target: primary.column, set })
         .returning(),
     );
+    return row;
   }
 
   /**
@@ -661,7 +679,7 @@ export class DrizzleRepository<
    * first, which is then locked and updated in turn.
    */
   private async upsertVersioned(
-    tx: DrizzleClient,
+    tx: DrizzlePostgresClient,
     data: PlainLiteralObject,
     key: unknown,
     changes: PlainLiteralObject,
@@ -774,23 +792,6 @@ export class DrizzleRepository<
   // ═══════════════════════════════════════════════════════════════════════════
   // Results
   // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * `row` holding only what the read asked for: the columns it selected, or
-   * all own columns.
-   */
-  private toResult(
-    row: PlainLiteralObject,
-    options: RepositoryFindOneOptions<Entity>,
-  ): Entity {
-    const keys = options.select?.length
-      ? options.select.map(String)
-      : this.metadata.columns.map((column) => column.name);
-    const result: Entity = Object.create(this.metadata.type.prototype);
-    const values: PlainLiteralObject = result;
-    for (const key of keys) values[key] = row[key];
-    return result;
-  }
 
   /** `values` as an instance of the entity class, holding nothing else. */
   private toEntity(values: PlainLiteralObject | DeepPartial<Entity>): Entity {
