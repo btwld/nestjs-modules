@@ -1,12 +1,4 @@
-import {
-  count,
-  DrizzleQueryError,
-  getTableName,
-  inArray,
-  is,
-  SQL,
-  type Table,
-} from 'drizzle-orm';
+import { count, getTableName, inArray, is, SQL, type Table } from 'drizzle-orm';
 import { type MySqlColumn, MySqlTable } from 'drizzle-orm/mysql-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
@@ -15,6 +7,7 @@ import { RuntimeException } from '@concepta/nestjs-core';
 
 import { type DrizzleClaimedRowInterface } from '../repository/drizzle-claimed-row.interface.js';
 import { columnOf } from '../repository/drizzle-metadata.js';
+import { isDrizzleQueryError } from '../repository/drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
 import { DrizzleRepository } from '../repository/drizzle-repository.js';
@@ -55,7 +48,7 @@ function keyText(value: unknown): string | undefined {
 
 /** The MySQL error number of a failed query, if it has one. */
 function errnoOf(error: unknown): unknown {
-  return error instanceof DrizzleQueryError &&
+  return isDrizzleQueryError(error) &&
     error.cause instanceof Error &&
     'errno' in error.cause
     ? error.cause.errno

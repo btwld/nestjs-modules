@@ -1,7 +1,10 @@
 import { type INestApplicationContext } from '@nestjs/common';
 import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
-import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
+import {
+  type ConformanceCapability,
+  type ConformanceHarnessInterface,
+} from '@concepta/nestjs-repository/conformance';
 
 import {
   ConformanceAuthorEntity,
@@ -13,6 +16,7 @@ import {
   ConformanceTagEntity,
   ConformanceTenantOrderEntity,
   ConformanceTenantOrderLineEntity,
+  ConformanceUniqueItemEntity,
 } from '../../__fixtures__/conformance/conformance.entity.fixture.js';
 import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
 import {
@@ -33,6 +37,7 @@ import {
   tagTable,
   tenantOrderLineTable,
   tenantOrderTable,
+  uniqueItemTable,
 } from './conformance-postgres.schema.fixture.js';
 import { type DrizzlePostgresConnect } from './drizzle-postgres-connect.type.js';
 
@@ -46,10 +51,16 @@ function database(app: INestApplicationContext): DrizzlePostgresClient {
 /**
  * The Drizzle Postgres adapter's conformance harness on the database
  * `connect` creates, with the fixture tables created afresh on startup.
+ *
+ * @param name - Names the run
+ * @param connect - Creates the database the run uses
+ * @param concurrentTransactions - Whether the database runs transactions
+ *   at the same time; one with a single connection refuses it
  */
 export function drizzlePostgresConformanceHarness(
   name: string,
   connect: DrizzlePostgresConnect,
+  concurrentTransactions: ConformanceCapability = 'supported',
 ): ConformanceHarnessInterface<typeof DrizzlePostgresRepositoryModule> {
   return {
     name,
@@ -77,6 +88,12 @@ export function drizzlePostgresConformanceHarness(
         key: 'conformance-plain-item',
         entity: ConformancePlainItemEntity,
         table: plainItemTable,
+      },
+      uniqueItem: {
+        key: 'conformance-unique-item',
+        entity: ConformanceUniqueItemEntity,
+        table: uniqueItemTable,
+        version: 'version',
       },
       author: {
         key: 'conformance-author',
@@ -124,6 +141,7 @@ export function drizzlePostgresConformanceHarness(
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
       softDelete: 'supported',
+      concurrentTransactions,
     },
     async reset(app) {
       const db = database(app);

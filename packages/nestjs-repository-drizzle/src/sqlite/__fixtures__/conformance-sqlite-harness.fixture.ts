@@ -15,6 +15,7 @@ import {
   ConformanceTagEntity,
   ConformanceTenantOrderEntity,
   ConformanceTenantOrderLineEntity,
+  ConformanceUniqueItemEntity,
 } from '../../__fixtures__/conformance/conformance.entity.fixture.js';
 import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
 import {
@@ -35,6 +36,7 @@ import {
   tagTable,
   tenantOrderLineTable,
   tenantOrderTable,
+  uniqueItemTable,
 } from './conformance-sqlite.schema.fixture.js';
 
 function database(app: INestApplicationContext): DrizzleSqliteClient {
@@ -77,6 +79,12 @@ export function drizzleSqliteConformanceHarness(): ConformanceHarnessInterface<
         key: 'conformance-plain-item',
         entity: ConformancePlainItemEntity,
         table: plainItemTable,
+      },
+      uniqueItem: {
+        key: 'conformance-unique-item',
+        entity: ConformanceUniqueItemEntity,
+        table: uniqueItemTable,
+        version: 'version',
       },
       author: {
         key: 'conformance-author',
@@ -124,6 +132,7 @@ export function drizzleSqliteConformanceHarness(): ConformanceHarnessInterface<
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
       softDelete: 'supported',
+      concurrentTransactions: 'refused',
     },
     async reset(app) {
       const db = database(app);

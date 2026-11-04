@@ -4,7 +4,6 @@ import {
   between,
   type Column,
   desc,
-  DrizzleQueryError,
   eq,
   getTableColumns,
   gt,
@@ -55,10 +54,9 @@ import {
   WhereOperator,
 } from '@concepta/nestjs-repository';
 
-import { DrizzleTransaction } from '../transaction/drizzle-transaction.js';
-
 import { type DrizzleClaimedRowInterface } from './drizzle-claimed-row.interface.js';
 import { columnOf } from './drizzle-metadata.js';
+import { isDrizzleQueryError } from './drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from './drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from './drizzle-repository-options.interface.js';
 import { asStored } from './drizzle-rows.util.js';
@@ -117,7 +115,7 @@ export abstract class DrizzleRepository<
   protected override describeDatabaseError(
     error: unknown,
   ): RepositoryDatabaseErrorInterface | undefined {
-    if (!(error instanceof DrizzleQueryError)) return undefined;
+    if (!isDrizzleQueryError(error)) return undefined;
     const reported = error.cause instanceof Error ? error.cause : undefined;
     const code =
       reported &&
@@ -214,9 +212,7 @@ export abstract class DrizzleRepository<
 
   /**
    * Run `work` in the caller's transaction on this connection, or
-   * `otherwise` when the caller has none. A statement that makes the
-   * database end the caller's transaction fails the caller's whole scope,
-   * so nothing after it runs outside the transaction or commits.
+   * `otherwise` when the caller has none.
    */
   protected async joining<T>(
     ctx: AppContextLike | undefined,
@@ -240,24 +236,7 @@ export abstract class DrizzleRepository<
         fault: 'internal',
       });
     }
-    try {
-      return await work(client);
-    } catch (error) {
-      if (this.endsTransaction(error) && tx instanceof DrizzleTransaction) {
-        tx.end(error);
-        trx.markFailed(error);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Whether the database ends the transaction a statement ran in when the
-   * statement fails with `error`, such as a deadlock it rolls the whole
-   * transaction back for.
-   */
-  protected endsTransaction(_error: unknown): boolean {
-    return false;
+    return work(client);
   }
 
   /**

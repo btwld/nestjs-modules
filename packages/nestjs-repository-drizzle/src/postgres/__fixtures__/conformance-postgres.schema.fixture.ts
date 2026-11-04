@@ -19,6 +19,13 @@ export const plainItemTable = pgTable('drizzle_conformance_plain_item', {
   name: text().notNull(),
 });
 
+export const uniqueItemTable = pgTable('drizzle_conformance_unique_item', {
+  id: text().primaryKey(),
+  code: text().notNull().unique(),
+  name: text().notNull(),
+  version: integer().notNull(),
+});
+
 export const authorTable = pgTable('drizzle_conformance_author', {
   id: text().primaryKey(),
   name: text().notNull(),
@@ -80,6 +87,7 @@ export const CONFORMANCE_TABLES = [
   authorTable,
   itemTable,
   plainItemTable,
+  uniqueItemTable,
 ];
 
 /**
@@ -93,7 +101,8 @@ export async function createConformanceSchema(
     sql`drop table if exists drizzle_conformance_tenant_order_line,
       drizzle_conformance_tenant_order, drizzle_conformance_award, drizzle_conformance_book,
       drizzle_conformance_book_with_eager_author, drizzle_conformance_tag,
-      drizzle_conformance_author, drizzle_conformance_item, drizzle_conformance_plain_item`,
+      drizzle_conformance_author, drizzle_conformance_item, drizzle_conformance_plain_item,
+      drizzle_conformance_unique_item`,
     sql`create table drizzle_conformance_item (
       id serial primary key,
       name text not null,
@@ -105,6 +114,12 @@ export async function createConformanceSchema(
     sql`create table drizzle_conformance_plain_item (
       id serial primary key,
       name text not null
+    )`,
+    sql`create table drizzle_conformance_unique_item (
+      id text primary key,
+      code text not null unique,
+      name text not null,
+      version integer not null
     )`,
     sql`create table drizzle_conformance_author (
       id text primary key,

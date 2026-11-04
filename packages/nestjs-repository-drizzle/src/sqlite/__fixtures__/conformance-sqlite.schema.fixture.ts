@@ -21,6 +21,13 @@ export const plainItemTable = sqliteTable('drizzle_conformance_plain_item', {
   name: text().notNull(),
 });
 
+export const uniqueItemTable = sqliteTable('drizzle_conformance_unique_item', {
+  id: text().primaryKey(),
+  code: text().notNull().unique(),
+  name: text().notNull(),
+  version: integer().notNull(),
+});
+
 export const authorTable = sqliteTable('drizzle_conformance_author', {
   id: text().primaryKey(),
   name: text().notNull(),
@@ -85,6 +92,7 @@ export const CONFORMANCE_TABLES = [
   authorTable,
   itemTable,
   plainItemTable,
+  uniqueItemTable,
 ];
 
 /**
@@ -106,6 +114,12 @@ export function createConformanceSchema(db: DrizzleSqliteClient): void {
     sql`create table drizzle_conformance_plain_item (
       id integer primary key autoincrement,
       name text not null
+    )`,
+    sql`create table drizzle_conformance_unique_item (
+      id text primary key,
+      code text not null unique,
+      name text not null,
+      version integer not null
     )`,
     sql`create table drizzle_conformance_author (
       id text primary key,

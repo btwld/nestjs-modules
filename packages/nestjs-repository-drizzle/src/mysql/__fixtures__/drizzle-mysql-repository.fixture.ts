@@ -20,7 +20,6 @@ import { DrizzleModule } from '@nestjs/drizzle';
 import { CoreModule } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
-  OptimisticLockException,
   RepositoryDatabaseException,
   RepositoryModule,
   type RepositoryInterface,
@@ -324,14 +323,6 @@ export function describeDrizzleMysqlRepository(
       expect(await tickets.count()).toBe(0);
     });
 
-    it('reports a versioned upsert that duplicates another unique column as the database error', async () => {
-      await tokens.create({ id: 'taken', label: 'taken' });
-
-      await expect(
-        tokens.upsert({ id: 'other', label: 'taken' }),
-      ).rejects.toThrow(RepositoryDatabaseException);
-    });
-
     it('refuses an upsert whose new key duplicates another unique column, writing no other row', async () => {
       await labels.create({ id: 'a', label: 'L', extra: 'one' });
 
@@ -483,117 +474,6 @@ export function describeDrizzleMysqlRepository(
         { id: BigInt('9007199254740994'), name: 'two' },
         { id: BigInt('9007199254740995'), name: 'three' },
       ]);
-    });
-
-    describe('in a transaction that has read before it writes', () => {
-      it('refuses a versioned write another caller has committed past', async () => {
-        const stored = await tokens.create({ id: 'stale', label: 'stale' });
-
-        const write = (expectedVersion?: number) =>
-          txScope.run({}, async (txCtx) => {
-            const [mine] = await tokens.find({
-              where: Where.eq('id', 'stale'),
-              ctx: txCtx,
-            });
-            if (!mine) throw new Error('the row is gone');
-            // Committed on another connection, after this run's first read.
-            const theirs = await tokens.findOne({
-              where: Where.eq('id', 'stale'),
-            });
-            if (!theirs) throw new Error('the row is gone');
-            await tokens.update(theirs, { label: `theirs-${theirs.version}` });
-            return tokens.update(
-              mine,
-              { label: 'mine' },
-              { ctx: txCtx, expectedVersion },
-            );
-          });
-
-        await expect(write()).rejects.toThrow(OptimisticLockException);
-        await expect(write(stored.version)).rejects.toThrow(
-          OptimisticLockException,
-        );
-        expect(
-          await tokens.findOne({ where: Where.eq('id', 'stale') }),
-        ).toEqual({ id: 'stale', label: 'theirs-2', version: 3 });
-      });
-
-      it('returns the row as stored, not as the run first read it', async () => {
-        const stored = await labels.create({
-          id: 'read-first',
-          label: 'R',
-          extra: 'same',
-        });
-
-        const written = await txScope.run({}, async (txCtx) => {
-          await labels.find({ ctx: txCtx });
-          await labels.update(stored, { label: 'R2' });
-          return labels.update(stored, { extra: 'same' }, { ctx: txCtx });
-        });
-
-        expect(written).toEqual({
-          id: 'read-first',
-          label: 'R2',
-          extra: 'same',
-        });
-      });
-    });
-
-    it('runs nothing more in a transaction a deadlock ended', async () => {
-      const [a, b] = await labels.createMany([
-        { id: 'dl-a', label: 'DA', extra: 'zero' },
-        { id: 'dl-b', label: 'DB', extra: 'zero' },
-      ]);
-      if (!a || !b) throw new Error('the rows were not created');
-      const victims: unknown[] = [];
-      const afterDeadlock: unknown[] = [];
-      let firstLocked = (): void => undefined;
-      const bothLocked = Promise.all([
-        new Promise<void>((resolve) => (firstLocked = resolve)),
-        new Promise<void>((resolve) => setTimeout(resolve, 200)),
-      ]);
-
-      // Each run locks its own row, then the other's: one is the victim.
-      const crossing = (own: LabelEntity, other: LabelEntity, name: string) =>
-        txScope.run({}, async (txCtx) => {
-          await labels.update(own, { extra: name }, { ctx: txCtx });
-          if (name === 'first') firstLocked();
-          await bothLocked;
-          try {
-            await labels.update(other, { extra: name }, { ctx: txCtx });
-          } catch (error) {
-            victims.push(error);
-            afterDeadlock.push(
-              await labels
-                .create(
-                  { id: `escaped-${name}`, label: name, extra: name },
-                  { ctx: txCtx },
-                )
-                .catch((caught: unknown) => caught),
-            );
-          }
-          return name;
-        });
-
-      const outcomes = await Promise.allSettled([
-        crossing(a, b, 'first'),
-        crossing(b, a, 'second'),
-      ]);
-
-      expect(victims).toEqual([expect.any(RepositoryDatabaseException)]);
-      expect(afterDeadlock).toEqual([
-        expect.objectContaining({
-          message:
-            'The database ended this transaction, so nothing more can run in it',
-        }),
-      ]);
-      expect(outcomes.map(({ status }) => status).sort()).toEqual([
-        'fulfilled',
-        'rejected',
-      ]);
-      expect(
-        await labels.count({ where: Where.starts('id', 'escaped-') }),
-      ).toBe(0);
     });
 
     it('keeps the version when every value equals the stored one, whatever its type', async () => {

@@ -15,6 +15,7 @@ import {
   ConformanceTagEntity,
   ConformanceTenantOrderEntity,
   ConformanceTenantOrderLineEntity,
+  ConformanceUniqueItemEntity,
 } from '../../__fixtures__/conformance/conformance.entity.fixture.js';
 import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
 import { toDrizzleMysqlClient } from '../drizzle-mysql-repository.module.js';
@@ -32,6 +33,7 @@ import {
   tagTable,
   tenantOrderLineTable,
   tenantOrderTable,
+  uniqueItemTable,
 } from './conformance-mysql.schema.fixture.js';
 import { type DrizzleMysqlAdapterModule } from './drizzle-mysql-adapter-module.type.js';
 
@@ -77,6 +79,12 @@ export function drizzleMysqlConformanceHarness(
         key: 'conformance-plain-item',
         entity: ConformancePlainItemEntity,
         table: plainItemTable,
+      },
+      uniqueItem: {
+        key: 'conformance-unique-item',
+        entity: ConformanceUniqueItemEntity,
+        table: uniqueItemTable,
+        version: 'version',
       },
       author: {
         key: 'conformance-author',
@@ -124,6 +132,7 @@ export function drizzleMysqlConformanceHarness(
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
       softDelete: 'supported',
+      concurrentTransactions: 'supported',
     },
     async reset(app) {
       const db = database(app);

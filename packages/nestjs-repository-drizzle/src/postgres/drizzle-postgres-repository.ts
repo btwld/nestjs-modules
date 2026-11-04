@@ -11,6 +11,7 @@ import {
 
 import { type DrizzleClaimedRowInterface } from '../repository/drizzle-claimed-row.interface.js';
 import { columnOf } from '../repository/drizzle-metadata.js';
+import { isDrizzleQueryError } from '../repository/drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
 import { DrizzleRepository } from '../repository/drizzle-repository.js';
@@ -86,6 +87,14 @@ export class DrizzlePostgresRepository<
       await applyTransactionSettings(tx, settings);
       return work(tx);
     });
+  }
+
+  /**
+   * Any failed statement: Postgres ends the transaction it ran in, and
+   * answers a later `COMMIT` with a rollback.
+   */
+  protected override endsTransaction(error: unknown): boolean {
+    return isDrizzleQueryError(error);
   }
 
   protected async selectRows(

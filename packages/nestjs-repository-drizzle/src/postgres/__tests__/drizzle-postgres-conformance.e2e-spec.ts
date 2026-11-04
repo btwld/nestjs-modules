@@ -4,6 +4,10 @@ import { drizzlePostgresConformanceHarness } from '../__fixtures__/conformance-p
 import { pgliteDatabase } from '../__fixtures__/postgres-databases.fixture.js';
 
 runRepositoryConformance(
-  drizzlePostgresConformanceHarness('drizzle-postgres/pglite', pgliteDatabase),
+  drizzlePostgresConformanceHarness(
+    'drizzle-postgres/pglite',
+    pgliteDatabase,
+    'refused',
+  ),
   { describe, it, beforeAll, afterAll, beforeEach },
 );

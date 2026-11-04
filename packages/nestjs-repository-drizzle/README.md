@@ -66,9 +66,13 @@ with `DrizzleUnsupportedDatabaseException`.
 - In ascending order, `NULL`s sort last.
 - Writes return the rows they wrote in the same statement (`RETURNING`).
 - Transactions run concurrently, each on its own connection.
-- A failed statement ends the transaction it ran in. A run that catches the
-  error and returns doesn't commit: it rejects with Postgres's
-  `current transaction is aborted` error, and nothing it wrote is kept.
+- A failed statement ends the transaction it ran in. The run then fails,
+  even if it catches the error, and keeps nothing it wrote; every later call
+  in it throws `TransactionDoomedException`. Raw SQL you run through the
+  transaction's `getClient()` is not watched: if you catch a failed
+  statement there, the run still resolves and runs its `onCommit`
+  callbacks, though Postgres kept nothing. Don't catch errors from raw SQL
+  in a run.
 - `transactionSettings` sets values at the start of every transaction, such
   as the caller's tenant — see
   [Row-Level Security (Postgres)](#row-level-security-postgres).
@@ -97,7 +101,8 @@ primary key, in your transaction or in one of its own.
   `RepositoryDatabaseException`
   (`context.code` `'ER_LOCK_DEADLOCK'`), and MySQL rolls back the whole
   transaction. The run then fails, even if it catches the error, and every
-  later call in it throws — retry the whole run. Leave
+  later call in it throws `TransactionDoomedException` — retry the whole
+  run. Leave
   `innodb_rollback_on_timeout` off (the default): with it on, a lock-wait
   timeout also rolls the whole transaction back, which the driver doesn't
   detect, so later calls in the run would run outside it.

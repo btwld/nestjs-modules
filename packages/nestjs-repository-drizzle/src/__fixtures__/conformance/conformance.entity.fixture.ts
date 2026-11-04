@@ -8,6 +8,7 @@ import {
   type ConformanceTagInterface,
   type ConformanceTenantOrderInterface,
   type ConformanceTenantOrderLineInterface,
+  type ConformanceUniqueItemInterface,
 } from '@concepta/nestjs-repository/conformance';
 
 // The conformance suite's fixtures as entity classes, shared by every
@@ -25,6 +26,13 @@ export class ConformanceItemEntity implements ConformanceItemInterface {
 export class ConformancePlainItemEntity implements ConformancePlainItemInterface {
   declare id: number;
   declare name: string;
+}
+
+export class ConformanceUniqueItemEntity implements ConformanceUniqueItemInterface {
+  declare id: string;
+  declare code: string;
+  declare name: string;
+  declare version: number;
 }
 
 export class ConformanceAuthorEntity implements ConformanceAuthorInterface {
