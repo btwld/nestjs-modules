@@ -136,7 +136,10 @@ export abstract class DrizzleRepository<
   protected abstract clientOfTransaction(tx: unknown): Client | undefined;
 
   /** Run `work` in a new transaction on the connection's database. */
-  protected abstract begin<T>(work: (tx: Client) => Promise<T>): Promise<T>;
+  protected abstract begin<T>(
+    work: (tx: Client) => Promise<T>,
+    ctx: AppContextLike | undefined,
+  ): Promise<T>;
 
   /** The rows a read selects. */
   protected abstract selectRows(
@@ -234,7 +237,7 @@ export abstract class DrizzleRepository<
     work: (tx: Client) => Promise<T>,
   ): Promise<T> {
     const open = await this.transaction(ctx);
-    return open !== undefined ? work(open) : this.begin(work);
+    return open !== undefined ? work(open) : this.begin(work, ctx);
   }
 
   /**

@@ -10,9 +10,12 @@ import { type DrizzleRepositoryOptions } from './repository/drizzle-repository-o
 /**
  * What one database's adapter gives the shared registration: its module
  * class, its transaction keys, the database it accepts, and how to build its
- * repositories and transaction factories.
+ * repositories and transaction factories from the registration's `options`.
  */
-export interface DrizzleAdapterDefinitionInterface<Client> {
+export interface DrizzleAdapterDefinitionInterface<
+  Client,
+  Options = undefined,
+> {
   /** The adapter's module class. */
   module: Type;
 
@@ -31,8 +34,13 @@ export interface DrizzleAdapterDefinitionInterface<Client> {
   /** Build the adapter's repository for one registration. */
   createRepository<Entity extends PlainLiteralObject>(
     options: DrizzleRepositoryOptions<Entity, Client>,
+    driverOptions?: Options,
   ): RepositoryAdapter<Entity>;
 
   /** Build the adapter's transaction factory for one connection. */
-  createTransactionFactory(db: Client): TransactionFactoryInterface;
+  createTransactionFactory(
+    db: Client,
+    connection: string,
+    driverOptions?: Options,
+  ): TransactionFactoryInterface;
 }

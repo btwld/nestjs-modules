@@ -32,10 +32,12 @@ export function resolveTransactionKey(
  */
 export function createDrizzleProvider<
   Client,
+  Options,
   Entity extends PlainLiteralObject,
 >(
-  definition: DrizzleAdapterDefinitionInterface<Client>,
+  definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   options: DrizzleProviderOptionsInterface<Entity>,
+  driverOptions?: Options,
 ): Provider {
   const connection = resolveConnectionName(options.connection);
 
@@ -46,40 +48,54 @@ export function createDrizzleProvider<
       { token: HookResolverService, optional: true },
     ],
     useFactory: (db: unknown, hookResolver?: HookResolverService) =>
-      definition.createRepository<Entity>({
-        entityKey: options.key,
-        db: definition.toClient(db, connection),
-        table: options.table,
-        metadata: buildMetadata(options, connection),
-        transactionKey: resolveTransactionKey(
-          definition.transactionKeyPrefix,
+      definition.createRepository<Entity>(
+        {
+          entityKey: options.key,
           connection,
-        ),
-        hookResolver,
-      }),
+          db: definition.toClient(db, connection),
+          table: options.table,
+          metadata: buildMetadata(options, connection),
+          transactionKey: resolveTransactionKey(
+            definition.transactionKeyPrefix,
+            connection,
+          ),
+          hookResolver,
+        },
+        driverOptions,
+      ),
   };
 }
 
 /** The transaction factory of one connection. */
-export function createTransactionFactoryDescriptor<Client>(
-  definition: DrizzleAdapterDefinitionInterface<Client>,
+export function createTransactionFactoryDescriptor<Client, Options>(
+  definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   connection: string,
+  driverOptions?: Options,
 ): TransactionFactoryDescriptor {
   return {
     key: resolveTransactionKey(definition.transactionKeyPrefix, connection),
     inject: [getDrizzleToken(connection)],
     useFactory: (db: unknown) =>
-      definition.createTransactionFactory(definition.toClient(db, connection)),
+      definition.createTransactionFactory(
+        definition.toClient(db, connection),
+        connection,
+        driverOptions,
+      ),
   };
 }
 
 /**
  * Build one adapter's registration for `RepositoryModule.forRoot()`: a
  * repository provider per entity and a transaction factory per connection.
+ *
+ * @param definition - The adapter
+ * @param entities - Its entities
+ * @param driverOptions - The registration's `options`, for the adapter
  */
-export function registerDrizzleAdapter<Client>(
-  definition: DrizzleAdapterDefinitionInterface<Client>,
+export function registerDrizzleAdapter<Client, Options>(
+  definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   entities: DrizzleProviderOptionsInterface[],
+  driverOptions?: Options,
 ): DynamicRepositoryModule {
   const connections = new Set(
     entities.map(({ connection }) => resolveConnectionName(connection)),
@@ -88,10 +104,10 @@ export function registerDrizzleAdapter<Client>(
   return {
     module: definition.module,
     providers: entities.map((entity) =>
-      createDrizzleProvider(definition, entity),
+      createDrizzleProvider(definition, entity, driverOptions),
     ),
     transactionFactories: Array.from(connections).map((connection) =>
-      createTransactionFactoryDescriptor(definition, connection),
+      createTransactionFactoryDescriptor(definition, connection, driverOptions),
     ),
   };
 }

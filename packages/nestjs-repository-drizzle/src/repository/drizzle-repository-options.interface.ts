@@ -14,6 +14,8 @@ export interface DrizzleRepositoryOptions<
   Client,
 > {
   entityKey: string;
+  /** The `@nestjs/drizzle` connection the registration names. */
+  connection: string;
   db: Client;
   table: Table;
   metadata: RepositoryMetadataInterface<Entity>;

@@ -10,7 +10,11 @@ import { type PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { RuntimeException } from '@concepta/nestjs-core';
+import {
+  AppContextHost,
+  type AppContextLike,
+  RuntimeException,
+} from '@concepta/nestjs-core';
 
 import { columnOf } from '../repository/drizzle-metadata.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
@@ -18,9 +22,11 @@ import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-
 import { DrizzleRepository } from '../repository/drizzle-repository.js';
 import { toRows } from '../repository/drizzle-rows.util.js';
 
+import { type DrizzlePostgresTransactionSettingsResolver } from './drizzle-postgres-transaction-settings-resolver.type.js';
 import { DrizzlePostgresTransaction } from './drizzle-postgres-transaction.js';
 import { DRIZZLE_POSTGRES_DATABASE } from './drizzle-postgres.constants.js';
 import { type DrizzlePostgresClient } from './drizzle-postgres.types.js';
+import { applyTransactionSettings } from './drizzle-postgres.util.js';
 
 /** A Postgres table, or a refusal naming the table that is not one. */
 function pgTableOf(table: Table): PgTable {
@@ -47,8 +53,15 @@ export class DrizzlePostgresRepository<
 
   private readonly table: PgTable;
 
+  /**
+   * @param options - The registration, its connection's database and its
+   *   metadata
+   * @param transactionSettings - Settings applied at the start of every
+   *   transaction the repository opens itself
+   */
   constructor(
     options: DrizzleRepositoryOptions<Entity, DrizzlePostgresClient>,
+    private readonly transactionSettings?: DrizzlePostgresTransactionSettingsResolver,
   ) {
     super(options, DRIZZLE_POSTGRES_DATABASE);
     this.table = pgTableOf(options.table);
@@ -68,8 +81,17 @@ export class DrizzlePostgresRepository<
 
   protected begin<T>(
     work: (tx: DrizzlePostgresClient) => Promise<T>,
+    ctx: AppContextLike | undefined,
   ): Promise<T> {
-    return this.options.db.transaction(work);
+    const settings =
+      this.transactionSettings?.(
+        AppContextHost.from(ctx),
+        this.options.connection,
+      ) ?? {};
+    return this.options.db.transaction(async (tx) => {
+      await applyTransactionSettings(tx, settings);
+      return work(tx);
+    });
   }
 
   protected async selectRows(

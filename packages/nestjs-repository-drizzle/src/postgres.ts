@@ -11,3 +11,6 @@ export { DrizzleRepositoryOptions } from './repository/drizzle-repository-option
 export { DrizzlePostgresTransaction } from './postgres/drizzle-postgres-transaction.js';
 export { DrizzlePostgresTransactionFactory } from './postgres/drizzle-postgres-transaction.factory.js';
 export { DrizzlePostgresClient } from './postgres/drizzle-postgres.types.js';
+export { DrizzlePostgresDriverOptionsInterface } from './postgres/drizzle-postgres-driver-options.interface.js';
+export { DrizzlePostgresTransactionSettingsResolver } from './postgres/drizzle-postgres-transaction-settings-resolver.type.js';
+export { DrizzlePostgresTransactionSettings } from './postgres/drizzle-postgres-transaction-settings.type.js';
