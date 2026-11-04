@@ -19,6 +19,11 @@ export class TypeOrmMysqlTransactionFactory extends TypeOrmTransactionFactory {
     super(dataSource, dataSourceKey);
   }
 
+  /** mysql2 gives an error the server sent its `sqlState`. */
+  protected override sentByServer(error: Error): boolean {
+    return 'sqlState' in error && typeof error.sqlState === 'string';
+  }
+
   create(): TypeOrmMysqlTransaction {
     return new TypeOrmMysqlTransaction(this.dataSource);
   }

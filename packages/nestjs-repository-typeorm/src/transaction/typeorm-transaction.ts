@@ -29,7 +29,7 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
   /**
    * @param dataSource - The data source to run on
    */
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(protected readonly dataSource: DataSource) {}
 
   /**
    * Runs once the transaction has begun, before it is handed out. A failure
@@ -90,6 +90,11 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
 
     try {
       await this.queryRunner.commitTransaction();
+    } catch (error) {
+      // A COMMIT the database refuses can leave the transaction open
+      // (SQLite does): end it before the connection goes back.
+      await this.rollbackOpen(this.queryRunner, 'commit()');
+      throw error;
     } finally {
       await this.cleanup();
     }
@@ -132,16 +137,7 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
   // subscriber), and releasing that connection would hand its open
   // transaction to the next request.
   private async abandon(queryRunner: QueryRunner): Promise<void> {
-    if (queryRunner.isTransactionActive) {
-      try {
-        await queryRunner.rollbackTransaction();
-      } catch (rollbackError) {
-        Logger.error(
-          `Failed to roll back QueryRunner after start() failed: ${rollbackError}`,
-          rollbackError instanceof Error ? rollbackError.stack : undefined,
-        );
-      }
-    }
+    await this.rollbackOpen(queryRunner, 'start()');
 
     try {
       await this.release(queryRunner);
@@ -149,6 +145,22 @@ export abstract class TypeOrmTransaction implements TransactionInterface {
       Logger.error(
         `Failed to release QueryRunner after start() failed: ${releaseError}`,
         releaseError instanceof Error ? releaseError.stack : undefined,
+      );
+    }
+  }
+
+  /** Roll back the transaction `queryRunner` reports open, after `failed`. */
+  private async rollbackOpen(
+    queryRunner: QueryRunner,
+    failed: string,
+  ): Promise<void> {
+    if (!queryRunner.isTransactionActive) return;
+    try {
+      await queryRunner.rollbackTransaction();
+    } catch (rollbackError) {
+      Logger.error(
+        `Failed to roll back QueryRunner after ${failed} failed: ${rollbackError}`,
+        rollbackError instanceof Error ? rollbackError.stack : undefined,
       );
     }
   }

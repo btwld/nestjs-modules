@@ -46,6 +46,13 @@ export interface ConformanceCapabilitiesInterface {
   referentialIntegrity: ConformanceCapability;
 
   /**
+   * The store checks `award.authorId` as a reference to an author when a
+   * transaction commits, not at the write: a run may write an award naming
+   * no author, and its commit is refused. Needs `transactions`.
+   */
+  deferredReferences: ConformanceCapability;
+
+  /**
    * The driver supports soft delete: it reports the remove date an entity
    * declares, sets and clears it, and leaves soft-deleted rows out of reads.
    * A driver that refuses it must refuse at startup an entity that declares

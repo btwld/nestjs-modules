@@ -426,6 +426,7 @@ runRepositoryConformance(
       relations: 'supported',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      deferredReferences: 'refused',
       softDelete: 'supported',
     },
     reset: (app) => removeEveryFixtureRow(app),
@@ -441,13 +442,16 @@ runRepositoryConformance(
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
   driver's own options go in `driverOptions`.
-- **Capabilities.** Six are optional, each `'supported'` or `'refused'`:
+- **Capabilities.** Seven are optional, each `'supported'` or `'refused'`:
   `transactions`, `concurrentTransactions` (needs `transactions`; your
   store runs transactions at the same time, so one commits while another
   is open — a store with one connection refuses it), `relations`,
   `eagerResults` (needs `relations`),
   `referentialIntegrity` (your store refuses a book naming no author, and
-  the delete of an author a book still names), and `softDelete`. A refused
+  the delete of an author a book still names), `deferredReferences` (needs
+  `transactions`; your store checks `award.authorId` at commit, so a run
+  may write an award naming no author and its commit is refused), and
+  `softDelete`. A refused
   one runs its refusal cases, if it has any, instead. A driver that refuses
   `relations` reports none, so the repository refuses every read that joins,
   filters on or sorts by one. A driver that refuses `softDelete` must refuse
@@ -459,9 +463,13 @@ runRepositoryConformance(
   write that changes a stored row, and for keeping it on a write that
   changes nothing. Refusing a stale row is checked inside a transaction
   only.
-- **Transactions.** On a store with a single connection, a call that ignores
-  the run's `ctx` still lands in the open transaction, so the suite can't see
-  it. Run it against a store with more than one connection too.
+- **Transactions.** A call made without the run's `ctx` while the run is
+  open must take no part in it: on a store with a single connection, make it
+  wait until the run ends. A commit your store refuses must end the
+  transaction, keeping none of its writes; describe the error in your
+  factory's `describeDatabaseError` so the run rejects with
+  `TransactionCommitException`. Describe only an error your database sent:
+  after a lost connection or a client timeout, the commit may have landed.
 - **Overlapping transactions.** With `concurrentTransactions`, the suite
   races runs against each other: a stale write, a read-back after another
   run committed, a deadlock, concurrent upserts of one key. Where your
@@ -1374,6 +1382,9 @@ work that otherwise succeeded:
   runs in it. A database error after which the database has ended the
   transaction itself, such as a MySQL deadlock, fails the scope too, even
   if the caller catches it.
+- A commit the database refuses, such as over a reference it checks at
+  commit, rejects the run with `TransactionCommitException`, a
+  `RepositoryDatabaseException`; none of the run's writes are kept.
 - `readOnly` is decided once, by whichever `run()` call creates the scope —
   every later participant just joins it. A nested or concurrent `run()`
   (or `runReadOnly()`) call whose explicit `readOnly` option conflicts with
@@ -1463,7 +1474,12 @@ scope runs under. Read the caller's overlays from it, row scope included, to
 prepare the transaction; never define overlays on it.
 
 Every read and write a driver makes with a scope's `ctx` takes part in that
-scope's transaction. A driver that registers no factory has none to join:
+scope's transaction, and a call made without it takes part in none, even
+while a run is open; on a store with one connection, it waits for the run
+to end. A `commit()` the database refuses ends the transaction before it
+rejects, keeping none of its writes; report the database's error from the
+factory's `describeDatabaseError(error)` and the run rejects with
+`TransactionCommitException`. A driver that registers no factory has none to join:
 `run()` then works without a transaction, and the writes made before a throw
 stay.
 
@@ -2941,6 +2957,7 @@ also exported for manual provider wiring.
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |
 | `TransactionClosedException` | A settled scope was used again — `getOrStart`, `enter`, `onCommit`, or `onRollback` after close |
 | `TransactionDoomedException` | A repository call joined a scope that had already failed — a participant threw, or the database ended the transaction (a deadlock) — so it will roll back |
+| `TransactionCommitException` | A `RepositoryDatabaseException` for a commit the database refused, such as over a reference it checks at commit. None of the run's writes were kept |
 | `TransactionHeuristicCommitException` | A multi-datasource commit failed after at least one datasource had already committed |
 | `TransactionReadOnlyConflictException` | A joining `run()`/`runReadOnly()` call's `readOnly` option conflicts with the scope it's joining |
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |

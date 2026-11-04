@@ -131,6 +131,7 @@ export function drizzleSqliteConformanceHarness(): ConformanceHarnessInterface<
       relations: 'refused',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      deferredReferences: 'supported',
       softDelete: 'supported',
       concurrentTransactions: 'refused',
     },

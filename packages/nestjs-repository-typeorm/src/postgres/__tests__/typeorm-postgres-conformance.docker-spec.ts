@@ -14,6 +14,7 @@ runRepositoryConformance(
         'postgres://postgres:postgres@localhost:55432/rockets_test',
       dropSchema: true,
     },
+    { deferredReferences: 'supported' },
   ),
   { describe, it, beforeAll, afterAll, beforeEach },
 );

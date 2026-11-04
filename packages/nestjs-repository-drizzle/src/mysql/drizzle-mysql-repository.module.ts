@@ -81,5 +81,6 @@ export const DRIZZLE_MYSQL_ADAPTER: DrizzleAdapterDefinitionInterface<DrizzleMys
     transactionKeyPrefix: DRIZZLE_MYSQL_TRANSACTION_KEY_PREFIX,
     toClient: (db, connection) => toDrizzleMysqlClient(db, connection),
     createRepository: (options) => new DrizzleMysqlRepository(options),
-    createTransactionFactory: (db) => new DrizzleMysqlTransactionFactory(db),
+    createTransactionFactory: (db) =>
+      new DrizzleMysqlTransactionFactory(db, DRIZZLE_MYSQL_DATABASE),
   };

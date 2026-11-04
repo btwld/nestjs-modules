@@ -1,6 +1,5 @@
 import {
   count,
-  DrizzleError,
   getTableName,
   is,
   type SQL,
@@ -27,7 +26,7 @@ import {
   SQLITE_TRANSACTION_ENDED_CODES,
 } from './drizzle-sqlite.constants.js';
 import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
-import { rollbackAfter } from './drizzle-sqlite.util.js';
+import { describeSqliteFailure, rollbackAfter } from './drizzle-sqlite.util.js';
 
 /** A SQLite table, or a refusal naming the table that is not one. */
 function sqliteTableOf(table: Table): SQLiteTable {
@@ -116,34 +115,11 @@ export class DrizzleSqliteRepository<
     return this.joining(ctx, work, () => gateOf(db).run(() => work(db)));
   }
 
-  /**
-   * A query SQLite failed, as better-sqlite3's `SqliteError`: thrown as is
-   * by a query Drizzle builds, and as the cause of a `DrizzleError` by one
-   * the adapter runs itself (`BEGIN IMMEDIATE`, `COMMIT`), so a database
-   * another connection has locked reports `SQLITE_BUSY` either way.
-   */
+  /** A query SQLite failed, as `describeSqliteFailure` reports it. */
   protected override describeDatabaseError(
     error: unknown,
   ): RepositoryDatabaseErrorInterface | undefined {
-    const reported =
-      is(error, DrizzleError) &&
-      'cause' in error &&
-      error.cause instanceof Error
-        ? error.cause
-        : error;
-    if (
-      reported instanceof Error &&
-      reported.name === 'SqliteError' &&
-      'code' in reported &&
-      typeof reported.code === 'string'
-    ) {
-      return {
-        database: DRIZZLE_SQLITE_DATABASE,
-        code: reported.code,
-        message: reported.message,
-      };
-    }
-    return super.describeDatabaseError(error);
+    return describeSqliteFailure(error);
   }
 
   /**

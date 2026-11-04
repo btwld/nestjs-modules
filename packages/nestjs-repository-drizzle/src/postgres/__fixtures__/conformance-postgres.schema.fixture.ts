@@ -130,6 +130,7 @@ export async function createConformanceSchema(
       id text primary key,
       name text not null,
       "authorId" text references drizzle_conformance_author (id)
+        deferrable initially deferred
     )`,
     sql`create table drizzle_conformance_book (
       id text primary key,

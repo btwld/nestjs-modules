@@ -1,5 +1,6 @@
 import { type AppContextHost } from '@concepta/nestjs-core';
 
+import { type RepositoryDatabaseErrorInterface } from '../repository/interfaces/repository-database-error.interface.js';
 import { type TransactionInterface } from '../transaction/interfaces/transaction.interface.js';
 
 /**
@@ -26,4 +27,16 @@ export interface TransactionFactoryInterface {
    * first to settle instead of erroring.
    */
   readonly supportsConcurrentTransactions?: boolean;
+
+  /**
+   * `error`, which a transaction's `commit()` threw, as the database's own
+   * refusal, or `undefined` when it isn't one. A described error rejects
+   * the run with `TransactionCommitException`, which tells the caller none
+   * of the run's writes were kept, so describe only an error the database
+   * sent: a lost connection or a client timeout leaves the commit's outcome
+   * unknown, and reaches the caller as it was thrown.
+   */
+  describeDatabaseError?(
+    error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined;
 }

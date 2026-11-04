@@ -20,6 +20,11 @@ export class TypeOrmSqliteTransactionFactory extends TypeOrmTransactionFactory {
     super(dataSource, dataSourceKey);
   }
 
+  /** better-sqlite3 throws what SQLite reports as a `SqliteError`. */
+  protected override sentByServer(error: Error): boolean {
+    return error.name === 'SqliteError';
+  }
+
   create(): TypeOrmSqliteTransaction {
     return new TypeOrmSqliteTransaction(this.dataSource);
   }

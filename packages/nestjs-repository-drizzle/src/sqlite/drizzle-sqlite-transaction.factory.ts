@@ -1,10 +1,12 @@
 import {
+  type RepositoryDatabaseErrorInterface,
   type TransactionFactoryInterface,
   type TransactionInterface,
 } from '@concepta/nestjs-repository';
 
 import { DrizzleSqliteTransaction } from './drizzle-sqlite-transaction.js';
 import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
+import { describeSqliteRefusal } from './drizzle-sqlite.util.js';
 
 /**
  * Creates the transactions of one `@nestjs/drizzle` SQLite connection. The
@@ -18,5 +20,12 @@ export class DrizzleSqliteTransactionFactory implements TransactionFactoryInterf
 
   create(): TransactionInterface {
     return new DrizzleSqliteTransaction(this.db);
+  }
+
+  /** A commit SQLite refused, as `describeSqliteRefusal` reports it. */
+  describeDatabaseError(
+    error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined {
+    return describeSqliteRefusal(error);
   }
 }

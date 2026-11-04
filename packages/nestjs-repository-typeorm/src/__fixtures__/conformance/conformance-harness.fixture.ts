@@ -60,14 +60,21 @@ type TypeOrmAdapterModule =
  * @param name - Names the run
  * @param driver - The adapter's module
  * @param connection - The data source the run uses
- * @param concurrentTransactions - Whether the database runs transactions
- *   at the same time; one with a single connection refuses it
+ * @param capabilities - What the database refuses or provides beyond the
+ *   default: a database with a single connection refuses
+ *   `concurrentTransactions`; one TypeORM writes deferrable references for
+ *   (Postgres, SQLite) supports `deferredReferences`
  */
 export function typeOrmConformanceHarness(
   name: string,
   driver: TypeOrmAdapterModule,
   connection: DataSourceOptions,
-  concurrentTransactions: ConformanceCapability = 'supported',
+  capabilities: Partial<
+    Record<
+      'concurrentTransactions' | 'deferredReferences',
+      ConformanceCapability
+    >
+  > = {},
 ): ConformanceHarnessInterface<TypeOrmAdapterModule> {
   const dataSource = (app: INestApplicationContext): DataSource =>
     app.get<DataSource>(getDataSourceToken());
@@ -112,10 +119,12 @@ export function typeOrmConformanceHarness(
     },
     capabilities: {
       transactions: 'supported',
-      concurrentTransactions,
+      concurrentTransactions:
+        capabilities.concurrentTransactions ?? 'supported',
       relations: 'supported',
       eagerResults: 'supported',
       referentialIntegrity: 'supported',
+      deferredReferences: capabilities.deferredReferences ?? 'refused',
       softDelete: 'supported',
     },
     async reset(app) {

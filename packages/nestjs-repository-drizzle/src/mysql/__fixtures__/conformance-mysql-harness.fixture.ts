@@ -131,6 +131,7 @@ export function drizzleMysqlConformanceHarness(
       relations: 'refused',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      deferredReferences: 'refused',
       softDelete: 'supported',
       concurrentTransactions: 'supported',
     },

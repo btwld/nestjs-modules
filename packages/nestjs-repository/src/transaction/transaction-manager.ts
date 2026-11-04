@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { AppContextHost } from '@concepta/nestjs-core';
 
 import { TransactionClosedException } from '../exceptions/transaction-closed.exception.js';
+import { TransactionCommitException } from '../exceptions/transaction-commit.exception.js';
 import { TransactionDoomedException } from '../exceptions/transaction-doomed.exception.js';
 import { TransactionHeuristicCommitException } from '../exceptions/transaction-heuristic-commit.exception.js';
 import { type TransactionFactoryInterface } from '../interfaces/transaction-factory.interface.js';
@@ -25,6 +26,10 @@ export class TransactionManager implements TransactionManagerInterface {
   private readonly transactions = new Map<
     string,
     Promise<TransactionInterface>
+  >();
+  private readonly factories = new WeakMap<
+    TransactionInterface,
+    TransactionFactoryInterface
   >();
   private readonly commitCallbacks: (() => void | Promise<void>)[] = [];
   private readonly rollbackCallbacks: (() => void | Promise<void>)[] = [];
@@ -157,6 +162,7 @@ export class TransactionManager implements TransactionManagerInterface {
 
     try {
       const tx = factory.create(this.scopeHost);
+      this.factories.set(tx, factory);
       await tx.start();
       return tx;
     } catch (error) {
@@ -191,8 +197,9 @@ export class TransactionManager implements TransactionManagerInterface {
    * Commit all active transactions, sequentially, stopping at the first
    * failure. Whichever transactions haven't committed yet when that
    * happens — the failed one and everything after it — are rolled back
-   * instead of left dangling. Throws the raw underlying error when nothing
-   * had committed yet — rolling everything back is then a clean, atomic
+   * instead of left dangling. Throws the commit's error when nothing had
+   * committed yet — a {@link TransactionCommitException} when the driver
+   * describes it as the database's — rolling everything back is then a clean, atomic
    * outcome, whether one datasource was involved or several — or
    * {@link TransactionHeuristicCommitException} once at least one
    * datasource has already committed, since that earlier commit can't be
@@ -213,7 +220,7 @@ export class TransactionManager implements TransactionManagerInterface {
           await tx.commit();
           committedCount++;
         } catch (error) {
-          originalError = error;
+          originalError = this.refusedCommit(tx, error);
           break;
         }
       }
@@ -236,6 +243,14 @@ export class TransactionManager implements TransactionManagerInterface {
     } finally {
       this.releaseQueues();
     }
+  }
+
+  /** `error` from `tx`'s commit, as the database refusing it if it was. */
+  private refusedCommit(tx: TransactionInterface, error: unknown): unknown {
+    const database = this.factories.get(tx)?.describeDatabaseError?.(error);
+    return database
+      ? new TransactionCommitException(database, { originalError: error })
+      : error;
   }
 
   /**

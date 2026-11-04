@@ -3,6 +3,7 @@ import { type Mock } from 'vitest';
 import { AppContextHost } from '@concepta/nestjs-core';
 
 import { TransactionClosedException } from '../../exceptions/transaction-closed.exception.js';
+import { TransactionCommitException } from '../../exceptions/transaction-commit.exception.js';
 import { TransactionDoomedException } from '../../exceptions/transaction-doomed.exception.js';
 import { TransactionHeuristicCommitException } from '../../exceptions/transaction-heuristic-commit.exception.js';
 import { type TransactionInterface } from '../interfaces/transaction.interface.js';
@@ -456,6 +457,73 @@ describe(TransactionManager.name, () => {
       await seed(manager, registry, 'typeorm:default', failingTx);
 
       await expect(manager.commitAll()).rejects.toBe(originalError);
+    });
+
+    describe('a commit the database refused', () => {
+      const refused = new Error('refused');
+      const database = { database: 'testdb', code: 'X1', message: 'refused' };
+      const refusing = () =>
+        createMockTransaction({
+          isActive: true,
+          commit: vi.fn().mockRejectedValue(refused),
+        });
+      const describing = (tx: TransactionInterface) => ({
+        create: () => tx,
+        describeDatabaseError: (error: unknown) =>
+          error === refused ? database : undefined,
+      });
+
+      it('rejects with TransactionCommitException when the factory describes the error', async () => {
+        registry.register('typeorm:default', describing(refusing()));
+        await manager.getOrStart('typeorm:default');
+
+        const rejection = manager.commitAll();
+
+        await expect(rejection).rejects.toBeInstanceOf(
+          TransactionCommitException,
+        );
+        await expect(rejection).rejects.toHaveProperty('context.code', 'X1');
+        await expect(rejection).rejects.toHaveProperty(
+          'context.originalError',
+          refused,
+        );
+      });
+
+      it('rejects with the error as thrown when the factory does not describe it', async () => {
+        const lost = new Error('connection lost');
+        registry.register('typeorm:default', {
+          create: () =>
+            createMockTransaction({
+              isActive: true,
+              commit: vi.fn().mockRejectedValue(lost),
+            }),
+          describeDatabaseError: () => undefined,
+        });
+        await manager.getOrStart('typeorm:default');
+
+        await expect(manager.commitAll()).rejects.toBe(lost);
+      });
+
+      it('carries it as the original error of a heuristic commit', async () => {
+        await seed(
+          manager,
+          registry,
+          'typeorm:first',
+          createMockTransaction({ isActive: true }),
+        );
+        registry.register('typeorm:refusing', describing(refusing()));
+        await manager.getOrStart('typeorm:refusing');
+
+        const rejection = manager.commitAll();
+
+        await expect(rejection).rejects.toBeInstanceOf(
+          TransactionHeuristicCommitException,
+        );
+        await expect(rejection).rejects.toHaveProperty(
+          'context.originalError',
+          expect.any(TransactionCommitException),
+        );
+      });
     });
 
     it('should reject with the original error, not a heuristic exception, when multiple datasources are involved but none committed', async () => {

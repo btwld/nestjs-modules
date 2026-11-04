@@ -8,9 +8,9 @@ import {
   type AppContextLike,
   RuntimeException,
 } from '@concepta/nestjs-core';
+import { type RepositoryDatabaseErrorInterface } from '@concepta/nestjs-repository';
 
 import { columnOf } from '../repository/drizzle-metadata.js';
-import { isDrizzleQueryError } from '../repository/drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
 import { DrizzleRepository } from '../repository/drizzle-repository.js';
@@ -20,7 +20,10 @@ import { type DrizzlePostgresTransactionSettingsResolver } from './drizzle-postg
 import { DrizzlePostgresTransaction } from './drizzle-postgres-transaction.js';
 import { DRIZZLE_POSTGRES_DATABASE } from './drizzle-postgres.constants.js';
 import { type DrizzlePostgresClient } from './drizzle-postgres.types.js';
-import { applyTransactionSettings } from './drizzle-postgres.util.js';
+import {
+  applyTransactionSettings,
+  describePostgresFailure,
+} from './drizzle-postgres.util.js';
 
 /** A Postgres table, or a refusal naming the table that is not one. */
 function pgTableOf(table: Table): PgTable {
@@ -93,7 +96,14 @@ export class DrizzlePostgresRepository<
    * answers a later `COMMIT` with a rollback.
    */
   protected override endsTransaction(error: unknown): boolean {
-    return isDrizzleQueryError(error);
+    return describePostgresFailure(error) !== undefined;
+  }
+
+  /** A statement Postgres failed, as `describePostgresFailure` reports it. */
+  protected override describeDatabaseError(
+    error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined {
+    return describePostgresFailure(error);
   }
 
   protected async selectRows(

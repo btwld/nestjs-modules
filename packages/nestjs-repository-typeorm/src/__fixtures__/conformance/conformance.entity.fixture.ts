@@ -102,8 +102,10 @@ export class ConformanceAwardEntity implements ConformanceAwardInterface {
   @Column({ type: 'varchar', nullable: true })
   authorId!: string | null;
 
+  // Checked at commit where the database can defer it (`deferredReferences`).
   @ManyToOne(() => ConformanceAuthorEntity, (author) => author.awards, {
     nullable: true,
+    deferrable: 'INITIALLY DEFERRED',
   })
   @JoinColumn({ name: 'authorId' })
   author?: ConformanceAuthorEntity | null;

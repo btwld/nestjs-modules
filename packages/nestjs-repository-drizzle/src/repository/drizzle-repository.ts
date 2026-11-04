@@ -55,7 +55,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { columnOf } from './drizzle-metadata.js';
-import { isDrizzleQueryError } from './drizzle-query-error.util.js';
+import { describeQueryFailure } from './drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from './drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from './drizzle-repository-options.interface.js';
 import { asStored } from './drizzle-rows.util.js';
@@ -106,29 +106,11 @@ export abstract class DrizzleRepository<
     return this.options.transactionKey;
   }
 
-  /**
-   * A query the database failed, reported with the database client's own
-   * error and code: `code` where the client sets one, else `errno`. Never
-   * Drizzle's own message, which holds the query and its values.
-   */
+  /** A query the database failed, as `describeQueryFailure` reports it. */
   protected override describeDatabaseError(
     error: unknown,
   ): RepositoryDatabaseErrorInterface | undefined {
-    if (!isDrizzleQueryError(error)) return undefined;
-    const reported = error.cause instanceof Error ? error.cause : undefined;
-    const code =
-      reported &&
-      'code' in reported &&
-      (typeof reported.code === 'string' || typeof reported.code === 'number')
-        ? reported.code
-        : reported && 'errno' in reported && typeof reported.errno === 'number'
-          ? reported.errno
-          : undefined;
-    return {
-      database: this.database,
-      code,
-      message: reported?.message ?? 'the database client gave no error',
-    };
+    return describeQueryFailure(error, this.database);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

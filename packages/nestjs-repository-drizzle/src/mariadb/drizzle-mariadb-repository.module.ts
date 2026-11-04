@@ -65,5 +65,6 @@ export const DRIZZLE_MARIADB_ADAPTER: DrizzleAdapterDefinitionInterface<DrizzleM
     toClient: (db, connection) =>
       toDrizzleMysqlClient(db, connection, DRIZZLE_MARIADB_DATABASE),
     createRepository: (options) => new DrizzleMariadbRepository(options),
-    createTransactionFactory: (db) => new DrizzleMysqlTransactionFactory(db),
+    createTransactionFactory: (db) =>
+      new DrizzleMysqlTransactionFactory(db, DRIZZLE_MARIADB_DATABASE),
   };

@@ -435,9 +435,10 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * Whether the database ended the transaction a call ran in when the call
-   * failed with `error`, such as a deadlock it rolls the whole transaction
-   * back for. The driver reports; the default reports nothing.
+   * Whether the database ended, or may have ended, the transaction a call
+   * ran in when the call failed with `error`, such as a deadlock it rolls
+   * the whole transaction back for. The driver reports; the default reports
+   * nothing.
    */
   protected endsTransaction(_error: unknown): boolean {
     return false;

@@ -11,7 +11,6 @@ import {
   MoreThan,
   MoreThanOrEqual,
   Not,
-  QueryFailedError,
   type QueryDeepPartialEntity,
   Raw,
   type Repository,
@@ -58,7 +57,10 @@ import {
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 import { TypeOrmTransaction } from '../transaction/typeorm-transaction.js';
-import { dataSourceOf } from '../typeorm-repository.util.js';
+import {
+  dataSourceOf,
+  describeQueryFailure,
+} from '../typeorm-repository.util.js';
 
 import {
   buildEntity,
@@ -150,36 +152,37 @@ export abstract class TypeOrmRepository<
    */
   protected readonly rereadLock?: FindOneOptions<Entity>['lock'];
 
-  /**
-   * A query the database failed, reported with the data source's type and the
-   * database client's own error code: `code` where the client sets one
-   * (`'23503'` on Postgres, `'SQLITE_CONSTRAINT_FOREIGNKEY'` on SQLite),
-   * otherwise its numeric `errno`.
-   */
+  /** A query the database failed, as `describeQueryFailure` reports it. */
   protected override describeDatabaseError(
     error: unknown,
   ): RepositoryDatabaseErrorInterface | undefined {
-    if (!(error instanceof QueryFailedError)) return undefined;
-    const reported: Error = error.driverError;
-    const code =
-      'code' in reported &&
-      (typeof reported.code === 'string' || typeof reported.code === 'number')
-        ? reported.code
-        : 'errno' in reported && typeof reported.errno === 'number'
-          ? reported.errno
-          : undefined;
-    return {
-      database: dataSourceOf(this.repo.manager).options.type,
-      code,
-      message: reported.message,
-    };
+    return describeQueryFailure(error, dataSourceOf(this.repo.manager));
   }
 
   /**
-   * Get the repository, using transactional EntityManager if available.
-   * Creates the driver transaction lazily on first access via `getOrStart()`.
+   * `work` on the repository of the caller's transaction, started on first
+   * use via `getOrStart()`, or, when `ctx` carries none, on the data
+   * source's own repository through `outsideTransaction`.
    */
-  protected async getRepo(ctx?: AppContextLike): Promise<Repository<Entity>> {
+  protected async withRepo<T>(
+    ctx: AppContextLike | undefined,
+    work: (repo: Repository<Entity>) => Promise<T>,
+  ): Promise<T> {
+    const repo = await this.transactionRepo(ctx);
+    return repo ? work(repo) : this.outsideTransaction(() => work(this.repo));
+  }
+
+  /**
+   * Runs `work`, a call that takes part in no transaction of the caller's.
+   */
+  protected outsideTransaction<T>(work: () => Promise<T>): Promise<T> {
+    return work();
+  }
+
+  /** The repository of the transaction `ctx` carries, if it carries one. */
+  private async transactionRepo(
+    ctx: AppContextLike | undefined,
+  ): Promise<Repository<Entity> | undefined> {
     if (this.options.transactionKey) {
       const context = AppContextHost.from(ctx);
       if (context.supports(TrxCtx)) {
@@ -197,7 +200,7 @@ export abstract class TypeOrmRepository<
         }
       }
     }
-    return this.repo;
+    return undefined;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -455,8 +458,9 @@ export abstract class TypeOrmRepository<
   protected async doFind(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<Entity[]> {
-    const repo = await this.getRepo(options.ctx);
-    const rows = await repo.find(this.buildNativeFindManyOptions(options));
+    const rows = await this.withRepo(options.ctx, (repo) =>
+      repo.find(this.buildNativeFindManyOptions(options)),
+    );
     return rows.map((row) =>
       this.toResult(row, options, this.allowsEagerRelations),
     );
@@ -465,21 +469,20 @@ export abstract class TypeOrmRepository<
   protected async doFindOne(
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
-    const repo = await this.getRepo(options.ctx);
     // TypeORM's findOne() refuses a read with no `where`, which ours allows
     // (the first row in order); it is otherwise this same one-row find.
-    const [row] = await repo.find({
-      ...this.buildNativeFindOneOptions(options),
-      take: 1,
-    });
+    const [row] = await this.withRepo(options.ctx, (repo) =>
+      repo.find({ ...this.buildNativeFindOneOptions(options), take: 1 }),
+    );
     return row ? this.toResult(row, options, this.allowsEagerRelations) : null;
   }
 
   protected async doCount(
     options: RepositoryCountOptions = {},
   ): Promise<number> {
-    const repo = await this.getRepo(options.ctx);
-    return repo.count(this.buildNativeCountOptions(options));
+    return this.withRepo(options.ctx, (repo) =>
+      repo.count(this.buildNativeCountOptions(options)),
+    );
   }
 
   /**
@@ -490,12 +493,18 @@ export abstract class TypeOrmRepository<
   protected async doFindAndCount(
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
-    const repo = await this.getRepo(options.ctx);
     const findOptions = this.buildNativeFindManyOptions(options);
-    const rows = await repo.find(findOptions);
-    const total =
-      totalFromPage(rows.length, findOptions.skip, findOptions.take) ??
-      (await repo.count(this.buildNativeCountOptions(options)));
+    const [rows, total] = await this.withRepo(
+      options.ctx,
+      async (repo): Promise<[Entity[], number]> => {
+        const found = await repo.find(findOptions);
+        return [
+          found,
+          totalFromPage(found.length, findOptions.skip, findOptions.take) ??
+            (await repo.count(this.buildNativeCountOptions(options))),
+        ];
+      },
+    );
     return [
       rows.map((row) => this.toResult(row, options, this.allowsEagerRelations)),
       total,
@@ -523,16 +532,18 @@ export abstract class TypeOrmRepository<
     entity: DeepPartial<Entity>,
     options?: RepositoryCreateOptions,
   ): Promise<Entity> {
-    const repo = await this.getRepo(options?.ctx);
-    return repo.save(this.toEntity(entity));
+    return this.withRepo(options?.ctx, (repo) =>
+      repo.save(this.toEntity(entity)),
+    );
   }
 
   protected async doCreateMany(
     entities: DeepPartial<Entity>[],
     options?: RepositoryCreateOptions,
   ): Promise<Entity[]> {
-    const repo = await this.getRepo(options?.ctx);
-    return repo.save(entities.map((entity) => this.toEntity(entity)));
+    return this.withRepo(options?.ctx, (repo) =>
+      repo.save(entities.map((entity) => this.toEntity(entity))),
+    );
   }
 
   // Update operations
@@ -569,7 +580,16 @@ export abstract class TypeOrmRepository<
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
-    const repo = await this.getRepo(options?.ctx);
+    return this.withRepo(options?.ctx, (repo) =>
+      this.upsertOn(repo, entity, options?.ctx),
+    );
+  }
+
+  private async upsertOn(
+    repo: Repository<Entity>,
+    entity: DeepPartial<Entity>,
+    ctx: AppContextLike | undefined,
+  ): Promise<Entity> {
     const instance = this.toEntity(entity);
     const versionColumn = this.getVersionColumn();
     if (versionColumn) {
@@ -598,7 +618,7 @@ export abstract class TypeOrmRepository<
       where: primaryWhere,
       withDeleted: true,
       loadEagerRelations: false,
-      lock: this.joinsTransaction(options?.ctx) ? this.rereadLock : undefined,
+      lock: this.joinsTransaction(ctx) ? this.rereadLock : undefined,
     });
 
     if (!result) {
@@ -658,9 +678,9 @@ export abstract class TypeOrmRepository<
     const primaryWhere: FindOptionsWhere<Entity> = {};
     primaryWhere[primaryColumn] = entity[primaryColumn];
 
-    const run = async (txCtx?: AppContextLike): Promise<Entity> => {
-      const repo = await this.getRepo(txCtx);
-
+    const run = (txCtx?: AppContextLike): Promise<Entity> =>
+      this.withRepo(txCtx, (repo) => write(repo));
+    const write = async (repo: Repository<Entity>): Promise<Entity> => {
       if (Object.keys(data).length > 0) {
         await repo.update(
           primaryWhere,
@@ -730,9 +750,9 @@ export abstract class TypeOrmRepository<
       primaryWhere: FindOptionsWhere<Entity>,
     ) => Promise<T>,
   ): Promise<T> {
-    const run = async (txCtx?: AppContextLike): Promise<T> => {
-      const repo = await this.getRepo(txCtx);
-
+    const run = (txCtx?: AppContextLike): Promise<T> =>
+      this.withRepo(txCtx, (repo) => guarded(repo));
+    const guarded = async (repo: Repository<Entity>): Promise<T> => {
       const primaryWhere: FindOptionsWhere<Entity> = {};
       const primaryColumn = this.getPrimaryColumn();
       if (primaryColumn !== undefined) {
@@ -764,7 +784,7 @@ export abstract class TypeOrmRepository<
     // than through RepositoryModule.forRoot(), which always provides one).
     // If the caller is already inside their own
     // active transaction, the guard and the write still resolve to the
-    // same connection via getRepo()/TrxCtx, so it's still safe — only
+    // same connection via withRepo()/TrxCtx, so it's still safe — only
     // refuse when neither guarantee is present, since running the guard
     // and the write as two separate autocommit statements would silently
     // reopen the exact race this whole mechanism exists to close.
@@ -872,8 +892,9 @@ export abstract class TypeOrmRepository<
       );
     }
 
-    const repo = await this.getRepo(options?.ctx);
-    const [deleted] = await this.remove(repo, [entity]);
+    const [deleted] = await this.withRepo(options?.ctx, (repo) =>
+      this.remove(repo, [entity]),
+    );
     return deleted;
   }
 
@@ -881,8 +902,7 @@ export abstract class TypeOrmRepository<
     entities: Entity[],
     options?: RepositoryDeleteOptions,
   ): Promise<Entity[]> {
-    const repo = await this.getRepo(options?.ctx);
-    return this.remove(repo, entities);
+    return this.withRepo(options?.ctx, (repo) => this.remove(repo, entities));
   }
 
   /**
@@ -911,8 +931,9 @@ export abstract class TypeOrmRepository<
       );
     }
 
-    const repo = await this.getRepo(options?.ctx);
-    return repo.softRemove(this.toEntity(entity));
+    return this.withRepo(options?.ctx, (repo) =>
+      repo.softRemove(this.toEntity(entity)),
+    );
   }
 
   protected async doRestore(
@@ -928,8 +949,9 @@ export abstract class TypeOrmRepository<
       );
     }
 
-    const repo = await this.getRepo(options?.ctx);
-    return repo.recover(this.toEntity(entity));
+    return this.withRepo(options?.ctx, (repo) =>
+      repo.recover(this.toEntity(entity)),
+    );
   }
 
   /**

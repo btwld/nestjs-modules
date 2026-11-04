@@ -1,4 +1,4 @@
-import { type DataSource } from 'typeorm';
+import { type DataSource, QueryFailedError } from 'typeorm';
 import { mockDeep } from 'vitest-mock-extended';
 
 import { TypeOrmMysqlTransactionFactory } from '../typeorm-mysql-transaction.factory.js';
@@ -16,5 +16,20 @@ describe(TypeOrmMysqlTransactionFactory.name, () => {
 
   it('should run transactions concurrently, each on its own connection', () => {
     expect(factory.supportsConcurrentTransactions).toBe(true);
+  });
+
+  it('should describe only a commit error the server sent', () => {
+    const sent = Object.assign(new Error('refused'), {
+      code: 'ER_ROW_IS_REFERENCED_2',
+      sqlState: '23000',
+    });
+    const lost = Object.assign(new Error('lost'), { code: 'ECONNRESET' });
+
+    expect(
+      factory.describeDatabaseError(new QueryFailedError('commit', [], sent)),
+    ).toHaveProperty('code', 'ER_ROW_IS_REFERENCED_2');
+    expect(
+      factory.describeDatabaseError(new QueryFailedError('commit', [], lost)),
+    ).toBeUndefined();
   });
 });

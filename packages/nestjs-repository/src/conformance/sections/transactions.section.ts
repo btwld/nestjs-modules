@@ -1,5 +1,6 @@
 import { OptimisticLockException } from '../../exceptions/optimistic-lock.exception.js';
 import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
+import { TransactionCommitException } from '../../exceptions/transaction-commit.exception.js';
 import { OrderBy } from '../../repository/order-by.helpers.js';
 import { Where } from '../../repository/where.helpers.js';
 import { type TransactionContextInterface } from '../../transaction/interfaces/transaction-context.interface.js';
@@ -70,6 +71,37 @@ function supported(ctx: ConformanceContext): void {
     );
 
     assert.deepStrictEqual(await names(ctx), ['kept']);
+  });
+
+  it('transactions: a call without the run’s context, made while the run is open, takes no part in it', async () => {
+    const plain = ctx.repo('plainItem');
+    let outside: Promise<unknown> = Promise.resolve();
+    let read: Promise<string[]> = Promise.resolve([]);
+
+    try {
+      await assert.rejects(
+        run(ctx, async (txCtx) => {
+          await plain.create({ name: 'inside' }, { ctx: txCtx });
+          outside = plain.create({ name: 'outside' });
+          read = plain.find().then((rows) => rows.map(({ name }) => name));
+          // A store with a connection per transaction answers the calls
+          // while the run is open; one with a single connection holds them
+          // until it ends, and the window is how long they get to reach
+          // the store, were they not kept out of the run.
+          await Promise.race([
+            Promise.all([outside, read]),
+            new Promise((resolve) => setTimeout(resolve, 200)),
+          ]);
+          throw new ConformanceRollback();
+        }),
+        ConformanceRollback,
+      );
+    } finally {
+      await Promise.all([settle(outside), settle(read)]);
+    }
+
+    assert.ok(!(await read).includes('inside'));
+    assert.deepStrictEqual(await names(ctx), ['outside']);
   });
 
   it('transactions: every read in a run sees the run’s own writes', async () => {
@@ -148,6 +180,33 @@ function supported(ctx: ConformanceContext): void {
 
     assert.equal(await ctx.repo('author').count(), 0);
   });
+
+  if (ctx.capabilities.deferredReferences === 'supported') {
+    it('transactions: a run whose commit the store refuses keeps none of its writes, and the next run commits', async () => {
+      await assert.rejects(
+        run(ctx, async (txCtx) => {
+          await ctx
+            .repo('plainItem')
+            .create({ name: 'refused' }, { ctx: txCtx });
+          // Accepted by the write; the store checks the author at commit.
+          await ctx
+            .repo('award')
+            .create(
+              { id: 'award-orphan', name: 'orphan', authorId: 'author-none' },
+              { ctx: txCtx },
+            );
+        }),
+        (error: unknown) => error instanceof TransactionCommitException,
+      );
+      assert.deepStrictEqual(await names(ctx), []);
+      assert.equal(await ctx.repo('award').count(), 0);
+
+      await run(ctx, (txCtx) =>
+        ctx.repo('plainItem').create({ name: 'next' }, { ctx: txCtx }),
+      );
+      assert.deepStrictEqual(await names(ctx), ['next']);
+    });
+  }
 
   it('transactions: a run that catches a failed write keeps all of its other writes or none', async () => {
     const committed: string[] = [];

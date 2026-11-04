@@ -2,6 +2,7 @@ import {
   type DataSource,
   type DataSourceOptions,
   type EntitySchema,
+  QueryFailedError,
   type Repository,
 } from 'typeorm';
 
@@ -21,6 +22,7 @@ import { HookResolverService } from '@concepta/nestjs-core';
 import {
   type DynamicRepositoryModule,
   getDynamicRepositoryToken,
+  type RepositoryDatabaseErrorInterface,
   type TransactionFactoryDescriptor,
   TransactionScope,
 } from '@concepta/nestjs-repository';
@@ -66,6 +68,32 @@ export function dataSourceOf(
     { readonly dataSource: DataSource } | { readonly connection: DataSource },
 ): DataSource {
   return 'dataSource' in manager ? manager.dataSource : manager.connection;
+}
+
+/**
+ * A query `dataSource`'s database failed, reported with the data source's
+ * type and the database client's own error code: `code` where the client
+ * sets one (`'23503'` on Postgres, `'SQLITE_CONSTRAINT_FOREIGNKEY'` on
+ * SQLite), otherwise its numeric `errno`. `undefined` for any other error.
+ */
+export function describeQueryFailure(
+  error: unknown,
+  dataSource: DataSource,
+): RepositoryDatabaseErrorInterface | undefined {
+  if (!(error instanceof QueryFailedError)) return undefined;
+  const reported: Error = error.driverError;
+  const code =
+    'code' in reported &&
+    (typeof reported.code === 'string' || typeof reported.code === 'number')
+      ? reported.code
+      : 'errno' in reported && typeof reported.errno === 'number'
+        ? reported.errno
+        : undefined;
+  return {
+    database: dataSource.options.type,
+    code,
+    message: reported.message,
+  };
 }
 
 /**

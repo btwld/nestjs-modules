@@ -140,6 +140,7 @@ export function drizzlePostgresConformanceHarness(
       relations: 'refused',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
+      deferredReferences: 'supported',
       softDelete: 'supported',
       concurrentTransactions,
     },

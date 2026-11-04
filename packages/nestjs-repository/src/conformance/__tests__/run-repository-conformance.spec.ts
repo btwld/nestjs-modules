@@ -163,6 +163,7 @@ const ALL_SUPPORTED: ConformanceCapabilitiesInterface = {
   relations: 'supported',
   eagerResults: 'supported',
   referentialIntegrity: 'supported',
+  deferredReferences: 'supported',
   softDelete: 'supported',
 };
 const ALL_REFUSED: ConformanceCapabilitiesInterface = {
@@ -171,6 +172,7 @@ const ALL_REFUSED: ConformanceCapabilitiesInterface = {
   relations: 'refused',
   eagerResults: 'refused',
   referentialIntegrity: 'refused',
+  deferredReferences: 'refused',
   softDelete: 'refused',
 };
 
@@ -323,6 +325,18 @@ describe(runRepositoryConformance.name, () => {
       'transactions > overlapping transactions: runs that upsert the same new key at once leave one row',
       'transactions > overlapping transactions: runs that upsert the same stored key at once move the version once per write kept',
       'transactions > overlapping transactions: runs that read the same versioned row, then each write it, keep exactly one write',
+    ]);
+    expect(refused.filter((name) => !supported.includes(name))).toEqual([]);
+  });
+
+  it('leaves out exactly the refused-commit case when deferred references are refused', () => {
+    const names = (capabilities: ConformanceCapabilitiesInterface) =>
+      register(capabilities).cases.map((path) => path.slice(1).join(' > '));
+    const supported = names(ALL_SUPPORTED);
+    const refused = names({ ...ALL_SUPPORTED, deferredReferences: 'refused' });
+
+    expect(supported.filter((name) => !refused.includes(name))).toEqual([
+      'transactions > transactions: a run whose commit the store refuses keeps none of its writes, and the next run commits',
     ]);
     expect(refused.filter((name) => !supported.includes(name))).toEqual([]);
   });

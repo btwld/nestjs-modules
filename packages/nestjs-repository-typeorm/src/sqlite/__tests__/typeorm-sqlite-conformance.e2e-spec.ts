@@ -9,7 +9,7 @@ runRepositoryConformance(
     TypeOrmSqliteRepositoryModule,
     { type: 'better-sqlite3', database: ':memory:' },
     // One connection: transactions run one at a time.
-    'refused',
+    { concurrentTransactions: 'refused', deferredReferences: 'supported' },
   ),
   { describe, it, beforeAll, afterAll, beforeEach },
 );

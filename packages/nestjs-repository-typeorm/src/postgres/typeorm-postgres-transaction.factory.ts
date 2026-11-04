@@ -28,6 +28,11 @@ export class TypeOrmPostgresTransactionFactory extends TypeOrmTransactionFactory
     super(dataSource, dataSourceKey);
   }
 
+  /** node-postgres gives an error the server sent its `severity`. */
+  protected override sentByServer(error: Error): boolean {
+    return 'severity' in error && typeof error.severity === 'string';
+  }
+
   create(ctx: AppContextHost): TypeOrmPostgresTransaction {
     return new TypeOrmPostgresTransaction(
       this.dataSource,

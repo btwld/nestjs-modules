@@ -1,10 +1,13 @@
-import { type DataSource } from 'typeorm';
+import { type DataSource, QueryFailedError } from 'typeorm';
 
 import { type AppContextHost } from '@concepta/nestjs-core';
 import {
+  type RepositoryDatabaseErrorInterface,
   type TransactionFactoryInterface,
   type TransactionInterface,
 } from '@concepta/nestjs-repository';
+
+import { describeQueryFailure } from '../typeorm-repository.util.js';
 
 /**
  * Factory for TypeORM transactions, shared by every database's adapter.
@@ -28,4 +31,27 @@ export abstract class TypeOrmTransactionFactory implements TransactionFactoryInt
    * Create a new transaction bound to this factory's data source.
    */
   abstract create(ctx: AppContextHost): TransactionInterface;
+
+  /**
+   * A commit the database refused: a failed query whose error the database
+   * server sent, as `describeQueryFailure` reports it. Any other error, such
+   * as a lost connection or a client timeout, leaves the commit's outcome
+   * unknown, and is not described.
+   */
+  describeDatabaseError(
+    error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined {
+    return error instanceof QueryFailedError &&
+      this.sentByServer(error.driverError)
+      ? describeQueryFailure(error, this.dataSource)
+      : undefined;
+  }
+
+  /**
+   * Whether the database server sent `error`, the client's own error under a
+   * failed query. The default tells none apart.
+   */
+  protected sentByServer(_error: Error): boolean {
+    return false;
+  }
 }
