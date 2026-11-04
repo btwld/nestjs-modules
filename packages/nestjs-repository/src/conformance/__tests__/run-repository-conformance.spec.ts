@@ -17,6 +17,7 @@ import { type ConformanceTagInterface } from '../interfaces/conformance-tag.inte
 import { type ConformanceTenantOrderLineInterface } from '../interfaces/conformance-tenant-order-line.interface.js';
 import { type ConformanceTenantOrderInterface } from '../interfaces/conformance-tenant-order.interface.js';
 import { type ConformanceTestApiInterface } from '../interfaces/conformance-test-api.interface.js';
+import { type ConformanceUniqueItemInterface } from '../interfaces/conformance-unique-item.interface.js';
 import { runRepositoryConformance } from '../run-repository-conformance.js';
 
 class StubDriver {
@@ -39,6 +40,12 @@ class Item implements ConformanceItemInterface {
 class PlainItem implements ConformancePlainItemInterface {
   declare id: number;
   declare name: string;
+}
+class UniqueItem implements ConformanceUniqueItemInterface {
+  declare id: string;
+  declare code: string;
+  declare name: string;
+  declare version: number;
 }
 class Author implements ConformanceAuthorInterface {
   declare id: string;
@@ -81,6 +88,7 @@ class TenantOrderLine implements ConformanceTenantOrderLineInterface {
 const FIXTURES: ConformanceFixtureBindings<typeof StubDriver> = {
   item: { key: 'item', entity: Item },
   plainItem: { key: 'plain-item', entity: PlainItem },
+  uniqueItem: { key: 'unique-item', entity: UniqueItem },
   author: { key: 'author', entity: Author },
   award: { key: 'award', entity: Award },
   book: { key: 'book', entity: Book },
@@ -151,6 +159,7 @@ function register(capabilities: ConformanceCapabilitiesInterface): {
 
 const ALL_SUPPORTED: ConformanceCapabilitiesInterface = {
   transactions: 'supported',
+  concurrentTransactions: 'supported',
   relations: 'supported',
   eagerResults: 'supported',
   referentialIntegrity: 'supported',
@@ -158,6 +167,7 @@ const ALL_SUPPORTED: ConformanceCapabilitiesInterface = {
 };
 const ALL_REFUSED: ConformanceCapabilitiesInterface = {
   transactions: 'refused',
+  concurrentTransactions: 'refused',
   relations: 'refused',
   eagerResults: 'refused',
   referentialIntegrity: 'refused',
@@ -293,6 +303,28 @@ describe(runRepositoryConformance.name, () => {
     expect(refused.filter((name) => !supported.includes(name))).toEqual([
       'metadata > metadata: reports no relations',
     ]);
+  });
+
+  it('leaves out exactly the overlapping-transaction cases when concurrent transactions are refused', () => {
+    const names = (capabilities: ConformanceCapabilitiesInterface) =>
+      register(capabilities).cases.map((path) => path.slice(1).join(' > '));
+    const supported = names(ALL_SUPPORTED);
+    const refused = names({
+      ...ALL_SUPPORTED,
+      concurrentTransactions: 'refused',
+    });
+
+    expect(supported.filter((name) => !refused.includes(name))).toEqual([
+      'transactions > overlapping transactions: a versioned write of a row another run has changed since it read it is refused',
+      'transactions > overlapping transactions: a write in a run that has read returns the row as stored, not as the run read it',
+      'transactions > overlapping transactions: an upsert in a run that has read returns the row as stored, not as the run read it',
+      'transactions > overlapping transactions: a versioned write of values another run stored since this run read returns the row as stored',
+      'transactions > overlapping transactions: a run that catches a deadlock keeps all of its writes or none',
+      'transactions > overlapping transactions: runs that upsert the same new key at once leave one row',
+      'transactions > overlapping transactions: runs that upsert the same stored key at once move the version once per write kept',
+      'transactions > overlapping transactions: runs that read the same versioned row, then each write it, keep exactly one write',
+    ]);
+    expect(refused.filter((name) => !supported.includes(name))).toEqual([]);
   });
 
   it('gives every case a unique name', () => {

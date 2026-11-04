@@ -25,6 +25,7 @@ import { RepositoryQueryException } from '../exceptions/repository-query.excepti
 import { RepositoryUnboundException } from '../exceptions/repository-unbound.exception.js';
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { TransactionClosedException } from '../exceptions/transaction-closed.exception.js';
+import { TransactionDoomedException } from '../exceptions/transaction-doomed.exception.js';
 import { TransactionHeuristicCommitException } from '../exceptions/transaction-heuristic-commit.exception.js';
 import { TransactionReadOnlyConflictException } from '../exceptions/transaction-read-only-conflict.exception.js';
 import { TransactionScopeFailedException } from '../exceptions/transaction-scope-failed.exception.js';
@@ -126,6 +127,11 @@ const CASES: {
     name: 'TransactionClosedException',
     build: () => new TransactionClosedException(),
     fault: 'usage',
+  },
+  {
+    name: 'TransactionDoomedException',
+    build: () => new TransactionDoomedException(),
+    fault: 'internal',
   },
   {
     name: 'TransactionHeuristicCommitException',

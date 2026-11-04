@@ -422,6 +422,7 @@ runRepositoryConformance(
     },
     capabilities: {
       transactions: 'supported',
+      concurrentTransactions: 'supported',
       relations: 'supported',
       eagerResults: 'refused',
       referentialIntegrity: 'supported',
@@ -440,8 +441,11 @@ runRepositoryConformance(
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
   driver's own options go in `driverOptions`.
-- **Capabilities.** Five are optional, each `'supported'` or `'refused'`:
-  `transactions`, `relations`, `eagerResults` (needs `relations`),
+- **Capabilities.** Six are optional, each `'supported'` or `'refused'`:
+  `transactions`, `concurrentTransactions` (needs `transactions`; your
+  store runs transactions at the same time, so one commits while another
+  is open — a store with one connection refuses it), `relations`,
+  `eagerResults` (needs `relations`),
   `referentialIntegrity` (your store refuses a book naming no author, and
   the delete of an author a book still names), and `softDelete`. A refused
   one runs its refusal cases, if it has any, instead. A driver that refuses
@@ -458,6 +462,14 @@ runRepositoryConformance(
 - **Transactions.** On a store with a single connection, a call that ignores
   the run's `ctx` still lands in the open transaction, so the suite can't see
   it. Run it against a store with more than one connection too.
+- **Overlapping transactions.** With `concurrentTransactions`, the suite
+  races runs against each other: a stale write, a read-back after another
+  run committed, a deadlock, concurrent upserts of one key. Where your
+  store's own limits make a write fail, the case accepts it, as long as a
+  run that resolves kept all of its writes and a run that rejects kept none.
+  Report in `endsTransaction(error)` the errors after which your database
+  has ended the transaction (MySQL's deadlock); the repository then fails
+  the caller's scope.
 - **`reset`** removes every fixture's rows before each case. **`linkBookTag`**
   writes one many-to-many link, since a repository refuses those writes;
   it's needed only when you support `relations`.
@@ -1357,6 +1369,11 @@ work that otherwise succeeded:
   rejects with `TransactionScopeFailedException` (carrying the sibling's
   error as `context.originalError`) rather than resolving as if nothing
   happened — even if the caller caught the sibling's error itself.
+- Once the scope has failed, every later repository call in it throws
+  `TransactionDoomedException`: the scope will roll back, so nothing more
+  runs in it. A database error after which the database has ended the
+  transaction itself, such as a MySQL deadlock, fails the scope too, even
+  if the caller catches it.
 - `readOnly` is decided once, by whichever `run()` call creates the scope —
   every later participant just joins it. A nested or concurrent `run()`
   (or `runReadOnly()`) call whose explicit `readOnly` option conflicts with
@@ -2923,6 +2940,7 @@ also exported for manual provider wiring.
 | `InvalidColumnValueException` | A write payload carried a function in place of a column value, or an object in a primary or foreign key column; the message lists the columns |
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |
 | `TransactionClosedException` | A settled scope was used again — `getOrStart`, `enter`, `onCommit`, or `onRollback` after close |
+| `TransactionDoomedException` | A repository call joined a scope that had already failed — a participant threw, or the database ended the transaction (a deadlock) — so it will roll back |
 | `TransactionHeuristicCommitException` | A multi-datasource commit failed after at least one datasource had already committed |
 | `TransactionReadOnlyConflictException` | A joining `run()`/`runReadOnly()` call's `readOnly` option conflicts with the scope it's joining |
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |

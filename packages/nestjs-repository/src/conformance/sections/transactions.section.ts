@@ -2,9 +2,11 @@ import { OptimisticLockException } from '../../exceptions/optimistic-lock.except
 import { OrderBy } from '../../repository/order-by.helpers.js';
 import { Where } from '../../repository/where.helpers.js';
 import { type TransactionContextInterface } from '../../transaction/interfaces/transaction-context.interface.js';
-import { assert, assertRows } from '../conformance-assert.js';
+import { assert, assertRows, settle } from '../conformance-assert.js';
 import { type ConformanceContext } from '../conformance-context.js';
 import { type ConformanceItemInterface } from '../interfaces/conformance-item.interface.js';
+
+import { overlappingTransactions } from './overlapping-transactions.section.js';
 
 class ConformanceRollback extends Error {
   constructor() {
@@ -146,7 +148,54 @@ function supported(ctx: ConformanceContext): void {
     assert.equal(await ctx.repo('author').count(), 0);
   });
 
+  it('transactions: a run that catches a failed write keeps all of its other writes or none', async () => {
+    const committed: string[] = [];
+    const rolledBack: string[] = [];
+    await ctx.repo('uniqueItem').create({ id: 'taken', code: 'C', name: 'a' });
+
+    const outcome = await settle(
+      run(ctx, async (txCtx) => {
+        txCtx.trx.onCommit(() => void committed.push('commit'));
+        txCtx.trx.onRollback(() => void rolledBack.push('rollback'));
+        await ctx.repo('plainItem').create({ name: 'kept' }, { ctx: txCtx });
+        // Fails in the store: the code is unique.
+        await ctx
+          .repo('uniqueItem')
+          .create({ id: 'clash', code: 'C', name: 'b' }, { ctx: txCtx })
+          .catch(() => undefined);
+      }),
+    );
+
+    if (outcome.ok) {
+      assert.deepStrictEqual(await names(ctx), ['kept']);
+      assert.deepStrictEqual([committed, rolledBack], [['commit'], []]);
+    } else {
+      assert.deepStrictEqual(await names(ctx), []);
+      assert.deepStrictEqual([committed, rolledBack], [[], ['rollback']]);
+    }
+  });
+
+  it('transactions: a run that catches a write refused before the store fails keeps its other writes', async () => {
+    const gone = await ctx
+      .repo('item')
+      .create({ name: 'gone', rank: 1, note: null });
+    await ctx.repo('item').delete(gone);
+
+    await run(ctx, async (txCtx) => {
+      await assert.rejects(
+        ctx.repo('item').update(gone, { rank: 2 }, { ctx: txCtx }),
+        OptimisticLockException,
+      );
+      await ctx.repo('plainItem').create({ name: 'kept' }, { ctx: txCtx });
+    });
+
+    assert.deepStrictEqual(await names(ctx), ['kept']);
+  });
+
   versionGuard(ctx);
+  if (ctx.capabilities.concurrentTransactions === 'supported') {
+    overlappingTransactions(ctx);
+  }
 }
 
 /**

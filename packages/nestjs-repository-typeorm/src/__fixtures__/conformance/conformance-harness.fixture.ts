@@ -3,7 +3,10 @@ import { type DataSource, type DataSourceOptions } from 'typeorm';
 import { type INestApplicationContext } from '@nestjs/common';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 
-import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
+import {
+  type ConformanceCapability,
+  type ConformanceHarnessInterface,
+} from '@concepta/nestjs-repository/conformance';
 
 import { type TypeOrmMariadbRepositoryModule } from '../../mariadb/typeorm-mariadb-repository.module.js';
 import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-repository.module.js';
@@ -23,6 +26,7 @@ import {
   ConformanceTagEntity,
   ConformanceTenantOrderEntity,
   ConformanceTenantOrderLineEntity,
+  ConformanceUniqueItemEntity,
 } from './conformance.entity.fixture.js';
 
 /** Every table, children before the rows they refer to. */
@@ -37,6 +41,7 @@ const TABLES = [
   'conformance_author',
   'conformance_item',
   'conformance_plain_item',
+  'conformance_unique_item',
 ];
 
 /** The adapters whose conformance this harness runs. */
@@ -51,11 +56,18 @@ type TypeOrmAdapterModule =
 /**
  * A TypeORM adapter's conformance harness for its database: the adapter,
  * the connection, and the adapter's entity for each fixture.
+ *
+ * @param name - Names the run
+ * @param driver - The adapter's module
+ * @param connection - The data source the run uses
+ * @param concurrentTransactions - Whether the database runs transactions
+ *   at the same time; one with a single connection refuses it
  */
 export function typeOrmConformanceHarness(
   name: string,
   driver: TypeOrmAdapterModule,
   connection: DataSourceOptions,
+  concurrentTransactions: ConformanceCapability = 'supported',
 ): ConformanceHarnessInterface<TypeOrmAdapterModule> {
   const dataSource = (app: INestApplicationContext): DataSource =>
     app.get<DataSource>(getDataSourceToken());
@@ -75,6 +87,10 @@ export function typeOrmConformanceHarness(
       plainItem: {
         key: 'conformance-plain-item',
         entity: ConformancePlainItemEntity,
+      },
+      uniqueItem: {
+        key: 'conformance-unique-item',
+        entity: ConformanceUniqueItemEntity,
       },
       author: { key: 'conformance-author', entity: ConformanceAuthorEntity },
       award: { key: 'conformance-award', entity: ConformanceAwardEntity },
@@ -96,6 +112,7 @@ export function typeOrmConformanceHarness(
     },
     capabilities: {
       transactions: 'supported',
+      concurrentTransactions,
       relations: 'supported',
       eagerResults: 'supported',
       referentialIntegrity: 'supported',

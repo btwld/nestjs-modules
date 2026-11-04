@@ -130,7 +130,10 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   /**
    * Create or update an entity based on primary key.
    * If entity with matching primary key exists, updates it; otherwise creates
-   * new, generating the key when it has none.
+   * new, generating the key when it has none. A payload the store could not
+   * insert as a row, such as one leaving out a required column, may be
+   * refused even when the row exists, as may concurrent upserts of one key:
+   * either way the call fails with the store's error and changes nothing.
    *
    * @param entity - Entity data, with or without its primary key
    * @param options - Upsert options

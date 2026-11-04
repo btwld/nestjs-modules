@@ -23,6 +23,7 @@ import {
   type ConformanceTagInterface,
   type ConformanceTenantOrderInterface,
   type ConformanceTenantOrderLineInterface,
+  type ConformanceUniqueItemInterface,
 } from '@concepta/nestjs-repository/conformance';
 
 /** The conformance suite's fixtures as TypeORM entities. */
@@ -55,6 +56,21 @@ export class ConformancePlainItemEntity implements ConformancePlainItemInterface
 
   @Column({ type: 'varchar' })
   name!: string;
+}
+
+@Entity('conformance_unique_item')
+export class ConformanceUniqueItemEntity implements ConformanceUniqueItemInterface {
+  @PrimaryColumn({ type: 'varchar', length: 64 })
+  id!: string;
+
+  @Column({ type: 'varchar', length: 64, unique: true })
+  code!: string;
+
+  @Column({ type: 'varchar' })
+  name!: string;
+
+  @VersionColumn()
+  version!: number;
 }
 
 @Entity('conformance_author')
@@ -200,6 +216,7 @@ export class ConformanceTenantOrderLineEntity implements ConformanceTenantOrderL
 export const CONFORMANCE_ENTITIES = [
   ConformanceItemEntity,
   ConformancePlainItemEntity,
+  ConformanceUniqueItemEntity,
   ConformanceAuthorEntity,
   ConformanceAwardEntity,
   ConformanceBookEntity,

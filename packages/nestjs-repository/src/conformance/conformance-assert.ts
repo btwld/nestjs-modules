@@ -55,4 +55,18 @@ export function sortedBy<Row extends object>(
       );
 }
 
+/**
+ * How a call settled: its value, or the error it failed with. For cases
+ * that accept either a result or a clean failure.
+ */
+export async function settle<T>(
+  call: Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> {
+  try {
+    return { ok: true, value: await call };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
 export { assert };

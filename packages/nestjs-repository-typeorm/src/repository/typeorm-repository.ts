@@ -143,6 +143,14 @@ export abstract class TypeOrmRepository<
   }
 
   /**
+   * The lock the re-read of a row just written takes, in the write's
+   * transaction. None by default: the read sees the row as stored. A
+   * database whose plain reads in a transaction see its snapshot instead
+   * sets one, so the row comes back as stored.
+   */
+  protected readonly rereadLock?: FindOneOptions<Entity>['lock'];
+
+  /**
    * A query the database failed, reported with the data source's type and the
    * database client's own error code: `code` where the client sets one
    * (`'23503'` on Postgres, `'SQLITE_CONSTRAINT_FOREIGNKEY'` on SQLite),
@@ -584,11 +592,13 @@ export abstract class TypeOrmRepository<
     }
 
     // Identity re-read of the row just written, whatever its delete date, for
-    // the columns `save()` did not hand back.
+    // the columns `save()` did not hand back; locked in the caller's
+    // transaction, where a plain read can return the transaction's snapshot.
     const result = await repo.findOne({
       where: primaryWhere,
       withDeleted: true,
       loadEagerRelations: false,
+      lock: this.joinsTransaction(options?.ctx) ? this.rereadLock : undefined,
     });
 
     if (!result) {
@@ -667,6 +677,7 @@ export abstract class TypeOrmRepository<
         where: primaryWhere,
         withDeleted: true,
         loadEagerRelations: false,
+        lock: this.rereadLock,
       });
 
       if (!result) {
@@ -676,9 +687,19 @@ export abstract class TypeOrmRepository<
       return this.toResult(result, {});
     };
 
-    return this.options.transactionScope
+    return this.options.transactionScope && !this.joinsTransaction(ctx)
       ? this.options.transactionScope.run(ctx ?? {}, (txCtx) => run(txCtx))
       : run(ctx);
+  }
+
+  /**
+   * Whether `ctx` carries the caller's transaction, which a write then
+   * joins directly. A run of the driver's own, nested in the caller's,
+   * would fail the caller's whole scope on any error it saw.
+   */
+  private joinsTransaction(ctx: AppContextLike | undefined): boolean {
+    const context = AppContextHost.from(ctx);
+    return context.supports(TrxCtx) && context.with(TrxCtx).trx.isSupported;
   }
 
   /**
@@ -695,11 +716,10 @@ export abstract class TypeOrmRepository<
    *
    * That guard statement and `op` are two separate SQL statements, so —
    * unless both run inside one DB transaction — a third writer could still
-   * interleave between them and reintroduce a lost update. `TransactionScope.run()`
-   * closes that window: it joins the caller's transaction if one is already
-   * active (e.g. via `@Transactional()`), or opens a short-lived one scoped
-   * to just this call if not, so every caller gets the same guarantee
-   * without having to opt in.
+   * interleave between them and reintroduce a lost update. Both join the
+   * caller's transaction when one is active (e.g. via `@Transactional()`),
+   * or `TransactionScope.run()` opens a short-lived one for just this call,
+   * so every caller gets the same guarantee without having to opt in.
    */
   private async withVersionGuard<T>(
     entity: Entity,
@@ -731,6 +751,9 @@ export abstract class TypeOrmRepository<
       return op(repo, primaryWhere);
     };
 
+    if (this.joinsTransaction(ctx)) {
+      return run(ctx);
+    }
     if (this.options.transactionScope) {
       return this.options.transactionScope.run(ctx ?? {}, (txCtx) =>
         run(txCtx),
@@ -794,6 +817,7 @@ export abstract class TypeOrmRepository<
           where: primaryWhere,
           withDeleted: true,
           loadEagerRelations: false,
+          lock: this.rereadLock,
         });
 
         if (!fresh) {
@@ -809,8 +833,25 @@ export abstract class TypeOrmRepository<
         // whenever the class initializes it (`badge = null`).
         const next = this.toEntity({ ...this.toResult(fresh, {}), ...data });
         next[guard.column] = fresh[guard.column];
+        await repo.save(next);
 
-        return this.toResult(await repo.save(next), {});
+        // The row as stored: `save()` returns it as TypeORM's own read saw
+        // it, which in a transaction that has read before can be its
+        // snapshot.
+        const saved = await repo.findOne({
+          where: primaryWhere,
+          withDeleted: true,
+          loadEagerRelations: false,
+          lock: this.rereadLock,
+        });
+        if (!saved) {
+          throw new RuntimeException({
+            message: 'Entity "%s" not found after update',
+            messageParams: [this.metadata.name],
+            fault: 'internal',
+          });
+        }
+        return this.toResult(saved, {});
       },
     );
   }

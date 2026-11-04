@@ -1,4 +1,9 @@
-import { type FindManyOptions, type Repository } from 'typeorm';
+import {
+  type FindManyOptions,
+  type FindOneOptions,
+  QueryFailedError,
+  type Repository,
+} from 'typeorm';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
@@ -9,7 +14,10 @@ import { TypeOrmRepository } from '../repository/typeorm-repository.js';
 import { dataSourceOf } from '../typeorm-repository.util.js';
 
 import { TypeOrmMysqlFoundRowsException } from './typeorm-mysql-found-rows.exception.js';
-import { TYPEORM_MYSQL_DATABASE } from './typeorm-mysql.constants.js';
+import {
+  MYSQL_TRANSACTION_ENDED_ERRNOS,
+  TYPEORM_MYSQL_DATABASE,
+} from './typeorm-mysql.constants.js';
 
 /**
  * A repository on a MySQL data source. Refuses a data source that turns off
@@ -36,6 +44,29 @@ export class TypeOrmMysqlRepository<
     ) {
       throw new TypeOrmMysqlFoundRowsException(this.metadata.name);
     }
+  }
+
+  /**
+   * A plain read in a transaction that has read before returns its
+   * snapshot, not a row another transaction has committed since, unless
+   * this transaction changed it: the re-read of a written row locks it.
+   */
+  protected override readonly rereadLock: FindOneOptions<Entity>['lock'] = {
+    mode: 'pessimistic_write',
+  };
+
+  /**
+   * A deadlock, or a lock table out of memory: MySQL has rolled the whole
+   * transaction back.
+   */
+  protected override endsTransaction(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) return false;
+    const reported: Error = error.driverError;
+    return (
+      'errno' in reported &&
+      typeof reported.errno === 'number' &&
+      MYSQL_TRANSACTION_ENDED_ERRNOS.includes(reported.errno)
+    );
   }
 
   /**

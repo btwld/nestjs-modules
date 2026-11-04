@@ -27,5 +27,6 @@ export { ConformanceAwardInterface } from './conformance/interfaces/conformance-
 export { ConformanceBookInterface } from './conformance/interfaces/conformance-book.interface.js';
 export { ConformanceBookWithEagerAuthorInterface } from './conformance/interfaces/conformance-book-with-eager-author.interface.js';
 export { ConformanceTagInterface } from './conformance/interfaces/conformance-tag.interface.js';
+export { ConformanceUniqueItemInterface } from './conformance/interfaces/conformance-unique-item.interface.js';
 export { ConformanceTenantOrderInterface } from './conformance/interfaces/conformance-tenant-order.interface.js';
 export { ConformanceTenantOrderLineInterface } from './conformance/interfaces/conformance-tenant-order-line.interface.js';

@@ -75,6 +75,11 @@ database stops startup with `TypeOrmUnsupportedDatabaseException`.
   case-sensitive.
 - In ascending order, `NULL`s sort last.
 - Transactions run concurrently, each on its own connection.
+- A failed statement ends the transaction it ran in. The run then fails,
+  even if it catches the error, and keeps nothing it wrote; every later call
+  in it throws `TransactionDoomedException`. Raw SQL you run through the
+  transaction's client is not watched: a failed statement there leaves the
+  run to commit nothing.
 - `transactionSettings` sets values at the start of every transaction, such
   as the caller's tenant — see
   [Row-Level Security (Postgres)](#row-level-security-postgres).
@@ -92,14 +97,22 @@ database stops startup with `TypeOrmUnsupportedDatabaseException`.
   default collations ignore it.
 - In ascending order, `NULL`s sort first.
 - Transactions run concurrently, each on its own connection.
+- A failed statement doesn't end the transaction it ran in, except a
+  deadlock or a full lock table, after which MySQL has rolled the whole
+  transaction back: the run fails, even if it catches the error, and every
+  later call in it throws `TransactionDoomedException` — retry the whole run.
+- A versioned `update` or `replace` of values another transaction stored
+  after your run first read the row may move the version on although
+  nothing changed: TypeORM compares against the row as your run first read
+  it. The row it returns is the row as stored.
 - [Durable messaging](#durable-messaging): supported.
 
 ### MariaDB
 
-MariaDB works like [MySQL](#mysql), flags, `timezone`, collations and
-[durable messaging](#durable-messaging) included. The outbox store needs
-MariaDB 11.4.7 or later and refuses an earlier one at startup; for later
-MariaDB versions, see the
+MariaDB works like [MySQL](#mysql), flags, `timezone`, collations,
+deadlocks, versions and [durable messaging](#durable-messaging) included.
+The outbox store needs MariaDB 11.4.7 or later and refuses an earlier one
+at startup; for later MariaDB versions, see the
 [`@nestjs/outbox` README](https://www.npmjs.com/package/@nestjs/outbox).
 
 ### Oracle
