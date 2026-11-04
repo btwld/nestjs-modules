@@ -1,4 +1,5 @@
 import { OptimisticLockException } from '../../exceptions/optimistic-lock.exception.js';
+import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
 import { OrderBy } from '../../repository/order-by.helpers.js';
 import { Where } from '../../repository/where.helpers.js';
 import { type TransactionContextInterface } from '../../transaction/interfaces/transaction-context.interface.js';
@@ -173,6 +174,26 @@ function supported(ctx: ConformanceContext): void {
       assert.deepStrictEqual(await names(ctx), []);
       assert.deepStrictEqual([committed, rolledBack], [[], ['rollback']]);
     }
+  });
+
+  it('transactions: a run that catches an upsert refused for another row’s unique column leaves that row unchanged', async () => {
+    const unique = ctx.repo('uniqueItem');
+    const other = await unique.create({ id: 'unique-a', code: 'C', name: 'a' });
+
+    let refused: unknown;
+    await settle(
+      run(ctx, async (txCtx) => {
+        refused = await unique
+          .upsert({ id: 'unique-b', code: 'C', name: 'b' }, { ctx: txCtx })
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+      }),
+    );
+
+    assert.ok(refused instanceof RepositoryDatabaseException, String(refused));
+    assertRows(await unique.find(), [other]);
   });
 
   it('transactions: a run that catches a write refused before the store fails keeps its other writes', async () => {
