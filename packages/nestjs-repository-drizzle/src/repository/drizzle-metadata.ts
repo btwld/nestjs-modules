@@ -1,6 +1,7 @@
 import {
   type Column,
   getTableColumns,
+  getTableName,
   getTableUniqueName,
   is,
   type Table,
@@ -51,7 +52,13 @@ export function columnOf<C extends Column>(
  * where the table is qualified by its schema when it has one.
  */
 export function buildUrn(table: Table, connection: string): string {
-  return `urn:drizzle:${connection}:${getTableUniqueName(table)}`;
+  const schema = is(table, PgTable)
+    ? getPgTableConfig(table).schema
+    : is(table, MySqlTable)
+      ? getMysqlTableConfig(table).schema
+      : undefined;
+  const name = getTableName(table);
+  return `urn:drizzle:${connection}:${schema ? `${schema}.${name}` : name}`;
 }
 
 /**

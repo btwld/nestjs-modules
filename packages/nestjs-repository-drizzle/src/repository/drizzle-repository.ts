@@ -6,6 +6,7 @@ import {
   desc,
   DrizzleQueryError,
   eq,
+  getTableColumns,
   gt,
   gte,
   inArray,
@@ -54,6 +55,9 @@ import {
   WhereOperator,
 } from '@concepta/nestjs-repository';
 
+import { DrizzleTransaction } from '../transaction/drizzle-transaction.js';
+
+import { type DrizzleClaimedRowInterface } from './drizzle-claimed-row.interface.js';
 import { columnOf } from './drizzle-metadata.js';
 import { type DrizzleReadQueryInterface } from './drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from './drizzle-repository-options.interface.js';
@@ -65,11 +69,12 @@ import { asStored } from './drizzle-rows.util.js';
  * builds; everything else — translation, versions, soft delete,
  * transactions — is here.
  *
- * Every read and every write a database can return rows from is one
- * statement on the entity's own table. A write to a versioned row reads the
- * row first, in the caller's transaction or one of its own, so the version
- * moves on only when the row changes. The driver reports no relations, so
- * no read it is given joins one.
+ * Every read, and every write but an upsert that a database can return rows
+ * from, is one statement on the entity's own table. An upsert, and a write
+ * to a versioned row, lock the row first, in the caller's transaction or one
+ * of their own, so an upsert updates only the columns its payload holds and
+ * a version moves on only when the row changes. The driver reports no
+ * relations, so no read it is given joins one.
  */
 export abstract class DrizzleRepository<
   Entity extends PlainLiteralObject,
@@ -106,13 +111,14 @@ export abstract class DrizzleRepository<
 
   /**
    * A query the database failed, reported with the database client's own
-   * error code: `code` where the client sets one, else `errno`.
+   * error and code: `code` where the client sets one, else `errno`. Never
+   * Drizzle's own message, which holds the query and its values.
    */
   protected override describeDatabaseError(
     error: unknown,
   ): RepositoryDatabaseErrorInterface | undefined {
     if (!(error instanceof DrizzleQueryError)) return undefined;
-    const reported = error.cause;
+    const reported = error.cause instanceof Error ? error.cause : undefined;
     const code =
       reported &&
       'code' in reported &&
@@ -124,7 +130,7 @@ export abstract class DrizzleRepository<
     return {
       database: this.database,
       code,
-      message: reported?.message ?? error.message,
+      message: reported?.message ?? 'the database client gave no error',
     };
   }
 
@@ -135,7 +141,10 @@ export abstract class DrizzleRepository<
   /** The client of a transaction, when it is one of this adapter's. */
   protected abstract clientOfTransaction(tx: unknown): Client | undefined;
 
-  /** Run `work` in a new transaction on the connection's database. */
+  /**
+   * Run `work` in a new transaction on the connection's database, for the
+   * caller `ctx`.
+   */
   protected abstract begin<T>(
     work: (tx: Client) => Promise<T>,
     ctx: AppContextLike | undefined,
@@ -160,13 +169,16 @@ export abstract class DrizzleRepository<
   ): Promise<PlainLiteralObject[]>;
 
   /**
-   * Insert `row` unless a row with its primary key exists, returning it as
-   * stored, or nothing when it was not inserted.
+   * The row an upsert's `key` names, locked until the transaction ends:
+   * the stored one, or `row` inserted when there is none. Nothing when
+   * neither can be had. A database without gap locks claims by
+   * {@link claimByLock}.
    */
-  protected abstract insertIfAbsent(
+  protected abstract claimRow(
     tx: Client,
     row: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined>;
+    key: unknown,
+  ): Promise<DrizzleClaimedRowInterface | undefined>;
 
   /**
    * Update the one row `where` matches with `set`, returning it as stored,
@@ -197,34 +209,55 @@ export abstract class DrizzleRepository<
     ctx: AppContextLike | undefined,
     work: (client: Client) => Promise<T>,
   ): Promise<T> {
-    return work((await this.transaction(ctx)) ?? this.options.db);
+    return this.joining(ctx, work, () => work(this.options.db));
   }
 
-  /** The caller's transaction on this connection, when it has one. */
-  protected async transaction(
-    ctx?: AppContextLike,
-  ): Promise<Client | undefined> {
+  /**
+   * Run `work` in the caller's transaction on this connection, or
+   * `otherwise` when the caller has none. A statement that makes the
+   * database end the caller's transaction fails the caller's whole scope,
+   * so nothing after it runs outside the transaction or commits.
+   */
+  protected async joining<T>(
+    ctx: AppContextLike | undefined,
+    work: (tx: Client) => Promise<T>,
+    otherwise: () => Promise<T>,
+  ): Promise<T> {
     const { transactionKey } = this.options;
-    if (transactionKey) {
-      const context = AppContextHost.from(ctx);
-      if (context.supports(TrxCtx)) {
-        const { trx } = context.with(TrxCtx);
-        if (trx?.isSupported) {
-          const tx = await trx.getOrStart(transactionKey);
-          const client = this.clientOfTransaction(tx);
-          if (client === undefined) {
-            throw new RuntimeException({
-              message:
-                'Transaction "%s" is not a transaction of the %s adapter',
-              messageParams: [transactionKey, this.database],
-              fault: 'internal',
-            });
-          }
-          return client;
-        }
-      }
+    const context = AppContextHost.from(ctx);
+    const trx =
+      transactionKey && context.supports(TrxCtx)
+        ? context.with(TrxCtx).trx
+        : undefined;
+    if (!transactionKey || !trx?.isSupported) return otherwise();
+
+    const tx = await trx.getOrStart(transactionKey);
+    const client = this.clientOfTransaction(tx);
+    if (client === undefined) {
+      throw new RuntimeException({
+        message: 'Transaction "%s" is not a transaction of the %s adapter',
+        messageParams: [transactionKey, this.database],
+        fault: 'internal',
+      });
     }
-    return undefined;
+    try {
+      return await work(client);
+    } catch (error) {
+      if (this.endsTransaction(error) && tx instanceof DrizzleTransaction) {
+        tx.end(error);
+        trx.markFailed(error);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Whether the database ends the transaction a statement ran in when the
+   * statement fails with `error`, such as a deadlock it rolls the whole
+   * transaction back for.
+   */
+  protected endsTransaction(_error: unknown): boolean {
+    return false;
   }
 
   /**
@@ -236,8 +269,7 @@ export abstract class DrizzleRepository<
     ctx: AppContextLike | undefined,
     work: (tx: Client) => Promise<T>,
   ): Promise<T> {
-    const open = await this.transaction(ctx);
-    return open !== undefined ? work(open) : this.begin(work, ctx);
+    return this.joining(ctx, work, () => this.begin(work, ctx));
   }
 
   /**
@@ -474,7 +506,7 @@ export abstract class DrizzleRepository<
   }
 
   /** The row `key` names, locked until the transaction ends. */
-  private async lockRow(
+  protected async lockRow(
     tx: Client,
     key: unknown,
   ): Promise<PlainLiteralObject | undefined> {
@@ -523,10 +555,29 @@ export abstract class DrizzleRepository<
     const key = after[primary.key];
     const bumped = await this.updateRow(
       tx,
-      { [version]: sql`${this.column(version)} + 1` },
+      {
+        ...this.keptAsStored([]),
+        [version]: sql`${this.column(version)} + 1`,
+      },
       eq(primary.column, key),
     );
     return bumped ?? after;
+  }
+
+  /**
+   * A `SET` of `keys` and every `$onUpdate` column, each to its own stored
+   * value: Drizzle adds every `$onUpdate` column to an update it builds, and
+   * an update the driver adds must write nothing the caller did not.
+   */
+  protected keptAsStored(keys: string[]): PlainLiteralObject {
+    return Object.fromEntries(
+      Object.entries(getTableColumns(this.options.table))
+        .filter(
+          ([key, column]) =>
+            keys.includes(key) || column.onUpdateFn !== undefined,
+        )
+        .map(([key, column]) => [key, sql`${column}`]),
+    );
   }
 
   protected async doCreate(
@@ -616,7 +667,7 @@ export abstract class DrizzleRepository<
     const before = await this.lockRow(tx, key);
     const after = await this.updateRow(
       tx,
-      keys.length > 0 ? data : { [version]: sql`${this.column(version)}` },
+      keys.length > 0 ? data : this.keptAsStored([version]),
       where,
     );
     return before && after
@@ -649,9 +700,10 @@ export abstract class DrizzleRepository<
   }
 
   /**
-   * Inserts, or updates the row the payload's primary key names: in one
-   * statement where the database can, or, for a versioned row, by locking
-   * the row, writing it, and moving the version on when that changed it.
+   * Inserts the payload, or updates the row its primary key names with the
+   * columns it holds: in a transaction, the row claimed and locked, then
+   * written, and its version moved on when that changed it. A payload that
+   * names a stored row need not hold its other columns.
    */
   protected async doUpsert(
     entity: DeepPartial<Entity>,
@@ -661,14 +713,9 @@ export abstract class DrizzleRepository<
     const data = this.withoutVersion(entity);
     const { [primary.key]: key, ...changes } = data;
 
-    const row =
-      this.getVersionColumn() === undefined
-        ? await this.writing(options?.ctx, (client) =>
-            this.upsertRow(client, data, changes),
-          )
-        : await this.atomically(options?.ctx, (tx) =>
-            this.upsertLocked(tx, data, key, changes),
-          );
+    const row = await this.atomically(options?.ctx, (tx) =>
+      this.upsertClaimed(tx, data, key, changes),
+    );
     if (!row) {
       throw new RuntimeException({
         message: 'Upsert of "%s" returned no row',
@@ -680,48 +727,55 @@ export abstract class DrizzleRepository<
   }
 
   /**
-   * An unversioned upsert: insert `row`, or update the row its primary key
-   * names with `changes` (or leave it as it is when there are none),
-   * returning it as stored. Locks the row first, as a versioned upsert does,
-   * so it needs a transaction: `writing()` opens one for a database that
-   * returns no written rows, and a database that does overrides this with
-   * one statement.
+   * The row `key` names, claimed, then updated with `changes` unless the
+   * claim inserted it or it already holds them as stored; returned as
+   * stored.
    */
-  protected async upsertRow(
-    client: Client,
-    row: PlainLiteralObject,
-    changes: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined> {
-    const primary = this.primaryColumn('upsert');
-    return this.upsertLocked(client, row, row[primary.key], changes);
-  }
-
-  /**
-   * An upsert by lock: the row `key` names is locked and updated when it
-   * exists; otherwise inserted, unless another transaction inserted it
-   * first, which is then locked and updated in turn. Taking the lock before
-   * the insert keeps two upserts of a stored row from each holding the
-   * shared lock a failed insert leaves, and deadlocking.
-   */
-  private async upsertLocked(
+  private async upsertClaimed(
     tx: Client,
     data: PlainLiteralObject,
     key: unknown,
     changes: PlainLiteralObject,
   ): Promise<PlainLiteralObject | undefined> {
-    const primary = this.primaryColumn('upsert');
-    let before = await this.lockRow(tx, key);
-    if (!before) {
-      const inserted = await this.insertIfAbsent(tx, this.toInsert(data));
-      if (inserted) return inserted;
-      before = await this.lockRow(tx, key);
-      if (!before) return undefined;
-    }
+    const claimed = await this.claimRow(tx, this.toInsert(data), key);
+    if (!claimed) return undefined;
 
     const keys = Object.keys(changes);
-    if (keys.length === 0) return before;
+    const holdsChanges = keys.every(
+      (column) => asStored(changes[column]) === asStored(claimed.row[column]),
+    );
+    if (claimed.inserted || holdsChanges) return claimed.row;
+    const primary = this.primaryColumn('upsert');
     const after = await this.updateRow(tx, changes, eq(primary.column, key));
-    return after && this.bumpIfChanged(tx, before, after, keys);
+    return after && this.bumpIfChanged(tx, claimed.row, after, keys);
+  }
+
+  /**
+   * A claim by lock: the row `key` names, locked, when it exists; else
+   * `insertIfAbsent()`'s row, which inserts nothing on a conflict with any
+   * unique column. Then the row with the key, inserted first by another
+   * transaction and locked in turn; or, when there is none, the conflict was
+   * with another row, which a plain insert reports as the database error.
+   *
+   * Locking before the insert keeps two upserts of a stored row from each
+   * holding the shared lock a failed insert leaves, and deadlocking; on a
+   * database with gap locks it makes two upserts of a new key deadlock
+   * instead.
+   */
+  protected async claimByLock(
+    tx: Client,
+    row: PlainLiteralObject,
+    key: unknown,
+    insertIfAbsent: () => Promise<PlainLiteralObject | undefined>,
+  ): Promise<DrizzleClaimedRowInterface | undefined> {
+    const stored = await this.lockRow(tx, key);
+    if (stored) return { row: stored, inserted: false };
+    const inserted = await insertIfAbsent();
+    if (inserted) return { row: inserted, inserted: true };
+    const raced = await this.lockRow(tx, key);
+    if (raced) return { row: raced, inserted: false };
+    const [created] = await this.insertRows(tx, [row]);
+    return created && { row: created, inserted: true };
   }
 
   protected async doDelete(

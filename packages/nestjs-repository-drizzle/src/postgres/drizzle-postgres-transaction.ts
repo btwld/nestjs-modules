@@ -1,3 +1,5 @@
+import { DrizzleQueryError, sql } from 'drizzle-orm';
+
 import { DrizzleTransaction } from '../transaction/drizzle-transaction.js';
 
 import { type DrizzlePostgresTransactionSettings } from './drizzle-postgres-transaction-settings.type.js';
@@ -27,5 +29,23 @@ export class DrizzlePostgresTransaction extends DrizzleTransaction<DrizzlePostgr
       await applyTransactionSettings(tx, this.settings);
       await work(tx);
     });
+  }
+
+  /**
+   * Postgres ends a transaction at its first failed statement, then answers
+   * `COMMIT` with a rollback and no error. One statement first fails if it
+   * has, so a commit that would write nothing is refused, with the
+   * database's own error.
+   */
+  protected override async beforeCommit(
+    client: DrizzlePostgresClient,
+  ): Promise<void> {
+    try {
+      await client.execute(sql`select 1`);
+    } catch (error) {
+      throw error instanceof DrizzleQueryError && error.cause instanceof Error
+        ? error.cause
+        : error;
+    }
   }
 }

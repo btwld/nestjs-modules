@@ -17,11 +17,7 @@ import {
   ConformanceTenantOrderLineEntity,
 } from '../../__fixtures__/conformance/conformance.entity.fixture.js';
 import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
-import { type DrizzleMariadbRepositoryModule } from '../../mariadb/drizzle-mariadb-repository.module.js';
-import {
-  type DrizzleMysqlRepositoryModule,
-  toDrizzleMysqlClient,
-} from '../drizzle-mysql-repository.module.js';
+import { toDrizzleMysqlClient } from '../drizzle-mysql-repository.module.js';
 import { type DrizzleMysqlClient } from '../drizzle-mysql.types.js';
 
 import {
@@ -37,10 +33,7 @@ import {
   tenantOrderLineTable,
   tenantOrderTable,
 } from './conformance-mysql.schema.fixture.js';
-
-/** The adapters whose conformance this harness runs. */
-type DrizzleMysqlAdapterModule =
-  typeof DrizzleMysqlRepositoryModule | typeof DrizzleMariadbRepositoryModule;
+import { type DrizzleMysqlAdapterModule } from './drizzle-mysql-adapter-module.type.js';
 
 function database(app: INestApplicationContext): DrizzleMysqlClient {
   return toDrizzleMysqlClient(

@@ -1,7 +1,6 @@
 import {
   count,
   DrizzleQueryError,
-  eq,
   getTableName,
   inArray,
   is,
@@ -14,6 +13,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 
 import { RuntimeException } from '@concepta/nestjs-core';
 
+import { type DrizzleClaimedRowInterface } from '../repository/drizzle-claimed-row.interface.js';
 import { columnOf } from '../repository/drizzle-metadata.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
@@ -23,7 +23,8 @@ import { asStored, toRows } from '../repository/drizzle-rows.util.js';
 import { DrizzleMysqlTransaction } from './drizzle-mysql-transaction.js';
 import {
   DRIZZLE_MYSQL_DATABASE,
-  MYSQL_DUPLICATE_KEY_ERRNO,
+  MYSQL_TRANSACTION_ENDED_ERRNOS,
+  MYSQL_UNINSERTABLE_ROW_ERRNOS,
 } from './drizzle-mysql.constants.js';
 import { type DrizzleMysqlClient } from './drizzle-mysql.types.js';
 
@@ -40,23 +41,25 @@ function mysqlTableOf(table: Table, database: string): MySqlTable {
 }
 
 /**
- * A primary key as text, so a key the driver holds as a number (an
- * `insertId`) matches the same key read back as a `bigint`.
+ * A primary key as text, so the same integer key matches however the
+ * client holds it: an `insertId` as a number, or as a string above 2^53,
+ * and the key read back as a number, `bigint` or string.
  */
 function keyText(value: unknown): string | undefined {
-  return typeof value === 'number' || typeof value === 'bigint'
+  return typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    (typeof value === 'string' && /^-?\d+$/.test(value))
     ? String(value)
     : asStored(value);
 }
 
-/** Whether `error` is MySQL refusing a duplicate key. */
-function isDuplicateKey(error: unknown): boolean {
-  return (
-    error instanceof DrizzleQueryError &&
-    error.cause !== undefined &&
-    'errno' in error.cause &&
-    error.cause.errno === MYSQL_DUPLICATE_KEY_ERRNO
-  );
+/** The MySQL error number of a failed query, if it has one. */
+function errnoOf(error: unknown): unknown {
+  return error instanceof DrizzleQueryError &&
+    error.cause instanceof Error &&
+    'errno' in error.cause
+    ? error.cause.errno
+    : undefined;
 }
 
 /**
@@ -69,9 +72,9 @@ function isDuplicateKey(error: unknown): boolean {
  * insert of that row alone. Any other key the database generates is
  * refused.
  *
- * An upsert locks the row its key names before writing it, never
- * `ON DUPLICATE KEY UPDATE`: that takes a duplicate of any unique key for
- * the row to update, and so could write a row the payload did not name.
+ * An upsert claims the row its key names with an insert that, on a
+ * duplicate, sets the key to itself and so changes no row, then writes the
+ * payload to the row with that key only.
  */
 export class DrizzleMysqlRepository<
   Entity extends PlainLiteralObject,
@@ -104,6 +107,14 @@ export class DrizzleMysqlRepository<
 
   protected begin<T>(work: (tx: DrizzleMysqlClient) => Promise<T>): Promise<T> {
     return this.options.db.transaction(work);
+  }
+
+  /**
+   * A deadlock, or a lock table out of memory: MySQL has rolled the whole
+   * transaction back.
+   */
+  protected override endsTransaction(error: unknown): boolean {
+    return MYSQL_TRANSACTION_ENDED_ERRNOS.includes(errnoOf(error));
   }
 
   /**
@@ -201,33 +212,53 @@ export class DrizzleMysqlRepository<
     });
   }
 
-  protected async insertIfAbsent(
+  /**
+   * `INSERT … ON DUPLICATE KEY UPDATE` setting the key, and every
+   * `$onUpdate` column, to itself, which inserts the row or locks the stored
+   * one without changing it, and takes no gap lock first; then the row read
+   * back, locked. No row with the key means the insert met a duplicate of
+   * another unique column, which a plain `INSERT` then reports as the
+   * database error.
+   *
+   * A payload MySQL cannot insert, such as one that leaves out a `NOT NULL`
+   * column, is refused before MySQL looks for a duplicate: the stored row is
+   * then claimed by its lock alone, or the refusal stands when there is none.
+   * Any other error stands as it is.
+   */
+  protected async claimRow(
     tx: DrizzleMysqlClient,
     row: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined> {
-    try {
-      const [inserted] = await this.insertRows(tx, [row]);
-      return inserted;
-    } catch (error) {
-      // A duplicate of anything but the primary key is the caller's error.
-      // The read locks, so it sees a row committed since the transaction's
-      // snapshot.
+    key: unknown,
+  ): Promise<DrizzleClaimedRowInterface | undefined> {
+    if (key !== undefined) {
       const primary = this.primaryColumn('upsert');
-      const key = row[primary.key];
-      const existing =
-        isDuplicateKey(error) && key !== undefined
-          ? await this.selectRows(tx, {
-              select: [],
-              where: eq(primary.column, key),
-              order: [],
-              lock: true,
-            })
-          : [];
-      if (existing.length === 0) throw error;
-      return undefined;
+      try {
+        await tx
+          .insert(this.table)
+          .values(row)
+          .onDuplicateKeyUpdate({ set: this.keptAsStored([primary.key]) });
+      } catch (error) {
+        // Only a row MySQL refuses as given: any other error, such as a
+        // lock wait that timed out or a query killed, stands as it is.
+        const stored = MYSQL_UNINSERTABLE_ROW_ERRNOS.includes(errnoOf(error))
+          ? await this.lockRow(tx, key)
+          : undefined;
+        if (!stored) throw error;
+        return { row: stored, inserted: false };
+      }
+      const stored = await this.lockRow(tx, key);
+      if (stored) return { row: stored, inserted: false };
     }
+    const [inserted] = await this.insertRows(tx, [row]);
+    return inserted && { row: inserted, inserted: true };
   }
 
+  /**
+   * The `UPDATE`, then the row read back with a locking read: a plain read
+   * in a transaction that has read before returns its snapshot, not a row
+   * another transaction has committed since, unless this `UPDATE` changed
+   * it.
+   */
   protected async updateRow(
     client: DrizzleMysqlClient,
     set: PlainLiteralObject,
@@ -238,6 +269,7 @@ export class DrizzleMysqlRepository<
       select: [],
       where,
       order: [],
+      lock: true,
     });
     return row;
   }

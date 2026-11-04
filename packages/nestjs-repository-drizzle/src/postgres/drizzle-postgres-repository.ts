@@ -1,11 +1,4 @@
-import {
-  count,
-  getTableName,
-  is,
-  type SQL,
-  sql,
-  type Table,
-} from 'drizzle-orm';
+import { count, getTableName, is, type SQL, type Table } from 'drizzle-orm';
 import { type PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
@@ -16,6 +9,7 @@ import {
   RuntimeException,
 } from '@concepta/nestjs-core';
 
+import { type DrizzleClaimedRowInterface } from '../repository/drizzle-claimed-row.interface.js';
 import { columnOf } from '../repository/drizzle-metadata.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
@@ -133,19 +127,26 @@ export class DrizzlePostgresRepository<
     return toRows(await client.insert(this.table).values(rows).returning());
   }
 
-  protected async insertIfAbsent(
+  /**
+   * Locked first, then `INSERT … ON CONFLICT DO NOTHING` on every unique
+   * column, so two upserts of a new key never fail each other on a unique
+   * column besides it.
+   */
+  protected claimRow(
     tx: DrizzlePostgresClient,
     row: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined> {
-    const primary = this.primaryColumn('upsert');
-    const [inserted] = toRows(
-      await tx
-        .insert(this.table)
-        .values(row)
-        .onConflictDoNothing({ target: this.pgColumn(primary.key) })
-        .returning(),
-    );
-    return inserted;
+    key: unknown,
+  ): Promise<DrizzleClaimedRowInterface | undefined> {
+    return this.claimByLock(tx, row, key, async () => {
+      const [inserted] = toRows(
+        await tx
+          .insert(this.table)
+          .values(row)
+          .onConflictDoNothing()
+          .returning(),
+      );
+      return inserted;
+    });
   }
 
   protected async updateRow(
@@ -157,29 +158,6 @@ export class DrizzlePostgresRepository<
       await client.update(this.table).set(set).where(where).returning(),
     );
     return row;
-  }
-
-  /** One `INSERT … ON CONFLICT DO UPDATE`, on the primary key only. */
-  protected override async upsertRow(
-    client: DrizzlePostgresClient,
-    row: PlainLiteralObject,
-    changes: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined> {
-    const primary = this.primaryColumn('upsert');
-    const target = this.pgColumn(primary.key);
-    // A payload of only its key still updates, so the row is returned.
-    const set =
-      Object.keys(changes).length > 0
-        ? changes
-        : { [primary.key]: sql`excluded.${sql.identifier(target.name)}` };
-    const [upserted] = toRows(
-      await client
-        .insert(this.table)
-        .values(row)
-        .onConflictDoUpdate({ target, set })
-        .returning(),
-    );
-    return upserted;
   }
 
   protected async deleteRows(

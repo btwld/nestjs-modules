@@ -38,15 +38,31 @@ export abstract class DrizzleTransaction<
     settled: Promise<void>;
   };
 
+  /** The error with which the database ended the transaction, if it has. */
+  private ended?: { reason: unknown };
+
   /** Run `work` in a new transaction on the connection's database. */
   protected abstract begin(work: (tx: Client) => Promise<void>): Promise<void>;
+
+  /**
+   * Check the transaction can commit, before `commit()` ends it. Throws
+   * when it cannot; the transaction is then still open to roll back.
+   */
+  protected async beforeCommit(_client: Client): Promise<void> {}
 
   get isActive(): boolean {
     return this.open !== undefined;
   }
 
-  /** The transaction's database, for every read and write in it. */
+  /**
+   * The transaction's database, for every read and write in it. Refused
+   * once the database has ended the transaction, so no later statement
+   * runs outside it.
+   */
   getClient(): Client {
+    if (this.ended) {
+      throw this.endedException(this.ended.reason);
+    }
     if (!this.open) {
       throw new RuntimeException({
         message: 'No active transaction - cannot get client',
@@ -54,6 +70,15 @@ export abstract class DrizzleTransaction<
       });
     }
     return this.open.client;
+  }
+
+  /**
+   * Record that the database ended the transaction with `reason`, such as a
+   * deadlock it rolled the transaction back for. Every later `getClient()`
+   * and `commit()` is refused; `rollback()` still ends it here.
+   */
+  end(reason: unknown): void {
+    this.ended ??= { reason };
   }
 
   async start(): Promise<void> {
@@ -87,6 +112,10 @@ export abstract class DrizzleTransaction<
         fault: 'internal',
       });
     }
+    if (this.ended) {
+      throw this.endedException(this.ended.reason);
+    }
+    await this.beforeCommit(open.client);
     this.open = undefined;
     open.outcome.resolve();
     await open.settled;
@@ -105,5 +134,14 @@ export abstract class DrizzleTransaction<
     } catch (error) {
       if (!(error instanceof DrizzleRollback)) throw error;
     }
+  }
+
+  private endedException(reason: unknown): RuntimeException {
+    return new RuntimeException({
+      message:
+        'The database ended this transaction, so nothing more can run in it',
+      fault: 'internal',
+      originalError: reason,
+    });
   }
 }

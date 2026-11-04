@@ -14,6 +14,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type AppContextLike, RuntimeException } from '@concepta/nestjs-core';
 import { type RepositoryDatabaseErrorInterface } from '@concepta/nestjs-repository';
 
+import { type DrizzleClaimedRowInterface } from '../repository/drizzle-claimed-row.interface.js';
 import { columnOf } from '../repository/drizzle-metadata.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
 import { type DrizzleRepositoryOptions } from '../repository/drizzle-repository-options.interface.js';
@@ -107,10 +108,8 @@ export class DrizzleSqliteRepository<
     ctx: AppContextLike | undefined,
     work: (client: DrizzleSqliteClient) => Promise<T>,
   ): Promise<T> {
-    const open = await this.transaction(ctx);
-    if (open !== undefined) return work(open);
     const { db } = this.options;
-    return gateOf(db).run(() => work(db));
+    return this.joining(ctx, work, () => gateOf(db).run(() => work(db)));
   }
 
   /**
@@ -190,19 +189,22 @@ export class DrizzleSqliteRepository<
     return toRows(await client.insert(this.table).values(rows).returning());
   }
 
-  protected async insertIfAbsent(
+  /** Read first, then `INSERT … ON CONFLICT DO NOTHING` on every unique column. */
+  protected claimRow(
     tx: DrizzleSqliteClient,
     row: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined> {
-    const primary = this.primaryColumn('upsert');
-    const [inserted] = toRows(
-      await tx
-        .insert(this.table)
-        .values(row)
-        .onConflictDoNothing({ target: this.sqliteColumn(primary.key) })
-        .returning(),
-    );
-    return inserted;
+    key: unknown,
+  ): Promise<DrizzleClaimedRowInterface | undefined> {
+    return this.claimByLock(tx, row, key, async () => {
+      const [inserted] = toRows(
+        await tx
+          .insert(this.table)
+          .values(row)
+          .onConflictDoNothing()
+          .returning(),
+      );
+      return inserted;
+    });
   }
 
   protected async updateRow(
@@ -214,29 +216,6 @@ export class DrizzleSqliteRepository<
       await client.update(this.table).set(set).where(where).returning(),
     );
     return row;
-  }
-
-  /** One `INSERT … ON CONFLICT DO UPDATE`, on the primary key only. */
-  protected override async upsertRow(
-    client: DrizzleSqliteClient,
-    row: PlainLiteralObject,
-    changes: PlainLiteralObject,
-  ): Promise<PlainLiteralObject | undefined> {
-    const primary = this.primaryColumn('upsert');
-    const target = this.sqliteColumn(primary.key);
-    // A payload of only its key still updates, so the row is returned.
-    const set =
-      Object.keys(changes).length > 0
-        ? changes
-        : { [primary.key]: sql`excluded.${sql.identifier(target.name)}` };
-    const [upserted] = toRows(
-      await client
-        .insert(this.table)
-        .values(row)
-        .onConflictDoUpdate({ target, set })
-        .returning(),
-    );
-    return upserted;
   }
 
   protected async deleteRows(

@@ -14,15 +14,12 @@ import { buildMetadata } from './repository/drizzle-metadata.js';
 import { type DrizzleProviderOptionsInterface } from './repository/drizzle-provider-options.interface.js';
 
 /** The connection an entity names, or the default one. */
-export function resolveConnectionName(connection?: string): string {
+function resolveConnectionName(connection?: string): string {
   return connection ?? DRIZZLE_DEFAULT_CONNECTION_NAME;
 }
 
 /** The key of a connection's transactions, under the adapter's prefix. */
-export function resolveTransactionKey(
-  prefix: string,
-  connection?: string,
-): string {
+function resolveTransactionKey(prefix: string, connection?: string): string {
   return `${prefix}:${resolveConnectionName(connection)}`;
 }
 
@@ -30,7 +27,7 @@ export function resolveTransactionKey(
  * A provider for one entity's repository, built from the database of its
  * connection.
  */
-export function createDrizzleProvider<
+function createDrizzleProvider<
   Client,
   Options,
   Entity extends PlainLiteralObject,
@@ -67,7 +64,7 @@ export function createDrizzleProvider<
 }
 
 /** The transaction factory of one connection. */
-export function createTransactionFactoryDescriptor<Client, Options>(
+function createTransactionFactoryDescriptor<Client, Options>(
   definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   connection: string,
   driverOptions?: Options,
