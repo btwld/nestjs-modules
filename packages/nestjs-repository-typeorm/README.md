@@ -78,8 +78,9 @@ database stops startup with `TypeOrmUnsupportedDatabaseException`.
 - A failed statement ends the transaction it ran in. The run then fails,
   even if it catches the error, and keeps nothing it wrote; every later call
   in it throws `TransactionDoomedException`. Raw SQL you run through the
-  transaction's client is not watched: a failed statement there leaves the
-  run to commit nothing.
+  transaction's client is not watched: if you catch a failed statement
+  there, the run still resolves and runs its `onCommit` callbacks, though
+  Postgres kept nothing. Don't catch errors from raw SQL in a run.
 - `transactionSettings` sets values at the start of every transaction, such
   as the caller's tenant — see
   [Row-Level Security (Postgres)](#row-level-security-postgres).
