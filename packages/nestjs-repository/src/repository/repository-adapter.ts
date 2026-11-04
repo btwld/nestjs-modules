@@ -52,6 +52,7 @@ import {
   type RowScopeQueryOperation,
   type RowScopeWriteOperation,
 } from '../row-scope/row-scope.types.js';
+import { TrxCtx } from '../transaction/interfaces/transaction-context.interface.js';
 import { AppendOnlyViolationException } from '../write-policy/exceptions/append-only-violation.exception.js';
 import {
   isAppendOnly,
@@ -427,9 +428,29 @@ export abstract class RepositoryAdapter<
         this.runHooks.bind(this),
         this.entityKey,
         (error) => this.describeDatabaseError(error),
+        (error, ctx) => this.failIfEnded(error, ctx),
       );
     }
     return this._permeator;
+  }
+
+  /**
+   * Whether the database ended the transaction a call ran in when the call
+   * failed with `error`, such as a deadlock it rolls the whole transaction
+   * back for. The driver reports; the default reports nothing.
+   */
+  protected endsTransaction(_error: unknown): boolean {
+    return false;
+  }
+
+  /**
+   * Fail the caller's transaction scope when the database ended its
+   * transaction, so no later call in the scope runs outside it.
+   */
+  private failIfEnded(error: unknown, ctx: PlainLiteralObject | undefined) {
+    if (!this.endsTransaction(error)) return;
+    const host = AppContextHost.from(ctx);
+    if (host.supports(TrxCtx)) host.with(TrxCtx).trx.markFailed(error);
   }
 
   /**

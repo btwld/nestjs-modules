@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { AppContextHost } from '@concepta/nestjs-core';
 
 import { TransactionClosedException } from '../exceptions/transaction-closed.exception.js';
+import { TransactionDoomedException } from '../exceptions/transaction-doomed.exception.js';
 import { TransactionHeuristicCommitException } from '../exceptions/transaction-heuristic-commit.exception.js';
 import { type TransactionFactoryInterface } from '../interfaces/transaction-factory.interface.js';
 
@@ -111,6 +112,13 @@ export class TransactionManager implements TransactionManagerInterface {
   async getOrStart(key: string): Promise<TransactionInterface> {
     if (this.closed) {
       throw new TransactionClosedException();
+    }
+    // The scope will roll back: nothing more runs in it, so nothing runs
+    // where the database has already ended the transaction either.
+    if (this.failed) {
+      throw new TransactionDoomedException({
+        originalError: this.abortController.signal.reason,
+      });
     }
 
     const existing = this.transactions.get(key);

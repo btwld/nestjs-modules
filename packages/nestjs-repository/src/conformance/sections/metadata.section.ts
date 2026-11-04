@@ -54,6 +54,12 @@ function columnsFor(
       column('version', { isVersion: true }),
     ],
     plainItem: [column('id', { isPrimary: true }), column('name')],
+    uniqueItem: [
+      column('code'),
+      column('id', { isPrimary: true }),
+      column('name'),
+      column('version', { isVersion: true }),
+    ],
     author: [column('id', { isPrimary: true }), column('name'), removedAt],
     award: [
       column('authorId'),
@@ -81,6 +87,7 @@ function columnsFor(
 const RELATIONS: Record<keyof ConformanceFixturesInterface, string[]> = {
   item: [],
   plainItem: [],
+  uniqueItem: [],
   author: ['awards', 'books'],
   award: ['author'],
   book: ['author', 'tags'],
@@ -93,6 +100,7 @@ const RELATIONS: Record<keyof ConformanceFixturesInterface, string[]> = {
 const KEYS: (keyof ConformanceFixturesInterface)[] = [
   'item',
   'plainItem',
+  'uniqueItem',
   'author',
   'award',
   'book',

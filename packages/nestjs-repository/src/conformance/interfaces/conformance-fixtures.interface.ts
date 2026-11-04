@@ -7,6 +7,7 @@ import { type ConformancePlainItemInterface } from './conformance-plain-item.int
 import { type ConformanceTagInterface } from './conformance-tag.interface.js';
 import { type ConformanceTenantOrderLineInterface } from './conformance-tenant-order-line.interface.js';
 import { type ConformanceTenantOrderInterface } from './conformance-tenant-order.interface.js';
+import { type ConformanceUniqueItemInterface } from './conformance-unique-item.interface.js';
 
 /**
  * Every entity the conformance suite reads and writes, by fixture key. A
@@ -15,6 +16,7 @@ import { type ConformanceTenantOrderInterface } from './conformance-tenant-order
 export interface ConformanceFixturesInterface {
   item: ConformanceItemInterface;
   plainItem: ConformancePlainItemInterface;
+  uniqueItem: ConformanceUniqueItemInterface;
   author: ConformanceAuthorInterface;
   award: ConformanceAwardInterface;
   book: ConformanceBookInterface;

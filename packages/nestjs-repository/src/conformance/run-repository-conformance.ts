@@ -57,6 +57,7 @@ export function runRepositoryConformance<
       fixtures: {
         item: fixtures.item,
         plainItem: fixtures.plainItem,
+        uniqueItem: fixtures.uniqueItem,
         author: fixtures.author,
         award: fixtures.award,
         book: fixtures.book,
@@ -79,6 +80,7 @@ export function runRepositoryConformance<
                     entities: [
                       fixtures.item,
                       fixtures.plainItem,
+                      fixtures.uniqueItem,
                       fixtures.author,
                       fixtures.award,
                       fixtures.book,

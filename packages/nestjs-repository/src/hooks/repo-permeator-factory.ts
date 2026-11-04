@@ -39,6 +39,8 @@ type DescribeDatabaseErrorFn = (
   error: unknown,
 ) => RepositoryDatabaseErrorInterface | undefined;
 
+type FailedFn = (error: unknown, ctx: PlainLiteralObject | undefined) => void;
+
 type Ctx = PlainLiteralObject;
 type HookCb = PassthroughPermeateCallback<Ctx>;
 
@@ -84,6 +86,7 @@ export class RepoPermeatorFactory<
     runHooks: RunHooksFn,
     entityName: string,
     describeDatabaseError: DescribeDatabaseErrorFn = () => undefined,
+    failed: FailedFn = () => undefined,
   ) {
     const cb =
       (key: HookMethodKeyType, filter?: HookMethodFilter): HookCb =>
@@ -91,7 +94,8 @@ export class RepoPermeatorFactory<
         runHooks(key, payload, ambient, filter);
 
     const options: PermeatorOptions<Ctx> = {
-      onError: (error: unknown): never => {
+      onError: (error: unknown, { ambient }): never => {
+        failed(error, ambient);
         if (error instanceof RuntimeException) throw error;
         const database = describeDatabaseError(error);
         if (database) {

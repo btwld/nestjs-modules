@@ -1,4 +1,4 @@
-import { type Repository } from 'typeorm';
+import { QueryFailedError, type Repository } from 'typeorm';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
@@ -15,5 +15,13 @@ export class TypeOrmPostgresRepository<
 > extends TypeOrmRepository<Entity> {
   constructor(repo: Repository<Entity>, options: TypeOrmRepositoryOptions) {
     super(repo, options, TYPEORM_POSTGRES_DATABASE);
+  }
+
+  /**
+   * Any failed statement: Postgres ends the transaction it ran in, and
+   * answers a later `COMMIT` with a rollback.
+   */
+  protected override endsTransaction(error: unknown): boolean {
+    return error instanceof QueryFailedError;
   }
 }

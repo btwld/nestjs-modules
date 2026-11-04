@@ -118,6 +118,7 @@ export { SoftDeletedImmutableException } from './exceptions/soft-deleted-immutab
 export { FederationException } from './federation/exceptions/federation.exception.js';
 export { TransactionTimeoutException } from './exceptions/transaction-timeout.exception.js';
 export { TransactionClosedException } from './exceptions/transaction-closed.exception.js';
+export { TransactionDoomedException } from './exceptions/transaction-doomed.exception.js';
 export { TransactionHeuristicCommitException } from './exceptions/transaction-heuristic-commit.exception.js';
 export { TransactionReadOnlyConflictException } from './exceptions/transaction-read-only-conflict.exception.js';
 export { TransactionScopeFailedException } from './exceptions/transaction-scope-failed.exception.js';

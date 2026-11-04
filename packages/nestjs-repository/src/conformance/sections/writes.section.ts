@@ -1,9 +1,11 @@
 import { EntityNotFoundException } from '../../exceptions/entity-not-found.exception.js';
+import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
 import { Where } from '../../repository/where.helpers.js';
 import {
   assert,
   assertRows,
   inOrder,
+  settle,
   valuesOf,
 } from '../conformance-assert.js';
 import { type ConformanceContext } from '../conformance-context.js';
@@ -173,6 +175,76 @@ export function writesSection(ctx: ConformanceContext): void {
     assertRows(inserted, { id: 'author-y', name: 'y', removedAt: null });
     assertRows(updated, { id: 'author-y', name: 'why', removedAt: null });
     assert.equal(await ctx.repo('author').count(), 1);
+  });
+
+  // A payload the store cannot insert may fail; it then fails cleanly.
+  const cleanlyRefused = (error: unknown) =>
+    assert.ok(error instanceof RepositoryDatabaseException, String(error));
+
+  it('doUpsert: a payload of a stored row’s key and some columns writes those columns, or fails changing nothing', async () => {
+    const stored = await ctx
+      .repo('item')
+      .create({ name: 'kept', rank: 1, note: null });
+
+    const outcome = await settle(
+      ctx.repo('item').upsert({ id: stored.id, note: 'new' }),
+    );
+
+    const after = await readItem(stored.id);
+    if (outcome.ok) {
+      const expected = { ...stored, note: 'new', version: stored.version + 1 };
+      assertRows(outcome.value, expected);
+      assertRows(after, expected);
+    } else {
+      cleanlyRefused(outcome.error);
+      assertRows(after, stored);
+    }
+  });
+
+  it('doUpsert: a payload of only a stored row’s key returns the row as stored, or fails changing nothing', async () => {
+    const stored = await ctx
+      .repo('item')
+      .create({ name: 'kept', rank: 1, note: null });
+
+    const outcome = await settle(ctx.repo('item').upsert({ id: stored.id }));
+
+    if (outcome.ok) {
+      assertRows(outcome.value, stored);
+    } else {
+      cleanlyRefused(outcome.error);
+    }
+    assertRows(await readItem(stored.id), stored);
+  });
+
+  it('doUpsert: a new key whose unique column another row holds is refused, changing no row', async () => {
+    const unique = ctx.repo('uniqueItem');
+    const other = await unique.create({ id: 'unique-a', code: 'C', name: 'a' });
+
+    await assert.rejects(
+      unique.upsert({ id: 'unique-b', code: 'C', name: 'b' }),
+      RepositoryDatabaseException,
+    );
+
+    assertRows(await unique.find(), [other]);
+  });
+
+  it('doUpdate, doReplace and doUpsert: a version in the data leaves the version to the driver', async () => {
+    const item = ctx.repo('item');
+    const created = await item.create({ name: 'v', rank: 1, note: null });
+
+    const updated = await item.update(created, { rank: 2, version: 99 });
+    const replaced = await item.replace(updated, { rank: 3, version: 99 });
+    const upserted = await item.upsert({
+      id: created.id,
+      rank: 4,
+      version: 99,
+    });
+
+    assert.deepStrictEqual(
+      [updated.version, replaced.version, upserted.version],
+      [created.version + 1, created.version + 2, created.version + 3],
+    );
+    assert.equal((await readItem(created.id))?.version, created.version + 3);
   });
 
   it('doDelete: removes the row and returns it with its key', async () => {

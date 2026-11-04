@@ -17,6 +17,14 @@ export interface ConformanceCapabilitiesInterface {
   transactions: ConformanceCapability;
 
   /**
+   * The store runs transactions at the same time, each on its own
+   * connection, so one can commit while another is open. A store with one
+   * connection, whose transactions run one at a time, refuses it. Needs
+   * `transactions`.
+   */
+  concurrentTransactions: ConformanceCapability;
+
+  /**
    * The driver reports the relations an entity declares, and translates
    * reads that join them, filter on them and sort by them. A driver that
    * refuses it reports no relations, so the repository refuses every such

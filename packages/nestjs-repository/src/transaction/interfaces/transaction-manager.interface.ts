@@ -87,7 +87,7 @@ export interface TransactionManagerInterface {
   /**
    * Get the current transaction for the given key, or create one lazily
    * via the factory registry if none exists. Throws once the scope is
-   * closed.
+   * closed, and `TransactionDoomedException` once it has failed.
    */
   getOrStart(key: string): Promise<TransactionInterface>;
 

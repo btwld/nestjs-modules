@@ -6,6 +6,9 @@ import {
 
 import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
 import { RepositoryQueryException } from '../../exceptions/repository-query.exception.js';
+import { TrxCtx } from '../../transaction/interfaces/transaction-context.interface.js';
+import { TransactionFactoryRegistry } from '../../transaction/transaction-factory-registry.js';
+import { TransactionManager } from '../../transaction/transaction-manager.js';
 import {
   isWhereNever,
   type WhereClause,
@@ -160,6 +163,31 @@ describe(RepositoryAdapter.name, () => {
         ['find', (repo) => repo.find()],
         ['findOne', (repo) => repo.findOne({})],
       ];
+
+    it.each([
+      ['fails', true],
+      ['leaves', false],
+    ])(
+      '%s the caller’s transaction scope when the driver reports it ended the transaction: %s',
+      async (_, ends) => {
+        class EndingAdapter extends TestRepositoryAdapter {
+          protected override endsTransaction(): boolean {
+            return ends;
+          }
+        }
+        const ending = new EndingAdapter('test-entity');
+        ending.bind({});
+        const trx = new TransactionManager(new TransactionFactoryRegistry());
+        const ctx = new AppContextHost();
+        ctx.defineOverlay(TrxCtx, { trx });
+
+        await expect(ending.find({ ctx })).rejects.toBeInstanceOf(
+          RepositoryQueryException,
+        );
+
+        expect(trx.hasFailed).toBe(ends);
+      },
+    );
 
     it.each(reads)(
       'is wrapped by %s in a RepositoryQueryException that keeps it as the cause',

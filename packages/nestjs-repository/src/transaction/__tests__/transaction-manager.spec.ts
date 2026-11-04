@@ -3,6 +3,7 @@ import { type Mock } from 'vitest';
 import { AppContextHost } from '@concepta/nestjs-core';
 
 import { TransactionClosedException } from '../../exceptions/transaction-closed.exception.js';
+import { TransactionDoomedException } from '../../exceptions/transaction-doomed.exception.js';
 import { TransactionHeuristicCommitException } from '../../exceptions/transaction-heuristic-commit.exception.js';
 import { type TransactionInterface } from '../interfaces/transaction.interface.js';
 import { TransactionFactoryRegistry } from '../transaction-factory-registry.js';
@@ -93,6 +94,20 @@ describe(TransactionManager.name, () => {
       await expect(manager.getOrStart('typeorm:default')).rejects.toThrow(
         TransactionClosedException,
       );
+    });
+
+    it('should refuse an open transaction once the scope has failed, carrying the failure', async () => {
+      const tx = createMockTransaction();
+      await seed(manager, registry, 'typeorm:default', tx);
+      const failure = new Error('deadlock');
+
+      manager.markFailed(failure);
+
+      const refused = await manager
+        .getOrStart('typeorm:default')
+        .catch((error: unknown) => error);
+      expect(refused).toBeInstanceOf(TransactionDoomedException);
+      expect(refused).toEqual(expect.objectContaining({ cause: failure }));
     });
   });
 
