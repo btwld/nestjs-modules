@@ -22,7 +22,10 @@ import { toRows } from '../repository/drizzle-rows.util.js';
 
 import { gateOf } from './drizzle-sqlite-gate.js';
 import { DrizzleSqliteTransaction } from './drizzle-sqlite-transaction.js';
-import { DRIZZLE_SQLITE_DATABASE } from './drizzle-sqlite.constants.js';
+import {
+  DRIZZLE_SQLITE_DATABASE,
+  SQLITE_TRANSACTION_ENDED_CODES,
+} from './drizzle-sqlite.constants.js';
 import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
 import { rollbackAfter } from './drizzle-sqlite.util.js';
 
@@ -58,7 +61,9 @@ function sqliteTableOf(table: Table): SQLiteTable {
  * case, while `eq` does not, and `NULL` sorts first ascending: SQLite's own
  * rules, which `PRAGMA case_sensitive_like` changes per connection. A
  * failed statement does not end the transaction it ran in; the run rolls
- * back only when the error leaves it. A statement binds at most 32766
+ * back only when the error leaves it, unless the error is one of
+ * `SQLITE_TRANSACTION_ENDED_CODES`, after which SQLite may have rolled the
+ * whole transaction back and the run fails. A statement binds at most 32766
  * values, so SQLite refuses a larger `in` list, `createMany` or
  * `deleteMany` as a database error, writing nothing.
  */
@@ -139,6 +144,22 @@ export class DrizzleSqliteRepository<
       };
     }
     return super.describeDatabaseError(error);
+  }
+
+  /**
+   * A full database, an I/O error, a busy lock, out of memory or an
+   * interrupt: SQLite may have rolled the whole transaction back. Told by
+   * the primary code, as better-sqlite3 reports extended ones
+   * (`SQLITE_IOERR_WRITE`).
+   */
+  protected override endsTransaction(error: unknown): boolean {
+    const code = this.describeDatabaseError(error)?.code;
+    return (
+      typeof code === 'string' &&
+      SQLITE_TRANSACTION_ENDED_CODES.some(
+        (ended) => code === ended || code.startsWith(`${ended}_`),
+      )
+    );
   }
 
   /**

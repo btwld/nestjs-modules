@@ -4,18 +4,24 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 import { type INestApplicationContext, Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DrizzleModule } from '@nestjs/drizzle';
+import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
 import { CoreModule } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
+  RepositoryDatabaseException,
   RepositoryModule,
   type RepositoryInterface,
+  TransactionDoomedException,
   TransactionScope,
   TransactionTimeoutException,
 } from '@concepta/nestjs-repository';
 
-import { DrizzleSqliteRepositoryModule } from '../drizzle-sqlite-repository.module.js';
+import { DRIZZLE_DEFAULT_CONNECTION_NAME } from '../../drizzle-repository.constants.js';
+import {
+  DrizzleSqliteRepositoryModule,
+  toDrizzleSqliteClient,
+} from '../drizzle-sqlite-repository.module.js';
 
 const noteTable = sqliteTable('gate_note', {
   id: integer().primaryKey({ autoIncrement: true }),
@@ -108,6 +114,31 @@ describe('DrizzleSqliteRepository on one connection', () => {
     await expect(run).rejects.toThrow(Rollback);
     await outside;
     expect((await notes.find()).map(({ name }) => name)).toEqual(['outside']);
+  });
+
+  it('fails a run whose statement fills the database, keeping none of its writes', async () => {
+    const db = toDrizzleSqliteClient(
+      app.get(getDrizzleToken()),
+      DRIZZLE_DEFAULT_CONNECTION_NAME,
+    );
+    // SQLite may roll the transaction back when the database is full; the
+    // run fails either way.
+    const pages = db.get<{ page_count: number }>(sql`pragma page_count`);
+    db.run(sql.raw(`pragma max_page_count = ${pages?.page_count ?? 0}`));
+
+    let full: unknown;
+    const run = scope.run({}, async (txCtx) => {
+      await notes.create({ name: 'before' }, { ctx: txCtx });
+      full = await notes
+        .create({ name: 'x'.repeat(100_000) }, { ctx: txCtx })
+        .catch((error: unknown) => error);
+      await notes.create({ name: 'after' }, { ctx: txCtx });
+    });
+
+    await expect(run).rejects.toThrow(TransactionDoomedException);
+    expect(full).toBeInstanceOf(RepositoryDatabaseException);
+    expect(full).toHaveProperty('context.code', 'SQLITE_FULL');
+    expect(await notes.find()).toEqual([]);
   });
 
   it('runs two transactions one after the other', async () => {

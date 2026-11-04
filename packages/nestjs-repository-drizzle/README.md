@@ -66,6 +66,10 @@ with `DrizzleUnsupportedDatabaseException`.
 - In ascending order, `NULL`s sort last.
 - Writes return the rows they wrote in the same statement (`RETURNING`).
 - Transactions run concurrently, each on its own connection.
+- Use a client that runs transactions. `upsert` and every versioned write
+  run in one of their own when you have none, so on a client without them,
+  such as Drizzle's `neon-http` or `xata-http`, those calls fail, as does
+  any `TransactionScope.run()` that calls such a repository.
 - A failed statement ends the transaction it ran in. The run then fails,
   even if it catches the error, and keeps nothing it wrote; every later call
   in it throws `TransactionDoomedException`. Raw SQL you run through the
@@ -152,7 +156,13 @@ DrizzleModule.forRootAsync({
   waits for the transaction to end — from inside the run, until the run
   times out and rolls back, after which the call runs on its own.
 - A failed statement doesn't end the transaction it ran in: the run rolls
-  back only if the error leaves it.
+  back only if the error leaves it. The exceptions are a full database, an
+  I/O error, a busy lock, out of memory and an interrupt (`context.code`
+  `'SQLITE_FULL'`, `'SQLITE_IOERR'`, `'SQLITE_BUSY'`, `'SQLITE_NOMEM'`,
+  `'SQLITE_INTERRUPT'`, or an extended code of one), after which SQLite may
+  have rolled the whole transaction back: the run fails, even if it catches
+  the error, and every later call in it throws `TransactionDoomedException`
+  — retry the whole run.
 - Another process holding the database's write lock fails the call with
   `RepositoryDatabaseException` and `context.code` `'SQLITE_BUSY'`, once
   better-sqlite3's `timeout` (5 seconds by default) runs out.
