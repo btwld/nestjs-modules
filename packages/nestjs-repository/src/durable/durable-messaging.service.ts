@@ -18,6 +18,7 @@ import {
   type TransactionContextInterface,
   TrxCtx,
 } from '../transaction/interfaces/transaction-context.interface.js';
+import { type TransactionManagerInterface } from '../transaction/interfaces/transaction-manager.interface.js';
 import { TransactionScope } from '../transaction/transaction-scope.js';
 
 import { DURABLE_MESSAGING_BINDING } from './durable-messaging.constants.js';
@@ -67,7 +68,8 @@ export class DurableMessaging implements OnModuleInit {
    * commits; nothing is published if it rolls back.
    *
    * Call it inside `TransactionScope.run()`; outside one there is no
-   * transaction to join, and resolving it throws.
+   * transaction to join, and resolving it throws. If it fails, the run
+   * fails, even if you catch the error.
    */
   async publish(
     ctx: PlainLiteralObject,
@@ -76,9 +78,27 @@ export class DurableMessaging implements OnModuleInit {
     const { trx } = AppContextHost.from(ctx).with(TrxCtx);
     const transaction = await trx.getOrStart(this.binding.transactionKey);
 
-    await this.outbox.add(transaction.getClient(), messages);
+    await this.add(trx, transaction.getClient(), messages);
 
     trx.onCommit(() => this.outbox.notify());
+  }
+
+  /**
+   * Write `messages` on `client`, failing the scope if the write fails,
+   * even if the caller catches it: the database may have ended the
+   * transaction it ran in.
+   */
+  private async add(
+    trx: TransactionManagerInterface,
+    client: unknown,
+    messages: NewOutboxMessage[],
+  ): Promise<void> {
+    try {
+      await this.outbox.add(client, messages);
+    } catch (error) {
+      trx.markFailed(error);
+      throw error;
+    }
   }
 
   /**

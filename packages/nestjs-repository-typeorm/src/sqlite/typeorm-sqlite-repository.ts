@@ -19,8 +19,7 @@ import {
  * transaction waits while another caller's transaction holds the
  * connection, instead of running inside it. So every call made while a run
  * is open must carry the run's context: a call without it waits for the
- * run to end. Made from inside the run, it waits until the run times out,
- * then runs after the run's rollback.
+ * run to end, so one the run itself awaits never returns.
  *
  * A failed statement does not end the transaction it ran in, unless the
  * error is one of `SQLITE_TRANSACTION_ENDED_CODES`, after which SQLite may

@@ -318,6 +318,7 @@ describe(runRepositoryConformance.name, () => {
 
     expect(supported.filter((name) => !refused.includes(name))).toEqual([
       'transactions > overlapping transactions: a versioned write of a row another run has changed since it read it is refused',
+      'transactions > overlapping transactions: a run that times out while its write waits on another run rejects at its timeout, and keeps none of the write',
       'transactions > overlapping transactions: a write in a run that has read returns the row as stored, not as the run read it',
       'transactions > overlapping transactions: an upsert in a run that has read returns the row as stored, not as the run read it',
       'transactions > overlapping transactions: a versioned write of values another run stored since this run read returns the row as stored',

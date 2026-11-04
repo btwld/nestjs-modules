@@ -179,24 +179,4 @@ describe('DrizzleSqliteRepository on one connection', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect((await notes.find()).map(({ name }) => name)).toEqual(['holder']);
   });
-
-  it('holds a call made without the run context inside a run until the run times out', async () => {
-    let stray: Promise<NoteEntity> | undefined;
-
-    await expect(
-      scope.run(
-        {},
-        async (txCtx) => {
-          await notes.create({ name: 'inside' }, { ctx: txCtx });
-          stray = notes.create({ name: 'stray' });
-          await stray;
-        },
-        { timeout: 100 },
-      ),
-    ).rejects.toThrow(TransactionTimeoutException);
-
-    // It runs once the run's transaction has rolled back.
-    await stray;
-    expect((await notes.find()).map(({ name }) => name)).toEqual(['stray']);
-  });
 });

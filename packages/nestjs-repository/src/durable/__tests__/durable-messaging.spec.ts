@@ -117,6 +117,20 @@ describe(DurableMessaging.name, () => {
       expect(store.stats(Date.now()).pending).toBe(0);
     });
 
+    it('fails the scope when its write fails, even if the caller catches it', async () => {
+      const refused = new Error('duplicate message id');
+      vi.spyOn(app.get(Outbox), 'add').mockRejectedValueOnce(refused);
+      const notify = vi.spyOn(app.get(Outbox), 'notify');
+
+      await expect(
+        txScope.run(new AppContextHost(), async (txCtx) => {
+          await durable.publish(txCtx, [message('a')]).catch(() => undefined);
+        }),
+      ).rejects.toThrow(TransactionScopeFailedException);
+
+      expect(notify).not.toHaveBeenCalled();
+    });
+
     it('wakes the relay only after the scope commits', async () => {
       const notify = vi.spyOn(app.get(Outbox), 'notify');
 

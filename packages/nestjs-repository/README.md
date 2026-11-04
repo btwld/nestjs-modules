@@ -1429,20 +1429,21 @@ await txScope.run(ctx, async (txCtx) => {
 ```
 
 This is cooperative — nothing here forcibly stops an operation that ignores
-the signal. A timed-out `run()` rejects with `TransactionTimeoutException`;
-an operation that outlives the timeout keeps running as an abandoned orphan,
-and its eventual failure is logged rather than surfaced to the caller, who
-has long since moved on. A timeout settles the scope immediately rather
-than waiting for every participant to exit, so a sibling still running —
-nested or concurrent, even one well within its own timeout — gets
-`TransactionClosedException` from its `txCtx`, and its `run()` rejects with
-`TransactionScopeFailedException` even if its own operation goes on to
-succeed.
+the signal. A timed-out `run()` rejects with `TransactionTimeoutException`
+at its timeout, and keeps none of its writes. The work it abandoned keeps
+running, and its transaction stays open, as your ORM's own transaction
+does, until that work returns; then it rolls back and `onRollback`
+callbacks run. Until then every repository call in the scope throws
+`TransactionDoomedException`, a sibling's `run()` — nested or concurrent —
+rejects with `TransactionScopeFailedException`, and so does a new `run()`
+on the same `ctx`: retry on a fresh `ctx`. A failure of the abandoned work
+is logged, not surfaced.
 
-The timeout covers the operation, not settlement — a `commit()` or
-`rollback()` call that hangs (a dead connection, a lock wait) is not
-bounded by it and can leave `run()` unresolved indefinitely. There is no
-safe way to abandon an in-flight commit without knowing whether it landed.
+The timeout covers the operation, not its transaction: work that never
+returns keeps its transaction and connection, and a `commit()` that hangs
+(a dead connection, a lock wait) can leave `run()` unresolved
+indefinitely. There is no safe way to abandon an in-flight commit without
+knowing whether it landed.
 
 #### Multiple datasources
 
@@ -2697,6 +2698,9 @@ await this.txScope.run(ctx, async (txCtx) => {
   ]);
 });
 ```
+
+If `publish` fails, the run fails with it, even if you catch the error:
+none of the run's writes are kept.
 
 Run a delivery's work once:
 

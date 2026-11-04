@@ -52,9 +52,8 @@ function sqliteTableOf(table: Table): SQLiteTable {
  * from changing under it.
  *
  * So every call made while a run is open on the connection must carry the
- * run's context: a call without it waits for the run to end. Made from
- * inside the run, it waits until the run times out, then runs after the
- * run's rollback.
+ * run's context: a call without it waits for the run to end, so one the
+ * run itself awaits never returns.
  *
  * `LIKE` (`contains`, `starts`, `ends`) matches ASCII letters in either
  * case, while `eq` does not, and `NULL` sorts first ascending: SQLite's own

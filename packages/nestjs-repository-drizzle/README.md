@@ -153,8 +153,7 @@ DrizzleModule.forRootAsync({
   commit or roll back. A nested `run()` joins the
   transaction already open and never waits.
 - **Pass the run's `ctx` to every call made inside it.** A call without it
-  waits for the transaction to end — from inside the run, until the run
-  times out and rolls back, after which the call runs on its own.
+  waits until the run ends, so one the run itself awaits never returns.
 - A failed statement doesn't end the transaction it ran in: the run rolls
   back only if the error leaves it. The exceptions are a full database, an
   I/O error, a busy lock, out of memory and an interrupt (`context.code`

@@ -39,8 +39,8 @@ export interface TransactionRunOptions {
  * defines `TrxCtx` and owns the scope; concurrent/nested `run()` calls on
  * the same context detect `TrxCtx` is already defined and join it — all
  * participants share one `TransactionManager`, refcounted via
- * `enter()`/`exit()`. The scope settles when the last participant exits, or
- * immediately if any participant times out — closes, commits/rolls back,
+ * `enter()`/`exit()`. The scope settles when the last participant's work
+ * returns, even one that timed out — closes, commits/rolls back,
  * removes `TrxCtx` from the context, then flushes the matching callbacks —
  * in that order, so a callback doing repository work on the same ctx gets
  * non-transactional access rather than the just-settled transaction. The
@@ -164,28 +164,31 @@ export class TransactionScope implements OnApplicationBootstrap {
 
     let result: T;
     let timedOut = false;
+    // A throw before the operation returns a promise rejects it like any
+    // other failure.
+    const work = (async () => operation(txCtx))();
 
     try {
-      result = await this.withTimeout(operation(txCtx), timeout);
+      result = await this.withTimeout(work, timeout);
     } catch (error) {
       timedOut = error instanceof TransactionTimeoutException;
       trx.markFailed(error);
       throw error;
     } finally {
-      // A timeout abandons this participant's operation while it may still
-      // be running — possibly forever, if it's hung on a dead connection or
-      // a stuck lock wait. Waiting for the refcount to reach 0 would leave
-      // the scope, and ctx, doomed but live for as long as that takes.
-      // Settling right away — regardless of depth — releases ctx
-      // immediately: a retry starts a genuinely fresh scope instead of
-      // joining the doomed one, and the still-running orphan's next
-      // getOrStart/onCommit/onRollback throws TransactionClosedException
-      // rather than silently racing an in-flight settlement. Safe because
-      // `settle()` is idempotent and, on this path, trx.hasFailed is
-      // already set — it can only take the rollbackAll() branch, which
-      // never throws, so this can't replace the timeout error below.
-      if (trx.exit() === 0 || timedOut) {
-        await this.settle(trx);
+      if (timedOut) {
+        // The run rejects at its timeout, but the scope lives as long as
+        // the work it abandoned, as a driver's own transaction lives as long
+        // as its callback: it settles, rolling back, once that work returns.
+        // Until then the scope is failed, so the work's next repository
+        // call throws TransactionDoomedException.
+        void work
+          .then(
+            () => undefined,
+            () => undefined,
+          )
+          .then(() => this.exit(trx));
+      } else {
+        await this.exit(trx);
       }
     }
 
@@ -202,30 +205,31 @@ export class TransactionScope implements OnApplicationBootstrap {
     return result;
   }
 
+  /** Leave the scope, settling it if this was its last participant. */
+  private async exit(trx: TransactionManager): Promise<void> {
+    if (trx.exit() === 0) {
+      await this.settle(trx);
+    }
+  }
+
   /**
    * Settle a scope: close it, commit or roll back, remove `TrxCtx` — so a
    * callback doing repository work on the same ctx gets non-transactional
    * access rather than the just-settled transaction — then flush the
-   * matching callbacks. Called once the last participant exits, or sooner
-   * if a participant's `run()` times out.
-   *
-   * Idempotent: a timeout forces settlement ahead of the refcount reaching
-   * 0 (see `run()`), so the participant that eventually does bring it to 0
-   * may find the scope already closed and must do nothing further — this
-   * is a no-op in that case.
+   * matching callbacks. Called once the last participant's work returns.
+   * A no-op on a scope already closed.
    *
    * Releases `TrxCtx` from `trx.host`, the host that created the scope —
    * not necessarily this call's own `appCtx`, since the last participant to
-   * exit need not be the first one to have entered (e.g. an outer
-   * participant that times out exits before a still-running nested one).
-   * Releasing the wrong host would leave the creator's `TrxCtx` stranded.
+   * exit need not be the first one to have entered (e.g. a nested
+   * participant outliving the outer one). Releasing the wrong host would
+   * leave the creator's `TrxCtx` stranded.
    *
-   * Closes the scope *before* committing/rolling back, not after: a still
-   * -running orphaned operation (one that outlived a timeout) can call
-   * `getOrStart`/`onCommit`/`onRollback` at any point while settlement is
-   * in flight, and without this, it could start a transaction — or
-   * register a callback — that this settlement's already-taken snapshot
-   * will never commit, roll back, or flush.
+   * Closes the scope *before* committing/rolling back, not after: work
+   * running without awaiting can call `getOrStart`/`onCommit`/`onRollback`
+   * at any point while settlement is in flight, and without this, it could
+   * start a transaction — or register a callback — that this settlement's
+   * already-taken snapshot will never commit, roll back, or flush.
    *
    * A commit failure's own fallback rollback already happens inside
    * `commitAll()` (only the transactions it didn't get to are rolled
@@ -235,9 +239,6 @@ export class TransactionScope implements OnApplicationBootstrap {
    * this method can skip removing the overlay.
    */
   private async settle(trx: TransactionManager): Promise<void> {
-    // Idempotent: a timeout can force settlement (see run()) before the
-    // refcount reaches 0, so the participant that eventually does bring it
-    // to 0 must find the scope already settled and do nothing further.
     if (trx.isClosed) {
       return;
     }

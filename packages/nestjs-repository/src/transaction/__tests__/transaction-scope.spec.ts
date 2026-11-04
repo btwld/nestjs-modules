@@ -4,6 +4,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { AppContextHost, OverlayRef } from '@concepta/nestjs-core';
 
 import { TransactionClosedException } from '../../exceptions/transaction-closed.exception.js';
+import { TransactionDoomedException } from '../../exceptions/transaction-doomed.exception.js';
 import { TransactionReadOnlyConflictException } from '../../exceptions/transaction-read-only-conflict.exception.js';
 import { TransactionScopeFailedException } from '../../exceptions/transaction-scope-failed.exception.js';
 import { TransactionTimeoutException } from '../../exceptions/transaction-timeout.exception.js';
@@ -593,8 +594,21 @@ describe(TransactionScope.name, () => {
     });
   });
 
-  describe('settling immediately on timeout, without waiting for other participants', () => {
-    it('should release TrxCtx as soon as the timeout fires, before a still-running nested participant exits', async () => {
+  it('should settle the scope when the operation throws before returning a promise', async () => {
+    const ctx = new AppContextHost();
+    const failure = new Error('thrown at once');
+
+    await expect(
+      transaction.run(ctx, () => {
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
+
+    expect(ctx.supports(TrxCtx)).toBe(false);
+  });
+
+  describe('on timeout, settling once the abandoned work returns', () => {
+    it('should keep TrxCtx until the timed-out work returns, then release it', async () => {
       const ctx = new AppContextHost();
       let releaseNested: (() => void) | undefined;
 
@@ -612,14 +626,14 @@ describe(TransactionScope.name, () => {
       );
 
       await expect(outerRun).rejects.toThrow(TransactionTimeoutException);
-
-      expect(ctx.supports(TrxCtx)).toBe(false);
+      expect(ctx.supports(TrxCtx)).toBe(true);
 
       releaseNested?.();
       await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(ctx.supports(TrxCtx)).toBe(false);
     });
 
-    it('should have rolled back the started transaction by the time the timeout rejects, without waiting for the still-running nested participant', async () => {
+    it('should roll back once the timed-out work returns, not when the timeout rejects', async () => {
       const mockTx = createMockTransaction();
       mockRegistry.register('typeorm:default', { create: () => mockTx });
 
@@ -644,17 +658,15 @@ describe(TransactionScope.name, () => {
       );
 
       await expect(outerRun).rejects.toThrow(TransactionTimeoutException);
+      expect(mockTx.rollback).not.toHaveBeenCalled();
 
-      expect(mockTx.rollback).toHaveBeenCalledTimes(1);
-
-      // The nested participant later exiting must not roll back a second time.
       releaseNested?.();
       await new Promise((resolve) => setTimeout(resolve, 0));
-
       expect(mockTx.rollback).toHaveBeenCalledTimes(1);
+      expect(mockTx.commit).not.toHaveBeenCalled();
     });
 
-    it('should let a run() retried on the same ctx immediately after a timeout start its own fresh scope, not join the doomed one', async () => {
+    it('should fail a run() retried on the same ctx while the timed-out work runs, and start a fresh scope once it has returned', async () => {
       const created: TransactionInterface[] = [];
       mockRegistry.register('typeorm:default', {
         create: () => {
@@ -686,42 +698,23 @@ describe(TransactionScope.name, () => {
 
       await expect(outerRun).rejects.toThrow(TransactionTimeoutException);
 
-      const retryResult = await transaction.run(
-        ctx,
-        async (retryTxCtx: TransactionContextInterface) => {
-          await retryTxCtx.trx.getOrStart('typeorm:default');
-          return 'retried';
-        },
-      );
+      const retry = () =>
+        transaction.run(
+          ctx,
+          async (retryTxCtx: TransactionContextInterface) => {
+            await retryTxCtx.trx.getOrStart('typeorm:default');
+            return 'retried';
+          },
+        );
 
-      expect(retryResult).toBe('retried');
-      expect(created).toHaveLength(2);
-      expect(created[1].commit).toHaveBeenCalledTimes(1);
-      expect(created[1].rollback).not.toHaveBeenCalled();
+      await expect(retry()).rejects.toThrow(TransactionDoomedException);
 
       releaseNested?.();
       await new Promise((resolve) => setTimeout(resolve, 0));
-    });
 
-    it('should not be pinned forever by an orphan that never resolves', async () => {
-      const ctx = new AppContextHost();
-
-      const outerRun = transaction.run(
-        ctx,
-        async (txCtx: TransactionContextInterface) => {
-          return transaction.run(txCtx, async () => {
-            // Never resolves — simulates a hung operation (dead connection,
-            // stuck lock wait) that outlives the timeout and keeps running.
-            return new Promise(() => {});
-          });
-        },
-        { timeout: 50 },
-      );
-
-      await expect(outerRun).rejects.toThrow(TransactionTimeoutException);
-
-      const result = await transaction.run(ctx, async () => 'fresh');
-      expect(result).toBe('fresh');
+      await expect(retry()).resolves.toBe('retried');
+      expect(created).toHaveLength(2);
+      expect(created[1].commit).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -181,9 +181,9 @@ Use the `better-sqlite3` driver; a `sqlite` data source stops startup with
   `run()` joins the transaction already open and never waits. Throughput on
   that data source is bounded by its longest-running transaction.
 - **Pass the run's `ctx` to every repository call inside a run.** A call
-  without it waits until the run ends, so one made from inside the run
-  stalls until the run times out. Your own queries on the data source don't
-  wait: they run inside whatever run is open.
+  without it waits until the run ends, so one the run itself awaits never
+  returns. Your own queries on the data source don't wait: they run inside
+  whatever run is open.
 - You can catch a failed write inside a run and carry on. The exceptions
   are a full database, an I/O error, a busy lock, out of memory and an
   interrupt (`context.code` `'SQLITE_FULL'`, `'SQLITE_IOERR'`,

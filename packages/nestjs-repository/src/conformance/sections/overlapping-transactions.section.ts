@@ -1,5 +1,6 @@
 import { OptimisticLockException } from '../../exceptions/optimistic-lock.exception.js';
 import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
+import { TransactionTimeoutException } from '../../exceptions/transaction-timeout.exception.js';
 import { Where } from '../../repository/where.helpers.js';
 import { type TransactionContextInterface } from '../../transaction/interfaces/transaction-context.interface.js';
 import { assert, assertRows, settle } from '../conformance-assert.js';
@@ -95,6 +96,58 @@ export function overlappingTransactions(ctx: ConformanceContext): void {
     const after = await readItem(stored.id);
     assert.equal(after?.note, null);
     assert.equal(after?.version, stored.version + 2);
+  });
+
+  it('overlapping transactions: a run that times out while its write waits on another run rejects at its timeout, and keeps none of the write', async () => {
+    const stored = await item().create({ name: 'o', rank: 1, note: null });
+    let release = (): void => undefined;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let held = (): void => undefined;
+    const holding = new Promise<void>((resolve) => (held = resolve));
+
+    // Holds the row until released, then rolls back.
+    const holder = settle(
+      run(async (theirs) => {
+        await item().update(stored, { note: 'theirs' }, { ctx: theirs });
+        held();
+        await released;
+        throw new Error('release the row');
+      }),
+    );
+    await holding;
+
+    let rolledBack = (): void => undefined;
+    const rollback = new Promise<void>((resolve) => (rolledBack = resolve));
+    const waiter = settle(
+      ctx.transactionScope.run(
+        {},
+        async (txCtx) => {
+          txCtx.trx.onRollback(() => rolledBack());
+          return item().update(stored, { rank: 2 }, { ctx: txCtx });
+        },
+        { timeout: 200 },
+      ),
+    );
+    // Long past the timeout; the row stays held until then either way.
+    const outcome = await Promise.race([
+      waiter,
+      new Promise<'late'>((resolve) => setTimeout(resolve, 2000, 'late')),
+    ]);
+    release();
+    await holder;
+    await waiter;
+    await rollback;
+
+    assert.notEqual(outcome, 'late', 'the run outlived its timeout');
+    assert.ok(
+      outcome !== 'late' &&
+        !outcome.ok &&
+        outcome.error instanceof TransactionTimeoutException,
+      String(outcome),
+    );
+    const after = await readItem(stored.id);
+    assert.equal(after?.rank, 1);
+    assert.equal(after?.version, stored.version);
   });
 
   it('overlapping transactions: a write in a run that has read returns the row as stored, not as the run read it', async () => {

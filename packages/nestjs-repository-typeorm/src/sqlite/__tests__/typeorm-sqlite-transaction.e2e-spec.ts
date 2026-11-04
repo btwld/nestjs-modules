@@ -9,7 +9,6 @@ import {
   type RepositoryInterface,
   TransactionDoomedException,
   TransactionScope,
-  TransactionTimeoutException,
 } from '@concepta/nestjs-repository';
 
 import { TEST_ENTITY_TOKEN } from '../../__fixtures__/repository/config/test.constants.fixture.js';
@@ -51,28 +50,6 @@ describe('TypeOrmSqliteRepository on one connection', () => {
     await starting;
     expect(second.isActive).toBe(true);
     await second.rollback();
-  });
-
-  it('holds a call made without the run context inside a run until the run times out', async () => {
-    let stray: Promise<TestEntityFixture> | undefined;
-
-    await expect(
-      scope.run(
-        {},
-        async (txCtx) => {
-          await tests.create({ firstName: 'inside' }, { ctx: txCtx });
-          stray = tests.create({ firstName: 'stray' });
-          await stray;
-        },
-        { timeout: 100 },
-      ),
-    ).rejects.toThrow(TransactionTimeoutException);
-
-    // It runs once the run's transaction has rolled back.
-    await stray;
-    expect((await tests.find()).map(({ firstName }) => firstName)).toEqual([
-      'stray',
-    ]);
   });
 
   it('rolls back a run whose commit SQLite refuses, keeping none of its writes', async () => {
