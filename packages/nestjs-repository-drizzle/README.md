@@ -102,10 +102,13 @@ primary key, in your transaction or in one of its own.
   (`context.code` `'ER_LOCK_DEADLOCK'`), and MySQL rolls back the whole
   transaction. The run then fails, even if it catches the error, and every
   later call in it throws `TransactionDoomedException` — retry the whole
-  run. Leave
-  `innodb_rollback_on_timeout` off (the default): with it on, a lock-wait
-  timeout also rolls the whole transaction back, which the driver doesn't
-  detect, so later calls in the run would run outside it.
+  run.
+- An `upsert` of a key with no row locks the gap where the row would go,
+  until the transaction ends. Concurrent upserts of new keys, the same or
+  neighbouring ones, may deadlock, and other inserts into that gap wait.
+- Leave `innodb_rollback_on_timeout` off (the default): with it on, a
+  lock-wait timeout also rolls the whole transaction back, which the driver
+  doesn't detect, so later calls in the run would run outside it.
 
 ### MariaDB
 
@@ -292,13 +295,17 @@ one. Read and write related rows through their own repositories.
 `upsert` inserts the payload, or updates the row its primary key names with
 the columns the payload holds; the others keep their stored values, so
 `upsert({ id, note })` on a stored row changes only `note`. It runs in your
-transaction, or in one of its own when you have none, and locks the row, so
-concurrent upserts of the same key, new or stored, each succeed in turn at
-the default isolation level. A payload that collides with another row on a
-different unique column fails with `RepositoryDatabaseException` and writes
-nothing. A payload that already holds the stored values writes nothing
-either, when it holds them in the form the database stores them: `'1.50'`
-for a `decimal(10,2)` holding `1.50`, not `'1.5'`.
+transaction, or in one of its own when you have none, and locks the row
+before writing it, so concurrent upserts of a stored key each succeed in
+turn at the default isolation level. Concurrent upserts of the same new key
+insert one row; the others may fail with `RepositoryDatabaseException` (a
+duplicate key, or on MySQL and MariaDB a deadlock) — retry the whole run,
+or the call when it ran outside one, and it updates the row. A payload that
+collides with another row on a different unique column fails with
+`RepositoryDatabaseException` and writes nothing. A payload that already
+holds the stored values writes nothing either, when it holds them in the
+form the database stores them: `'1.50'` for a `decimal(10,2)` holding
+`1.50`, not `'1.5'`.
 
 ### Versions
 
@@ -320,16 +327,10 @@ guarantees: row scope, write policy and hooks never see what it does.
   column whenever Drizzle builds an update of the row, which a write may do
   even when it changes nothing (the version then stays where it was), and on
   an insert that leaves the column out, unless it has a default. Which writes
-  build an update is the driver's to choose, and differs by database — on
-  MySQL and MariaDB an `upsert` that inserts a row can also update it, when
-  the payload is not in its stored form — so don't rely on `$onUpdate` to
+  build an update is the driver's to choose, so don't rely on `$onUpdate` to
   mark that a row changed.
 - **Database defaults, triggers and generated columns** are your database's:
   what they write reaches the row unchecked, and comes back in the result.
-  On MySQL and MariaDB an `upsert` claims its row with
-  `INSERT … ON DUPLICATE KEY UPDATE`, which changes no row but still fires
-  `UPDATE` triggers — on the stored row, or on another row whose unique
-  column the payload duplicates.
 
 ## Transaction Support
 

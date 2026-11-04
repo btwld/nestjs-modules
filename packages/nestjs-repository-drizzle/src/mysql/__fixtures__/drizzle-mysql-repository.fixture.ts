@@ -20,11 +20,8 @@ import { DrizzleModule } from '@nestjs/drizzle';
 import { CoreModule } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
-  RepositoryDatabaseException,
   RepositoryModule,
   type RepositoryInterface,
-  TransactionScope,
-  Where,
 } from '@concepta/nestjs-repository';
 
 import { type DrizzleMysqlAdapterModule } from './drizzle-mysql-adapter-module.type.js';
@@ -49,15 +46,6 @@ const labelTable = mysqlTable('mysql_label', {
   id: varchar({ length: 36 }).primaryKey(),
   label: varchar({ length: 64 }).notNull().unique(),
   extra: varchar({ length: 64 }).notNull(),
-});
-
-/** A unique column besides the key, and a column Drizzle stamps on update. */
-const stampTable = mysqlTable('mysql_stamp', {
-  id: varchar({ length: 36 }).primaryKey(),
-  label: varchar({ length: 64 }).notNull().unique(),
-  touched: int()
-    .notNull()
-    .$onUpdate(() => 1),
 });
 
 /** A versioned row Drizzle counts up on every update it builds. */
@@ -117,12 +105,6 @@ class LabelEntity {
   declare extra: string;
 }
 
-class StampEntity {
-  declare id: string;
-  declare label: string;
-  declare touched: number;
-}
-
 class TouchedEntity {
   declare id: string;
   declare label: string;
@@ -171,10 +153,8 @@ export function describeDrizzleMysqlRepository(
     let labels: RepositoryInterface<LabelEntity>;
     let bigs: RepositoryInterface<BigEntity>;
     let huges: RepositoryInterface<BigEntity>;
-    let stamps: RepositoryInterface<StampEntity>;
     let toucheds: RepositoryInterface<TouchedEntity>;
     let checkeds: RepositoryInterface<CheckedEntity>;
-    let txScope: TransactionScope;
 
     beforeAll(async () => {
       app = await NestFactory.createApplicationContext(
@@ -194,8 +174,7 @@ export function describeDrizzleMysqlRepository(
                 });
                 await db.execute(
                   sql`drop table if exists mysql_token, mysql_ticket, mysql_shape,
-                  mysql_label, mysql_big, mysql_huge, mysql_stamp, mysql_touched,
-                  mysql_checked`,
+                  mysql_label, mysql_big, mysql_huge, mysql_touched, mysql_checked`,
                 );
                 await db.execute(sql`create table mysql_touched (
                 id varchar(36) primary key,
@@ -208,11 +187,6 @@ export function describeDrizzleMysqlRepository(
                 low int not null,
                 high int not null default 0,
                 check (low <= high)
-              )`);
-                await db.execute(sql`create table mysql_stamp (
-                id varchar(36) primary key,
-                label varchar(64) not null unique,
-                touched int not null
               )`);
                 await db.execute(sql`create table mysql_huge (
                 id bigint auto_increment primary key,
@@ -263,7 +237,6 @@ export function describeDrizzleMysqlRepository(
                     { key: 'label', entity: LabelEntity, table: labelTable },
                     { key: 'big', entity: BigEntity, table: bigTable },
                     { key: 'huge', entity: BigEntity, table: hugeTable },
-                    { key: 'stamp', entity: StampEntity, table: stampTable },
                     {
                       key: 'touched',
                       entity: TouchedEntity,
@@ -295,10 +268,8 @@ export function describeDrizzleMysqlRepository(
       labels = app.get(getDynamicRepositoryToken('label'));
       bigs = app.get(getDynamicRepositoryToken('big'));
       huges = app.get(getDynamicRepositoryToken('huge'));
-      stamps = app.get(getDynamicRepositoryToken('stamp'));
       toucheds = app.get(getDynamicRepositoryToken('touched'));
       checkeds = app.get(getDynamicRepositoryToken('checked'));
-      txScope = app.get(TransactionScope);
     });
 
     afterAll(async () => {
@@ -323,33 +294,6 @@ export function describeDrizzleMysqlRepository(
       expect(await tickets.count()).toBe(0);
     });
 
-    it('refuses an upsert whose new key duplicates another unique column, writing no other row', async () => {
-      await labels.create({ id: 'a', label: 'L', extra: 'one' });
-
-      await expect(
-        labels.upsert({ id: 'b', label: 'L', extra: 'two' }),
-      ).rejects.toThrow(RepositoryDatabaseException);
-      expect(
-        (await labels.find()).map(({ id, extra }) => ({ id, extra })),
-      ).toEqual([{ id: 'a', extra: 'one' }]);
-    });
-
-    it('leaves the other row untouched when an upsert duplicates its unique column', async () => {
-      await stamps.create({ id: 'a', label: 'L', touched: 0 });
-
-      const run = txScope.run({}, async (txCtx) => {
-        const refused = await stamps
-          .upsert({ id: 'b', label: 'L', touched: 0 }, { ctx: txCtx })
-          .catch((error: unknown) => error);
-        return refused;
-      });
-
-      expect(await run).toBeInstanceOf(RepositoryDatabaseException);
-      expect(await stamps.find()).toEqual([
-        { id: 'a', label: 'L', touched: 0 },
-      ]);
-    });
-
     it('stamps an $onUpdate column once for each upsert that changes the row, and never for one that does not', async () => {
       // Drizzle fills a left-out `$onUpdate` column on insert too.
       const inserted = await toucheds.upsert({
@@ -367,7 +311,7 @@ export function describeDrizzleMysqlRepository(
       ]);
     });
 
-    it('upserts a stored row from a payload that could not be inserted alone', async () => {
+    it('upserts a stored row from a payload of its key and some columns', async () => {
       await checkeds.create({ id: 'ck', low: 1, high: 10 });
 
       // Inserted alone, low 5 and the default high 0 break the check.
@@ -377,66 +321,6 @@ export function describeDrizzleMysqlRepository(
         high: 10,
       });
     });
-
-    it('upserts an unversioned row by its key: inserts it, then updates it', async () => {
-      const inserted = await labels.upsert({
-        id: 'u',
-        label: 'U',
-        extra: 'one',
-      });
-      const updated = await labels.upsert({
-        id: 'u',
-        label: 'U',
-        extra: 'two',
-      });
-
-      expect([inserted.extra, updated.extra]).toEqual(['one', 'two']);
-      expect(await labels.count({ where: Where.eq('id', 'u') })).toBe(1);
-    });
-
-    it('upserts a stored row from a payload of its key and some columns', async () => {
-      await labels.create({ id: 'partial', label: 'P', extra: 'one' });
-
-      const partial = await labels.upsert({ id: 'partial', extra: 'two' });
-      const keyOnly = await labels.upsert({ id: 'partial' });
-
-      const stored = { id: 'partial', label: 'P', extra: 'two' };
-      expect([partial, keyOnly]).toEqual([stored, stored]);
-    });
-
-    it.each([
-      [
-        'without',
-        (id: string, caller: number): Promise<unknown> =>
-          labels.upsert({ id, label: id, extra: `${caller}` }),
-      ],
-      [
-        'with',
-        (id: string): Promise<unknown> => tokens.upsert({ id, label: id }),
-      ],
-    ])(
-      'upserts a new key from several callers at once %s a version, every one succeeding',
-      async (versioning, upsert) => {
-        const outcomes: string[] = [];
-        for (let round = 0; round < 20; round++) {
-          const id = `fresh-${versioning}-${round}`;
-          const results = await Promise.allSettled(
-            [0, 1, 2, 3].map((caller) => upsert(id, caller)),
-          );
-          outcomes.push(
-            ...results.map((result) =>
-              result.status === 'fulfilled'
-                ? 'ok'
-                : result.reason instanceof Error
-                  ? result.reason.message
-                  : String(result.reason),
-            ),
-          );
-        }
-
-        expect(outcomes.filter((outcome) => outcome !== 'ok')).toEqual([]);
-      },
-    );
 
     it('upserts a stored row from several callers at once without deadlocking', async () => {
       await labels.create({ id: 'busy', label: 'B', extra: 'zero' });

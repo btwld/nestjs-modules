@@ -9,7 +9,6 @@ import {
   RuntimeException,
 } from '@concepta/nestjs-core';
 
-import { type DrizzleClaimedRowInterface } from '../repository/drizzle-claimed-row.interface.js';
 import { columnOf } from '../repository/drizzle-metadata.js';
 import { isDrizzleQueryError } from '../repository/drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from '../repository/drizzle-read-query.interface.js';
@@ -134,28 +133,6 @@ export class DrizzlePostgresRepository<
     rows: PlainLiteralObject[],
   ): Promise<PlainLiteralObject[]> {
     return toRows(await client.insert(this.table).values(rows).returning());
-  }
-
-  /**
-   * Locked first, then `INSERT … ON CONFLICT DO NOTHING` on every unique
-   * column, so two upserts of a new key never fail each other on a unique
-   * column besides it.
-   */
-  protected claimRow(
-    tx: DrizzlePostgresClient,
-    row: PlainLiteralObject,
-    key: unknown,
-  ): Promise<DrizzleClaimedRowInterface | undefined> {
-    return this.claimByLock(tx, row, key, async () => {
-      const [inserted] = toRows(
-        await tx
-          .insert(this.table)
-          .values(row)
-          .onConflictDoNothing()
-          .returning(),
-      );
-      return inserted;
-    });
   }
 
   protected async updateRow(

@@ -54,7 +54,6 @@ import {
   WhereOperator,
 } from '@concepta/nestjs-repository';
 
-import { type DrizzleClaimedRowInterface } from './drizzle-claimed-row.interface.js';
 import { columnOf } from './drizzle-metadata.js';
 import { isDrizzleQueryError } from './drizzle-query-error.util.js';
 import { type DrizzleReadQueryInterface } from './drizzle-read-query.interface.js';
@@ -165,18 +164,6 @@ export abstract class DrizzleRepository<
     client: Client,
     rows: PlainLiteralObject[],
   ): Promise<PlainLiteralObject[]>;
-
-  /**
-   * The row an upsert's `key` names, locked until the transaction ends:
-   * the stored one, or `row` inserted when there is none. Nothing when
-   * neither can be had. A database without gap locks claims by
-   * {@link claimByLock}.
-   */
-  protected abstract claimRow(
-    tx: Client,
-    row: PlainLiteralObject,
-    key: unknown,
-  ): Promise<DrizzleClaimedRowInterface | undefined>;
 
   /**
    * Update the one row `where` matches with `set`, returning it as stored,
@@ -548,7 +535,7 @@ export abstract class DrizzleRepository<
    * value: Drizzle adds every `$onUpdate` column to an update it builds, and
    * an update the driver adds must write nothing the caller did not.
    */
-  protected keptAsStored(keys: string[]): PlainLiteralObject {
+  private keptAsStored(keys: string[]): PlainLiteralObject {
     return Object.fromEntries(
       Object.entries(getTableColumns(this.options.table))
         .filter(
@@ -680,9 +667,9 @@ export abstract class DrizzleRepository<
 
   /**
    * Inserts the payload, or updates the row its primary key names with the
-   * columns it holds: in a transaction, the row claimed and locked, then
-   * written, and its version moved on when that changed it. A payload that
-   * names a stored row need not hold its other columns.
+   * columns it holds: in a transaction, the row locked, then written, and
+   * its version moved on when that changed it. A payload that names a
+   * stored row need not hold its other columns.
    */
   protected async doUpsert(
     entity: DeepPartial<Entity>,
@@ -693,7 +680,7 @@ export abstract class DrizzleRepository<
     const { [primary.key]: key, ...changes } = data;
 
     const row = await this.atomically(options?.ctx, (tx) =>
-      this.upsertClaimed(tx, data, key, changes),
+      this.upsertRow(tx, data, key, changes),
     );
     if (!row) {
       throw new RuntimeException({
@@ -706,55 +693,33 @@ export abstract class DrizzleRepository<
   }
 
   /**
-   * The row `key` names, claimed, then updated with `changes` unless the
-   * claim inserted it or it already holds them as stored; returned as
-   * stored.
+   * The row `key` names, locked, then updated with `changes` unless it
+   * already holds them as stored; or, when there is none, the payload
+   * inserted. Returned as stored. Another transaction inserting the same
+   * key first makes the insert fail with the database's error; on a
+   * database with gap locks, the lock on a missing key covers its gap, so
+   * concurrent inserts of neighbouring keys may deadlock too.
    */
-  private async upsertClaimed(
+  private async upsertRow(
     tx: Client,
     data: PlainLiteralObject,
     key: unknown,
     changes: PlainLiteralObject,
   ): Promise<PlainLiteralObject | undefined> {
-    const claimed = await this.claimRow(tx, this.toInsert(data), key);
-    if (!claimed) return undefined;
+    const stored = await this.lockRow(tx, key);
+    if (!stored) {
+      const [created] = await this.insertRows(tx, [this.toInsert(data)]);
+      return created;
+    }
 
     const keys = Object.keys(changes);
     const holdsChanges = keys.every(
-      (column) => asStored(changes[column]) === asStored(claimed.row[column]),
+      (column) => asStored(changes[column]) === asStored(stored[column]),
     );
-    if (claimed.inserted || holdsChanges) return claimed.row;
+    if (holdsChanges) return stored;
     const primary = this.primaryColumn('upsert');
     const after = await this.updateRow(tx, changes, eq(primary.column, key));
-    return after && this.bumpIfChanged(tx, claimed.row, after, keys);
-  }
-
-  /**
-   * A claim by lock: the row `key` names, locked, when it exists; else
-   * `insertIfAbsent()`'s row, which inserts nothing on a conflict with any
-   * unique column. Then the row with the key, inserted first by another
-   * transaction and locked in turn; or, when there is none, the conflict was
-   * with another row, which a plain insert reports as the database error.
-   *
-   * Locking before the insert keeps two upserts of a stored row from each
-   * holding the shared lock a failed insert leaves, and deadlocking; on a
-   * database with gap locks it makes two upserts of a new key deadlock
-   * instead.
-   */
-  protected async claimByLock(
-    tx: Client,
-    row: PlainLiteralObject,
-    key: unknown,
-    insertIfAbsent: () => Promise<PlainLiteralObject | undefined>,
-  ): Promise<DrizzleClaimedRowInterface | undefined> {
-    const stored = await this.lockRow(tx, key);
-    if (stored) return { row: stored, inserted: false };
-    const inserted = await insertIfAbsent();
-    if (inserted) return { row: inserted, inserted: true };
-    const raced = await this.lockRow(tx, key);
-    if (raced) return { row: raced, inserted: false };
-    const [created] = await this.insertRows(tx, [row]);
-    return created && { row: created, inserted: true };
+    return after && this.bumpIfChanged(tx, stored, after, keys);
   }
 
   protected async doDelete(
