@@ -7,6 +7,7 @@ import { type DynamicRepositoryModule } from '@concepta/nestjs-repository';
 
 import { type DrizzleAdapterDefinitionInterface } from '../drizzle-adapter-definition.interface.js';
 import { registerDrizzleAdapter } from '../drizzle-repository.util.js';
+import { DrizzleSingleConnectionException } from '../exceptions/drizzle-single-connection.exception.js';
 import { DrizzleUnsupportedDatabaseException } from '../exceptions/drizzle-unsupported-database.exception.js';
 import { type DrizzleProviderOptionsInterface } from '../repository/drizzle-provider-options.interface.js';
 
@@ -57,7 +58,9 @@ export class DrizzleMysqlRepositoryModule {
 }
 
 /**
- * The database `@nestjs/drizzle` registered, which must be a mysql2 one.
+ * The database `@nestjs/drizzle` registered, which must be a mysql2 one on
+ * a pool: on a single connection, Drizzle runs every transaction on it.
+ * A pool is told apart the way Drizzle's own transactions tell it apart.
  *
  * @param db - The database registered for the connection
  * @param connection - The `@nestjs/drizzle` connection
@@ -70,6 +73,14 @@ export function toDrizzleMysqlClient(
 ): DrizzleMysqlClient {
   if (!is(db, MySql2Database)) {
     throw new DrizzleUnsupportedDatabaseException(connection, accepted);
+  }
+  const client: unknown = Reflect.get(db, '$client');
+  if (
+    typeof client === 'object' &&
+    client !== null &&
+    !('getConnection' in client)
+  ) {
+    throw new DrizzleSingleConnectionException(connection);
   }
   return db;
 }

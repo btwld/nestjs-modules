@@ -1,4 +1,4 @@
-import { is } from 'drizzle-orm';
+import { entityKind, is } from 'drizzle-orm';
 import { PgDatabase } from 'drizzle-orm/pg-core';
 
 import { Module } from '@nestjs/common';
@@ -7,6 +7,7 @@ import { type DynamicRepositoryModule } from '@concepta/nestjs-repository';
 
 import { type DrizzleAdapterDefinitionInterface } from '../drizzle-adapter-definition.interface.js';
 import { registerDrizzleAdapter } from '../drizzle-repository.util.js';
+import { DrizzleSingleConnectionException } from '../exceptions/drizzle-single-connection.exception.js';
 import { DrizzleUnsupportedDatabaseException } from '../exceptions/drizzle-unsupported-database.exception.js';
 import { type DrizzleProviderOptionsInterface } from '../repository/drizzle-provider-options.interface.js';
 
@@ -58,7 +59,11 @@ export class DrizzlePostgresRepositoryModule {
   }
 }
 
-/** The database `@nestjs/drizzle` registered, which must be a Postgres one. */
+/**
+ * The database `@nestjs/drizzle` registered, which must be a Postgres one,
+ * and on node-postgres a pool: Drizzle runs every transaction on a single
+ * `Client`'s one connection.
+ */
 export function toDrizzlePostgresClient(
   db: unknown,
   connection: string,
@@ -69,7 +74,27 @@ export function toDrizzlePostgresClient(
       DRIZZLE_POSTGRES_DATABASE,
     );
   }
+  if (isSingleNodePgConnection(db)) {
+    throw new DrizzleSingleConnectionException(connection);
+  }
   return db;
+}
+
+/**
+ * A node-postgres database on a `Client` rather than a pool, told apart the
+ * way Drizzle's own transactions tell them apart. Read without importing
+ * node-postgres, which other Postgres clients don't need.
+ */
+function isSingleNodePgConnection(db: DrizzlePostgresClient): boolean {
+  if (Reflect.get(db.constructor, entityKind) !== 'NodePgDatabase') {
+    return false;
+  }
+  const client: unknown = Reflect.get(db, '$client');
+  return (
+    typeof client === 'object' &&
+    client !== null &&
+    !client.constructor.name.includes('Pool')
+  );
 }
 
 /** The Postgres adapter's definition, for the shared registration. */

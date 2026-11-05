@@ -65,7 +65,10 @@ with `DrizzleUnsupportedDatabaseException`.
   case-sensitive.
 - In ascending order, `NULL`s sort last.
 - Writes return the rows they wrote in the same statement (`RETURNING`).
-- Transactions run concurrently, each on its own connection.
+- Transactions run concurrently, each on its own connection. On
+  node-postgres, register a `Pool` (a `connection` option or URL gives you
+  one): a single `Client` would run every transaction on its one connection,
+  so startup refuses it with `DrizzleSingleConnectionException`.
 - Use a client that runs transactions. `upsert` and every versioned write
   run in one of their own when you have none, so on a client without them,
   such as Drizzle's `neon-http` or `xata-http`, those calls fail, as does
@@ -98,7 +101,10 @@ primary key, in your transaction or in one of its own.
 - Whether text matching ignores case depends on the column's collation; the
   default collations ignore it.
 - In ascending order, `NULL`s sort first.
-- Transactions run concurrently, each on its own connection.
+- Transactions run concurrently, each on its own connection. Register a
+  pool (a `connection` option or URL gives you one): a single connection
+  would run every transaction on it, so startup refuses it with
+  `DrizzleSingleConnectionException`.
 - A failed statement doesn't end the transaction it ran in, except a
   deadlock, or a lock table out of memory (`'ER_LOCK_TABLE_FULL'`), which
   the driver treats the same. A deadlock fails the statement with
@@ -504,6 +510,7 @@ create role app_admin login password '...' bypassrls;
 | `RepositoryQueryException` | `@concepta/nestjs-repository` | Any other error a repository call raised (wraps the original error) |
 | `OptimisticLockException` | `@concepta/nestjs-repository` | A write targeted a stale version — see [Versions](#versions) |
 | `DrizzleUnsupportedDatabaseException` | `@concepta/nestjs-repository-drizzle` | At startup: a connection is not a database its adapter is for |
+| `DrizzleSingleConnectionException` | `@concepta/nestjs-repository-drizzle` | At startup: a node-postgres or mysql2 connection is a single connection, not a pool |
 
 The repository's own exceptions are listed in the
 [`@concepta/nestjs-repository` README](../nestjs-repository/README.md#exceptions).
@@ -512,7 +519,7 @@ The repository's own exceptions are listed in the
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-drizzle` | `DrizzleProviderOptionsInterface`, `DrizzleRepositoryOptions`, `DRIZZLE_DEFAULT_CONNECTION_NAME`, `DrizzleUnsupportedDatabaseException` |
+| `@concepta/nestjs-repository-drizzle` | `DrizzleProviderOptionsInterface`, `DrizzleRepositoryOptions`, `DRIZZLE_DEFAULT_CONNECTION_NAME`, `DrizzleUnsupportedDatabaseException`, `DrizzleSingleConnectionException` |
 | `@concepta/nestjs-repository-drizzle/postgres` | `DrizzlePostgresRepositoryModule`, `DrizzlePostgresDriverOptionsInterface`, `DrizzlePostgresTransactionSettingsResolver`, `DrizzlePostgresTransactionSettings`, `DrizzlePostgresRepository`, `DrizzleRepositoryOptions`, `DrizzlePostgresTransaction`, `DrizzlePostgresTransactionFactory`, `DrizzlePostgresClient` |
 | `@concepta/nestjs-repository-drizzle/mysql` | `DrizzleMysqlRepositoryModule`, `DrizzleMysqlRepository`, `DrizzleRepositoryOptions`, `DrizzleMysqlTransaction`, `DrizzleMysqlTransactionFactory`, `DrizzleMysqlClient` |
 | `@concepta/nestjs-repository-drizzle/mariadb` | `DrizzleMariadbRepositoryModule`, `DrizzleMariadbRepository`, `DrizzleRepositoryOptions`, `DrizzleMysqlTransaction`, `DrizzleMysqlTransactionFactory`, `DrizzleMysqlClient` |
