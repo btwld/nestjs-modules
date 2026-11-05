@@ -76,25 +76,25 @@ export class DurableMessaging implements OnModuleInit {
     messages: NewOutboxMessage[],
   ): Promise<void> {
     const { trx } = AppContextHost.from(ctx).with(TrxCtx);
-    const transaction = await trx.getOrStart(this.binding.transactionKey);
 
-    await this.add(trx, transaction.getClient(), messages);
+    await this.add(trx, messages);
 
     trx.onCommit(() => this.outbox.notify());
   }
 
   /**
-   * Write `messages` on `client`, failing the scope if the write fails,
-   * even if the caller catches it: the database may have ended the
-   * transaction it ran in.
+   * Join the run's transaction on the bound registration and write
+   * `messages` in it, failing the scope if either fails, even if the caller
+   * catches it: the messages are not stored, and the database may have
+   * ended the transaction the write ran in.
    */
   private async add(
     trx: TransactionManagerInterface,
-    client: unknown,
     messages: NewOutboxMessage[],
   ): Promise<void> {
     try {
-      await this.outbox.add(client, messages);
+      const transaction = await trx.getOrStart(this.binding.transactionKey);
+      await this.outbox.add(transaction.getClient(), messages);
     } catch (error) {
       trx.markFailed(error);
       throw error;

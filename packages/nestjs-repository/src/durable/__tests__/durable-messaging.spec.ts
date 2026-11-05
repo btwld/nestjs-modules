@@ -131,6 +131,22 @@ describe(DurableMessaging.name, () => {
       expect(notify).not.toHaveBeenCalled();
     });
 
+    it('fails the scope when its transaction cannot start, even if the caller catches it', async () => {
+      const notify = vi.spyOn(app.get(Outbox), 'notify');
+
+      await expect(
+        txScope.run(new AppContextHost(), async (txCtx) => {
+          vi.spyOn(txCtx.trx, 'getOrStart').mockRejectedValueOnce(
+            new Error('BEGIN refused'),
+          );
+          await durable.publish(txCtx, [message('a')]).catch(() => undefined);
+        }),
+      ).rejects.toThrow(TransactionScopeFailedException);
+
+      expect(store.stats(Date.now()).pending).toBe(0);
+      expect(notify).not.toHaveBeenCalled();
+    });
+
     it('wakes the relay only after the scope commits', async () => {
       const notify = vi.spyOn(app.get(Outbox), 'notify');
 
