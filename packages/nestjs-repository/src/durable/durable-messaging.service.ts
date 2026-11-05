@@ -19,7 +19,6 @@ import {
   TrxCtx,
 } from '../transaction/interfaces/transaction-context.interface.js';
 import { type TransactionManagerInterface } from '../transaction/interfaces/transaction-manager.interface.js';
-import { TransactionScope } from '../transaction/transaction-scope.js';
 
 import { DURABLE_MESSAGING_BINDING } from './durable-messaging.constants.js';
 import { type DurableBindingInterface } from './interfaces/durable-binding.interface.js';
@@ -36,7 +35,6 @@ export class DurableMessaging implements OnModuleInit {
     private readonly binding: DurableBindingInterface,
     private readonly outbox: Outbox,
     private readonly inbox: OutboxInbox,
-    private readonly txScope: TransactionScope,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -77,56 +75,54 @@ export class DurableMessaging implements OnModuleInit {
   ): Promise<void> {
     const { trx } = AppContextHost.from(ctx).with(TrxCtx);
 
-    await this.add(trx, messages);
+    await this.joined(trx, async (client) => {
+      await this.outbox.add(client, messages);
+    });
 
     trx.onCommit(() => this.outbox.notify());
   }
 
   /**
-   * Join the run's transaction on the bound registration and write
-   * `messages` in it, failing the scope if either fails, even if the caller
-   * catches it: the messages are not stored, and the database may have
-   * ended the transaction the write ran in.
-   */
-  private async add(
-    trx: TransactionManagerInterface,
-    messages: NewOutboxMessage[],
-  ): Promise<void> {
-    try {
-      const transaction = await trx.getOrStart(this.binding.transactionKey);
-      await this.outbox.add(transaction.getClient(), messages);
-    } catch (error) {
-      trx.markFailed(error);
-      throw error;
-    }
-  }
-
-  /**
-   * Record `messageId` for `consumer` and run `work` once, both in one
-   * transaction: a repeated delivery returns `{ duplicate: true }` without
-   * running `work`.
+   * Record `messageId` for `consumer` and run `work` once, both in the
+   * transaction `ctx` is running: a repeated delivery returns
+   * `{ duplicate: true }` without running `work`.
    *
-   * Opens a transaction scope, or joins the one `ctx` is already in. If
-   * `work` throws, that whole scope rolls back — the inbox record and, in a
-   * joined scope, the caller's earlier writes with it.
+   * Call it inside `TransactionScope.run()`; outside one there is no
+   * transaction to join, and resolving it throws. If `work` or the record
+   * fails, the run fails, even if you catch the error: none of its writes
+   * are kept, the inbox record included.
    */
-  once<T>(
+  async once<T>(
     ctx: PlainLiteralObject,
     consumer: string,
     messageId: string,
     work: (txCtx: TransactionContextInterface) => Promise<T>,
   ): Promise<OutboxInboxResult<T>> {
-    return this.txScope.run(ctx, async (txCtx) => {
-      const transaction = await txCtx.trx.getOrStart(
-        this.binding.transactionKey,
-      );
+    const txCtx = AppContextHost.from(ctx).with(TrxCtx);
 
-      return this.inbox.processInTransaction(
-        transaction.getClient(),
-        consumer,
-        messageId,
-        () => work(txCtx),
-      );
-    });
+    return this.joined(txCtx.trx, async (client) =>
+      this.inbox.processInTransaction(client, consumer, messageId, () =>
+        work(txCtx),
+      ),
+    );
+  }
+
+  /**
+   * Join the run's transaction on the bound registration and `use` it,
+   * failing the scope if either fails, even if the caller catches it:
+   * nothing `use` wrote is kept, and the database may have ended the
+   * transaction it ran in.
+   */
+  private async joined<T>(
+    trx: TransactionManagerInterface,
+    use: (client: unknown) => Promise<T>,
+  ): Promise<T> {
+    try {
+      const transaction = await trx.getOrStart(this.binding.transactionKey);
+      return await use(transaction.getClient());
+    } catch (error) {
+      trx.markFailed(error);
+      throw error;
+    }
   }
 }

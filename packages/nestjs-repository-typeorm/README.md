@@ -1130,19 +1130,24 @@ inbox check would only repeat it:
 ```ts
 @Injectable()
 export class OrderPlacedHandler {
-  constructor(private readonly durable: DurableMessaging) {}
+  constructor(
+    private readonly durable: DurableMessaging,
+    private readonly txScope: TransactionScope,
+  ) {}
 
   @OnOutboxMessage('order.placed', { consumer: 'billing', inbox: false })
   async handle(payload: { orderId: string }, { message }: OutboxHandlerContext) {
-    await this.durable.once(new AppContextHost(), 'billing', message.id, async (txCtx) => {
-      // repository writes here commit with the inbox record
-    });
+    await this.txScope.run(new AppContextHost(), (txCtx) =>
+      this.durable.once(txCtx, 'billing', message.id, async () => {
+        // repository writes here, with txCtx, commit with the inbox record
+      }),
+    );
   }
 }
 ```
 
-An inbound webhook works the same way: call `durable.once` with the
-provider's delivery id as the message id.
+An inbound webhook works the same way: in your transaction, call
+`durable.once` with the provider's delivery id as the message id.
 
 To make a Rockets package's own write durable, wrap the package call in your
 own scope and publish beside it; the package's `run()` joins your scope:

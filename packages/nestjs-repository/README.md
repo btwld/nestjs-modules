@@ -2720,12 +2720,15 @@ await this.txScope.run(ctx, async (txCtx) => {
 If `publish` fails, the run fails with it, even if you catch the error:
 none of the run's writes are kept.
 
-Run a delivery's work once:
+Run a delivery's work once, inside your transaction:
 
 ```ts
-const result = await this.durable.once(ctx, 'billing', message.id, async (txCtx) => {
-  // repository writes here join the same transaction as the inbox record
-});
+const result = await this.txScope.run(ctx, (txCtx) =>
+  this.durable.once(txCtx, 'billing', message.id, async () => {
+    // repository writes here, with txCtx, join the same transaction as the
+    // inbox record
+  }),
+);
 // result is { duplicate: true } when this consumer already processed the message
 ```
 
@@ -2736,17 +2739,19 @@ and the message goes straight to the dead letters for review:
 ```ts
 @OnOutboxMessage('provider.callback', { consumer: 'billing', inbox: false })
 async handle(payload: CallbackPayload, { message }: OutboxHandlerContext) {
-  await this.durable.once(new AppContextHost(), 'billing', message.id, async (txCtx) => {
-    const invoice = await this.invoices.findOne({
-      where: Where.eq('id', payload.invoiceId),
-      ctx: txCtx,
-    });
-    if (invoice?.status === 'void') {
-      // a callback for a voided invoice will not succeed on a retry
-      throw new NonRetryableMessageError(`invoice ${payload.invoiceId} is void`);
-    }
-    // ...apply the callback
-  });
+  await this.txScope.run(new AppContextHost(), (txCtx) =>
+    this.durable.once(txCtx, 'billing', message.id, async () => {
+      const invoice = await this.invoices.findOne({
+        where: Where.eq('id', payload.invoiceId),
+        ctx: txCtx,
+      });
+      if (invoice?.status === 'void') {
+        // a callback for a voided invoice will not succeed on a retry
+        throw new NonRetryableMessageError(`invoice ${payload.invoiceId} is void`);
+      }
+      // ...apply the callback
+    }),
+  );
 }
 ```
 
@@ -2778,9 +2783,10 @@ What to know:
 
 - `publish` needs a transaction scope; outside one it throws. The relay is
   woken when the scope commits.
-- `once` opens a scope, or joins the one `ctx` is in. If `work` throws, the
-  whole scope rolls back, including a joined caller's earlier writes, and the
-  caller's own `run()` throws `TransactionScopeFailedException`.
+- `once` needs a transaction scope too; outside one it throws. If `work` or
+  the inbox record fails, the whole scope rolls back, including your earlier
+  writes in it. Your `run()` rejects with that error, or with
+  `TransactionScopeFailedException` if you caught it.
 - Startup refuses, with `UnsupportedDurableDriverException`, a key nothing is
   registered under and a registration its driver cannot carry: no
   transactions, or a database `@nestjs/outbox` has no store for.

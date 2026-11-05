@@ -187,21 +187,26 @@ describe(DurableMessaging.name, () => {
       await app.close();
     });
 
-    it('records the message and runs the work once', async () => {
+    it('refuses a call outside a run, without running the work', async () => {
       const work = vi.fn(async () => 'done');
 
-      const first = await durable.once(
-        new AppContextHost(),
-        'billing',
-        'm1',
-        work,
-      );
-      const second = await durable.once(
-        new AppContextHost(),
-        'billing',
-        'm1',
-        work,
-      );
+      await expect(
+        durable.once(new AppContextHost(), 'billing', 'm1', work),
+      ).rejects.toThrow(RuntimeException);
+
+      expect(work).not.toHaveBeenCalled();
+      expect(store.hasInbox('billing', 'm1')).toBe(false);
+    });
+
+    it('records the message and runs the work once', async () => {
+      const work = vi.fn(async () => 'done');
+      const deliver = () =>
+        txScope.run(new AppContextHost(), (txCtx) =>
+          durable.once(txCtx, 'billing', 'm1', work),
+        );
+
+      const first = await deliver();
+      const second = await deliver();
 
       expect(first).toEqual({ duplicate: false, result: 'done' });
       expect(second).toEqual({ duplicate: true });
@@ -210,13 +215,10 @@ describe(DurableMessaging.name, () => {
     });
 
     it('hands the work the scope it runs in', async () => {
-      await durable.once(
-        new AppContextHost(),
-        'billing',
-        'm1',
-        async (txCtx) => {
-          await durable.publish(txCtx, [message('reply')]);
-        },
+      await txScope.run(new AppContextHost(), (txCtx) =>
+        durable.once(txCtx, 'billing', 'm1', async (workCtx) => {
+          await durable.publish(workCtx, [message('reply')]);
+        }),
       );
 
       expect(store.stats(Date.now()).pending).toBe(1);
@@ -224,10 +226,44 @@ describe(DurableMessaging.name, () => {
 
     it('drops the inbox record when the work throws', async () => {
       await expect(
-        durable.once(new AppContextHost(), 'billing', 'm1', async () => {
-          throw new Error('handler failed');
-        }),
+        txScope.run(new AppContextHost(), (txCtx) =>
+          durable.once(txCtx, 'billing', 'm1', async () => {
+            throw new Error('handler failed');
+          }),
+        ),
       ).rejects.toThrow('handler failed');
+
+      expect(store.hasInbox('billing', 'm1')).toBe(false);
+    });
+
+    it('fails the run when its transaction cannot start, even if the caller catches it', async () => {
+      const work = vi.fn(async () => 'done');
+
+      await expect(
+        txScope.run(new AppContextHost(), async (txCtx) => {
+          vi.spyOn(txCtx.trx, 'getOrStart').mockRejectedValueOnce(
+            new Error('BEGIN refused'),
+          );
+          await durable
+            .once(txCtx, 'billing', 'm1', work)
+            .catch(() => undefined);
+        }),
+      ).rejects.toThrow(TransactionScopeFailedException);
+
+      expect(work).not.toHaveBeenCalled();
+      expect(store.hasInbox('billing', 'm1')).toBe(false);
+    });
+
+    it('fails the run when the work throws, even if the caller catches it', async () => {
+      await expect(
+        txScope.run(new AppContextHost(), async (txCtx) => {
+          await durable
+            .once(txCtx, 'billing', 'm1', async () => {
+              throw new Error('handler failed');
+            })
+            .catch(() => undefined);
+        }),
+      ).rejects.toThrow(TransactionScopeFailedException);
 
       expect(store.hasInbox('billing', 'm1')).toBe(false);
     });
