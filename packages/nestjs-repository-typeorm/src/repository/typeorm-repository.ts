@@ -944,12 +944,14 @@ export abstract class TypeOrmRepository<
    * `row` holding only what the read asked for: the columns it selected, or
    * all own columns, and each joined relation with its own columns. With
    * `eager`, set by a read that asked TypeORM to load eager relations, the
-   * relations TypeORM loads eagerly come back too, as loaded.
+   * relations TypeORM loads eagerly come back too, each with its own columns
+   * and, as loaded, any eager relation nested in it.
    *
-   * TypeORM builds a loaded row with the entity's constructor, so a field the
-   * class initializes comes back whether or not it was read — a relation the
-   * read never joined (`post = null`), or a column `select` left out
-   * (`status = 'draft'`). The result keeps the row's class but none of that.
+   * TypeORM builds a loaded row, related ones included, with the entity's
+   * constructor, so a field the class initializes comes back whether or not
+   * it was read — a relation the read never joined (`post = null`), or a
+   * column `select` left out (`status = 'draft'`). The result keeps each
+   * row's class but none of that.
    */
   private toResult(
     row: Entity,
@@ -972,27 +974,48 @@ export abstract class TypeOrmRepository<
       const value: unknown = loaded[relation];
       if (!declared || value === undefined) continue;
 
-      const columns = declared.targetColumns.map((column) => column.name);
-      values[relation] = Array.isArray(value)
-        ? value.map((related) => this.pickRelated(related, columns))
-        : this.pickRelated(value, columns);
+      values[relation] = this.pickLoaded(
+        value,
+        declared.targetColumns.map((column) => column.name),
+      );
     }
 
     if (eager) {
       const joined = new Set(
         (options.join ?? []).map(({ relation }) => relation),
       );
-      for (const { propertyName } of this.repo.metadata.eagerRelations) {
-        if (!joined.has(propertyName) && loaded[propertyName] !== undefined) {
-          values[propertyName] = loaded[propertyName];
-        }
+      for (const { propertyName, inverseEntityMetadata } of this.repo.metadata
+        .eagerRelations) {
+        const value: unknown = loaded[propertyName];
+        if (joined.has(propertyName) || value === undefined) continue;
+
+        // The target's own eager relations stay as loaded, so one nested
+        // in this relation still reaches the result check.
+        const declared = this.metadata.relations?.find(
+          ({ name }) => name === propertyName,
+        );
+        values[propertyName] = declared
+          ? this.pickLoaded(value, [
+              ...declared.targetColumns.map((column) => column.name),
+              ...inverseEntityMetadata.eagerRelations.map(
+                (nested) => nested.propertyName,
+              ),
+            ])
+          : value;
       }
     }
 
     return result;
   }
 
-  /** A joined relation's value reduced to its own columns; `null` stays. */
+  /** A loaded relation's value, each row reduced to `keys`. */
+  private pickLoaded(value: unknown, keys: string[]): unknown {
+    return Array.isArray(value)
+      ? value.map((related) => this.pickRelated(related, keys))
+      : this.pickRelated(value, keys);
+  }
+
+  /** A related row reduced to `columns`; `null` stays. */
   private pickRelated(value: unknown, columns: string[]): unknown {
     if (!isObject(value)) return value;
     const related: PlainLiteralObject = value;

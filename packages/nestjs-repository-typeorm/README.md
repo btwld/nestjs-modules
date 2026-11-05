@@ -362,8 +362,10 @@ A relation declared with `eager: true` loads only for a repository registered
 with `allowEagerRelations: true` (see
 [What a result holds](../nestjs-repository/README.md#what-a-result-holds)).
 The rows its reads return then hold each eager relation, which may hold only its
-own columns: an eager relation nested inside another one throws. Without the
-opt-in, a row holds only the relations its read joined.
+own columns: an eager relation nested inside another one throws. A field the
+related class initializes that isn't one of its columns is left out, as for
+the row itself. Without the opt-in, a row holds only the relations its read
+joined.
 
 ### TypeORM Features at Your Own Risk
 
