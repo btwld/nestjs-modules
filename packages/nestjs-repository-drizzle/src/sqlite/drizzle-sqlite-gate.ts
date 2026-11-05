@@ -33,11 +33,17 @@ export class DrizzleSqliteGate {
 
 const gates = new WeakMap<object, DrizzleSqliteGate>();
 
-/** The gate of the connection `db` holds, shared by everything using it. */
+/**
+ * The gate of the connection `db` holds, shared by everything using it,
+ * other Drizzle databases on the same connection included.
+ */
 export function gateOf(db: object): DrizzleSqliteGate {
-  const existing = gates.get(db);
+  const client: unknown = Reflect.get(db, '$client');
+  const connection =
+    typeof client === 'object' && client !== null ? client : db;
+  const existing = gates.get(connection);
   if (existing) return existing;
   const gate = new DrizzleSqliteGate();
-  gates.set(db, gate);
+  gates.set(connection, gate);
   return gate;
 }
