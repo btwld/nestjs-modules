@@ -34,8 +34,10 @@ with audit columns and a version.
 ## Installation
 
 ```sh
-yarn add @concepta/nestjs-repository-typeorm @nestjs/common @nestjs/core @nestjs/typeorm typeorm pg
+yarn add @concepta/nestjs-repository-typeorm @concepta/nestjs-repository @concepta/nestjs-core @nestjs/common @nestjs/core @nestjs/typeorm typeorm pg
 ```
+
+Install every `@concepta` package at the same version.
 
 Replace `pg` with your database's client from
 [Choose Your Adapter](#choose-your-adapter).

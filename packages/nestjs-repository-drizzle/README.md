@@ -27,8 +27,10 @@ Drizzle tables with it, and you get repositories that run on the
 ## Installation
 
 ```sh
-yarn add @concepta/nestjs-repository-drizzle @nestjs/common @nestjs/core @nestjs/drizzle drizzle-orm pg
+yarn add @concepta/nestjs-repository-drizzle @concepta/nestjs-repository @concepta/nestjs-core @nestjs/common @nestjs/core @nestjs/drizzle drizzle-orm pg
 ```
+
+Install every `@concepta` package at the same version.
 
 Replace `pg` with your database's client from
 [Choose Your Adapter](#choose-your-adapter).

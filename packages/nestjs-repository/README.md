@@ -37,8 +37,10 @@ nesting, and a two-level repository hook system.
 ## Installation
 
 ```sh
-yarn add @concepta/nestjs-repository @nestjs/common @nestjs/core rxjs
+yarn add @concepta/nestjs-repository @concepta/nestjs-core @nestjs/common @nestjs/core rxjs
 ```
+
+Install every `@concepta` package at the same version.
 
 ### Requirements
 
