@@ -8,8 +8,7 @@ import { type TypeOrmRepositoryOptions } from '../repository/typeorm-repository-
 import { TYPEORM_MARIADB_DATABASE } from './typeorm-mariadb.constants.js';
 
 /**
- * A repository on a MariaDB data source. Refuses a data source that turns
- * off the `FOUND_ROWS` client flag (on by default).
+ * A repository on a MariaDB data source.
  */
 export class TypeOrmMariadbRepository<
   Entity extends PlainLiteralObject,

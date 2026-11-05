@@ -199,6 +199,28 @@ export function overlappingTransactions(ctx: ConformanceContext): void {
     assertRows(after, { ...stored, rank: 7, version: after.version });
   });
 
+  it('overlapping transactions: a versioned write in a run that has read moves the version past a write another run made since', async () => {
+    const stored = await item().create({ name: 'o', rank: 1, note: null });
+
+    await run(async (txCtx) => {
+      await item().find({ ctx: txCtx });
+      await run((theirs) =>
+        item().update(stored, { rank: 7 }, { ctx: theirs }),
+      );
+      const current = await readItem(stored.id);
+      assert.ok(current);
+      return item().update(current, { note: 'mine' }, { ctx: txCtx });
+    });
+
+    const after = await readItem(stored.id);
+    assertRows(after, {
+      ...stored,
+      rank: 7,
+      note: 'mine',
+      version: stored.version + 2,
+    });
+  });
+
   it('overlapping transactions: a run that catches a deadlock keeps all of its writes or none', async () => {
     const [a, b] = await plain().createMany([{ name: 'a' }, { name: 'b' }]);
     assert.ok(a && b);

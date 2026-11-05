@@ -1,4 +1,4 @@
-import { type Repository } from 'typeorm';
+import { type FindOneOptions, type Repository } from 'typeorm';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 
@@ -29,6 +29,10 @@ export class TypeOrmSqliteRepository<
   Entity extends PlainLiteralObject,
 > extends TypeOrmRepository<Entity> {
   private readonly gate: TypeOrmSqliteGate;
+
+  /** SQLite has no row locks; its one connection runs one write at a time. */
+  protected override readonly rowLock: FindOneOptions<Entity>['lock'] =
+    undefined;
 
   constructor(repo: Repository<Entity>, options: TypeOrmRepositoryOptions) {
     super(repo, options, TYPEORM_SQLITE_DATABASE);

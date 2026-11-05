@@ -10,7 +10,6 @@ export { TypeOrmMariadbRepository } from './mariadb/typeorm-mariadb-repository.j
 export { TypeOrmRepositoryOptions } from './repository/typeorm-repository-options.interface.js';
 export { TypeOrmMysqlTransaction } from './mysql/typeorm-mysql-transaction.js';
 export { TypeOrmMysqlTransactionFactory } from './mysql/typeorm-mysql-transaction.factory.js';
-export { TypeOrmMysqlFoundRowsException } from './mysql/typeorm-mysql-found-rows.exception.js';
 
 export { ActivityMariadbEntity } from './mariadb/entities/activity-mariadb.entity.js';
 export { AppendOnlyMariadbEntity } from './mariadb/entities/append-only-mariadb.entity.js';

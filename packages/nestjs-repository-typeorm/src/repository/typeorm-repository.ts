@@ -11,7 +11,6 @@ import {
   MoreThan,
   MoreThanOrEqual,
   Not,
-  type QueryDeepPartialEntity,
   Raw,
   type Repository,
   type FindOptionsRelations,
@@ -151,6 +150,16 @@ export abstract class TypeOrmRepository<
    * sets one, so the row comes back as stored.
    */
   protected readonly rereadLock?: FindOneOptions<Entity>['lock'];
+
+  /**
+   * The lock a write takes on the row it is about to change, in the write's
+   * transaction, so no other transaction changes or removes the row before
+   * the write saves it. A database with one connection, which runs one
+   * transaction at a time, needs none.
+   */
+  protected readonly rowLock?: FindOneOptions<Entity>['lock'] = {
+    mode: 'pessimistic_write',
+  };
 
   /** A query the database failed, as `describeQueryFailure` reports it. */
   protected override describeDatabaseError(
@@ -559,6 +568,7 @@ export abstract class TypeOrmRepository<
         data,
         options.versionGuard,
         options.ctx,
+        'update',
       );
     }
 
@@ -643,6 +653,7 @@ export abstract class TypeOrmRepository<
         data,
         options.versionGuard,
         options.ctx,
+        'replace',
       );
     }
 
@@ -650,15 +661,15 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * `update`/`replace`'s write when no version guard applies: one `UPDATE` of
-   * the columns in `data` on the row `entity`'s primary key names, then a
-   * re-read of that row, both in one transaction so the row returned is the
-   * row written.
+   * `update`/`replace`'s write when no version guard applies, in one
+   * transaction: a locking read of the row `entity`'s primary key names, so
+   * a row no longer stored is not found (`save()` would insert it again),
+   * then `save()` of that key and `data`, then a re-read, so the row returned
+   * is the row written.
    *
-   * Only `data` is written, so a column the caller's `entity` holds a stale
-   * value for keeps the value stored by a later writer. A row no longer stored
-   * is reported by the re-read rather than by the `UPDATE`'s affected count,
-   * which some databases give as rows changed rather than rows matched.
+   * `save()` writes only the columns it is given, so a column the caller's
+   * `entity` holds a stale value for keeps the value stored by a later
+   * writer.
    */
   private async writeData(
     entity: Entity,
@@ -681,35 +692,52 @@ export abstract class TypeOrmRepository<
     const run = (txCtx?: AppContextLike): Promise<Entity> =>
       this.withRepo(txCtx, (repo) => write(repo));
     const write = async (repo: Repository<Entity>): Promise<Entity> => {
-      if (Object.keys(data).length > 0) {
-        await repo.update(
-          primaryWhere,
-          Object.assign<QueryDeepPartialEntity<Entity>, DeepPartial<Entity>>(
-            {},
-            data,
-          ),
-        );
-      }
-
-      // `withDeleted: true` — identity re-read of the row just written, by its
-      // primary key alone, whatever its delete date.
-      const result = await repo.findOne({
-        where: primaryWhere,
-        withDeleted: true,
-        loadEagerRelations: false,
-        lock: this.rereadLock,
-      });
-
-      if (!result) {
+      if (!(await this.lockRow(repo, primaryWhere))) {
         throw new EntityNotFoundException(this.metadata.name, operation);
       }
-
-      return this.toResult(result, {});
+      return this.saveData(repo, primaryWhere, data, operation);
     };
 
     return this.options.transactionScope && !this.joinsTransaction(ctx)
       ? this.options.transactionScope.run(ctx ?? {}, (txCtx) => run(txCtx))
       : run(ctx);
+  }
+
+  /**
+   * The row `where` names, whatever its delete date, locked until the
+   * transaction ends; `null` when there is none.
+   */
+  private lockRow(
+    repo: Repository<Entity>,
+    where: FindOptionsWhere<Entity>,
+  ): Promise<Entity | null> {
+    return repo.findOne({
+      where,
+      withDeleted: true,
+      loadEagerRelations: false,
+      lock: this.rowLock,
+    });
+  }
+
+  /**
+   * The row `where` names, as stored, whatever its delete date; a row no
+   * longer stored is not found.
+   */
+  private async reread(
+    repo: Repository<Entity>,
+    where: FindOptionsWhere<Entity>,
+    operation: string,
+  ): Promise<Entity> {
+    const row = await repo.findOne({
+      where,
+      withDeleted: true,
+      loadEagerRelations: false,
+      lock: this.rereadLock,
+    });
+    if (!row) {
+      throw new EntityNotFoundException(this.metadata.name, operation);
+    }
+    return this.toResult(row, {});
   }
 
   /**
@@ -723,23 +751,18 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * Run `op` guarded by an atomic optimistic-lock compare-and-swap on
-   * `guard.column`, identifying the row by `entity`'s primary key.
+   * Run `op` guarded by the version in `guard`, identifying the row by
+   * `entity`'s primary key.
    *
-   * The check is `increment(…, 0)`: one `UPDATE` that matches the row only at
-   * the expected version and leaves the version as it is. No match means
-   * someone else wrote first, so it throws `OptimisticLockException`.
+   * The check is a locking read of the row at the expected version: no row
+   * means someone else wrote or removed it first, so it throws
+   * `OptimisticLockException`. The lock holds the row until the transaction
+   * ends, so no other writer changes it before `op` saves it.
    *
-   * TypeORM stamps the update date on that `UPDATE` and runs subscribers for
-   * it; the README's Optimistic Locking section tells implementers what they
-   * see, and its Expected Version section covers the MySQL caveat.
-   *
-   * That guard statement and `op` are two separate SQL statements, so —
-   * unless both run inside one DB transaction — a third writer could still
-   * interleave between them and reintroduce a lost update. Both join the
-   * caller's transaction when one is active (e.g. via `@Transactional()`),
-   * or `TransactionScope.run()` opens a short-lived one for just this call,
-   * so every caller gets the same guarantee without having to opt in.
+   * The check and `op` run in one transaction: the caller's when one is
+   * active (e.g. via `@Transactional()`), or a short-lived one
+   * `TransactionScope.run()` opens for just this call, so every caller gets
+   * the same guarantee without having to opt in.
    */
   private async withVersionGuard<T>(
     entity: Entity,
@@ -762,9 +785,7 @@ export abstract class TypeOrmRepository<
       const lockWhere: FindOptionsWhere<Entity> = { ...primaryWhere };
       lockWhere[guard.column] = guard.value;
 
-      const lockResult = await repo.increment(lockWhere, guard.column, 0);
-
-      if (lockResult.affected === 0) {
+      if (!(await this.lockRow(repo, lockWhere))) {
         throw new OptimisticLockException(this.metadata.name);
       }
 
@@ -806,74 +827,38 @@ export abstract class TypeOrmRepository<
     return run(ctx);
   }
 
-  /**
-   * `update`/`replace`'s operation for `withVersionGuard`: write `data` over
-   * the own columns of a freshly re-read row and save it.
-   *
-   * The version column is put back to the freshly-read value so a value for
-   * it in `data` can never override it. TypeORM only auto-increments a version
-   * column when its own diff of the entity finds no other pending change to
-   * it, so without this a spoofed `data` value would both survive as written
-   * and* suppress the real auto-increment.
-   */
+  /** `update`/`replace` of a versioned entity: `saveData` under the guard. */
   private async saveWithVersionGuard(
     entity: Entity,
     data: DeepPartial<Entity>,
     guard: RepositoryVersionGuardInterface<Entity>,
     ctx: PlainLiteralObject | undefined,
+    operation: 'update' | 'replace',
   ): Promise<Entity> {
-    return this.withVersionGuard(
-      entity,
-      guard,
-      ctx,
-      async (repo, primaryWhere) => {
-        // `withDeleted: true` — identity re-read of the row the `increment`
-        // guard above just matched (full primary key + version), whatever its
-        // delete date, so it cannot come back null for a row that exists.
-        //
-        // `loadEagerRelations: false` — the row is reduced to its own
-        // columns below, so there is no point loading them.
-        const fresh = await repo.findOne({
-          where: primaryWhere,
-          withDeleted: true,
-          loadEagerRelations: false,
-          lock: this.rereadLock,
-        });
-
-        if (!fresh) {
-          throw new RuntimeException({
-            message: 'Entity "%s" not found after update',
-            messageParams: [this.metadata.name],
-            fault: 'internal',
-          });
-        }
-
-        // Own columns only: a relation on the row would outrank its foreign
-        // key column when saved, and TypeORM's constructor puts one there
-        // whenever the class initializes it (`badge = null`).
-        const next = this.toEntity({ ...this.toResult(fresh, {}), ...data });
-        next[guard.column] = fresh[guard.column];
-        await repo.save(next);
-
-        // The row as stored: `save()` returns it as TypeORM's own read saw
-        // it, which in a transaction that has read before can be its
-        // snapshot.
-        const saved = await repo.findOne({
-          where: primaryWhere,
-          withDeleted: true,
-          loadEagerRelations: false,
-          lock: this.rereadLock,
-        });
-        if (!saved) {
-          throw new RuntimeException({
-            message: 'Entity "%s" not found after update',
-            messageParams: [this.metadata.name],
-            fault: 'internal',
-          });
-        }
-        return this.toResult(saved, {});
-      },
+    return this.withVersionGuard(entity, guard, ctx, (repo, primaryWhere) =>
+      this.saveData(repo, primaryWhere, data, operation),
     );
+  }
+
+  /**
+   * `save()` of the row's key and `data`, then the row as stored. TypeORM
+   * writes the columns of `data` that differ from the row as it reads it,
+   * and moves the version itself; a value for the version in `data` is
+   * dropped, so it can neither be written nor hold the version back.
+   */
+  private async saveData(
+    repo: Repository<Entity>,
+    primaryWhere: FindOptionsWhere<Entity>,
+    data: DeepPartial<Entity>,
+    operation: 'update' | 'replace',
+  ): Promise<Entity> {
+    const row = this.toEntity(data);
+    const values: PlainLiteralObject = row;
+    Object.assign(values, primaryWhere);
+    const versionColumn = this.getVersionColumn();
+    if (versionColumn) delete values[versionColumn];
+    await repo.save(row);
+    return this.reread(repo, primaryWhere, operation);
   }
 
   // Delete operations
@@ -922,36 +907,65 @@ export abstract class TypeOrmRepository<
     options?: RepositoryDeleteOneOptions &
       RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
-    if (options?.versionGuard) {
-      return this.withVersionGuard(
-        entity,
-        options.versionGuard,
-        options.ctx,
-        (repo) => repo.softRemove(this.toEntity(entity)),
-      );
-    }
-
-    return this.withRepo(options?.ctx, (repo) =>
-      repo.softRemove(this.toEntity(entity)),
-    );
+    return this.setRemoved(entity, 'softDelete', options);
   }
 
   protected async doRestore(
     entity: Entity,
     options?: RepositoryRestoreOptions & RepositoryVersionGuardOptions<Entity>,
   ): Promise<Entity> {
+    return this.setRemoved(entity, 'restore', options);
+  }
+
+  /**
+   * `softDelete`/`restore`'s write, in one transaction: a locking read of
+   * the row `entity`'s primary key names, so a row no longer stored is not
+   * found, then `softRemove()`/`recover()` of the row as stored, then a
+   * re-read, so the row returned is the row as stored rather than the
+   * caller's copy. Guarded by the version when the caller states one.
+   */
+  private async setRemoved(
+    entity: Entity,
+    operation: 'softDelete' | 'restore',
+    options?: RepositoryDeleteOneOptions &
+      RepositoryVersionGuardOptions<Entity>,
+  ): Promise<Entity> {
+    const write = async (
+      repo: Repository<Entity>,
+      primaryWhere: FindOptionsWhere<Entity>,
+    ): Promise<Entity> => {
+      const stored = await this.lockRow(repo, primaryWhere);
+      if (!stored) {
+        throw new EntityNotFoundException(this.metadata.name, operation);
+      }
+      // Own columns only, as for a versioned save.
+      const row = this.toEntity(this.toResult(stored, {}));
+      await (operation === 'softDelete'
+        ? repo.softRemove(row)
+        : repo.recover(row));
+      return this.reread(repo, primaryWhere, operation);
+    };
+
     if (options?.versionGuard) {
       return this.withVersionGuard(
         entity,
         options.versionGuard,
         options.ctx,
-        (repo) => repo.recover(this.toEntity(entity)),
+        write,
       );
     }
 
-    return this.withRepo(options?.ctx, (repo) =>
-      repo.recover(this.toEntity(entity)),
-    );
+    const primaryColumn = this.getPrimaryColumn();
+    const primaryWhere: FindOptionsWhere<Entity> = {};
+    if (primaryColumn !== undefined) {
+      primaryWhere[primaryColumn] = entity[primaryColumn];
+    }
+    const ctx = options?.ctx;
+    const run = (txCtx?: AppContextLike): Promise<Entity> =>
+      this.withRepo(txCtx, (repo) => write(repo, primaryWhere));
+    return this.options.transactionScope && !this.joinsTransaction(ctx)
+      ? this.options.transactionScope.run(ctx ?? {}, (txCtx) => run(txCtx))
+      : run(ctx);
   }
 
   /**

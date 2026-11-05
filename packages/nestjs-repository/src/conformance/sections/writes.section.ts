@@ -293,6 +293,45 @@ export function writesSection(ctx: ConformanceContext): void {
       assert.equal(await ctx.repo('item').count(), 1);
     });
 
+    it('doSoftDelete and doRestore: a row deleted after it was read is not found', async () => {
+      const { books } = await seedLibrary(ctx);
+      const book = ctx.repo('book');
+      const removed = await book.softDelete(books.gamma);
+      await book.delete(books.delta);
+      await book.delete(removed);
+
+      await assert.rejects(
+        book.softDelete(books.delta),
+        EntityNotFoundException,
+      );
+      await assert.rejects(book.restore(removed), EntityNotFoundException);
+      assert.equal(await book.count({ withDeleted: true }), 2);
+    });
+
+    it('doSoftDelete and doRestore: return the row as stored, not as a stale row holds it', async () => {
+      const { books } = await seedLibrary(ctx);
+      const book = ctx.repo('book');
+      await book.update(books.delta, { title: 'renamed' });
+
+      const removed = await book.softDelete(books.delta);
+      assert.equal(removed.title, 'renamed');
+      assert.ok(removed.removedAt instanceof Date);
+      assertRows(
+        removed,
+        await book.findOne({
+          where: Where.eq('id', books.delta.id),
+          withDeleted: true,
+        }),
+      );
+
+      const live = await book.restore(removed);
+      await book.update(live, { title: 'again' });
+      await book.softDelete(live);
+      const restored = await book.restore(removed);
+      assert.equal(restored.title, 'again');
+      assert.equal(restored.removedAt, null);
+    });
+
     it('doRestore: leaves a live row live', async () => {
       const created = await ctx
         .repo('item')

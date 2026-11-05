@@ -10,7 +10,6 @@ export { TypeOrmMysqlRepository } from './mysql/typeorm-mysql-repository.js';
 export { TypeOrmRepositoryOptions } from './repository/typeorm-repository-options.interface.js';
 export { TypeOrmMysqlTransaction } from './mysql/typeorm-mysql-transaction.js';
 export { TypeOrmMysqlTransactionFactory } from './mysql/typeorm-mysql-transaction.factory.js';
-export { TypeOrmMysqlFoundRowsException } from './mysql/typeorm-mysql-found-rows.exception.js';
 
 export { ActivityMysqlEntity } from './mysql/entities/activity-mysql.entity.js';
 export { AppendOnlyMysqlEntity } from './mysql/entities/append-only-mysql.entity.js';

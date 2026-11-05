@@ -88,9 +88,6 @@ database stops startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### MySQL
 
-- Keep the client's default flags. Versioned writes rely on `FOUND_ROWS`,
-  so a data source that turns it off (`flags` or `extra.flags` holding
-  `'-FOUND_ROWS'`) stops startup with `TypeOrmMysqlFoundRowsException`.
 - Run the server in UTC and set `timezone: 'Z'` on the data source.
   Otherwise dates the database fills in, like `dateCreated`, come back
   shifted by your host's UTC offset.
@@ -369,17 +366,15 @@ guarantees: row scope, write policy and hooks never see what it does.
   Write listeners receive an entity built without running its constructor,
   so they can't rely on state the constructor sets, and reading an ES
   `#private` field throws.
-- **`update` and `replace` of a versioned entity** stamp your
-  `@UpdateDateColumn` even when `data` changes nothing. Your subscribers'
-  `beforeUpdate`/`afterUpdate` run one extra time, with only the version in
-  `event.entity` and no `databaseEntity`; the entity's own
-  `@BeforeUpdate`/`@AfterUpdate` methods don't.
-- **`update` and `replace` of an entity without a version column** write only
-  the columns in `data`, with one `UPDATE` followed by a re-read in the same
-  transaction, so a stale `entity` never overwrites a later writer's change.
-  `@BeforeUpdate`/`@AfterUpdate` methods on the entity don't run for them;
-  your subscribers' `beforeUpdate`/`afterUpdate` do, with only the written
-  columns in `event.entity` and no `databaseEntity`.
+- **`update` and `replace`** `save()` only the row's key and the columns in
+  `data`: a stale `entity` never overwrites a later writer's change, and
+  your listeners see just those columns. TypeORM writes a column only when
+  it differs from the row as it reads it — inside a run on MySQL or
+  MariaDB, as the run first read it — so a value equal to that isn't
+  written, even if another request has changed it since.
+- **`create`** returns the row as TypeORM saved it: a value the database
+  rounds, such as a `decimal` or a `timestamp` without milliseconds, comes
+  back as you gave it. Read the row to see it as stored.
 - **`@Column({ insert: false })` and `@Column({ update: false })`** are
   honoured by TypeORM, not the repository: a value for such a column is
   dropped from a create or update without an error. An `update` or `replace`
@@ -1183,7 +1178,6 @@ Requirements and limits:
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
 | `TypeOrmUnsupportedDatabaseException` | Not exported; its `errorCode` is `TYPEORM_UNSUPPORTED_DATABASE` | At startup: an entity is registered on a data source of a database its adapter isn't for |
 | `TypeOrmRelationMetadataException` | Not exported; its `errorCode` is `TYPEORM_RELATION_METADATA` | At startup: a relation lacks its `@JoinColumn` or its inverse side |
-| `TypeOrmMysqlFoundRowsException` | `/mysql`, `/mariadb`; its `errorCode` is `TYPEORM_MYSQL_FOUND_ROWS` | At startup: the data source turns off the `FOUND_ROWS` client flag — see [MySQL](#mysql) |
 
 ## Entry Points
 
@@ -1191,8 +1185,8 @@ Requirements and limits:
 | --- | --- |
 | `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions` and `TypeOrmProviderOptionsInterface` |
 | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
-| `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
-| `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `TypeOrmMysqlFoundRowsException`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
+| `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
+| `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
 | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerDriverOptionsInterface`, `TypeOrmSqlServerSessionContextResolver`, `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
