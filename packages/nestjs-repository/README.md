@@ -739,8 +739,10 @@ Three entity shapes are refused at startup with `RepositoryBootException`:
   columns;
 - a relation whose foreign key has no column of its own, since it could never
   be written;
-- a primary or foreign key column defined as a getter or setter on the entity
-  class. Keys are plain properties.
+- a column defined as a getter or setter on the entity class. Columns are
+  plain properties: the field a setter stores into isn't a column, so every
+  row built through it would fail its read. Normalise a value in a hook
+  instead.
 
 ### Cascading writes
 

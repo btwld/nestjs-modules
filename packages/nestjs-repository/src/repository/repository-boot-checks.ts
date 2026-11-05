@@ -47,32 +47,34 @@ export function checkSinglePrimaryKey(adapters: AnyAdapter[]): string[] {
 }
 
 /**
- * Check that no primary or foreign key column is backed by a getter or setter
- * on the entity class.
+ * Check that no column, foreign key columns included, is backed by a getter
+ * or setter on the entity class.
  *
- * The repository's checks read a key as the value it was given, but a driver
- * building the entity runs the class's setters. A setter that rewrites a key,
- * such as one lowercasing an email, makes the two name different rows: the
- * create guard looks up one key while the driver overwrites another, or a
- * row-scope resolver checks one parent while the driver links another.
+ * A driver building the entity runs the class's setters. The field a setter
+ * stores the value in is not a column, so every row built that way holds a
+ * property nothing asked for, and its read fails. A setter that rewrites a
+ * key, such as one lowercasing an email, also makes the repository's checks
+ * and the driver name different rows: the create guard looks up one key
+ * while the driver overwrites another, or a row-scope resolver checks one
+ * parent while the driver links another.
  */
-export function checkNoAccessorKeys(adapters: AnyAdapter[]): string[] {
+export function checkNoAccessorColumns(adapters: AnyAdapter[]): string[] {
   return adapters.flatMap((adapter) => {
     const { type, columns, relations = [] } = adapter.metadata;
-    const keys = new Set<string>([
-      ...columns.filter((column) => column.isPrimary).map(({ name }) => name),
+    const names = new Set<string>([
+      ...columns.map(({ name }) => name),
       ...relations.flatMap(({ foreignKey = [] }) =>
         foreignKey.map(({ from }) => from),
       ),
     ]);
 
-    return [...keys]
-      .filter((key) => isAccessor(type, key))
+    return [...names]
+      .filter((name) => isAccessor(type, name))
       .map(
-        (key) =>
-          `"${adapter.entityKey}" key column "${key}" is a getter or setter ` +
-          `on ${type.name}. Keys are read and written as plain properties; ` +
-          `make "${key}" one.`,
+        (name) =>
+          `"${adapter.entityKey}" column "${name}" is a getter or setter on ` +
+          `${type.name}. Columns are read and written as plain properties; ` +
+          `make "${name}" one.`,
       );
   });
 }

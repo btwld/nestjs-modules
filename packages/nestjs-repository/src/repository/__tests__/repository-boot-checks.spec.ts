@@ -16,11 +16,14 @@ import { type RepositoryRelationMetadataInterface } from '../interfaces/reposito
 import {
   checkColumnsAreNotRelations,
   checkForeignKeyColumns,
-  checkNoAccessorKeys,
+  checkNoAccessorColumns,
   checkSinglePrimaryKey,
 } from '../repository-boot-checks.js';
 
-/** Lowercases its keys on assignment, so the driver writes another value. */
+/**
+ * Lowercases its columns on assignment, into fields that are not columns:
+ * the driver writes another value, and a row it builds holds the fields.
+ */
 class AccountEntity {
   [key: string]: unknown;
   private stored = '';
@@ -106,40 +109,39 @@ describe(checkSinglePrimaryKey, () => {
   });
 });
 
-describe(checkNoAccessorKeys, () => {
+describe(checkNoAccessorColumns, () => {
   it('refuses a primary key backed by a getter or setter', () => {
     expect(
-      checkNoAccessorKeys([adapterFor(AccountEntity, ['email', 'name'])]),
+      checkNoAccessorColumns([adapterFor(AccountEntity, ['email', 'name'])]),
     ).toEqual([
-      '"accounts" key column "email" is a getter or setter on ' +
-        'AccountEntity. Keys are read and written as plain properties; ' +
-        'make "email" one.',
+      '"accounts" column "email" is a getter or setter on AccountEntity. ' +
+        'Columns are read and written as plain properties; make "email" one.',
     ]);
   });
 
   it('refuses a foreign key backed by a getter or setter', () => {
     expect(
-      checkNoAccessorKeys([
+      checkNoAccessorColumns([
         adapterFor(AccountEntity, ['id', 'ownerId'], [owner('ownerId')]),
       ]),
-    ).toEqual([expect.stringContaining('key column "ownerId"')]);
+    ).toEqual([expect.stringContaining('column "ownerId"')]);
   });
 
-  it('refuses an accessor key inherited from a base class', () => {
+  it('refuses an accessor column inherited from a base class', () => {
     expect(
-      checkNoAccessorKeys([adapterFor(SubAccountEntity, ['email'])]),
+      checkNoAccessorColumns([adapterFor(SubAccountEntity, ['email'])]),
     ).toHaveLength(1);
   });
 
-  it('allows an accessor on a column that is not a key', () => {
+  it('refuses an accessor on a column that is not a key', () => {
     expect(
-      checkNoAccessorKeys([adapterFor(AccountEntity, ['id', 'email'])]),
-    ).toEqual([]);
+      checkNoAccessorColumns([adapterFor(AccountEntity, ['id', 'email'])]),
+    ).toEqual([expect.stringContaining('column "email"')]);
   });
 
-  it('allows keys that are plain properties', () => {
+  it('allows columns that are plain properties', () => {
     expect(
-      checkNoAccessorKeys([
+      checkNoAccessorColumns([
         adapterFor(
           PlainAccountEntity,
           ['email', 'ownerId'],
@@ -254,6 +256,10 @@ describe('repository startup checks', () => {
     [
       'an accessor-backed primary key',
       () => adapterFor(AccountEntity, ['email']),
+    ],
+    [
+      'an accessor-backed column that is not a key',
+      () => adapterFor(AccountEntity, ['id', 'email']),
     ],
     [
       'a foreign key without a column',
