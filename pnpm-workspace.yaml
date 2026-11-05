@@ -101,3 +101,4 @@ overrides:
 minimumReleaseAgeExclude:
   - '@nestjs/outbox@0.1.4'
   - '@nestjs/store-kit@0.1.3'
+  - '@tsyche/membrane@0.9.0'

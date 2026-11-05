@@ -1836,7 +1836,8 @@ single-entity payloads and options objects (`Membrane.object` /
 - **`Membrane.objectReplace`** -- read operations (`find`, `findOne`,
   `count`, `findAndCount`): the last hook's return value replaces the
   payload/result wholesale, so hooks may freely transform options and
-  results.
+  results. When `findOne` finds nothing, its after-hooks receive `null`,
+  and what they return is the result.
 - **`Membrane.object`** -- single-entity write operations (`create`,
   `update`, `upsert`, `replace`) and delete/lifecycle operations (`delete`,
   `deleteMany`, `softDelete`, `restore`): hook output is merged onto the

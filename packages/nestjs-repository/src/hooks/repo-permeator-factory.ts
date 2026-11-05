@@ -143,11 +143,10 @@ export class RepoPermeatorFactory<
           Ctx
         >(cb(K.BEFORE_FIND_ONE)),
       ),
-      Membrane.nullable(
-        Membrane.sequence(
-          Membrane.objectReplace<Entity, Entity, Ctx>(cb(K.AFTER_FIND_ONE)),
-          Membrane.objectReplace<Entity, Entity, Ctx>(cb(K.AFTER_READ)),
-        ),
+      // A miss reaches the hooks as null, as their types say.
+      Membrane.sequence(
+        Membrane.optional<Entity, Entity | null, Ctx>(cb(K.AFTER_FIND_ONE)),
+        Membrane.optional<Entity, Entity | null, Ctx>(cb(K.AFTER_READ)),
       ),
       options,
     );

@@ -27,7 +27,7 @@
   "dependencies": {
     "@concepta/nestjs-core": "workspace:^",
     "@concepta/nestjs-repository": "workspace:*",
-    "@tsyche/membrane": "^0.8.1"
+    "@tsyche/membrane": "^0.9.0"
   },
   "devDependencies": {
     "@concepta/typeorm-seeding": "^4.0.0",

@@ -429,6 +429,38 @@ describe('repository hooks', () => {
     });
   });
 
+  describe('a read hook on a findOne that finds nothing', () => {
+    it('receives null, and its null keeps the miss null', async () => {
+      const seen: unknown[] = [];
+
+      @RepoHook()
+      class LabelHook {
+        @AfterFindOne()
+        async afterFindOne(row: Order | null) {
+          seen.push(row);
+          return row === null ? null : { ...row, description: 'labelled' };
+        }
+
+        @AfterRead()
+        async afterRead(
+          result: Order | Order[] | null | number | [Order[], number],
+        ) {
+          seen.push(result);
+          return result;
+        }
+      }
+      await boot(LabelHook);
+
+      expect(
+        await orders.findOne({
+          where: Where.eq('id', 'missing'),
+          ctx: ctxWithHooks(LabelHook),
+        }),
+      ).toBeNull();
+      expect(seen).toEqual([null, null]);
+    });
+  });
+
   describe('a read hook changing the options', () => {
     it('cannot name a field a caller could not', async () => {
       @RepoHook()
