@@ -413,6 +413,11 @@ guarantees: row scope, write policy and hooks never see what it does.
 Joining a relation adds the related row to each result and never changes which
 rows come back or the total.
 
+A repository read loads the relations it joins in the same query as its rows,
+whatever `relationLoadStrategy` the data source sets, so a filter on a joined
+column narrows the joined rows too. Your own TypeORM queries keep the data
+source's setting.
+
 The one exception is a required relation (`nullable: false`) declared with
 `createForeignKeyConstraints: false`: its key can point at a row that no longer
 exists, and joining it may then drop such rows from the result and the total.

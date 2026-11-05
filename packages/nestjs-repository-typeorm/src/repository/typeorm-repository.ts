@@ -454,6 +454,11 @@ export abstract class TypeOrmRepository<
     return this.buildNativeFindBaseOptions(options);
   }
 
+  /**
+   * Relations load in the same query as the rows, whatever the data source's
+   * `relationLoadStrategy`: a query of their own would load every related
+   * row, not just those the where matched.
+   */
   private buildNativeFindBaseOptions(
     options: RepositoryFindOneOptions<Entity>,
   ): FindOneOptions<Entity> {
@@ -468,6 +473,7 @@ export abstract class TypeOrmRepository<
       order,
       withDeleted: options.withDeleted,
       loadEagerRelations: this.allowsEagerRelations,
+      relationLoadStrategy: 'join',
     };
   }
 
@@ -543,6 +549,7 @@ export abstract class TypeOrmRepository<
       relations: this.translateJoin(options.join),
       withDeleted: options.withDeleted,
       loadEagerRelations: this.allowsEagerRelations,
+      relationLoadStrategy: 'join',
     };
   }
 
