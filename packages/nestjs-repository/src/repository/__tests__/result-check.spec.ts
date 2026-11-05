@@ -413,4 +413,26 @@ describe('what a read may name about a joined relation', () => {
     );
     expect(repo.reads).toEqual([]);
   });
+
+  it('refuses an OR of more branches than the limit, as an AND that expands to them', async () => {
+    const repo = new ResultFixture('employees');
+    repo.bind({});
+    const either = (count: number) =>
+      Where.or(
+        ...Array.from({ length: count }, (_, index) =>
+          Where.eq('id', `id-${index}`),
+        ),
+      );
+
+    await expect(repo.find({ where: either(50) })).resolves.toEqual([]);
+    const error = await refusal(repo.find({ where: either(51) }));
+
+    expect(error).toEqual(
+      expect.objectContaining({
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      }),
+    );
+    expect(repo.reads).toHaveLength(1);
+  });
 });

@@ -2031,6 +2031,7 @@ export abstract class RepositoryAdapter<
         const branches = clause.conditions
           .flatMap((c) => this.toDnf(c))
           .filter((branch) => !this.isNeverBranch(branch));
+        this.assertDnfBranches(branches.length);
         return branches.length === 0 ? [[Where.never()]] : branches;
       }
 
@@ -2073,6 +2074,22 @@ export abstract class RepositoryAdapter<
   protected static readonly MAX_DNF_BRANCHES = 50;
 
   /**
+   * Refuse a filter whose expansion has more branches than the limit, from
+   * an OR as from an AND over ORs, so a row scope ANDed in never changes
+   * the answer.
+   */
+  private assertDnfBranches(count: number): void {
+    if (count > RepositoryAdapter.MAX_DNF_BRANCHES) {
+      throw new RuntimeException({
+        message: 'Where clause too complex: exceeded %d DNF branches',
+        messageParams: [RepositoryAdapter.MAX_DNF_BRANCHES],
+        httpStatus: HttpStatus.BAD_REQUEST,
+        fault: 'client',
+      });
+    }
+  }
+
+  /**
    * Compute cartesian product of AND-groups of OR-branches.
    * Distributes AND over OR at the AST level.
    *
@@ -2086,14 +2103,7 @@ export abstract class RepositoryAdapter<
       const newResult: WhereClause[][] = [];
       for (const existing of result) {
         for (const next of nextGroup) {
-          if (newResult.length >= RepositoryAdapter.MAX_DNF_BRANCHES) {
-            throw new RuntimeException({
-              message: 'Where clause too complex: exceeded %d DNF branches',
-              messageParams: [RepositoryAdapter.MAX_DNF_BRANCHES],
-              httpStatus: HttpStatus.BAD_REQUEST,
-              fault: 'client',
-            });
-          }
+          this.assertDnfBranches(newResult.length + 1);
           newResult.push([...existing, ...next]);
         }
       }

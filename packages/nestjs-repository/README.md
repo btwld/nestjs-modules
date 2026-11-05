@@ -1049,6 +1049,10 @@ const orders = await orderRepo.find(
 );
 ```
 
+A filter may expand to at most 50 alternatives: an `or` of 50 conditions,
+or an `and` of two `or`s of 7 (49). A larger one is refused with a 400; for
+a long list of values, use `in`.
+
 ### Relation Conditions
 
 Use `rel()` to tag a condition with a relation name. The condition is applied
