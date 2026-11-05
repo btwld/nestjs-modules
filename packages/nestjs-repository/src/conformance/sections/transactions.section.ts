@@ -402,9 +402,9 @@ function versionGuard(ctx: ConformanceContext): void {
     changed(created, upserted);
   });
 
-  it('doDelete: refuses a stale row', async () => {
+  it('doDelete: refuses a stale row, and deletes a current one', async () => {
     const stale = await create();
-    await run(ctx, (txCtx) =>
+    const updated = await run(ctx, (txCtx) =>
       item().update(stale, { rank: 2 }, { ctx: txCtx }),
     );
 
@@ -418,6 +418,14 @@ function versionGuard(ctx: ConformanceContext): void {
       OptimisticLockException,
     );
     assert.equal((await stored())?.rank, 2);
+
+    await run(ctx, (txCtx) =>
+      item().delete(updated, {
+        ctx: txCtx,
+        expectedVersion: updated.version,
+      }),
+    );
+    assert.equal(await stored(), null);
   });
 
   if (ctx.capabilities.softDelete === 'supported') {
@@ -439,9 +447,13 @@ function versionGuard(ctx: ConformanceContext): void {
       assert.equal((await stored())?.removedAt, null);
 
       const removed = await run(ctx, (txCtx) =>
-        item().softDelete(updated, { ctx: txCtx }),
+        item().softDelete(updated, {
+          ctx: txCtx,
+          expectedVersion: updated.version,
+        }),
       );
       changed(updated, removed);
+      assert.ok((await stored())?.removedAt instanceof Date);
     });
 
     it('doRestore: changes the version, and refuses a stale row', async () => {
@@ -450,7 +462,7 @@ function versionGuard(ctx: ConformanceContext): void {
         item().softDelete(created, { ctx: txCtx }),
       );
       const restored = await run(ctx, (txCtx) =>
-        item().restore(stale, { ctx: txCtx }),
+        item().restore(stale, { ctx: txCtx, expectedVersion: stale.version }),
       );
       changed(stale, restored);
 

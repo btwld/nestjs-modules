@@ -714,15 +714,16 @@ export function readTranslationSection(ctx: ConformanceContext): void {
         join: [{ relation: 'author' }],
         where: Where.notNull('authorId'),
         order: [
-          OrderBy.rel('author', OrderBy.desc('name')),
+          OrderBy.rel('author', OrderBy.asc('name')),
           OrderBy.desc('title'),
         ],
       });
 
+      // Neither the title order alone nor the author order alone gives this.
       assert.deepStrictEqual(inOrder(byAuthor, 'title'), [
-        'gamma',
         'beta',
         'alpha',
+        'gamma',
       ]);
     });
 
@@ -853,11 +854,15 @@ export function readTranslationSection(ctx: ConformanceContext): void {
       await ctx.repo('tenantOrder').createMany([
         { id: 'order-1', tenantId: 'tenant-a', total: 10 },
         { id: 'order-2', tenantId: 'tenant-b', total: 20 },
+        { id: 'order-3', tenantId: 'tenant-a', total: 30 },
       ]);
+      // Two orders in tenant-a, so a join on the tenant alone matches lines
+      // of the other order too.
       await ctx.repo('tenantOrderLine').createMany([
         { id: 'line-1', tenantId: 'tenant-a', orderId: 'order-1', qty: 1 },
         { id: 'line-2', tenantId: 'tenant-a', orderId: 'order-1', qty: 2 },
         { id: 'line-3', tenantId: 'tenant-b', orderId: 'order-2', qty: 3 },
+        { id: 'line-4', tenantId: 'tenant-a', orderId: 'order-3', qty: 4 },
       ]);
     });
 
@@ -873,11 +878,11 @@ export function readTranslationSection(ctx: ConformanceContext): void {
 
       assert.deepStrictEqual(
         orders.map((order) => valuesOf(order.lines ?? [], 'id')),
-        [['line-1', 'line-2'], ['line-3']],
+        [['line-1', 'line-2'], ['line-3'], ['line-4']],
       );
       assert.deepStrictEqual(
         lines.map((line) => line.order?.id),
-        ['order-1', 'order-1', 'order-2'],
+        ['order-1', 'order-1', 'order-2', 'order-3'],
       );
     });
 
