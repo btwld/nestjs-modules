@@ -552,7 +552,8 @@ caller-held row whose version the client could have read.
 Drivers never decide any of this — `RepositoryAdapter` resolves a
 `RepositoryVersionGuardInterface` descriptor (`{ column, value }`) and
 passes it down via `options.versionGuard`; a driver's only job is to
-execute an atomic compare-and-swap on `column === value` before writing.
+check `column === value` as it writes, in the caller's transaction when
+there is one. It never opens a transaction of its own to do so.
 `versionGuard` is not a caller option: it is added to the options a driver's
 `do*` methods receive (`RepositoryVersionGuardOptions`), and a value a caller
 passes anyway is overwritten.

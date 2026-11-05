@@ -106,7 +106,10 @@ function supported(ctx: ConformanceContext): void {
     assert.deepStrictEqual(await names(ctx), ['outside']);
   });
 
-  it('transactions: a write that fails outside a run keeps another write made at once with the same context', async () => {
+  // Outside a run each write stands alone: a driver that leaves a
+  // transaction of its own on the caller's context would take the other
+  // write down with the failing one.
+  it('transactions: outside a run, a failing write leaves another made at once with the same context', async () => {
     const item = ctx.repo('item');
     const plain = ctx.repo('plainItem');
     const stale = await item.create({ name: 's', rank: 1, note: null });
