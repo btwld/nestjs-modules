@@ -34,6 +34,7 @@ import {
   type JoinClause,
   OptimisticLockException,
   TrxCtx,
+  type TransactionScope,
   RepositoryAdapter,
   type RepositoryCountOptions,
   type RepositoryCreateOptions,
@@ -699,7 +700,7 @@ export abstract class TypeOrmRepository<
     };
 
     return this.options.transactionScope && !this.joinsTransaction(ctx)
-      ? this.options.transactionScope.run(ctx ?? {}, (txCtx) => run(txCtx))
+      ? this.inOwnTransaction(this.options.transactionScope, ctx, run)
       : run(ctx);
   }
 
@@ -751,6 +752,21 @@ export abstract class TypeOrmRepository<
   }
 
   /**
+   * Run `work` in a transaction of its own, opened on a child of `ctx`. The
+   * child holds everything the caller's context does, but the transaction
+   * never shows on the caller's context, so another call made with that
+   * context at the same time takes no part in it.
+   */
+  private inOwnTransaction<T>(
+    scope: TransactionScope,
+    ctx: AppContextLike | undefined,
+    work: (txCtx: AppContextLike) => Promise<T>,
+  ): Promise<T> {
+    const child = AppContextHost.from(Object.create(AppContextHost.from(ctx)));
+    return scope.run(child, work);
+  }
+
+  /**
    * Run `op` guarded by the version in `guard`, identifying the row by
    * `entity`'s primary key.
    *
@@ -796,9 +812,7 @@ export abstract class TypeOrmRepository<
       return run(ctx);
     }
     if (this.options.transactionScope) {
-      return this.options.transactionScope.run(ctx ?? {}, (txCtx) =>
-        run(txCtx),
-      );
+      return this.inOwnTransaction(this.options.transactionScope, ctx, run);
     }
 
     // No TransactionScope wired (a repository constructed by hand rather
@@ -964,7 +978,7 @@ export abstract class TypeOrmRepository<
     const run = (txCtx?: AppContextLike): Promise<Entity> =>
       this.withRepo(txCtx, (repo) => write(repo, primaryWhere));
     return this.options.transactionScope && !this.joinsTransaction(ctx)
-      ? this.options.transactionScope.run(ctx ?? {}, (txCtx) => run(txCtx))
+      ? this.inOwnTransaction(this.options.transactionScope, ctx, run)
       : run(ctx);
   }
 

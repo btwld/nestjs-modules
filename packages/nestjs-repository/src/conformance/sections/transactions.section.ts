@@ -1,3 +1,5 @@
+import { AppContextHost } from '@concepta/nestjs-core';
+
 import { OptimisticLockException } from '../../exceptions/optimistic-lock.exception.js';
 import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
 import { TransactionCommitException } from '../../exceptions/transaction-commit.exception.js';
@@ -102,6 +104,46 @@ function supported(ctx: ConformanceContext): void {
 
     assert.ok(!(await read).includes('inside'));
     assert.deepStrictEqual(await names(ctx), ['outside']);
+  });
+
+  it('transactions: a write that fails outside a run keeps another write made at once with the same context', async () => {
+    const item = ctx.repo('item');
+    const plain = ctx.repo('plainItem');
+    const stale = await item.create({ name: 's', rank: 1, note: null });
+    await item.update(stale, { rank: 2 });
+    const gonePlain = await plain.create({ name: 'gone' });
+    await plain.delete(gonePlain);
+    const goneItem = await item.create({ name: 'g', rank: 1, note: null });
+    await item.delete(goneItem);
+
+    const failing: [string, (shared: AppContextHost) => Promise<unknown>][] = [
+      [
+        'a stale versioned update',
+        (shared) => item.update(stale, { rank: 3 }, { ctx: shared }),
+      ],
+      [
+        'an update of a deleted row',
+        (shared) => plain.update(gonePlain, { name: 'back' }, { ctx: shared }),
+      ],
+    ];
+    if (softDelete) {
+      failing.push([
+        'a soft delete of a deleted row',
+        (shared) => item.softDelete(goneItem, { ctx: shared }),
+      ]);
+    }
+
+    for (const [label, write] of failing) {
+      const shared = new AppContextHost();
+      const [failed, kept] = await Promise.all([
+        settle(write(shared)),
+        settle(plain.create({ name: label }, { ctx: shared })),
+      ]);
+
+      assert.ok(!failed.ok, `${label} succeeded`);
+      assert.ok(kept.ok, `${label}: ${kept.ok ? '' : String(kept.error)}`);
+      assert.ok((await names(ctx)).includes(label), `${label}: create lost`);
+    }
   });
 
   it('transactions: every read in a run sees the run’s own writes', async () => {
