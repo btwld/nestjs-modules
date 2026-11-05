@@ -67,7 +67,11 @@ NestJS 12.
 
 The sections below list what differs per database; everything else in this
 README applies to all six. An entity registered on a data source of another
-database stops startup with `TypeOrmUnsupportedDatabaseException`.
+database stops startup with `TypeOrmUnsupportedDatabaseException`. So does
+one on a data source with `cache: { alwaysEnabled: true }`, with
+`TypeOrmQueryCacheException`: a versioned write checks the row in the
+database, never in a cache. `cache: true` is fine; the repository's queries
+don't ask for the cache.
 
 ### Postgres
 
@@ -1187,13 +1191,14 @@ Requirements and limits:
 | `EntityNotFoundException` | `@concepta/nestjs-repository` | An `update` or `replace` named a row that is no longer stored |
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
 | `TypeOrmUnsupportedDatabaseException` | `@concepta/nestjs-repository-typeorm` | At startup: an entity is registered on a data source of a database its adapter isn't for |
+| `TypeOrmQueryCacheException` | `@concepta/nestjs-repository-typeorm` | At startup: an entity is registered on a data source that caches every query (`cache.alwaysEnabled`) |
 | `TypeOrmRelationMetadataException` | Not exported; its `errorCode` is `TYPEORM_RELATION_METADATA` | At startup: a relation lacks its `@JoinColumn` or its inverse side |
 
 ## Entry Points
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface` and `TypeOrmUnsupportedDatabaseException` |
+| `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmUnsupportedDatabaseException` and `TypeOrmQueryCacheException` |
 | `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmPostgresTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |

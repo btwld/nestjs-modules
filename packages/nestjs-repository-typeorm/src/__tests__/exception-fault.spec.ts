@@ -7,6 +7,7 @@ import {
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
+import { TypeOrmQueryCacheException } from '../exceptions/typeorm-query-cache.exception.js';
 import { TypeOrmRelationMetadataException } from '../exceptions/typeorm-relation-metadata.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 
@@ -22,6 +23,11 @@ const CASES: {
   {
     name: 'TypeOrmEntityNameException',
     build: () => new TypeOrmEntityNameException(),
+    fault: 'usage',
+  },
+  {
+    name: 'TypeOrmQueryCacheException',
+    build: () => new TypeOrmQueryCacheException('Post'),
     fault: 'usage',
   },
   {

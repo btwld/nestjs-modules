@@ -12,6 +12,7 @@ import {
 
 import { ormConfig } from '../../__fixtures__/repository/config/ormconfig.fixture.js';
 import { TestEntityFixture } from '../../__fixtures__/repository/entity/test.entity.fixture.js';
+import { TypeOrmQueryCacheException } from '../../exceptions/typeorm-query-cache.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../../exceptions/typeorm-unsupported-database.exception.js';
 import { TypeOrmPostgresRepository } from '../../postgres/typeorm-postgres-repository.js';
 import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.js';
@@ -279,5 +280,42 @@ describe(TypeOrmRepository, () => {
         }),
       );
     });
+
+    const withCache = (cache: unknown) =>
+      sqliteRepoWith({
+        manager: {
+          dataSource: {
+            options: { ...dataSource.options, cache },
+            driver: dataSource.driver,
+          },
+        },
+      });
+
+    it('refuses a data source that caches every query', () => {
+      const build = () =>
+        new TypeOrmSqliteRepository(withCache({ alwaysEnabled: true }), {
+          entityKey: 'test',
+        });
+
+      expect(build).toThrow(TypeOrmQueryCacheException);
+      expect(build).toThrow(
+        expect.objectContaining({
+          fault: 'usage',
+          message:
+            'Entity TestEntityFixture uses a data source that caches every ' +
+            'query: turn off cache.alwaysEnabled',
+        }),
+      );
+    });
+
+    it.each([[true], [{ duration: 1000 }], [{ alwaysEnabled: false }]])(
+      'accepts a data source whose cache a query must ask for (%j)',
+      (cache) => {
+        expect(
+          new TypeOrmSqliteRepository(withCache(cache), { entityKey: 'test' })
+            .metadata.name,
+        ).toBe('TestEntityFixture');
+      },
+    );
   });
 });

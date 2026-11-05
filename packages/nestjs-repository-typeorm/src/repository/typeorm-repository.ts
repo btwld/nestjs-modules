@@ -55,6 +55,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { TypeOrmEntityNameException } from '../exceptions/typeorm-entity-name.exception.js';
+import { TypeOrmQueryCacheException } from '../exceptions/typeorm-query-cache.exception.js';
 import { TypeOrmUnsupportedDatabaseException } from '../exceptions/typeorm-unsupported-database.exception.js';
 import { TypeOrmTransaction } from '../transaction/typeorm-transaction.js';
 import {
@@ -113,6 +114,12 @@ export abstract class TypeOrmRepository<
         dataSourceOptions.type,
         databaseType,
       );
+    }
+    // Reads that check a write, save()'s own among them, must reach the
+    // database; a cache only a query asks for is never asked for here.
+    const { cache } = dataSourceOptions;
+    if (typeof cache === 'object' && cache.alwaysEnabled === true) {
+      throw new TypeOrmQueryCacheException(entityName);
     }
 
     const database = driver.database;
