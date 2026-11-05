@@ -238,7 +238,7 @@ importers:
   packages/nestjs-access-control:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       accesscontrol:
         specifier: ^2.2.1
@@ -482,7 +482,7 @@ importers:
   packages/nestjs-authentication:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-password':
         specifier: workspace:*
@@ -576,7 +576,7 @@ importers:
   packages/nestjs-cache:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -717,7 +717,7 @@ importers:
   packages/nestjs-crud:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -834,7 +834,7 @@ importers:
   packages/nestjs-federated:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -874,7 +874,7 @@ importers:
   packages/nestjs-file:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -923,7 +923,7 @@ importers:
   packages/nestjs-invitation:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -1162,7 +1162,7 @@ importers:
   packages/nestjs-otp:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -1214,7 +1214,7 @@ importers:
   packages/nestjs-password:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@types/zxcvbn':
         specifier: ^4.4.4
@@ -1294,7 +1294,7 @@ importers:
   packages/nestjs-repository:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@tsyche/membrane':
         specifier: ^0.9.0
@@ -1325,7 +1325,7 @@ importers:
   packages/nestjs-repository-drizzle:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -1365,7 +1365,7 @@ importers:
   packages/nestjs-repository-typeorm:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -1426,7 +1426,7 @@ importers:
   packages/nestjs-role:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-repository':
         specifier: workspace:*
@@ -1579,7 +1579,7 @@ importers:
   packages/nestjs-user:
     dependencies:
       '@concepta/nestjs-core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../nestjs-core
       '@concepta/nestjs-password':
         specifier: workspace:*

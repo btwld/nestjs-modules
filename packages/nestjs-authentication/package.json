@@ -25,7 +25,7 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-core": "workspace:*",
     "@concepta/nestjs-password": "workspace:*",
     "@concepta/nestjs-user": "workspace:*",
     "@nestjs/jwt": "^12.0.1",

@@ -43,7 +43,7 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-core": "workspace:*",
     "@concepta/nestjs-repository": "workspace:*",
     "zod": "~4.4.3"
   },

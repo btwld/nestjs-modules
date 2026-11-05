@@ -25,7 +25,7 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-core": "workspace:*",
     "@concepta/nestjs-repository": "workspace:*",
     "@standard-schema/spec": "^1.0.0",
     "deepmerge": "^3.2.0",

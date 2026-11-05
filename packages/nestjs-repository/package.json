@@ -43,7 +43,7 @@
     "!dist/**/__fixtures__/**"
   ],
   "dependencies": {
-    "@concepta/nestjs-core": "workspace:^",
+    "@concepta/nestjs-core": "workspace:*",
     "@tsyche/membrane": "^0.9.0"
   },
   "devDependencies": {
