@@ -34,7 +34,6 @@ function createDrizzleProvider<
 >(
   definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   options: DrizzleProviderOptionsInterface<Entity>,
-  driverOptions?: Options,
 ): Provider {
   const connection = resolveConnectionName(options.connection);
 
@@ -45,21 +44,18 @@ function createDrizzleProvider<
       { token: HookResolverService, optional: true },
     ],
     useFactory: (db: unknown, hookResolver?: HookResolverService) =>
-      definition.createRepository<Entity>(
-        {
-          entityKey: options.key,
+      definition.createRepository<Entity>({
+        entityKey: options.key,
+        connection,
+        db: definition.toClient(db, connection),
+        table: options.table,
+        metadata: buildMetadata(options, connection),
+        transactionKey: resolveTransactionKey(
+          definition.transactionKeyPrefix,
           connection,
-          db: definition.toClient(db, connection),
-          table: options.table,
-          metadata: buildMetadata(options, connection),
-          transactionKey: resolveTransactionKey(
-            definition.transactionKeyPrefix,
-            connection,
-          ),
-          hookResolver,
-        },
-        driverOptions,
-      ),
+        ),
+        hookResolver,
+      }),
   };
 }
 
@@ -101,7 +97,7 @@ export function registerDrizzleAdapter<Client, Options>(
   return {
     module: definition.module,
     providers: entities.map((entity) =>
-      createDrizzleProvider(definition, entity, driverOptions),
+      createDrizzleProvider(definition, entity),
     ),
     transactionFactories: Array.from(connections).map((connection) =>
       createTransactionFactoryDescriptor(definition, connection, driverOptions),

@@ -57,7 +57,7 @@ function errnoOf(error: unknown): unknown {
  * A repository on a Drizzle MySQL database, through the mysql2 client.
  *
  * MySQL returns no rows from a write, so a write reads its rows back by
- * primary key, in the caller's transaction or one of its own. A row inserted
+ * primary key, in the caller's transaction when there is one. A row inserted
  * without its key gets one the driver can read back: a `$defaultFn` key is
  * generated before the insert, and an auto-increment key is read from the
  * insert of that row alone. Any other key the database generates is
@@ -66,8 +66,6 @@ function errnoOf(error: unknown): unknown {
 export class DrizzleMysqlRepository<
   Entity extends PlainLiteralObject,
 > extends DrizzleRepository<Entity, DrizzleMysqlClient> {
-  protected readonly returnsWrittenRows = false;
-
   private readonly table: MySqlTable;
 
   /**
@@ -90,10 +88,6 @@ export class DrizzleMysqlRepository<
 
   protected clientOfTransaction(tx: unknown): DrizzleMysqlClient | undefined {
     return tx instanceof DrizzleMysqlTransaction ? tx.getClient() : undefined;
-  }
-
-  protected begin<T>(work: (tx: DrizzleMysqlClient) => Promise<T>): Promise<T> {
-    return this.options.db.transaction(work);
   }
 
   /**
@@ -200,10 +194,11 @@ export class DrizzleMysqlRepository<
   }
 
   /**
-   * The `UPDATE`, then the row read back with a locking read: a plain read
-   * in a transaction that has read before returns its snapshot, not a row
-   * another transaction has committed since, unless this `UPDATE` changed
-   * it.
+   * The `UPDATE`, then the row read back, with a locking read in the
+   * caller's transaction: a plain read in a transaction that has read
+   * before returns its snapshot, not a row another transaction has
+   * committed since, unless this `UPDATE` changed it. Outside a
+   * transaction the read back may see another writer's row.
    */
   protected async updateRow(
     client: DrizzleMysqlClient,
@@ -215,7 +210,7 @@ export class DrizzleMysqlRepository<
       select: [],
       where,
       order: [],
-      lock: true,
+      lock: this.inTransaction(client),
     });
     return row;
   }

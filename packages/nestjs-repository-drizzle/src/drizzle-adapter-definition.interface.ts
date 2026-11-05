@@ -34,7 +34,6 @@ export interface DrizzleAdapterDefinitionInterface<
   /** Build the adapter's repository for one registration. */
   createRepository<Entity extends PlainLiteralObject>(
     options: DrizzleRepositoryOptions<Entity, Client>,
-    driverOptions?: Options,
   ): RepositoryAdapter<Entity>;
 
   /** Build the adapter's transaction factory for one connection. */

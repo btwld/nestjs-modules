@@ -69,10 +69,9 @@ with `DrizzleUnsupportedDatabaseException`.
   node-postgres, register a `Pool` (a `connection` option or URL gives you
   one): a single `Client` would run every transaction on its one connection,
   so startup refuses it with `DrizzleSingleConnectionException`.
-- Use a client that runs transactions. `upsert` and every versioned write
-  run in one of their own when you have none, so on a client without them,
-  such as Drizzle's `neon-http` or `xata-http`, those calls fail, as does
-  any `TransactionScope.run()` that calls such a repository.
+- On a client without transactions, such as Drizzle's `neon-http` or
+  `xata-http`, calls outside a run work, but a `TransactionScope.run()` that
+  calls such a repository fails.
 - A failed statement ends the transaction it ran in. The run then fails,
   even if it catches the error, and keeps nothing it wrote; every later call
   in it throws `TransactionDoomedException`. Raw SQL you run through the
@@ -87,7 +86,9 @@ with `DrizzleUnsupportedDatabaseException`.
 ### MySQL
 
 MySQL returns no rows from a write, so each write reads its rows back by
-primary key, in your transaction or in one of its own.
+primary key. In your transaction that read is locked, so it returns the row
+as written; outside one it can see another writer's row, and a `createMany`
+whose rows insert one by one is not all-or-nothing.
 
 - `create` without a key needs one the driver can read back: an
   auto-increment key, or one the key column's `$defaultFn` generates.
@@ -154,10 +155,9 @@ DrizzleModule.forRootAsync({
   `createMany` or `deleteMany` fails with `RepositoryDatabaseException` and
   writes nothing.
 - Transactions run one at a time. The database has one connection, so a
-  second `TransactionScope.run()` (or a write that opens one of its own —
-  see [Upsert](#upsert) and [Versions](#versions)) waits for the first to
-  commit or roll back. A nested `run()` joins the
-  transaction already open and never waits.
+  second `TransactionScope.run()` waits for the first to commit or roll
+  back. A nested `run()` joins the transaction already open and never
+  waits.
 - **Pass the run's `ctx` to every call made inside it.** A call without it
   waits until the run ends, so one the run itself awaits never returns.
 - A failed statement doesn't end the transaction it ran in: the run rolls
@@ -310,13 +310,14 @@ one. Read and write related rows through their own repositories.
 
 `upsert` inserts the payload, or updates the row its primary key names with
 the columns the payload holds; the others keep their stored values, so
-`upsert({ id, note })` on a stored row changes only `note`. It runs in your
-transaction, or in one of its own when you have none, and locks the row
-before writing it, so concurrent upserts of a stored key each succeed in
-turn at the default isolation level. Concurrent upserts of the same new key
-insert one row; the others may fail with `RepositoryDatabaseException` (a
-duplicate key, or on MySQL and MariaDB a deadlock) — retry the whole run,
-or the call when it ran outside one, and it updates the row. A payload that
+`upsert({ id, note })` on a stored row changes only `note`. In your
+transaction it locks the row before writing it, so concurrent upserts of a
+stored key each succeed in turn at the default isolation level; outside one
+it reads, then writes, so a concurrent writer can come in between.
+Concurrent upserts of the same new key insert one row; the others may fail
+with `RepositoryDatabaseException` (a duplicate key, or on MySQL and MariaDB
+a deadlock) — retry the whole run, or the call when it ran outside one, and
+it updates the row. A payload that
 collides with another row on a different unique column fails with
 `RepositoryDatabaseException` and writes nothing. A payload that already
 holds the stored values writes nothing either, when it holds them in the
@@ -326,12 +327,14 @@ form the database stores them: `'1.50'` for a `decimal(10,2)` holding
 ### Versions
 
 On an entity with a `version` column, `update`, `replace`, `upsert`,
-`softDelete` and `restore` lock the row, write it, and move the version on
+`softDelete` and `restore` read the row, write it, and move the version on
 only when the stored row changed — an `update` with nothing new keeps it.
-These versioned writes run in your transaction, or in one of their own when
-you have none. A stale `entity`, or
-a stale `expectedVersion`, fails with `OptimisticLockException` (see
-[Expected Version](../nestjs-repository/README.md#expected-version)).
+A stale `entity`, or a stale `expectedVersion`, fails with
+`OptimisticLockException` (see
+[Expected Version](../nestjs-repository/README.md#expected-version)). In
+your transaction the row is locked from the read on, so the check is
+certain; outside one the read, the write and the version's move are
+separate statements, so a concurrent writer can still win.
 
 ### Drizzle Features at Your Own Risk
 
@@ -412,8 +415,8 @@ forgot to scope. Row scope stays the enforcement; RLS is the backstop.
 ### Setting the tenant
 
 Give the Postgres adapter a `transactionSettings` function. Every
-transaction it opens starts by setting those values, read from the caller's
-context.
+transaction a run opens on the connection starts by setting those values,
+read from the caller's context.
 
 ```ts
 import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
@@ -444,13 +447,12 @@ Postgres adapter takes the option.
 Name each setting anything with a dot in it, and use the same name in your
 policies. An `undefined` value is skipped.
 
-What you get: each transaction the driver opens sets these values before any
-of your queries run, with `set_config(name, value, true)`. That includes
-`@Transactional()`, `TransactionScope.run()` and `runReadOnly()`, the
-transaction an `upsert` or a versioned write (see [Versions](#versions))
-opens when you have none, and the transactions other Rockets modules open
-themselves. The values end with the transaction, so the next request on a
-pooled connection starts with none. If a setting fails, the transaction is
+What you get: each transaction a run opens on the connection sets these
+values before any of your queries run, with `set_config(name, value, true)`.
+That includes `@Transactional()`, `TransactionScope.run()` and
+`runReadOnly()`, and the runs other Rockets modules open themselves. The
+values end with the transaction, so the next request on a pooled connection
+starts with none. If a setting fails, the transaction is
 rolled back and you get the error.
 
 ### Policies

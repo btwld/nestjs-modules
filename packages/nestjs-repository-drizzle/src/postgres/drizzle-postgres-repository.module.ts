@@ -111,8 +111,7 @@ export const DRIZZLE_POSTGRES_ADAPTER: DrizzleAdapterDefinitionInterface<
   module: DrizzlePostgresRepositoryModule,
   transactionKeyPrefix: DRIZZLE_POSTGRES_TRANSACTION_KEY_PREFIX,
   toClient: toDrizzlePostgresClient,
-  createRepository: (options, driverOptions) =>
-    new DrizzlePostgresRepository(options, driverOptions?.transactionSettings),
+  createRepository: (options) => new DrizzlePostgresRepository(options),
   createTransactionFactory: (db, connection, driverOptions) =>
     new DrizzlePostgresTransactionFactory(
       db,

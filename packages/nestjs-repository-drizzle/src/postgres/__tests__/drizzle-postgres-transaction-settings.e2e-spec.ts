@@ -157,7 +157,7 @@ describe('transactionSettings on the Drizzle Postgres adapter', () => {
     expect(note.stamped).toBe('');
   });
 
-  it("sets the caller's values in the transaction a versioned write opens itself", async () => {
+  it('sets nothing on a versioned write outside a transaction', async () => {
     const note = await createIn(TENANT_A, 'a');
 
     const updated = await notes.update(
@@ -169,7 +169,7 @@ describe('transactionSettings on the Drizzle Postgres adapter', () => {
     expect(updated).toEqual({
       id: note.id,
       name: 'a-2',
-      stamped: TENANT_B,
+      stamped: '',
       version: 2,
     });
   });
@@ -180,15 +180,8 @@ describe('transactionSettings on the Drizzle Postgres adapter', () => {
     await expect(createIn(TENANT_REFUSED, 'refused')).rejects.toThrow(
       'unrecognized configuration parameter "no-dot-is-refused"',
     );
-    await expect(
-      notes.update(
-        await createIn(TENANT_A, 'a'),
-        { name: 'refused' },
-        { ctx: tenantCtx(TENANT_REFUSED) },
-      ),
-    ).rejects.toThrow('unrecognized configuration parameter');
 
-    expect(await notes.count()).toBe(before + 1);
+    expect(await notes.count()).toBe(before);
     expect((await createIn(TENANT_B, 'b')).stamped).toBe(TENANT_B);
   });
 });

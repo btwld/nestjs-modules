@@ -104,7 +104,7 @@ describe('DrizzleSqliteRepository on a database another connection holds', () =>
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("reports the lock as SQLITE_BUSY when a write's own transaction cannot begin", async () => {
+  it('reports the lock as SQLITE_BUSY when a write cannot take the write lock', async () => {
     const note = await notes.create({ name: 'a' });
     other.prepare('begin immediate').run();
     try {

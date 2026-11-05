@@ -1,11 +1,4 @@
-import {
-  count,
-  getTableName,
-  is,
-  type SQL,
-  sql,
-  type Table,
-} from 'drizzle-orm';
+import { count, getTableName, is, type SQL, type Table } from 'drizzle-orm';
 import { type SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import { type PlainLiteralObject } from '@nestjs/common';
@@ -26,7 +19,7 @@ import {
   SQLITE_TRANSACTION_ENDED_CODES,
 } from './drizzle-sqlite.constants.js';
 import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
-import { describeSqliteFailure, rollbackAfter } from './drizzle-sqlite.util.js';
+import { describeSqliteFailure } from './drizzle-sqlite.util.js';
 
 /** A SQLite table, or a refusal naming the table that is not one. */
 function sqliteTableOf(table: Table): SQLiteTable {
@@ -45,11 +38,11 @@ function sqliteTableOf(table: Table): SQLiteTable {
  * A repository on a Drizzle SQLite database, through better-sqlite3. Every
  * write returns the rows it wrote with `RETURNING`.
  *
- * The database has one connection. A statement outside the caller's
+ * The database has one connection. A call outside the caller's
  * transaction waits while another caller's transaction holds the
- * connection, and a transaction of its own (`BEGIN IMMEDIATE`) holds it in
- * turn; SQLite's write lock, not `FOR UPDATE`, keeps the rows it reads
- * from changing under it.
+ * connection, then holds it in turn for its statements; SQLite's write
+ * lock, not `FOR UPDATE`, keeps the rows a transaction reads from changing
+ * under it.
  *
  * So every call made while a run is open on the connection must carry the
  * run's context: a call without it waits for the run to end, so one the
@@ -68,8 +61,6 @@ function sqliteTableOf(table: Table): SQLiteTable {
 export class DrizzleSqliteRepository<
   Entity extends PlainLiteralObject,
 > extends DrizzleRepository<Entity, DrizzleSqliteClient> {
-  protected readonly returnsWrittenRows = true;
-
   private readonly table: SQLiteTable;
 
   constructor(options: DrizzleRepositoryOptions<Entity, DrizzleSqliteClient>) {
@@ -83,23 +74,6 @@ export class DrizzleSqliteRepository<
 
   protected clientOfTransaction(tx: unknown): DrizzleSqliteClient | undefined {
     return tx instanceof DrizzleSqliteTransaction ? tx.getClient() : undefined;
-  }
-
-  /** `work` in a transaction of its own, holding the connection's turn. */
-  protected begin<T>(
-    work: (tx: DrizzleSqliteClient) => Promise<T>,
-  ): Promise<T> {
-    const { db } = this.options;
-    return gateOf(db).run(async () => {
-      db.run(sql`begin immediate`);
-      try {
-        const result = await work(db);
-        db.run(sql`commit`);
-        return result;
-      } catch (error) {
-        return rollbackAfter(db, error);
-      }
-    });
   }
 
   /**

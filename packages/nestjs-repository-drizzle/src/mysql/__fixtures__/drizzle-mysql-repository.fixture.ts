@@ -15,7 +15,7 @@ import { drizzle } from 'drizzle-orm/mysql2';
 
 import { type INestApplicationContext, Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DrizzleModule } from '@nestjs/drizzle';
+import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
 import { CoreModule } from '@concepta/nestjs-core';
 import {
@@ -23,6 +23,8 @@ import {
   RepositoryModule,
   type RepositoryInterface,
 } from '@concepta/nestjs-repository';
+
+import { type DrizzleMysqlClient } from '../drizzle-mysql.types.js';
 
 import { type DrizzleMysqlAdapterModule } from './drizzle-mysql-adapter-module.type.js';
 
@@ -381,6 +383,29 @@ export function describeDrizzleMysqlRepository(
         created.version,
         created.version,
       ]);
+    });
+
+    it('opens no transaction of its own for a write outside a run', async () => {
+      const db: DrizzleMysqlClient = app.get(getDrizzleToken());
+      const token = await tokens.create({ label: 'a' });
+      const ticket = await tickets.create({ id: randomUUID(), label: 'a' });
+      const transaction = vi.spyOn(db, 'transaction');
+
+      try {
+        const updated = await tokens.update(token, { label: 'b' });
+        await tokens.update(
+          updated,
+          { label: 'c' },
+          { expectedVersion: updated.version },
+        );
+        await tokens.upsert({ id: token.id, label: 'd' });
+        await tickets.update(ticket, { label: 'b' });
+        await bigs.createMany([{ name: 'x' }, { name: 'y' }]);
+
+        expect(transaction).not.toHaveBeenCalled();
+      } finally {
+        transaction.mockRestore();
+      }
     });
   });
 }
