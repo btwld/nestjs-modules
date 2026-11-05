@@ -90,11 +90,17 @@ function isSingleNodePgConnection(db: DrizzlePostgresClient): boolean {
     return false;
   }
   const client: unknown = Reflect.get(db, '$client');
-  return (
-    typeof client === 'object' &&
-    client !== null &&
-    !client.constructor.name.includes('Pool')
-  );
+  if (typeof client !== 'object' || client === null) return false;
+  // A class whose name, or whose ancestors' name, says Pool: what
+  // `instanceof Pool` finds, without node-postgres.
+  for (
+    let proto: unknown = Object.getPrototypeOf(client);
+    typeof proto === 'object' && proto !== null;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    if (proto.constructor.name.includes('Pool')) return false;
+  }
+  return true;
 }
 
 /** The Postgres adapter's definition, for the shared registration. */

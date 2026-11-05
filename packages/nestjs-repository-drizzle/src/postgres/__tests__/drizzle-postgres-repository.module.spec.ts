@@ -22,6 +22,13 @@ describe(toDrizzlePostgresClient.name, () => {
     expect(toDrizzlePostgresClient(db, 'default')).toBe(db);
   });
 
+  it('accepts a node-postgres pool of a class extending Pool', () => {
+    class TenantPg extends pg.Pool {}
+    const db = drizzleNodePg({ client: new TenantPg() });
+
+    expect(toDrizzlePostgresClient(db, 'default')).toBe(db);
+  });
+
   it('refuses a single node-postgres connection, naming its connection', () => {
     // Not connected: a client connects only when asked.
     const db = drizzleNodePg({ client: new pg.Client() });
