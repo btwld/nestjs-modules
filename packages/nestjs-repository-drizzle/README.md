@@ -229,7 +229,8 @@ of `entity`, holding the table's columns.
 ### Provider Options
 
 ```ts
-interface DrizzleProviderOptionsInterface<Entity> extends RepositoryProviderOptions<Entity> {
+interface DrizzleProviderOptionsInterface<Entity extends PlainLiteralObject>
+  extends RepositoryProviderOptions<Entity> {
   key: string;                        // Injection key
   entity: Type<Entity>;               // The class rows come back as
   table: Table;                       // The Drizzle table its rows live in
@@ -389,6 +390,12 @@ export class BookService {
 A repository never opens a savepoint: a write that fails inside your
 transaction does to it what any other failed statement does on your
 database — see your adapter under [Choose Your Adapter](#choose-your-adapter).
+
+### Durable Messaging
+
+This package ships no durable driver, so
+[durable messaging](../nestjs-repository/README.md#durable-messaging) (the
+outbox and inbox) is not available on a Drizzle connection.
 
 ## Row-Level Security (Postgres)
 

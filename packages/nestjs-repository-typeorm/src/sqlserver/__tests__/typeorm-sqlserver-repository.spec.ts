@@ -53,7 +53,7 @@ describe(TypeOrmSqlServerRepository.name, () => {
     });
 
     expect(repository.report(failed(driverError))).toEqual({
-      database: 'mssql',
+      database: 'sqlserver',
       code: 2627,
       message: 'Violation of PRIMARY KEY',
     });
@@ -65,7 +65,7 @@ describe(TypeOrmSqlServerRepository.name, () => {
     });
 
     expect(repository.report(failed(driverError))).toEqual({
-      database: 'mssql',
+      database: 'sqlserver',
       code: 'ESOCKET',
       message: 'Connection lost',
     });

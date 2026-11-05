@@ -5,17 +5,9 @@ import { isObject } from '@concepta/nestjs-core';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { type RepositoryRelationMetadataInterface } from '../repository/interfaces/repository-relation-metadata.interface.js';
 import { type RepositoryInterface } from '../repository/interfaces/repository.interface.js';
-import { type RepositoryAdapter } from '../repository/repository-adapter.js';
 import { Where } from '../repository/where.helpers.js';
 
-/**
- * A relation whose rows a write passes on to the related entity's own
- * repository.
- */
-export interface CascadeRelation {
-  readonly relation: RepositoryRelationMetadataInterface;
-  readonly target: RepositoryAdapter<PlainLiteralObject>;
-}
+import { type CascadeRelation } from './cascade-relation.interface.js';
 
 /** The cascade relations a payload carried, by name, with their values. */
 export type CascadeChildren = ReadonlyMap<string, unknown>;

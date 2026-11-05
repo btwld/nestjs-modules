@@ -168,12 +168,6 @@ startup, so `app.init()` refuses it (`RepositoryBootException`).
 module that imports it, by key:
 
 ```ts
-@Module({
-  imports: [RepositoryModule.forFeature(['orders', 'customers'])],
-  providers: [OrdersService],
-})
-export class OrdersModule {}
-
 @Injectable()
 export class OrdersService {
   constructor(
@@ -181,6 +175,12 @@ export class OrdersService {
     private readonly orders: RepositoryInterface<Order>,
   ) {}
 }
+
+@Module({
+  imports: [RepositoryModule.forFeature(['orders', 'customers'])],
+  providers: [OrdersService],
+})
+export class OrdersModule {}
 ```
 
 A repository is injectable only where its key is imported. A key `forRoot()`
@@ -198,8 +198,12 @@ interface RepositoryModuleOptionsInterface {
   defaultTimeout?: number; // Transaction timeout in milliseconds (default: 30000)
   requireRowScopeDeclaration?: boolean; // Fail startup on an entity with no rowScope (default: false)
   requireWritePolicyDeclaration?: boolean; // Fail startup on an entity with no writePolicy (default: false)
+  federation?: { maxKeys?: number }; // Bound on federated reads (default: 1000) — see `maxKeys`
 }
 ```
+
+`forRoot()` takes these beside `drivers`; `forRootAsync()`'s `useFactory`
+returns them.
 
 `requireRowScopeDeclaration` turns "nobody declared this entity" into a
 startup failure rather than a silent omission. Off by default because whether
@@ -322,7 +326,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | --- | --- | --- |
 | `getPrimaryColumn()` | protected | Get the primary key column name from metadata, if the entity has one (subclass-author API) |
 | `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any — backs both the in-request lock and `expectedVersion` (subclass-author API) |
-| `getDeleteDateColumn()` | protected | Get the soft-remove date column name from metadata, if any (subclass-author API) |
+| `getDeleteDateColumn()` | public | Get the soft-remove date column name from metadata, if any |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
 | `runHooks(methodKey, payload, ctx, filter?)` | protected | Execute repository hooks for a lifecycle event; `filter` selects by hook metadata, which is how `{ replace: true }` routing works (subclass-author API) |
 | `allowsEagerRelations` | public | Whether the entity set `allowEagerRelations`, so a driver knows whether to load eager relations |
@@ -539,6 +543,9 @@ try {
 Passing `expectedVersion` against an entity with no version column throws a
 `RuntimeException` with `fault: 'usage'` — a caller asking for a guarantee
 the entity cannot provide is a wiring mistake, not a client error.
+So does a guarded write of a row that holds no version, such as one read
+with a `select` that left the version column out: pass the row as read,
+version included.
 `upsert()` and `deleteMany()` don't accept it: neither has a single
 caller-held row whose version the client could have read.
 
@@ -1250,7 +1257,10 @@ with automatic nesting support.
 transactions. It is provided globally by `RepositoryModule.forRoot()`.
 
 ```ts
-import { TransactionScope } from '@concepta/nestjs-repository';
+import { HttpStatus } from '@nestjs/common';
+
+import { RuntimeException } from '@concepta/nestjs-core';
+import { TransactionScope, Where } from '@concepta/nestjs-repository';
 
 @Injectable()
 export class OrderService {
@@ -1261,9 +1271,16 @@ export class OrderService {
       // Pass txCtx, not ctx, to repository calls inside the operation
       const order = await orderRepo.create(dto, { ctx: txCtx });
       const item = await inventoryRepo.findOne({
-        where: { id: order.itemId },
+        where: Where.eq('id', order.itemId),
         ctx: txCtx,
       });
+      if (!item) {
+        throw new RuntimeException({
+          message: 'Item not found',
+          httpStatus: HttpStatus.NOT_FOUND,
+          fault: 'client',
+        });
+      }
       await inventoryRepo.update(item, { reserved: true }, { ctx: txCtx });
 
       // Register post-commit callback
@@ -1759,11 +1776,11 @@ class registered on more than one entity:
 ```ts
 import { RepoHook, RepoSpec, AfterCreate } from '@concepta/nestjs-repository';
 
-@RepoHook(RepoSpec.isEntity('User'))
+@RepoHook(RepoSpec.isEntity('user'))
 export class UserOnlyHook {
   @AfterCreate()
-  notifyUserCreated(result, ctx) {
-    // Only runs for User entity operations
+  notifyUserCreated(result: PlainLiteralObject, ctx: PlainLiteralObject) {
+    // Only runs for the entity registered under the key 'user'
     return result;
   }
 }
@@ -2496,7 +2513,7 @@ routes bypass it:
 - **Foreign-key actions.** `ON DELETE CASCADE` or `SET NULL` from an
   append-only table lets a parent delete rewrite its rows. Declare those
   foreign keys `RESTRICT` or `NO ACTION`.
-- **A direct `@InjectRepository` handle**, the same as for row scope.
+- **The ORM's own repository, used directly**, the same as for row scope.
 
 ### Write-policy startup checks
 
@@ -2640,8 +2657,8 @@ store's row scope and hooks apply as for any entity.
 - Refused or failed writes, and reads.
 - A `softDelete` of a row that is already soft-deleted. A `restore` is always
   recorded, even of a row that wasn't deleted.
-- Writes outside the repository: migrations, raw SQL, a direct
-  `@InjectRepository` handle. They leave gaps in a row's history.
+- Writes outside the repository: migrations, raw SQL, the ORM's own
+  repository used directly. They leave gaps in a row's history.
 
 ### Personal data and retention
 
@@ -2811,8 +2828,11 @@ RepositoryModule.forRoot({
       driver: YourDriverModule,
       entities: [
         { key: 'users', entity: UserEntity, relations: { posts: { federated: true } } },
-        { key: 'posts', entity: PostEntity, dataSource: 'content' },
       ],
+    },
+    {
+      driver: YourOtherDriverModule, // posts live in another database
+      entities: [{ key: 'posts', entity: PostEntity }],
     },
   ],
 });
@@ -2954,6 +2974,8 @@ also exported for manual provider wiring.
 | `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
 | `EntityNotFoundException` | An `update` or `replace` on an entity without a version column named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404) |
+| `SoftDeletedImmutableException` | An `update`, `replace` or `upsert` targeted a soft-deleted row (409 Conflict). `restore` it first — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
+| `PrimaryKeyImmutableException` | An `update` or `replace` was given data that changes the primary key of the row it names (400). Delete and create to move a record to a new key |
 | `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
 | `CascadeWriteException` | A cascade relation in a write payload held something other than its rows: a list of objects for a to-many relation, an object or `null` for a to-one — see [Cascading writes](#cascading-writes) |
 | `UnknownColumnException` | A write payload, or a read's `select`, `where` or `order`, named a property that is not a column of the entity; the message lists them — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
@@ -2967,6 +2989,7 @@ also exported for manual provider wiring.
 | `TransactionScopeFailedException` | A participant's own operation succeeded, but its shared scope had already failed via a sibling |
 | `FederationException` | A federated read that cannot be answered exactly ([What is refused](#what-is-refused), [`maxKeys`](#maxkeys)), or a to-one that more than one related row points at. An error from the related repository reaches you as it threw it |
 | `RepositoryBootException` | One or more structural repository checks failed at startup, such as a composite primary key or a foreign key with no column of its own; the message lists every failure. Also thrown for a `forFeature()` key `forRoot()` did not register |
+| `HookBootException` | A declared repository hook could never run, or would run twice; the message lists every failure — see [Wiring Hooks](#wiring-hooks) |
 | `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |

@@ -11,7 +11,7 @@ export { TypeOrmPostgresRepository } from './postgres/typeorm-postgres-repositor
 export { TypeOrmRepositoryOptions } from './repository/typeorm-repository-options.interface.js';
 export { TypeOrmPostgresTransaction } from './postgres/typeorm-postgres-transaction.js';
 export { TypeOrmPostgresTransactionFactory } from './postgres/typeorm-postgres-transaction.factory.js';
-export { TypeOrmTransactionSettingsResolver } from './postgres/typeorm-postgres-transaction-settings-resolver.type.js';
+export { TypeOrmPostgresTransactionSettingsResolver } from './postgres/typeorm-postgres-transaction-settings-resolver.type.js';
 
 export { ActivityPostgresEntity } from './postgres/entities/activity-postgres.entity.js';
 export { AppendOnlyPostgresEntity } from './postgres/entities/append-only-postgres.entity.js';

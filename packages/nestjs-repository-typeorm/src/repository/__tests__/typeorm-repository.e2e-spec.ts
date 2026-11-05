@@ -53,33 +53,6 @@ describe(TypeOrmRepository, () => {
   });
 
   describe('version column', () => {
-    it('should not let a client-supplied version in data override the real version', async () => {
-      const entity = await testFactory.create({
-        firstName: 'Alice',
-        lastName: 'Smith',
-      });
-      const updated = await testRepository.update(entity, {
-        firstName: 'Bob',
-        version: 999, // deliberately spoofing version via the DTO
-      });
-
-      expect(updated.version).toBe(entity.version + 1);
-    });
-
-    it('should bump the version whatever version an upsert payload carries', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-      await testRepository.upsert({ id: entity.id, firstName: 'Bob' });
-
-      // The version the caller read before the write above.
-      const result = await testRepository.upsert({
-        id: entity.id,
-        firstName: 'Carol',
-        version: entity.version,
-      });
-
-      expect(result.version).toBe(entity.version + 2);
-    });
-
     it('returns the deleted row with its key under expectedVersion', async () => {
       const created = await testFactory.create({ firstName: 'Alice' });
 

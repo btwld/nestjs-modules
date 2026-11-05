@@ -199,18 +199,18 @@ describe(TypeOrmRepository, () => {
         [
           'the client code',
           Object.assign(new Error('duplicate'), { code: '23505', errno: 7 }),
-          { database: 'better-sqlite3', code: '23505', message: 'duplicate' },
+          { database: 'sqlite', code: '23505', message: 'duplicate' },
         ],
         [
           'the errno without a code',
           Object.assign(new Error('missing row'), { errno: 1452 }),
-          { database: 'better-sqlite3', code: 1452, message: 'missing row' },
+          { database: 'sqlite', code: 1452, message: 'missing row' },
         ],
         [
           'no code when the client gives none',
           new Error('lost connection'),
           {
-            database: 'better-sqlite3',
+            database: 'sqlite',
             code: undefined,
             message: 'lost connection',
           },

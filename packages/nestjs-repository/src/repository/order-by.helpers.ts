@@ -114,17 +114,25 @@ export class OrderBy<Entity extends PlainLiteralObject = PlainLiteralObject> {
     return OrderBy.desc(field);
   }
 
-  rel<K extends OrderSortKey<Entity> = OrderSortKey<Entity>>(
-    relation: string,
-    key: K,
-  ): K {
+  /**
+   * Tag a sort key on a related entity's columns with the relation name —
+   * see `OrderBy.rel`.
+   */
+  rel<
+    E extends PlainLiteralObject = PlainLiteralObject,
+    K extends OrderSortKey<E> = OrderSortKey<E>,
+  >(relation: string, key: K): K {
     return OrderBy.rel(relation, key);
   }
 
-  relDot<K extends OrderSortKey<Entity> = OrderSortKey<Entity>>(
-    dotField: string,
-    key: K,
-  ): K {
+  /**
+   * Tag a sort key on a related entity's columns with the relation named in
+   * `relation.field` dot notation — see `OrderBy.relDot`.
+   */
+  relDot<
+    E extends PlainLiteralObject = PlainLiteralObject,
+    K extends OrderSortKey<E> = OrderSortKey<E>,
+  >(dotField: string, key: K): K {
     return OrderBy.relDot(dotField, key);
   }
 

@@ -1,6 +1,7 @@
 import {
   type DataSource,
   type DataSourceOptions,
+  QueryFailedError,
   type Repository,
 } from 'typeorm';
 import { mockDeep } from 'vitest-mock-extended';
@@ -24,6 +25,7 @@ import {
   createTypeOrmProvider,
   getTypeOrmImports,
   createTransactionFactoryDescriptor,
+  describeQueryFailure,
   OPTIONAL_HOOK_RESOLVER_INJECT,
 } from '../typeorm-repository.util.js';
 
@@ -509,6 +511,27 @@ describe('typeorm-repository.util', () => {
       descriptor.useFactory(dataSourceOfType('postgres')).create(ctx);
 
       expect(transactionSettings).toHaveBeenCalledWith(ctx, 'secondary');
+    });
+  });
+
+  describe('describeQueryFailure', () => {
+    it.each([
+      ['postgres', 'postgres'],
+      ['mysql', 'mysql'],
+      ['mariadb', 'mariadb'],
+      ['oracle', 'oracle'],
+      ['mssql', 'sqlserver'],
+      ['better-sqlite3', 'sqlite'],
+    ])('should name a %s data source\'s database "%s"', (type, database) => {
+      const dataSource = mockDeep<DataSource>();
+      Object.defineProperty(dataSource, 'options', { value: { type } });
+
+      expect(
+        describeQueryFailure(
+          new QueryFailedError('SELECT 1', [], new Error('refused')),
+          dataSource,
+        ),
+      ).toEqual({ database, code: undefined, message: 'refused' });
     });
   });
 });

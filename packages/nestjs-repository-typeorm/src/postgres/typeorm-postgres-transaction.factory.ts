@@ -4,7 +4,7 @@ import { type AppContextHost } from '@concepta/nestjs-core';
 
 import { TypeOrmTransactionFactory } from '../transaction/typeorm-transaction.factory.js';
 
-import { type TypeOrmTransactionSettingsResolver } from './typeorm-postgres-transaction-settings-resolver.type.js';
+import { type TypeOrmPostgresTransactionSettingsResolver } from './typeorm-postgres-transaction-settings-resolver.type.js';
 import { TypeOrmPostgresTransaction } from './typeorm-postgres-transaction.js';
 
 /**
@@ -23,7 +23,7 @@ export class TypeOrmPostgresTransactionFactory extends TypeOrmTransactionFactory
   constructor(
     dataSource: DataSource,
     dataSourceKey: string,
-    private readonly transactionSettings?: TypeOrmTransactionSettingsResolver,
+    private readonly transactionSettings?: TypeOrmPostgresTransactionSettingsResolver,
   ) {
     super(dataSource, dataSourceKey);
   }

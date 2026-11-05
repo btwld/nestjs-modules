@@ -22,11 +22,10 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  * // app.module.ts
  * @Module({
  *   imports: [
- *     TypeOrmModule.forRoot({ ... }),
  *     RepositoryModule.forRoot({
  *       drivers: [
  *         {
- *           driver: TypeOrmPostgresRepositoryModule,
+ *           driver: YourDriverModule,
  *           entities: [
  *             { key: 'orders', entity: Order },
  *             { key: 'customers', entity: Customer },

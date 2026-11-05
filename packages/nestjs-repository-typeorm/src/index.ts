@@ -6,3 +6,6 @@ export { TypeOrmProviderOptionsInterface } from './repository/typeorm-provider-o
 // Transaction
 export { TypeOrmTransaction } from './transaction/typeorm-transaction.js';
 export { TypeOrmTransactionFactory } from './transaction/typeorm-transaction.factory.js';
+
+// Exceptions
+export { TypeOrmUnsupportedDatabaseException } from './exceptions/typeorm-unsupported-database.exception.js';

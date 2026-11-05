@@ -19,6 +19,7 @@ import {
   TransactionContextInterface,
   TrxCtx,
 } from './interfaces/transaction-context.interface.js';
+import { TransactionRunOptions } from './interfaces/transaction-run-options.interface.js';
 import {
   TransactionFactoryRegistry,
   TRANSACTION_FACTORY_REGISTRY,
@@ -26,11 +27,6 @@ import {
 import { TransactionManager } from './transaction-manager.js';
 
 const DEFAULT_TIMEOUT = 30000;
-
-export interface TransactionRunOptions {
-  readOnly?: boolean;
-  timeout?: number;
-}
 
 /**
  * Orchestrates transaction lifecycle.

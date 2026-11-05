@@ -5,11 +5,12 @@ import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
 import { RuntimeException } from '@concepta/nestjs-core';
 
 import { type WhereClause } from '../../repository/interfaces/where-clause.interface.js';
+import { type RowScopeBaseOptions } from '../interfaces/row-scope-base-options.interface.js';
 import {
   type RowScopeRepository,
   type RowScopeWriteParams,
 } from '../interfaces/row-scope.interface.js';
-import { RowScopeBase, type RowScopeBaseOptions } from '../row-scope-base.js';
+import { RowScopeBase } from '../row-scope-base.js';
 import { RowScopeOperation } from '../row-scope.types.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────

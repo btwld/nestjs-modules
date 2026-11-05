@@ -313,6 +313,8 @@ export function overlappingTransactions(ctx: ConformanceContext): void {
       const kept = outcomes.flatMap((outcome) =>
         outcome.ok ? [outcome.value] : [],
       );
+      // A store that fails a run over the race lets another through.
+      assert.ok(kept.length > 0, `${id}: every run failed`);
       const after = await unique().findOne({ where: Where.eq('id', id) });
       assert.equal(after?.version, stored.version + kept.length, id);
       // Each write kept moved the version on once, the last to the stored one.
@@ -322,9 +324,7 @@ export function overlappingTransactions(ctx: ConformanceContext): void {
         id,
       );
       assert.ok(
-        kept.length === 0
-          ? after?.name === 'stored'
-          : kept.some(({ name }) => name === after?.name),
+        kept.some(({ name }) => name === after?.name),
         id,
       );
     }

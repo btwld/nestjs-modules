@@ -16,6 +16,11 @@ interface TestEntity {
   status: string;
 }
 
+interface TaskEntity {
+  id: string;
+  title: string;
+}
+
 describe('Where', () => {
   // ═══════════════════════════════════════════════════════════════════════════
   // Static scalar operators
@@ -516,6 +521,22 @@ describe('Where', () => {
         field: 'status',
         operator: 'eq',
         value: 'active',
+        relation: 'tasks',
+      });
+    });
+
+    it("rel() and relDot() should take a condition on the related entity's columns", () => {
+      const condition = Where.eq<TaskEntity>('title', 'Ship');
+      expect(w.rel('tasks', condition)).toEqual({
+        field: 'title',
+        operator: 'eq',
+        value: 'Ship',
+        relation: 'tasks',
+      });
+      expect(w.relDot('tasks.title', condition)).toEqual({
+        field: 'title',
+        operator: 'eq',
+        value: 'Ship',
         relation: 'tasks',
       });
     });

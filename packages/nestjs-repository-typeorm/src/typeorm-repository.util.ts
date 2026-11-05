@@ -71,10 +71,20 @@ export function dataSourceOf(
 }
 
 /**
- * A query `dataSource`'s database failed, reported with the data source's
- * type and the database client's own error code: `code` where the client
- * sets one (`'23503'` on Postgres, `'SQLITE_CONSTRAINT_FOREIGNKEY'` on
- * SQLite), otherwise its numeric `errno`. `undefined` for any other error.
+ * The database a data source type names, where TypeORM names it after the
+ * client.
+ */
+const DATABASE_OF_CLIENT: Readonly<Record<string, string>> = {
+  'better-sqlite3': 'sqlite',
+  mssql: 'sqlserver',
+};
+
+/**
+ * A query `dataSource`'s database failed, reported with the database's name
+ * (`postgres`, `sqlite`, `sqlserver`, …) and the database client's own error
+ * code: `code` where the client sets one (`'23503'` on Postgres,
+ * `'SQLITE_CONSTRAINT_FOREIGNKEY'` on SQLite), otherwise its numeric `errno`.
+ * `undefined` for any other error.
  */
 export function describeQueryFailure(
   error: unknown,
@@ -89,8 +99,9 @@ export function describeQueryFailure(
       : 'errno' in reported && typeof reported.errno === 'number'
         ? reported.errno
         : undefined;
+  const { type } = dataSource.options;
   return {
-    database: dataSource.options.type,
+    database: DATABASE_OF_CLIENT[type] ?? type,
     code,
     message: reported.message,
   };

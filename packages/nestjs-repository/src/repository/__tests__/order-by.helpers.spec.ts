@@ -7,6 +7,11 @@ interface TestEntity {
   createdAt: string;
 }
 
+interface CompanyEntity {
+  id: string;
+  title: string;
+}
+
 describe('OrderBy', () => {
   // ═══════════════════════════════════════════════════════════════════════════
   // Static asc / desc
@@ -138,6 +143,20 @@ describe('OrderBy', () => {
       expect(o.desc('createdAt')).toEqual({
         field: 'createdAt',
         order: SortOrder.DESC,
+      });
+    });
+
+    it("rel() and relDot() should take a key on the related entity's columns", () => {
+      const key = OrderBy.asc<CompanyEntity>('title');
+      expect(o.rel('company', key)).toEqual({
+        field: 'title',
+        order: SortOrder.ASC,
+        relation: 'company',
+      });
+      expect(o.relDot('company.title', key)).toEqual({
+        field: 'title',
+        order: SortOrder.ASC,
+        relation: 'company',
       });
     });
 

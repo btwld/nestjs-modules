@@ -5,7 +5,7 @@ import { type RepositoryMetadataInterface } from '../repository/interfaces/repos
 import { type RepositoryAdapter } from '../repository/repository-adapter.js';
 import { type RepositoryRegistryService } from '../services/repository-registry.service.js';
 
-import { type FederatedRelation } from './federation-reader.service.js';
+import { type FederatedRelation } from './federated-relation.interface.js';
 
 type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
 

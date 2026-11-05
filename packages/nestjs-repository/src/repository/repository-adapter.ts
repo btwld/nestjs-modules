@@ -14,10 +14,8 @@ import {
 } from '@concepta/nestjs-core';
 
 import { ActivityWriter } from '../activity/activity-writer.js';
-import {
-  type CascadeRelation,
-  CascadeWriter,
-} from '../cascade/cascade-writer.js';
+import { type CascadeRelation } from '../cascade/cascade-relation.interface.js';
+import { CascadeWriter } from '../cascade/cascade-writer.js';
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
@@ -31,11 +29,9 @@ import { RepositoryUnboundException } from '../exceptions/repository-unbound.exc
 import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
 import { UnknownColumnException } from '../exceptions/unknown-column.exception.js';
 import { FederationException } from '../federation/exceptions/federation.exception.js';
+import { type FederatedRelation } from '../federation/federated-relation.interface.js';
 import { splitFederatedWhere } from '../federation/federated-where.js';
-import {
-  type FederatedRelation,
-  type FederationRoot,
-} from '../federation/federation-reader.service.js';
+import { type FederationRoot } from '../federation/federation-root.interface.js';
 import { RepoPermeatorFactory } from '../hooks/repo-permeator-factory.js';
 import { RepoHook } from '../hooks/repository-hook.decorators.js';
 import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
@@ -59,6 +55,7 @@ import {
   type WritePolicyRegistration,
 } from '../write-policy/interfaces/write-policy-registration.interface.js';
 
+import { type FederatedCaller } from './interfaces/federated-caller.interface.js';
 import { type JoinClause } from './interfaces/join-clause.interface.js';
 import { type RepositoryBindingInterface } from './interfaces/repository-binding.interface.js';
 import { type RepositoryDatabaseErrorInterface } from './interfaces/repository-database-error.interface.js';
@@ -86,12 +83,6 @@ import {
 } from './interfaces/where-clause.interface.js';
 import { SortOrder, WhereCompoundOperator } from './repository.types.js';
 import { Where } from './where.helpers.js';
-
-/** The `ctx` a read arrived with, and the row scope resolved from it. */
-interface FederatedCaller {
-  readonly ctx?: PlainLiteralObject;
-  readonly scope?: PlainLiteralObject;
-}
 
 // Module-scoped: the root cause (CoreModule not imported) is identical no
 // matter how many repositories/entities hit it, so warn once per process
@@ -1671,7 +1662,7 @@ export abstract class RepositoryAdapter<
    * date column.
    *
    * **Scope of this guarantee.** It covers the repository's own entry points.
-   * It does not cover a direct `@InjectRepository` handle or a database
+   * It does not cover the ORM's own repository used directly, or a database
    * foreign key action, neither of which passes through one. Another entity's
    * write cannot reach this table: `toOwnColumns` keeps every write to its own
    * entity's table.
@@ -1965,14 +1956,23 @@ export abstract class RepositoryAdapter<
     options: { expectedVersion?: number } | undefined,
     whenUnspecified: 'guard' | 'skip',
   ): RepositoryVersionGuardInterface<Entity> | undefined {
+    const column = this.getVersionColumn();
+    const guarded =
+      options?.expectedVersion !== undefined || whenUnspecified === 'guard';
+
+    if (column && guarded && entity[column] == null) {
+      throw new RuntimeException({
+        message:
+          'Cannot guard a write of "%s": the row passed holds no "%s". ' +
+          'Pass the row as read, with its version',
+        messageParams: [this.metadata.name, column],
+        fault: 'usage',
+      });
+    }
+
     this.assertExpectedVersion(entity, options);
 
-    const column = this.getVersionColumn();
-    if (!column) return undefined;
-
-    if (options?.expectedVersion === undefined && whenUnspecified === 'skip') {
-      return undefined;
-    }
+    if (!column || !guarded) return undefined;
 
     // Safe uniformly: assertExpectedVersion has already proved this equals
     // expectedVersion whenever the caller supplied one.

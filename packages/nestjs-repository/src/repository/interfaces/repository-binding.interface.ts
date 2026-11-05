@@ -3,11 +3,9 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type HookOption } from '@concepta/nestjs-core';
 
 import { type ActivityBinding } from '../../activity/interfaces/activity-binding.interface.js';
-import { type CascadeRelation } from '../../cascade/cascade-writer.js';
-import {
-  type FederatedRelation,
-  type FederationReader,
-} from '../../federation/federation-reader.service.js';
+import { type CascadeRelation } from '../../cascade/cascade-relation.interface.js';
+import { type FederatedRelation } from '../../federation/federated-relation.interface.js';
+import { type FederationReader } from '../../federation/federation-reader.service.js';
 import { type RowScopeRegistration } from '../../row-scope/interfaces/row-scope-registration.interface.js';
 import { type WritePolicyRegistration } from '../../write-policy/interfaces/write-policy-registration.interface.js';
 import { type RepositoryAdapter } from '../repository-adapter.js';

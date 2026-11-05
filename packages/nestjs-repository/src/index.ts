@@ -11,12 +11,10 @@ export {
   RepositoryBindingInterface,
   RepositoryFederationBinding,
 } from './repository/interfaces/repository-binding.interface.js';
-export {
-  FederatedRelation,
-  FederationReader,
-  FederationReadOptions,
-  FederationRoot,
-} from './federation/federation-reader.service.js';
+export { FederatedRelation } from './federation/federated-relation.interface.js';
+export { FederationReader } from './federation/federation-reader.service.js';
+export { FederationReadOptions } from './federation/federation-read-options.interface.js';
+export { FederationRoot } from './federation/federation-root.interface.js';
 export { FederatedWhere } from './federation/federated-where.js';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -36,6 +34,7 @@ export {
   RepositoryRootAsyncOptions,
   RepositoryRootOptions,
 } from './interfaces/repository-root-options.interface.js';
+export { RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Row Scope
@@ -54,10 +53,8 @@ export {
   RowScopeWriteParams,
 } from './row-scope/interfaces/row-scope.interface.js';
 export { RowScopeCtx } from './row-scope/interfaces/row-scope-context.interface.js';
-export {
-  RowScopeBase,
-  RowScopeBaseOptions,
-} from './row-scope/row-scope-base.js';
+export { RowScopeBase } from './row-scope/row-scope-base.js';
+export { RowScopeBaseOptions } from './row-scope/interfaces/row-scope-base-options.interface.js';
 export {
   RowScopeRegistration,
   RowScopeScopedRegistration,
@@ -130,6 +127,7 @@ export { TransactionScopeFailedException } from './exceptions/transaction-scope-
 export { TransactionFactoryInterface } from './interfaces/transaction-factory.interface.js';
 export { TransactionManager } from './transaction/transaction-manager.js';
 export { TransactionScope } from './transaction/transaction-scope.js';
+export { TransactionRunOptions } from './transaction/interfaces/transaction-run-options.interface.js';
 export { RepoCtx } from './context/interfaces/repository-context.interface.js';
 export { TrxCtx } from './transaction/interfaces/transaction-context.interface.js';
 export { TransactionalRunner } from './transaction/transactional-runner.js';

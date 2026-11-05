@@ -7,10 +7,7 @@ import {
 
 import { type RepositoryRelationMetadataInterface } from '../repository/interfaces/repository-relation-metadata.interface.js';
 import { type RepositoryInterface } from '../repository/interfaces/repository.interface.js';
-import {
-  type WhereClause,
-  type WhereCondition,
-} from '../repository/interfaces/where-clause.interface.js';
+import { type WhereClause } from '../repository/interfaces/where-clause.interface.js';
 import { Where } from '../repository/where.helpers.js';
 import {
   REPOSITORY_REGISTRY,
@@ -18,44 +15,15 @@ import {
 } from '../services/repository-registry.service.js';
 
 import { FederationException } from './exceptions/federation.exception.js';
+import { type FederatedRelation } from './federated-relation.interface.js';
 import { type FederatedWhere } from './federated-where.js';
+import { type FederationReadOptions } from './federation-read-options.interface.js';
+import { type FederationRoot } from './federation-root.interface.js';
 
 export const FEDERATION_READER = Symbol('FederationReader');
 
 /** `federation.maxKeys` when `forRoot()` does not set it. */
 export const FEDERATION_DEFAULT_MAX_KEYS = 1000;
-
-/** A federated relation an entity joins, with its `forRoot()` settings. */
-export interface FederatedRelation {
-  readonly relation: RepositoryRelationMetadataInterface;
-  /** Narrows which related rows belong to the relation. */
-  readonly distinctFilter?: WhereCondition<PlainLiteralObject>;
-}
-
-/** What a federated read needs from the root's own store. */
-export interface FederationRoot {
-  /**
-   * The root rows matching `where`, holding at least `columns`, at most
-   * `take` of them. Runs under the read's own row scope and soft delete.
-   */
-  rows(
-    columns: string[],
-    where: WhereClause | undefined,
-    take: number,
-  ): Promise<PlainLiteralObject[]>;
-}
-
-/** How a federated read reaches the related repositories. */
-export interface FederationReadOptions {
-  /**
-   * The `ctx` each related read runs under. Called before every read, so it
-   * can refuse a `ctx` a hook changed during an earlier one.
-   */
-  readonly ctx: () => PlainLiteralObject | undefined;
-  readonly withDeleted?: boolean;
-  /** The most keys any one query may carry, or any one key set may hold. */
-  readonly maxKeys: number;
-}
 
 /**
  * Reads federated relations through their own repositories, so each related

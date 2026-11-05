@@ -5,6 +5,7 @@ import { RuntimeException } from '@concepta/nestjs-core';
 import { type WhereClause } from '../repository/interfaces/where-clause.interface.js';
 import { Where } from '../repository/where.helpers.js';
 
+import { type RowScopeBaseOptions } from './interfaces/row-scope-base-options.interface.js';
 import {
   type RowScopeColumn,
   type RowScopeInterface,
@@ -18,37 +19,6 @@ import {
   type RowScopeValues,
   type ScalarValue,
 } from './row-scope.types.js';
-
-/**
- * Configuration for {@link RowScopeBase}.
- */
-export interface RowScopeBaseOptions<
-  Scope extends PlainLiteralObject = PlainLiteralObject,
-> {
-  /**
-   * The columns carrying the caller's scope, e.g. a tenant ID column, on every
-   * entity the resolver serves. A name reads the caller's value from the
-   * `RowScopeCtx` key of the same name; `{ column, key }` names the key.
-   */
-  readonly scope: readonly (string | RowScopeColumn)[];
-
-  /**
-   * The scope columns a caller is not held to on reads — every column for a
-   * caller who reads everything. Writes are never relaxed: a caller writes
-   * only inside its full scope. Not called without a scope.
-   *
-   * Must be a pure function of `scope`: it is asked again when a read joins.
-   */
-  readonly relax?: (scope: Scope) => readonly string[];
-
-  /**
-   * Let reads join between entities scoped by joinable resolvers on the same
-   * columns. See {@link RowScopeInterface.joinable} for what this states —
-   * leave it off a subclass whose `scopeQuery` reads more broadly or more
-   * narrowly than its enforced columns, for any caller.
-   */
-  readonly joinable?: boolean;
-}
 
 /**
  * A ready-to-extend row scope for scope expressed as columns on the entity.

@@ -6,7 +6,7 @@ import { type AppContextHost } from '@concepta/nestjs-core';
  * entry is applied with `set_config(name, value, true)`, so it lasts until
  * the transaction ends; an `undefined` value is left unset.
  */
-export type TypeOrmTransactionSettingsResolver = (
+export type TypeOrmPostgresTransactionSettingsResolver = (
   ctx: AppContextHost,
   dataSourceKey: string,
 ) => Readonly<Record<string, string | undefined>>;

@@ -239,6 +239,53 @@ describe('RepositoryAdapter expected version', () => {
     });
   });
 
+  describe('a row passed without its version', () => {
+    function rowWithoutVersion(): TestEntity {
+      const entity = new TestEntityClass();
+      entity.id = '1';
+      entity.dateDeleted = null;
+      return entity;
+    }
+
+    async function usageError(write: Promise<unknown>): Promise<void> {
+      const error = await write.catch((err: unknown) => err);
+      expect(error).toBeInstanceOf(RuntimeException);
+      if (error instanceof RuntimeException) {
+        expect(error.fault).toEqual('usage');
+      }
+    }
+
+    it('should refuse update and replace without calling the driver', async () => {
+      await usageError(adapter.update(rowWithoutVersion(), { name: 'x' }));
+      await usageError(adapter.replace(rowWithoutVersion(), { name: 'x' }));
+
+      expect(adapter.doUpdateCalls).toEqual(0);
+      expect(adapter.doReplaceCalls).toEqual(0);
+    });
+
+    it('should refuse a stated expectedVersion without calling the driver', async () => {
+      await usageError(
+        adapter.update(
+          rowWithoutVersion(),
+          { name: 'x' },
+          { expectedVersion: 1 },
+        ),
+      );
+      await usageError(
+        adapter.delete(rowWithoutVersion(), { expectedVersion: 1 }),
+      );
+
+      expect(adapter.doUpdateCalls).toEqual(0);
+      expect(adapter.doDeleteCalls).toEqual(0);
+    });
+
+    it('should delete when no version is stated', async () => {
+      await adapter.delete(rowWithoutVersion());
+
+      expect(adapter.doDeleteCalls).toEqual(1);
+    });
+  });
+
   describe('an entity with no version column', () => {
     let noVersionAdapter: TestRepositoryAdapterNoVersion;
 

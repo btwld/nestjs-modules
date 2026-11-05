@@ -5,7 +5,7 @@ import { type RepositoryMetadataInterface } from '../repository/interfaces/repos
 import { type RepositoryAdapter } from '../repository/repository-adapter.js';
 import { isAppendOnly } from '../write-policy/interfaces/write-policy-registration.interface.js';
 
-import { type CascadeRelation } from './cascade-writer.js';
+import { type CascadeRelation } from './cascade-relation.interface.js';
 
 type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
 

@@ -11,6 +11,7 @@ import {
 function softDeletedEntity(): TestEntity {
   const entity = new TestEntityClass();
   entity.id = '1';
+  entity.version = 1;
   entity.dateDeleted = new Date();
   return entity;
 }
@@ -18,6 +19,7 @@ function softDeletedEntity(): TestEntity {
 function liveEntity(): TestEntity {
   const entity = new TestEntityClass();
   entity.id = '1';
+  entity.version = 1;
   entity.dateDeleted = null;
   return entity;
 }

@@ -34,7 +34,7 @@ with audit columns and a version.
 ## Installation
 
 ```sh
-yarn add @concepta/nestjs-repository-typeorm @nestjs/common @nestjs/core typeorm pg
+yarn add @concepta/nestjs-repository-typeorm @nestjs/common @nestjs/core @nestjs/typeorm typeorm pg
 ```
 
 Replace `pg` with your database's client from
@@ -50,6 +50,7 @@ NestJS 12.
 | Package | Required | Notes |
 | --- | --- | --- |
 | `@nestjs/common`, `@nestjs/core` | Yes | NestJS 12 |
+| `@nestjs/typeorm` | Yes | `^12.0.1`; your app's `TypeOrmModule` |
 | `typeorm` | Yes | `^0.3.31 \|\| ^1.1.0` |
 | `@nestjs/outbox` | No | Only for [Durable Messaging](#durable-messaging) |
 
@@ -70,7 +71,8 @@ database stops startup with `TypeOrmUnsupportedDatabaseException`.
 
 ### Postgres
 
-- Dates round-trip exactly; no time-zone setting is needed.
+- Dates you write round-trip exactly; no time-zone setting is needed. Dates
+  the database stamps don't — see [Base Entities](#base-entities).
 - `Where.contains('name', 'ali')` doesn't match `Alice`: text matching is
   case-sensitive.
 - In ascending order, `NULL`s sort last.
@@ -119,7 +121,8 @@ Uses the `oracledb` client in its default Thin mode.
 
 - Oracle stores an empty string as `NULL`: `create({ note: '' })` reads back
   `note: null`, and `''` in a `NOT NULL` column fails the write.
-- Leave `useUTC` off: with the defaults, every date round-trips exactly.
+- Leave `useUTC` off: with the defaults, every date you write round-trips
+  exactly.
   `useUTC: true` sets the session time zone for the whole process, and then
   dates the database fills in on a `timestamp` column, and dates you write to
   a `timestamp with time zone` column (like the activity entities'
@@ -233,10 +236,11 @@ there with `@InjectDynamicRepository('orders')`.
 ### Provider Options
 
 ```ts
-interface TypeOrmProviderOptionsInterface<Entity> extends RepositoryProviderOptions<Entity> {
+interface TypeOrmProviderOptionsInterface<Entity extends PlainLiteralObject>
+  extends RepositoryProviderOptions<Entity> {
   key: string;                                             // Injection key
   entity: Type<Entity>;                                    // TypeORM entity class
-  dataSource?: TypeOrmDataSourceToken;                     // Data source (default: 'default')
+  dataSource?: DataSource | DataSourceOptions | string;    // Data source (default: 'default')
   factory?: (dataSource: DataSource) => Repository<Entity>; // Custom repository factory
   relations?: Record<string, RelationConfig>;              // Per-relation settings (cascade, …)
   rowScope?: RowScopeRegistration;                         // Declarations, bound by forRoot()
@@ -948,6 +952,12 @@ locking). Dates are `timestamptz` on Postgres, `datetime(6)` on MySQL and
 MariaDB, `timestamp with time zone` on Oracle, `datetimeoffset` on SQL
 Server, and `datetime` on SQLite.
 
+The database stamps `dateCreated` and `dateUpdated` to the microsecond, or
+finer on SQL Server, but a JavaScript `Date` holds milliseconds. So
+`Where.eq('dateCreated', order.dateCreated)` can match nothing. Filter a
+stamped date with a range, such as `Where.between()` over the millisecond it
+falls in. SQLite stamps whole seconds, which a `Date` holds exactly.
+
 ### Using Base Entities
 
 ```ts
@@ -1170,21 +1180,21 @@ Requirements and limits:
 | Exception | Package | Description |
 | --- | --- | --- |
 | `RepositoryQueryException` | `@concepta/nestjs-repository` | Repository query error (wraps original error) |
-| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` is the data source `type` (`postgres`, `mysql`, `mariadb`, `oracle`, `mssql`, `better-sqlite3`); `context.code` is the database client's `code` (`'ORA-00001'` on Oracle), or its `errno` when it has no `code`; on SQL Server, the error number (`2627`, `2601`) |
+| `RepositoryDatabaseException` | `@concepta/nestjs-repository` | A query the database failed. `context.database` names the database (`postgres`, `mysql`, `mariadb`, `oracle`, `sqlserver`, `sqlite`); `context.code` is the database client's `code` (`'ORA-00001'` on Oracle), or its `errno` when it has no `code`; on SQL Server, the error number (`2627`, `2601`) |
 | `OptimisticLockException` | `@concepta/nestjs-repository` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — see [Optimistic Locking](#optimistic-locking) |
 | `SoftDeletedImmutableException` | `@concepta/nestjs-repository` | A write targeted a soft-deleted row — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `EntityAlreadyExistsException` | `@concepta/nestjs-repository` | A `create` supplied a primary key that already names a row |
 | `EntityNotFoundException` | `@concepta/nestjs-repository` | An `update` or `replace` named a row that is no longer stored |
 | `PrimaryKeyImmutableException` | `@concepta/nestjs-repository` | An `update`/`replace` carried data that would change the primary key |
-| `TypeOrmUnsupportedDatabaseException` | Not exported; its `errorCode` is `TYPEORM_UNSUPPORTED_DATABASE` | At startup: an entity is registered on a data source of a database its adapter isn't for |
+| `TypeOrmUnsupportedDatabaseException` | `@concepta/nestjs-repository-typeorm` | At startup: an entity is registered on a data source of a database its adapter isn't for |
 | `TypeOrmRelationMetadataException` | Not exported; its `errorCode` is `TYPEORM_RELATION_METADATA` | At startup: a relation lacks its `@JoinColumn` or its inverse side |
 
 ## Entry Points
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions` and `TypeOrmProviderOptionsInterface` |
-| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
+| `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface` and `TypeOrmUnsupportedDatabaseException` |
+| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmPostgresTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
 | `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |

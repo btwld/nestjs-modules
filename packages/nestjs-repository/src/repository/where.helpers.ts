@@ -393,17 +393,25 @@ export class Where<Entity extends PlainLiteralObject = PlainLiteralObject> {
     return Where.or(...conditions);
   }
 
-  rel<C extends WhereCondition<Entity> = WhereCondition<Entity>>(
-    relation: string,
-    condition: C,
-  ): C {
+  /**
+   * Tag a condition on a related entity's columns with the relation name —
+   * see `Where.rel`.
+   */
+  rel<
+    E extends PlainLiteralObject = PlainLiteralObject,
+    C extends WhereCondition<E> = WhereCondition<E>,
+  >(relation: string, condition: C): C {
     return Where.rel(relation, condition);
   }
 
-  relDot<C extends WhereCondition<Entity> = WhereCondition<Entity>>(
-    dotField: string,
-    condition: C,
-  ): C {
+  /**
+   * Tag a condition on a related entity's columns with the relation named
+   * in `relation.field` dot notation — see `Where.relDot`.
+   */
+  relDot<
+    E extends PlainLiteralObject = PlainLiteralObject,
+    C extends WhereCondition<E> = WhereCondition<E>,
+  >(dotField: string, condition: C): C {
     return Where.relDot(dotField, condition);
   }
 

@@ -20,7 +20,7 @@ export function createMockRepository<
   return {
     metadata: {
       name: 'MockEntity',
-      type: class {} as never,
+      type: vi.fn<() => Entity>(),
       urn: 'urn:mock:MockEntity',
       columns: [],
       ...metadataOverrides,

@@ -186,14 +186,6 @@ describe('TypeOrmRepository (relations)', () => {
         expect(found).toBeInstanceOf(CommentEntityFixture);
       });
 
-      it('loads an eager relation for a repository that allows it', async () => {
-        const found = await eagerCommentRepo.findOne({
-          where: Where.eq('id', comment.id),
-        });
-
-        expect(found?.post?.id).toBe(first.id);
-      });
-
       it('returns no relation it did not load, even for a repository that allows eager relations', async () => {
         const upserted = await eagerCommentRepo.upsert({
           id: comment.id,

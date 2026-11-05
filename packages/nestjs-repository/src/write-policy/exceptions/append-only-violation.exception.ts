@@ -12,8 +12,8 @@ import {
  * There is deliberately no escape hatch. An escape hatch is the failure mode
  * the declaration exists to prevent: the value of "this row never changes" is that a reader
  * can rely on it without auditing every call site. Data migration and
- * backfill run outside the repository layer, the same place direct
- * `@InjectRepository` writes do.
+ * backfill run outside the repository layer, the same place writes through
+ * the ORM's own repository do.
  *
  * To correct an append-only record, append a new one that references it.
  */

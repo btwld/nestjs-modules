@@ -1,12 +1,10 @@
-import { vi, type Mock } from 'vitest';
+import { type Mock } from 'vitest';
 import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
 
 import { AppContextHost } from '@concepta/nestjs-core';
 
-import {
-  type TransactionContextInterface,
-  TrxCtx,
-} from '../transaction/interfaces/transaction-context.interface.js';
+import { TrxCtx } from '../transaction/interfaces/transaction-context.interface.js';
+import { type TransactionManager } from '../transaction/transaction-manager.js';
 import { type TransactionScope } from '../transaction/transaction-scope.js';
 
 export interface MockTransactionHandle {
@@ -25,15 +23,14 @@ export function createMockTransaction(): {
   transaction: DeepMockProxy<TransactionScope>;
   trxHandle: MockTransactionHandle;
 } {
+  const trx = mockDeep<TransactionManager>();
   const trxHandle: MockTransactionHandle = {
-    onCommit: vi.fn(),
-    onRollback: vi.fn(),
+    onCommit: trx.onCommit,
+    onRollback: trx.onRollback,
   };
 
   const mockHost = new AppContextHost();
-  mockHost.defineOverlay(TrxCtx, {
-    trx: trxHandle,
-  } as unknown as TransactionContextInterface);
+  mockHost.defineOverlay(TrxCtx, { trx });
   const mockTxCtx = mockHost.with(TrxCtx);
 
   const transaction = mockDeep<TransactionScope>();
