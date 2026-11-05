@@ -1,7 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
-import { RuntimeException } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
   OptimisticLockException,
@@ -102,75 +101,76 @@ describe(TypeOrmRepository, () => {
     });
   });
 
-  describe('optimistic locking without TransactionScope wired', () => {
-    // A repository constructed by hand: RepositoryModule.forRoot() always
-    // provides a TransactionScope, so only this path can lack one.
-    let bareRepository: TypeOrmRepository<TestEntityFixture>;
+  describe('outside a run', () => {
     let transactionScope: TransactionScope;
 
     beforeEach(() => {
+      transactionScope = moduleFixture.get(TransactionScope);
+    });
+
+    it.each([
+      [
+        'update',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.update(e, { firstName: 'Bob' }),
+      ],
+      [
+        'replace',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.replace(e, { firstName: 'Bob' }),
+      ],
+      [
+        'softDelete with expectedVersion',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.softDelete(e, { expectedVersion: e.version }),
+      ],
+      [
+        'delete with expectedVersion',
+        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
+          repo.delete(e, { expectedVersion: e.version }),
+      ],
+    ] as const)('%s opens no transaction of its own', async (_name, call) => {
+      const entity = await testFactory.create({ firstName: 'Alice' });
+      const run = vi.spyOn(transactionScope, 'run');
+
+      await call(testRepository, entity);
+
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('a repository built by hand writes a versioned row', async () => {
       const dataSource = moduleFixture.get(getDataSourceToken());
-      bareRepository = new TypeOrmSqliteRepository(
+      const bareRepository = new TypeOrmSqliteRepository(
         dataSource.getRepository(TestEntityFixture),
         { entityKey: 'bare-test-entity' },
       );
       bareRepository.bind({});
-      transactionScope = moduleFixture.get(TransactionScope);
-    });
-
-    it('should throw rather than silently run unprotected when no transaction is active', async () => {
       const entity = await testFactory.create({ firstName: 'Alice' });
 
-      await expect(
-        bareRepository.update(entity, { firstName: 'Bob' }),
-      ).rejects.toThrow(RuntimeException);
-    });
-
-    it('should still work correctly when the caller already provides an active transaction', async () => {
-      const entity = await testFactory.create({ firstName: 'Alice' });
-
-      const updated = await transactionScope.run({}, async (txCtx) =>
-        bareRepository.update(entity, { firstName: 'Bob' }, { ctx: txCtx }),
-      );
+      const updated = await bareRepository.update(entity, { firstName: 'Bob' });
 
       expect(updated.firstName).toBe('Bob');
       expect(updated.version).toBe(entity.version + 1);
     });
 
-    // delete/softDelete/restore only take on the transaction requirement
-    // when the caller actually supplies `expectedVersion` — this is what
-    // keeps #472 non-breaking for every existing caller of those methods.
-    it.each([
-      [
-        'delete',
-        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
-          repo.delete(e),
-      ],
-      [
-        'softDelete',
-        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
-          repo.softDelete(e),
-      ],
-      [
-        'restore',
-        (repo: TypeOrmRepository<TestEntityFixture>, e: TestEntityFixture) =>
-          repo.restore(e),
-      ],
-    ] as const)(
-      'should run %s unprotected, with no transaction requirement, when expectedVersion is omitted',
-      async (_name, call) => {
-        const entity = await testFactory.create({ firstName: 'Alice' });
-        const result = await call(bareRepository, entity);
-        expect(result).toBeDefined();
-      },
-    );
-
-    it('should throw rather than silently run delete unprotected when expectedVersion is supplied with no transaction active', async () => {
+    it('a write in a run joins it, and rolls back with it', async () => {
       const entity = await testFactory.create({ firstName: 'Alice' });
 
       await expect(
-        bareRepository.delete(entity, { expectedVersion: entity.version }),
-      ).rejects.toThrow(RuntimeException);
+        transactionScope.run({}, async (txCtx) => {
+          const updated = await testRepository.update(
+            entity,
+            { firstName: 'Bob' },
+            { ctx: txCtx },
+          );
+          expect(updated.version).toBe(entity.version + 1);
+          throw new Error('roll back');
+        }),
+      ).rejects.toThrow('roll back');
+
+      const [stored] = await testRepository.find();
+      expect(stored?.firstName).toBe('Alice');
+      expect(stored?.version).toBe(entity.version);
     });
   });
 });

@@ -180,10 +180,10 @@ Use the `better-sqlite3` driver; a `sqlite` data source stops startup with
   case for ASCII letters.
 - In ascending order, `NULL`s sort first.
 - Transactions run one at a time. A data source has one connection, so a
-  second `TransactionScope.run()` (or a versioned `update` or `replace`,
-  which opens one) waits for the first to commit or roll back. A nested
-  `run()` joins the transaction already open and never waits. Throughput on
-  that data source is bounded by its longest-running transaction.
+  second `TransactionScope.run()` waits for the first to commit or roll
+  back. A nested `run()` joins the transaction already open and never waits.
+  Throughput on that data source is bounded by its longest-running
+  transaction.
 - **Pass the run's `ctx` to every repository call inside a run.** A call
   without it waits until the run ends, so one the run itself awaits never
   returns. Your own queries on the data source don't wait: they run inside
@@ -327,7 +327,10 @@ the primary key.
 
 `update` and `replace` on an entity with a `@VersionColumn` (every `Audit*`
 and `Common*` entity) reject a stale `entity` with `OptimisticLockException`
-(409). The call runs in a transaction, opening one if needed.
+(409). In your transaction the check is certain: the row is locked from the
+check until the transaction ends. Outside one the check reads the row, then
+`save()` writes it, so a writer in between can still win; run the call in a
+transaction when that matters.
 
 - Use the return value: it is a fresh object with no relations, and changes
   to `entity` that aren't in `data` are dropped.
@@ -342,7 +345,9 @@ requests (see
 [Expected Version](../nestjs-repository/README.md#expected-version)). It also
 guards `delete`, `softDelete` and `restore`, only when you pass it. On a row
 that is already soft-deleted, a stale `expectedVersion` throws
-`OptimisticLockException`, and a matching one is a no-op.
+`OptimisticLockException`, and a matching one is a no-op. As for `update`
+and `replace`, the check is certain in your transaction and best effort
+outside one.
 
 ### Soft-Deleted Immutability
 
@@ -379,7 +384,10 @@ guarantees: row scope, write policy and hooks never see what it does.
   your listeners see just those columns. TypeORM writes a column only when
   it differs from the row as it reads it — inside a run on MySQL or
   MariaDB, as the run first read it — so a value equal to that isn't
-  written, even if another request has changed it since.
+  written, even if another request has changed it since. Outside a run, on
+  an entity without a version column, a row another request deletes between
+  the read and the `save()` is inserted again, as `save()` does; run the
+  call in a transaction, or add a version column.
 - **`create`** returns the row as TypeORM saved it: a value the database
   rounds, such as a `decimal` or a `timestamp` without milliseconds, comes
   back as you gave it. Read the row to see it as stored.
@@ -594,8 +602,8 @@ every transaction. The policies are a few lines of SQL in your migrations.
 ### Setting the tenant
 
 Give the Postgres adapter a `transactionSettings` function. Every
-transaction it opens starts by setting those values, read from the caller's
-context.
+transaction a run opens on the data source starts by setting those values,
+read from the caller's context.
 
 ```ts
 import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
@@ -626,12 +634,12 @@ Postgres adapter takes the option.
 Name each setting anything with a dot in it, and use the same name in your
 policies. An `undefined` value is skipped.
 
-What you get: each transaction the driver opens sets these values before any
-of your queries run, with `set_config(name, value, true)`. That includes
-`@Transactional()`, `TransactionScope.run()` and `runReadOnly()`, versioned
-`update` and `replace`, and the transactions other Rockets modules open
-themselves. The values end with the transaction, so the next request on a
-pooled connection starts with none. If a setting fails, the transaction is
+What you get: each transaction a run opens on the data source sets these
+values before any of your queries run, with `set_config(name, value, true)`.
+That includes `@Transactional()`, `TransactionScope.run()` and
+`runReadOnly()`, and the runs other Rockets modules open themselves. The
+values end with the transaction, so the next request on a pooled connection
+starts with none. If a setting fails, the transaction is
 rolled back and you get the error.
 
 ### Policies
@@ -699,8 +707,9 @@ Edition 2.
 
 A VPD policy reads the caller's tenant from an application context, which
 only its own package can set. Give the Oracle adapter `applicationContext`:
-that package's `procedure` and a `values` function. Every transaction it
-opens starts by setting those values, read from the caller's context.
+that package's `procedure` and a `values` function. Every transaction a run
+opens on the data source starts by setting those values, read from the
+caller's context.
 
 ```ts
 import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
@@ -730,7 +739,7 @@ As on Postgres, read the tenant from the same `RowScopeCtx` overlay your row
 scope resolver reads. The second argument is the data source name, and an
 `undefined` value is skipped. Only the Oracle adapter takes the option.
 
-What you get: each transaction the driver opens calls
+What you get: each transaction a run opens on the data source calls
 `procedure(name, value)` for each value before any of your queries run, from
 the same places as on Postgres. An application context outlives the
 transaction on a pooled connection, so before the connection goes back to
@@ -824,8 +833,8 @@ repository. Row scope stays the enforcement; RLS is the backstop.
 ### Setting the tenant in the session context
 
 Give the SQL Server adapter a `sessionContext` function. Every transaction
-it opens starts by setting those values in the session context, read from
-the caller's context.
+a run opens on the data source starts by setting those values in the
+session context, read from the caller's context.
 
 ```ts
 import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
@@ -853,7 +862,7 @@ scope resolver reads, and the second argument is the data source name.
 An `undefined` value, or a name an earlier transaction set and this one
 leaves out, is set to `NULL`, so a caller without a tenant sees nothing.
 
-What you get: each transaction the driver opens calls
+What you get: each transaction a run opens on the data source calls
 `sp_set_session_context` for each value before any of your queries run,
 from the same places as on Postgres, and sets `rockets.transaction_id`
 (`TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`) to the transaction's id. The

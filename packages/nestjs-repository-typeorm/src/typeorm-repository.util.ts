@@ -24,7 +24,6 @@ import {
   getDynamicRepositoryToken,
   type RepositoryDatabaseErrorInterface,
   type TransactionFactoryDescriptor,
-  TransactionScope,
 } from '@concepta/nestjs-repository';
 
 import { type TypeOrmProviderOptionsInterface } from './repository/typeorm-provider-options.interface.js';
@@ -150,7 +149,6 @@ export function createTypeOrmRepository<E extends PlainLiteralObject, Options>(
   entityKey: string,
   dataSource?: string,
   hookResolver?: HookResolverService,
-  transactionScope?: TransactionScope,
 ): TypeOrmRepository<E> {
   return definition.createRepository(repo, {
     entityKey,
@@ -160,7 +158,6 @@ export function createTypeOrmRepository<E extends PlainLiteralObject, Options>(
     ),
     dataSourceName: resolveDataSourceName(dataSource),
     hookResolver,
-    transactionScope,
   });
 }
 
@@ -174,16 +171,6 @@ export const OPTIONAL_HOOK_RESOLVER_INJECT = {
 };
 
 /**
- * Injection token for optional TransactionScope.
- * `RepositoryModule.forRoot()` provides it globally, but the driver's
- * providers still resolve without it, so the driver can be tested alone.
- */
-export const OPTIONAL_TRANSACTION_SCOPE_INJECT = {
-  token: TransactionScope,
-  optional: true,
-};
-
-/**
  * Create a NestJS provider for an entity, built by an adapter.
  */
 export function createTypeOrmProvider<E extends PlainLiteralObject, Options>(
@@ -193,37 +180,22 @@ export function createTypeOrmProvider<E extends PlainLiteralObject, Options>(
   const { key, entity, dataSource, factory } = options;
   const dsName = resolveDataSourceName(dataSource);
   const dsToken = resolveTokenName(dsName);
-  const optional = [
-    OPTIONAL_HOOK_RESOLVER_INJECT,
-    OPTIONAL_TRANSACTION_SCOPE_INJECT,
-  ];
-  const build = (
-    repo: Repository<E>,
-    hookResolver?: HookResolverService,
-    transactionScope?: TransactionScope,
-  ) =>
-    createTypeOrmRepository(
-      definition,
-      repo,
-      key,
-      dsName,
-      hookResolver,
-      transactionScope,
-    );
+  const build = (repo: Repository<E>, hookResolver?: HookResolverService) =>
+    createTypeOrmRepository(definition, repo, key, dsName, hookResolver);
 
   return factory
     ? {
         provide: getDynamicRepositoryToken(key),
-        inject: [getDataSourceToken(dsToken), ...optional],
-        useFactory: (
-          ds: DataSource,
-          hookResolver?: HookResolverService,
-          transactionScope?: TransactionScope,
-        ) => build(factory(ds), hookResolver, transactionScope),
+        inject: [getDataSourceToken(dsToken), OPTIONAL_HOOK_RESOLVER_INJECT],
+        useFactory: (ds: DataSource, hookResolver?: HookResolverService) =>
+          build(factory(ds), hookResolver),
       }
     : {
         provide: getDynamicRepositoryToken(key),
-        inject: [getRepositoryToken(entity, dsToken), ...optional],
+        inject: [
+          getRepositoryToken(entity, dsToken),
+          OPTIONAL_HOOK_RESOLVER_INJECT,
+        ],
         useFactory: build,
       };
 }

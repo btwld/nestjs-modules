@@ -34,7 +34,6 @@ import {
   type JoinClause,
   OptimisticLockException,
   TrxCtx,
-  type TransactionScope,
   RepositoryAdapter,
   type RepositoryCountOptions,
   type RepositoryCreateOptions,
@@ -152,18 +151,19 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * The lock the re-read of a row just written takes, in the write's
-   * transaction. None by default: the read sees the row as stored. A
-   * database whose plain reads in a transaction see its snapshot instead
+   * The lock the re-read of a row just written takes, only inside the
+   * caller's transaction. None by default: the read sees the row as stored.
+   * A database whose plain reads in a transaction see its snapshot instead
    * sets one, so the row comes back as stored.
    */
   protected readonly rereadLock?: FindOneOptions<Entity>['lock'];
 
   /**
-   * The lock a write takes on the row it is about to change, in the write's
-   * transaction, so no other transaction changes or removes the row before
-   * the write saves it. A database with one connection, which runs one
-   * transaction at a time, needs none.
+   * The lock a write takes on the row it is about to change, only inside the
+   * caller's transaction, so no other transaction changes or removes the row
+   * before the write saves it. Outside one there is no lock to hold. A
+   * database with one connection, which runs one transaction at a time,
+   * needs none.
    */
   protected readonly rowLock?: FindOneOptions<Entity>['lock'] = {
     mode: 'pessimistic_write',
@@ -177,16 +177,19 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * `work` on the repository of the caller's transaction, started on first
+   * `work` on the repository of the caller's transaction, joined on first
    * use via `getOrStart()`, or, when `ctx` carries none, on the data
-   * source's own repository through `outsideTransaction`.
+   * source's own repository through `outsideTransaction`. `inRun` tells
+   * `work` which: a row lock holds only inside the caller's transaction.
    */
   protected async withRepo<T>(
     ctx: AppContextLike | undefined,
-    work: (repo: Repository<Entity>) => Promise<T>,
+    work: (repo: Repository<Entity>, inRun: boolean) => Promise<T>,
   ): Promise<T> {
     const repo = await this.transactionRepo(ctx);
-    return repo ? work(repo) : this.outsideTransaction(() => work(this.repo));
+    return repo
+      ? work(repo, true)
+      : this.outsideTransaction(() => work(this.repo, false));
   }
 
   /**
@@ -598,15 +601,15 @@ export abstract class TypeOrmRepository<
     entity: DeepPartial<Entity>,
     options?: RepositoryUpsertOptions,
   ): Promise<Entity> {
-    return this.withRepo(options?.ctx, (repo) =>
-      this.upsertOn(repo, entity, options?.ctx),
+    return this.withRepo(options?.ctx, (repo, inRun) =>
+      this.upsertOn(repo, entity, inRun),
     );
   }
 
   private async upsertOn(
     repo: Repository<Entity>,
     entity: DeepPartial<Entity>,
-    ctx: AppContextLike | undefined,
+    inRun: boolean,
   ): Promise<Entity> {
     const instance = this.toEntity(entity);
     const versionColumn = this.getVersionColumn();
@@ -636,7 +639,7 @@ export abstract class TypeOrmRepository<
       where: primaryWhere,
       withDeleted: true,
       loadEagerRelations: false,
-      lock: this.joinsTransaction(ctx) ? this.rereadLock : undefined,
+      lock: inRun ? this.rereadLock : undefined,
     });
 
     if (!result) {
@@ -669,11 +672,12 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * `update`/`replace`'s write when no version guard applies, in one
-   * transaction: a locking read of the row `entity`'s primary key names, so
-   * a row no longer stored is not found (`save()` would insert it again),
-   * then `save()` of that key and `data`, then a re-read, so the row returned
-   * is the row written.
+   * `update`/`replace`'s write when no version guard applies: a read of the
+   * row `entity`'s primary key names, so a row no longer stored is not found
+   * (`save()` would insert it again), then `save()` of that key and `data`,
+   * then a re-read, so the row returned is the row written. In the caller's
+   * transaction the read locks the row; outside one, another writer can
+   * change or remove it between the read and the save.
    *
    * `save()` writes only the columns it is given, so a column the caller's
    * `entity` holds a stale value for keeps the value stored by a later
@@ -697,33 +701,29 @@ export abstract class TypeOrmRepository<
     const primaryWhere: FindOptionsWhere<Entity> = {};
     primaryWhere[primaryColumn] = entity[primaryColumn];
 
-    const run = (txCtx?: AppContextLike): Promise<Entity> =>
-      this.withRepo(txCtx, (repo) => write(repo));
-    const write = async (repo: Repository<Entity>): Promise<Entity> => {
-      if (!(await this.lockRow(repo, primaryWhere))) {
+    return this.withRepo(ctx, async (repo, inRun) => {
+      if (!(await this.lockRow(repo, primaryWhere, inRun))) {
         throw new EntityNotFoundException(this.metadata.name, operation);
       }
-      return this.saveData(repo, primaryWhere, data, operation);
-    };
-
-    return this.options.transactionScope && !this.joinsTransaction(ctx)
-      ? this.inOwnTransaction(this.options.transactionScope, ctx, run)
-      : run(ctx);
+      return this.saveData(repo, primaryWhere, data, operation, inRun);
+    });
   }
 
   /**
-   * The row `where` names, whatever its delete date, locked until the
-   * transaction ends; `null` when there is none.
+   * The row `where` names, whatever its delete date, or `null` when there is
+   * none. In the caller's transaction (`inRun`) it is locked until that
+   * transaction ends; outside one there is no lock to hold.
    */
   private lockRow(
     repo: Repository<Entity>,
     where: FindOptionsWhere<Entity>,
+    inRun: boolean,
   ): Promise<Entity | null> {
     return repo.findOne({
       where,
       withDeleted: true,
       loadEagerRelations: false,
-      lock: this.rowLock,
+      lock: inRun ? this.rowLock : undefined,
     });
   }
 
@@ -735,12 +735,13 @@ export abstract class TypeOrmRepository<
     repo: Repository<Entity>,
     where: FindOptionsWhere<Entity>,
     operation: string,
+    inRun: boolean,
   ): Promise<Entity> {
     const row = await repo.findOne({
       where,
       withDeleted: true,
       loadEagerRelations: false,
-      lock: this.rereadLock,
+      lock: inRun ? this.rereadLock : undefined,
     });
     if (!row) {
       throw new EntityNotFoundException(this.metadata.name, operation);
@@ -749,43 +750,15 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * Whether `ctx` carries the caller's transaction, which a write then
-   * joins directly. A run of the driver's own, nested in the caller's,
-   * would fail the caller's whole scope on any error it saw.
-   */
-  private joinsTransaction(ctx: AppContextLike | undefined): boolean {
-    const context = AppContextHost.from(ctx);
-    return context.supports(TrxCtx) && context.with(TrxCtx).trx.isSupported;
-  }
-
-  /**
-   * Run `work` in a transaction of its own, opened on a child of `ctx`. The
-   * child holds everything the caller's context does, but the transaction
-   * never shows on the caller's context, so another call made with that
-   * context at the same time takes no part in it.
-   */
-  private inOwnTransaction<T>(
-    scope: TransactionScope,
-    ctx: AppContextLike | undefined,
-    work: (txCtx: AppContextLike) => Promise<T>,
-  ): Promise<T> {
-    const child = AppContextHost.from(Object.create(AppContextHost.from(ctx)));
-    return scope.run(child, work);
-  }
-
-  /**
    * Run `op` guarded by the version in `guard`, identifying the row by
    * `entity`'s primary key.
    *
-   * The check is a locking read of the row at the expected version: no row
-   * means someone else wrote or removed it first, so it throws
-   * `OptimisticLockException`. The lock holds the row until the transaction
-   * ends, so no other writer changes it before `op` saves it.
-   *
-   * The check and `op` run in one transaction: the caller's when one is
-   * active (e.g. via `@Transactional()`), or a short-lived one
-   * `TransactionScope.run()` opens for just this call, so every caller gets
-   * the same guarantee without having to opt in.
+   * The check is a read of the row at the expected version: no row means
+   * someone else wrote or removed it first, so it throws
+   * `OptimisticLockException`. In the caller's transaction the read locks
+   * the row until that transaction ends, so no other writer changes it
+   * before `op` saves it; outside one the check is best effort, and a
+   * writer can slip in between the read and `op`.
    */
   private async withVersionGuard<T>(
     entity: Entity,
@@ -794,11 +767,10 @@ export abstract class TypeOrmRepository<
     op: (
       repo: Repository<Entity>,
       primaryWhere: FindOptionsWhere<Entity>,
+      inRun: boolean,
     ) => Promise<T>,
   ): Promise<T> {
-    const run = (txCtx?: AppContextLike): Promise<T> =>
-      this.withRepo(txCtx, (repo) => guarded(repo));
-    const guarded = async (repo: Repository<Entity>): Promise<T> => {
+    return this.withRepo(ctx, async (repo, inRun) => {
       const primaryWhere: FindOptionsWhere<Entity> = {};
       const primaryColumn = this.getPrimaryColumn();
       if (primaryColumn !== undefined) {
@@ -808,44 +780,12 @@ export abstract class TypeOrmRepository<
       const lockWhere: FindOptionsWhere<Entity> = { ...primaryWhere };
       lockWhere[guard.column] = guard.value;
 
-      if (!(await this.lockRow(repo, lockWhere))) {
+      if (!(await this.lockRow(repo, lockWhere, inRun))) {
         throw new OptimisticLockException(this.metadata.name);
       }
 
-      return op(repo, primaryWhere);
-    };
-
-    if (this.joinsTransaction(ctx)) {
-      return run(ctx);
-    }
-    if (this.options.transactionScope) {
-      return this.inOwnTransaction(this.options.transactionScope, ctx, run);
-    }
-
-    // No TransactionScope wired (a repository constructed by hand rather
-    // than through RepositoryModule.forRoot(), which always provides one).
-    // If the caller is already inside their own
-    // active transaction, the guard and the write still resolve to the
-    // same connection via withRepo()/TrxCtx, so it's still safe — only
-    // refuse when neither guarantee is present, since running the guard
-    // and the write as two separate autocommit statements would silently
-    // reopen the exact race this whole mechanism exists to close.
-    const alreadyInTransaction = ctx
-      ? AppContextHost.from(ctx).supports(TrxCtx)
-      : false;
-
-    if (!alreadyInTransaction) {
-      throw new RuntimeException({
-        message:
-          'Optimistic locking for "%s" requires an active transaction — ' +
-          'import RepositoryModule.forRoot() so TransactionScope is ' +
-          'available, or wrap this call in an existing transaction',
-        messageParams: [this.metadata.name],
-        fault: 'usage',
-      });
-    }
-
-    return run(ctx);
+      return op(repo, primaryWhere, inRun);
+    });
   }
 
   /** `update`/`replace` of a versioned entity: `saveData` under the guard. */
@@ -856,8 +796,12 @@ export abstract class TypeOrmRepository<
     ctx: PlainLiteralObject | undefined,
     operation: 'update' | 'replace',
   ): Promise<Entity> {
-    return this.withVersionGuard(entity, guard, ctx, (repo, primaryWhere) =>
-      this.saveData(repo, primaryWhere, data, operation),
+    return this.withVersionGuard(
+      entity,
+      guard,
+      ctx,
+      (repo, primaryWhere, inRun) =>
+        this.saveData(repo, primaryWhere, data, operation, inRun),
     );
   }
 
@@ -872,6 +816,7 @@ export abstract class TypeOrmRepository<
     primaryWhere: FindOptionsWhere<Entity>,
     data: DeepPartial<Entity>,
     operation: 'update' | 'replace',
+    inRun: boolean,
   ): Promise<Entity> {
     const row = this.toEntity(data);
     const values: PlainLiteralObject = row;
@@ -879,7 +824,7 @@ export abstract class TypeOrmRepository<
     const versionColumn = this.getVersionColumn();
     if (versionColumn) delete values[versionColumn];
     await repo.save(row);
-    return this.reread(repo, primaryWhere, operation);
+    return this.reread(repo, primaryWhere, operation, inRun);
   }
 
   // Delete operations
@@ -939,11 +884,12 @@ export abstract class TypeOrmRepository<
   }
 
   /**
-   * `softDelete`/`restore`'s write, in one transaction: a locking read of
-   * the row `entity`'s primary key names, so a row no longer stored is not
-   * found, then `softRemove()`/`recover()` of the row as stored, then a
-   * re-read, so the row returned is the row as stored rather than the
-   * caller's copy. Guarded by the version when the caller states one.
+   * `softDelete`/`restore`'s write: a read of the row `entity`'s primary key
+   * names, so a row no longer stored is not found, then
+   * `softRemove()`/`recover()` of the row as stored, then a re-read, so the
+   * row returned is the row as stored rather than the caller's copy. The
+   * read locks the row in the caller's transaction. Guarded by the version
+   * when the caller states one.
    */
   private async setRemoved(
     entity: Entity,
@@ -954,8 +900,9 @@ export abstract class TypeOrmRepository<
     const write = async (
       repo: Repository<Entity>,
       primaryWhere: FindOptionsWhere<Entity>,
+      inRun: boolean,
     ): Promise<Entity> => {
-      const stored = await this.lockRow(repo, primaryWhere);
+      const stored = await this.lockRow(repo, primaryWhere, inRun);
       if (!stored) {
         throw new EntityNotFoundException(this.metadata.name, operation);
       }
@@ -964,7 +911,7 @@ export abstract class TypeOrmRepository<
       await (operation === 'softDelete'
         ? repo.softRemove(row)
         : repo.recover(row));
-      return this.reread(repo, primaryWhere, operation);
+      return this.reread(repo, primaryWhere, operation, inRun);
     };
 
     if (options?.versionGuard) {
@@ -981,12 +928,9 @@ export abstract class TypeOrmRepository<
     if (primaryColumn !== undefined) {
       primaryWhere[primaryColumn] = entity[primaryColumn];
     }
-    const ctx = options?.ctx;
-    const run = (txCtx?: AppContextLike): Promise<Entity> =>
-      this.withRepo(txCtx, (repo) => write(repo, primaryWhere));
-    return this.options.transactionScope && !this.joinsTransaction(ctx)
-      ? this.inOwnTransaction(this.options.transactionScope, ctx, run)
-      : run(ctx);
+    return this.withRepo(options?.ctx, (repo, inRun) =>
+      write(repo, primaryWhere, inRun),
+    );
   }
 
   /**
