@@ -22,6 +22,8 @@ import { type DurableDriverInterface } from '../interfaces/durable-driver.interf
 
 import {
   DurableDriverFixture,
+  DurableFeatureModuleFixture,
+  DurableHandlerFixture,
   DurableMemoryRepositoryModuleFixture,
   durableStoreFixture,
   RefusingDurableDriverFixture,
@@ -37,6 +39,7 @@ async function createApp(
     key?: string;
     driver?: Type<DurableDriverInterface>;
     twice?: 'other-outbox-options' | 'same-outbox-options';
+    feature?: Type;
   } = {},
 ): Promise<TestingModule> {
   const outbox = { relay: { enabled: false } };
@@ -67,6 +70,7 @@ async function createApp(
             }),
           ]
         : []),
+      ...(options.feature ? [options.feature] : []),
     ],
   }).compile();
 
@@ -286,6 +290,15 @@ describe(DurableMessaging.name, () => {
   });
 
   describe('startup', () => {
+    it('is injectable in a feature module that does not import it', async () => {
+      const app = await createApp({ feature: DurableFeatureModuleFixture });
+
+      expect(app.get(DurableHandlerFixture).durable).toBe(
+        app.get(DurableMessaging),
+      );
+      await app.close();
+    });
+
     it('refuses a registration its driver cannot bind', async () => {
       await expect(
         createApp({ driver: RefusingDurableDriverFixture }),

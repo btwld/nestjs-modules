@@ -2791,8 +2791,9 @@ What to know:
 - Startup refuses, with `UnsupportedDurableDriverException`, a key nothing is
   registered under and a registration its driver cannot carry: no
   transactions, or a database `@nestjs/outbox` has no store for.
-- Import `DurableMessagingModule.forRoot()` once per application. A second
-  one fails startup.
+- Import `DurableMessagingModule.forRoot()` once per application; it is
+  global, so `DurableMessaging` is injectable in every module. A second
+  import fails startup.
 - Delivery is at least once: a handler that does not use `once` must be
   idempotent.
 - `OutboxInbox`, `OutboxDeadLetters` and `OutboxRelay` from `@nestjs/outbox`

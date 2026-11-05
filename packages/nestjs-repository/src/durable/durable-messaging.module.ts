@@ -19,8 +19,8 @@ import { type DurableMessagingOptionsInterface } from './interfaces/durable-mess
 /**
  * Durable messaging for one registration: sets up `OutboxModule`, asks the
  * registration's driver for a store on its datasource, and provides
- * `DurableMessaging`. Import `forRoot()` once per application, after
- * `RepositoryModule.forRoot()`.
+ * `DurableMessaging`, injectable in every module. Import `forRoot()` once
+ * per application, after `RepositoryModule.forRoot()`.
  */
 @Module({})
 export class DurableMessagingModule {
@@ -29,6 +29,7 @@ export class DurableMessagingModule {
 
     return {
       module: DurableMessagingModule,
+      global: true,
       imports: [OutboxModule.forRoot(outbox)],
       providers: [
         driver,

@@ -1,10 +1,11 @@
-import { Injectable, Module } from '@nestjs/common';
+import { Inject, Injectable, Module } from '@nestjs/common';
 import { InMemoryOutboxStore } from '@nestjs/outbox';
 
 import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-repository.module.fixture.js';
 import { type DynamicRepositoryModule } from '../../interfaces/repository-module.interface.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
 import { type TransactionInterface } from '../../transaction/interfaces/transaction.interface.js';
+import { DurableMessaging } from '../durable-messaging.service.js';
 import { UnsupportedDurableDriverException } from '../exceptions/unsupported-durable-driver.exception.js';
 import { type DurableBindingInterface } from '../interfaces/durable-binding.interface.js';
 import { type DurableDriverInterface } from '../interfaces/durable-driver.interface.js';
@@ -104,6 +105,15 @@ export class DurableDriverFixture implements DurableDriverInterface {
     };
   }
 }
+
+/** A handler in a feature module that does not import durable messaging. */
+@Injectable()
+export class DurableHandlerFixture {
+  constructor(@Inject(DurableMessaging) readonly durable: DurableMessaging) {}
+}
+
+@Module({ providers: [DurableHandlerFixture] })
+export class DurableFeatureModuleFixture {}
 
 /** A driver that cannot carry durable messaging. */
 @Injectable()
