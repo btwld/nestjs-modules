@@ -34,7 +34,8 @@ export class FileStorageService {
   }
 
   /**
-   * The file with its upload target and signed download URL, for create.
+   * The file with its upload target, for create. A new file is pending, so
+   * no download URL is issued.
    */
   async toCreatedResult(
     ctx: PlainLiteralObject,
@@ -52,20 +53,23 @@ export class FileStorageService {
       });
     }
 
-    const { signedDownloadUrl } = await this.toReadResult(ctx, file);
-
-    return { file, upload, signedDownloadUrl };
+    return { file, upload };
   }
 
   /**
-   * The file with its signed download URL, for confirm and reads. Never
-   * asks for an upload URL.
+   * The file, for confirm and reads, with a signed download URL only when
+   * it is downloadable (`active` and not soft-deleted); storage isn't asked
+   * for one otherwise. Never asks for an upload target.
    */
   async toReadResult(
     ctx: PlainLiteralObject,
     file: File,
   ): Promise<FileReadResultInterface> {
     const storageService = this.resolve(file.serviceKey);
+
+    if (!file.isDownloadable) {
+      return { file };
+    }
 
     try {
       const signedDownloadUrl = await storageService.getSignedDownloadUrl(

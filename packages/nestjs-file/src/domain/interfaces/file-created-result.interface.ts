@@ -17,9 +17,4 @@ export interface FileCreatedResultInterface {
    * create.
    */
   upload: FileUploadTargetInterface;
-
-  /**
-   * Signed, expiring URL the client GETs the file's bytes from.
-   */
-  signedDownloadUrl: string;
 }

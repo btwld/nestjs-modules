@@ -63,6 +63,13 @@ export class File extends MutableAggregate<FileInterface> {
   }
 
   /**
+   * Whether a download URL may be issued: `active` and not soft-deleted.
+   */
+  get isDownloadable(): boolean {
+    return !this.isSoftDeleted && this.status === 'active';
+  }
+
+  /**
    * Whether the upload is confirmed: confirming again changes nothing.
    */
   get isUploadConfirmed(): boolean {

@@ -160,6 +160,24 @@ describe(File.name, () => {
     expect(createMockFile({ status }).isUploadConfirmed).toEqual(expected);
   });
 
+  describe('isDownloadable', () => {
+    it.each<[FileStatus, boolean]>([
+      ['pending', false],
+      ['active', true],
+      ['removing', false],
+      ['remove-failed', false],
+    ])('is %s → %s', (status, expected) => {
+      expect(createMockFile({ status }).isDownloadable).toEqual(expected);
+    });
+
+    it('is false for a soft-deleted active file', () => {
+      expect(
+        createMockFile({ status: 'active', dateDeleted: new Date() })
+          .isDownloadable,
+      ).toEqual(false);
+    });
+  });
+
   describe('removed', () => {
     it('applies FileRemovedEvent while removing', () => {
       const file = createMockFile({ status: 'removing' });

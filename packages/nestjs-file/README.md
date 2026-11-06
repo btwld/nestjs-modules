@@ -21,6 +21,7 @@ upload and download URLs, and tracks each file from upload to removal.
 - [The File Aggregate](#the-file-aggregate)
 - [Commands](#commands)
 - [Queries](#queries)
+- [Download Access](#download-access)
 - [Domain Events](#domain-events)
 - [Referring to a File](#referring-to-a-file)
 - [Writing a Controller](#writing-a-controller)
@@ -296,9 +297,9 @@ pick a bucket or prefix from it.
 
 | Status | What it means for you |
 | --- | --- |
-| `pending` | Created. Upload to the `upload` target, then confirm. |
-| `active` | Confirmed and ready to download. |
-| `removing` | A removal is running, or was interrupted. The file stays readable until it's gone. Remove it again to finish. |
+| `pending` | Created. Upload to the `upload` target, then confirm. No download URL yet. |
+| `active` | Confirmed and ready to download. The only status that gets a download URL. |
+| `removing` | A removal is running, or was interrupted. You can still read the record, without a download URL, until it's gone. Remove it again to finish. |
 | `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
 
 **Soft delete** a `pending` or `active` file to hide it from reads while
@@ -347,13 +348,15 @@ Change a file only through the commands; they apply the rules and write it.
 
 | Result | Properties |
 | --- | --- |
-| `FileCreatedResultInterface` | `file`, `upload` (`{ url, method, headers?, fields? }`), `signedDownloadUrl` |
-| `FileReadResultInterface` | `file`, `signedDownloadUrl` |
+| `FileCreatedResultInterface` | `file`, `upload` (`{ url, method, headers?, fields? }`) |
+| `FileReadResultInterface` | `file`, and `signedDownloadUrl` when the file is `active` and not soft-deleted |
 
-Create is the only command that gives you an `upload` target; confirm and
-reads give you `signedDownloadUrl`. If storage can't produce one, you get
-`FileUploadTargetException` or `FileDownloadUrlException`, and a failed create
-leaves nothing behind.
+Create is the only command that gives you an `upload` target. Confirm and
+reads give you a `signedDownloadUrl` only for an `active` file: anything not
+yet confirmed, or being removed, comes back without one, so nobody can fetch
+bytes that haven't been accepted. If storage can't produce a target or URL,
+you get `FileUploadTargetException` or `FileDownloadUrlException`, and a
+failed create leaves nothing behind.
 
 Create and confirm wait for your storage service inside a transaction, so keep
 those calls fast: past the transaction timeout (30 seconds by default) the
@@ -370,9 +373,9 @@ Pass the name the user picked; create stores a safe display name.
 
 A name with nothing left, such as `..`, throws `FileNameInvalidException`.
 Names don't have to be unique: several files can be called `insurance.pdf`,
-each with its own `id`. Quotes and semicolons are kept, so encode the name
-when you put it in a `Content-Disposition` header
-(`filename*=UTF-8''…`, RFC 6266).
+each with its own `id`. Quotes, apostrophes and semicolons are kept, so build
+a `Content-Disposition` header with the `content-disposition` package rather
+than by hand (see [Download Access](#download-access)).
 
 **Dispatch `RemoveFileCommand` outside any transaction**, including the
 transactional interceptor; inside one it throws
@@ -404,6 +407,66 @@ const { signedDownloadUrl } = await this.queryBus.execute(
   new GetFileQuery(ctx, id, { status: ['active'] }),
 );
 ```
+
+## Download Access
+
+A file is private: the module hands out its bytes only through a signed
+download URL, and only for an `active` file. But a signed URL is a bearer
+token.
+Anyone holding it can download the file until it expires, even after you
+take their permission away. So:
+
+- **Keep expiries short.** Sign download URLs for minutes, not days (the S3
+  example uses 300 seconds), and sign a fresh one per request.
+- **Serve through your own route when access must stop at once.** Your
+  controller checks the caller's permission on every request and streams the
+  object itself, so revoking permission takes effect on the next request:
+
+```ts
+import { Readable } from 'node:stream';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+
+// In S3StorageService
+async openReadStream(file: FileObjectInterface): Promise<Readable> {
+  const { Body } = await this.client.send(
+    new GetObjectCommand({ Bucket: this.bucket, Key: file.id }),
+  );
+  if (!(Body instanceof Readable)) {
+    throw new Error(`No readable body for file ${file.id}`);
+  }
+  return Body;
+}
+```
+
+```ts
+import { Get, Param, StreamableFile, type PlainLiteralObject } from '@nestjs/common';
+import contentDisposition from 'content-disposition';
+
+// In FileController
+@Get(':id/content')
+async content(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+  const { file } = await this.queryBus.execute(
+    new GetFileQuery(ctx, id, { status: ['active'] }),
+  );
+
+  // Your rule: tenant, role, and the record the file belongs to.
+  await this.fileAccess.assertCanRead(ctx, file);
+
+  return new StreamableFile(await this.s3.openReadStream(file.toPlain()), {
+    type: file.contentType,
+    length: file.size,
+    disposition: contentDisposition(file.fileName),
+  });
+}
+```
+
+`GetFileQuery` with `status: ['active']` throws `FileNotFoundException` for
+anything else, so the route never streams a file that hasn't been accepted.
+The module ships no permission check: who may read which file is yours to
+decide, in `assertCanRead`. `contentDisposition` (the
+[`content-disposition`](https://www.npmjs.com/package/content-disposition)
+package Express uses; add `@types/content-disposition` for its types) encodes
+any file name safely.
 
 ## Domain Events
 

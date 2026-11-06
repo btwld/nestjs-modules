@@ -120,6 +120,25 @@ describe('file lifecycle (e2e)', () => {
     expect(read.file.id).toEqual(file.id);
   });
 
+  it('issues no download url until the upload is confirmed', async () => {
+    const created = await commandBus.execute(new CreateFileCommand({}, dto));
+    expect(created).not.toHaveProperty('signedDownloadUrl');
+
+    const pending = await queryBus.execute(
+      new GetFileQuery({}, created.file.id),
+    );
+    expect(pending).toEqual({ file: expect.any(Object) });
+    expect(pending.file.status).toEqual('pending');
+    expect(storage.getSignedDownloadUrl).not.toHaveBeenCalled();
+
+    const confirmed = await commandBus.execute(
+      new ConfirmFileUploadCommand({}, created.file.id),
+    );
+    expect(confirmed.signedDownloadUrl).toEqual(
+      `https://download.test/${created.file.id}`,
+    );
+  });
+
   it('stores files that share a name as separate objects', async () => {
     const first = await commandBus.execute(new CreateFileCommand({}, dto));
     const second = await commandBus.execute(new CreateFileCommand({}, dto));

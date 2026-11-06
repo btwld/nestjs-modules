@@ -37,13 +37,14 @@ describe(CreateFileHandler.name, () => {
     );
   });
 
-  it('creates the file in a transaction and returns the upload target and download url', async () => {
+  it('creates the file in a transaction and returns the upload target, never a download url', async () => {
     const result = await handler.execute(new CreateFileCommand({}, dto));
 
     expect(fileLifecycle.create).toHaveBeenCalledWith(expect.anything(), dto);
     expect(result.file.status).toEqual('pending');
     expect(result.upload.url).toEqual('https://upload.test/file-1');
-    expect(result.signedDownloadUrl).toEqual('https://download.test/file-1');
+    expect(result).not.toHaveProperty('signedDownloadUrl');
+    expect(storage.getSignedDownloadUrl).not.toHaveBeenCalled();
     expect(mocks.trxHandle.onCommit).toHaveBeenCalledTimes(1);
     expect(mocks.trxHandle.onRollback).toHaveBeenCalledTimes(1);
   });
