@@ -12,8 +12,9 @@ import {
 } from '@nestjs/outbox/postgres';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
-import { type RepositoryInterface } from '@concepta/nestjs-repository';
+import { type RepositoryAdapter } from '@concepta/nestjs-repository';
 import {
+  type DurableBindingInterface,
   type DurableDriverInterface,
   UnsupportedDurableDriverException,
 } from '@concepta/nestjs-repository/optional/outbox';
@@ -36,11 +37,11 @@ export class TypeOrmDurable implements DurableDriverInterface {
   constructor(private readonly moduleRef: ModuleRef) {}
 
   bind(
-    repository: RepositoryInterface<PlainLiteralObject>,
-  ): ReturnType<DurableDriverInterface['bind']> {
+    repository: RepositoryAdapter<PlainLiteralObject>,
+  ): DurableBindingInterface {
     if (!(repository instanceof TypeOrmRepository)) {
       throw new UnsupportedDurableDriverException(
-        repository.metadata.name,
+        repository.entityKey,
         'its repository is not a TypeORM repository',
       );
     }

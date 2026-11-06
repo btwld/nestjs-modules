@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock, mockDeep } from 'vitest-mock-extended';
 
 import { type PlainLiteralObject } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
@@ -10,7 +10,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 
 import {
   getDynamicRepositoryToken,
-  type RepositoryInterface,
+  type RepositoryAdapter,
 } from '@concepta/nestjs-repository';
 import {
   DurableMessagingModule,
@@ -102,14 +102,20 @@ describe(TypeOrmDurable.name, () => {
       );
     });
 
-    it('refuses a repository that is not a TypeORM repository', () => {
+    it('refuses a repository that is not a TypeORM repository, naming its key', () => {
       const { durable } = durableResolving(
         new DataSource({ type: 'postgres' }),
       );
-      const other = mockDeep<RepositoryInterface<PlainLiteralObject>>();
+      const other = mock<RepositoryAdapter<PlainLiteralObject>>({
+        entityKey: 'others',
+        metadata: { name: 'OtherEntity' },
+      });
 
       expect(() => durable.bind(other)).toThrow(
         UnsupportedDurableDriverException,
+      );
+      expect(() => durable.bind(other)).toThrow(
+        'The "others" registration cannot carry durable messaging',
       );
     });
 
