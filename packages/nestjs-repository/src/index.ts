@@ -30,6 +30,8 @@ export {
   TransactionFactoryDescriptor,
 } from './interfaces/repository-module.interface.js';
 export {
+  RepositoryDriverEntityOptions,
+  RepositoryDriverOptions,
   RepositoryDriverRegistration,
   RepositoryRootAsyncOptions,
   RepositoryRootOptions,

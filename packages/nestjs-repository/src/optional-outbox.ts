@@ -12,4 +12,5 @@ export { DurableMessaging } from './durable/durable-messaging.service.js';
 export { DurableMessagingModule } from './durable/durable-messaging.module.js';
 export { DurableMessagingOptionsInterface } from './durable/interfaces/durable-messaging-options.interface.js';
 export { DurableDriverInterface } from './durable/interfaces/durable-driver.interface.js';
+export { DurableBindingInterface } from './durable/interfaces/durable-binding.interface.js';
 export { UnsupportedDurableDriverException } from './durable/exceptions/unsupported-durable-driver.exception.js';
