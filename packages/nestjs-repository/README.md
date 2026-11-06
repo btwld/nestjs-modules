@@ -333,6 +333,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | `getDeleteDateColumn()` | public | Get the soft-remove date column name from metadata, if any |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
 | `endsTransaction(error)` | protected | Whether the database ended the caller's transaction after `error` (a deadlock); `true` fails the scope (subclass-author API) |
+| `distinctKeys(keys)` | protected | `keys` without repeats, compared as the repository compares keys (dates by time, binary keys by bytes) — what a `deleteMany` that may name a row twice is checked against (subclass-author API) |
 | `runHooks(methodKey, payload, ctx, filter?)` | protected | Execute repository hooks for a lifecycle event; `filter` selects by hook metadata, which is how `{ replace: true }` routing works (subclass-author API) |
 | `allowsEagerRelations` | public | Whether the entity set `allowEagerRelations`, so a driver knows whether to load eager relations |
 
@@ -3010,7 +3011,7 @@ also exported for manual provider wiring.
 | `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
 | `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
-| `EntityNotFoundException` | An `update` or `replace` on an entity without a version column named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404) |
+| `EntityNotFoundException` | An `update`, `replace`, `delete` or `deleteMany` on an entity without a version column named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404). A `deleteMany` naming one deletes none of the others |
 | `SoftDeletedImmutableException` | An `update`, `replace` or `upsert` targeted a soft-deleted row (409 Conflict). `restore` it first — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `PrimaryKeyImmutableException` | An `update` or `replace` was given data that changes the primary key of the row it names (400). Delete and create to move a record to a new key |
 | `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |

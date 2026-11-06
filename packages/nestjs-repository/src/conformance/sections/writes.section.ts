@@ -275,6 +275,43 @@ export function writesSection(ctx: ConformanceContext): void {
     ]);
   });
 
+  it('doDelete: a row deleted after it was read is not found', async () => {
+    const created = await ctx
+      .repo('item')
+      .create({ name: 'gone', rank: null, note: null });
+    await ctx.repo('item').delete(created);
+
+    await assert.rejects(
+      ctx.repo('item').delete(created),
+      EntityNotFoundException,
+    );
+  });
+
+  it('doDeleteMany: a row deleted after it was read is not found, and deletes none of the others', async () => {
+    const [kept, gone] = await ctx.repo('item').createMany([
+      { name: 'kept', rank: null, note: null },
+      { name: 'gone', rank: null, note: null },
+    ]);
+    assert.ok(kept && gone);
+    await ctx.repo('item').delete(gone);
+
+    await assert.rejects(
+      ctx.repo('item').deleteMany([kept, gone]),
+      EntityNotFoundException,
+    );
+    assert.equal((await readItem(kept.id))?.name, 'kept');
+  });
+
+  it('doDeleteMany: a row named twice is deleted once', async () => {
+    const created = await ctx
+      .repo('item')
+      .create({ name: 'twice', rank: null, note: null });
+
+    await ctx.repo('item').deleteMany([created, created]);
+
+    assert.equal(await readItem(created.id), null);
+  });
+
   if (softDelete) {
     it('doSoftDelete and doRestore: set and clear the remove date', async () => {
       const created = await ctx

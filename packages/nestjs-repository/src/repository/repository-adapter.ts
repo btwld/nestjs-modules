@@ -1879,6 +1879,17 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * `keys` without repeats, compared as `sameKey` compares them: what a
+   * driver checks a `deleteMany` against, which may name a row twice.
+   */
+  protected distinctKeys(keys: unknown[]): unknown[] {
+    return keys.filter(
+      (key, index) =>
+        keys.findIndex((other) => this.sameKey(other, key)) === index,
+    );
+  }
+
+  /**
    * Whether two key values are the same: identical, dates of the same time,
    * or binary keys with the same bytes.
    */

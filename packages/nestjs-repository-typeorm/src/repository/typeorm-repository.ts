@@ -852,9 +852,10 @@ export abstract class TypeOrmRepository<
       );
     }
 
-    const [deleted] = await this.withRepo(options?.ctx, (repo) =>
-      this.remove(repo, [entity]),
-    );
+    const [deleted] = await this.withRepo(options?.ctx, async (repo, inRun) => {
+      await this.assertStored(repo, [entity], 'delete', inRun);
+      return this.remove(repo, [entity]);
+    });
     return deleted;
   }
 
@@ -862,7 +863,43 @@ export abstract class TypeOrmRepository<
     entities: Entity[],
     options?: RepositoryDeleteOptions,
   ): Promise<Entity[]> {
-    return this.withRepo(options?.ctx, (repo) => this.remove(repo, entities));
+    if (entities.length === 0) return [];
+    return this.withRepo(options?.ctx, async (repo, inRun) => {
+      await this.assertStored(repo, entities, 'deleteMany', inRun);
+      return this.remove(repo, entities);
+    });
+  }
+
+  /**
+   * Refuse a delete naming a row that is not stored, before any is removed:
+   * `remove()` passes over a missing row. The rows are locked in the
+   * caller's transaction (`inRun`), as `lockRow` locks one.
+   */
+  private async assertStored(
+    repo: Repository<Entity>,
+    entities: Entity[],
+    operation: string,
+    inRun: boolean,
+  ): Promise<void> {
+    const primaryColumn = this.getPrimaryColumn();
+    if (primaryColumn === undefined) return;
+
+    const keys = this.distinctKeys(
+      entities.map((entity) => entity[primaryColumn]),
+    );
+    const where = Object.assign<
+      FindOptionsWhere<Entity>,
+      Record<string, FindOperator<unknown>>
+    >({}, { [primaryColumn]: In(keys) });
+    const stored = await repo.find({
+      where,
+      withDeleted: true,
+      loadEagerRelations: false,
+      lock: inRun ? this.rowLock : undefined,
+    });
+    if (stored.length < keys.length) {
+      throw new EntityNotFoundException(this.metadata.name, operation);
+    }
   }
 
   /**

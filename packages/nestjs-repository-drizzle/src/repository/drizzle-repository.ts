@@ -704,8 +704,9 @@ export abstract class DrizzleRepository<
     const deleted = await this.withClient(options?.ctx, (client) =>
       this.deleteRows(client, where),
     );
-    if (deleted === 0 && guard) {
-      throw new OptimisticLockException(this.metadata.name);
+    if (deleted === 0) {
+      if (guard) throw new OptimisticLockException(this.metadata.name);
+      throw new EntityNotFoundException(this.metadata.name, 'delete');
     }
     return this.toEntity(entity);
   }
@@ -716,13 +717,19 @@ export abstract class DrizzleRepository<
   ): Promise<Entity[]> {
     if (entities.length === 0) return [];
     const primary = this.primaryColumn('deleteMany');
-    const where = inArray(
-      primary.column,
-      entities.map((entity) => entity[primary.key]),
-    );
-    await this.withClient(options?.ctx, (client) =>
-      this.deleteRows(client, where),
-    );
+    const keys = entities.map((entity) => entity[primary.key]);
+    const where = inArray(primary.column, keys);
+    const expected = this.distinctKeys(keys).length;
+    // Every row named must be there: counted first, so a missing one
+    // deletes none of the others, and checked again after.
+    await this.withClient(options?.ctx, async (client) => {
+      if (
+        (await this.countRows(client, where)) < expected ||
+        (await this.deleteRows(client, where)) < expected
+      ) {
+        throw new EntityNotFoundException(this.metadata.name, 'deleteMany');
+      }
+    });
     return entities.map((entity) => this.toEntity(entity));
   }
 
