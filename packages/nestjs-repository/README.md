@@ -3011,7 +3011,7 @@ also exported for manual provider wiring.
 | `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
 | `RepositoryDuplicateUrnException` | Two registrations read the same rows (the same URN), detected at startup |
 | `EntityAlreadyExistsException` | A `create`/`createMany` supplied a primary key that already names a row — create inserts, it never updates. Use `upsert` for insert-or-update |
-| `EntityNotFoundException` | An `update`, `replace`, `delete` or `deleteMany` on an entity without a version column named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404). A `deleteMany` naming one deletes none of the others |
+| `EntityNotFoundException` | An `update` or `replace` on an entity without a version column, or a `delete` or `deleteMany` without `expectedVersion`, named a row that is no longer stored, such as one another request deleted after it was read (HTTP 404). A `deleteMany` naming one deletes none of the others, nor their cascaded rows |
 | `SoftDeletedImmutableException` | An `update`, `replace` or `upsert` targeted a soft-deleted row (409 Conflict). `restore` it first — see [Soft-Deleted Immutability](#soft-deleted-immutability) |
 | `PrimaryKeyImmutableException` | An `update` or `replace` was given data that changes the primary key of the row it names (400). Delete and create to move a record to a new key |
 | `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |

@@ -18,6 +18,7 @@ import { type CascadeRelation } from '../cascade/cascade-relation.interface.js';
 import { CascadeWriter } from '../cascade/cascade-writer.js';
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
+import { EntityNotFoundException } from '../exceptions/entity-not-found.exception.js';
 import { HookBootException } from '../exceptions/hook-boot.exception.js';
 import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
 import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
@@ -1478,6 +1479,9 @@ export abstract class RepositoryAdapter<
             options?.ctx,
           )
         ).map((entity) => this.toStoredRow(entity));
+        if (this.cascadeRelations.size > 0) {
+          await this.assertAllStored(values, options?.ctx);
+        }
         for (const value of values) {
           await this.cascade.remove(value, 'delete', options?.ctx);
         }
@@ -1738,6 +1742,31 @@ export abstract class RepositoryAdapter<
    * An equality clause on the primary key, read as given, or `undefined` when
    * the key is absent — nothing to identify a row with.
    */
+  /**
+   * Refuse a `deleteMany` naming a row that is no longer stored before its
+   * cascade runs: the cascade removes each row's related rows first, so a
+   * refusal from the driver would come after the others' were gone. Reads
+   * through `doFind`, bypassing hooks and row scope, like the create guard;
+   * the write scope has already checked the rows.
+   */
+  private async assertAllStored(
+    rows: Entity[],
+    ctx?: PlainLiteralObject,
+  ): Promise<void> {
+    const primaryColumn = this.getPrimaryColumn();
+    if (primaryColumn === undefined) return;
+
+    const keys = this.distinctKeys(rows.map((row) => row[primaryColumn]));
+    const stored = await this.doFind({
+      where: Where.in(primaryColumn, keys),
+      withDeleted: true,
+      ctx,
+    });
+    if (stored.length < keys.length) {
+      throw new EntityNotFoundException(this.metadata.name, 'deleteMany');
+    }
+  }
+
   private keyClause(entity: DeepPartial<Entity>): WhereClause | undefined {
     const primaryColumn = this.getPrimaryColumn();
     if (primaryColumn === undefined || !isObject(entity)) return undefined;

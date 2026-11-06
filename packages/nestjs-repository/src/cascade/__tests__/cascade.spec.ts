@@ -42,6 +42,7 @@ import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-
 import { type TenantScopeFixture } from '../../__fixtures__/memory/order-row-scope.fixture.js';
 import { CascadeWriteException } from '../../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../../exceptions/entity-already-exists.exception.js';
+import { EntityNotFoundException } from '../../exceptions/entity-not-found.exception.js';
 import { PrimaryKeyImmutableException } from '../../exceptions/primary-key-immutable.exception.js';
 import { RelationWriteException } from '../../exceptions/relation-write.exception.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
@@ -687,5 +688,46 @@ describe('cascade startup checks', () => {
 
       expect(payment.refunds?.map(({ amount }) => amount)).toEqual([1]);
     });
+  });
+});
+
+describe('cascading without row scope', () => {
+  const unscoped = (options: RepositoryProviderOptions) => {
+    const { rowScope: _rowScope, ...rest } = options;
+    return rest;
+  };
+
+  let moduleRef: TestingModule;
+  let invoices: MemoryRepositoryFixture<InvoiceFixture>;
+  let lines: MemoryRepositoryFixture<InvoiceLineFixture>;
+
+  beforeEach(async () => {
+    moduleRef = await compile(
+      [INVOICES, LINES, NOTES, RECEIPTS].map(unscoped),
+      false,
+    );
+    await moduleRef.init();
+    invoices = moduleRef.get(getDynamicRepositoryToken(INVOICE_TOKEN));
+    lines = moduleRef.get(getDynamicRepositoryToken(INVOICE_LINE_TOKEN));
+  });
+
+  afterEach(async () => {
+    await moduleRef.close();
+  });
+
+  it('deletes no related row when a parent a deleteMany names is no longer stored', async () => {
+    const kept = await invoices.create({
+      number: 'A-1',
+      lines: [{ sku: 'widget' }],
+    });
+    const gone = await invoices.create({ number: 'B-1' });
+    await invoices.delete(gone);
+
+    await expect(invoices.deleteMany([kept, gone])).rejects.toThrow(
+      EntityNotFoundException,
+    );
+
+    expect(invoices.stored).toHaveLength(1);
+    expect(lines.stored.map(({ sku }) => sku)).toEqual(['widget']);
   });
 });
