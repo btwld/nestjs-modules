@@ -1,6 +1,6 @@
 {
   "name": "@concepta/nestjs-cache",
-  "version": "8.0.0-alpha.14",
+  "version": "8.0.0-alpha.15",
   "description": "Rockets NestJS Cache",
   "type": "module",
   "engines": {
@@ -67,8 +67,8 @@
     "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
-    "@concepta/nestjs-crud": "8.0.0-alpha.14",
-    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.14",
+    "@concepta/nestjs-crud": "8.0.0-alpha.15",
+    "@concepta/nestjs-repository-typeorm": "8.0.0-alpha.15",
     "@concepta/typeorm-seeding": "^4.0.0",
     "@faker-js/faker": "^8.4.1",
     "@nestjs/common": "^12.0.1",
