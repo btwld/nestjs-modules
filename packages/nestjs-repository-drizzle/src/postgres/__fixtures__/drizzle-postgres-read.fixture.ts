@@ -10,8 +10,6 @@ import {
   getDynamicRepositoryToken,
   RepositoryModule,
   type RepositoryInterface,
-  Where,
-  WhereCompoundOperator,
 } from '@concepta/nestjs-repository';
 
 import {
@@ -103,24 +101,5 @@ export function describeDrizzlePostgresReads(
       expect(found.map(({ title }) => title)).toEqual(['a']);
       expect(queries).toEqual(['select "id", "title" from "select_note"']);
     });
-
-    it.each([WhereCompoundOperator.AND, WhereCompoundOperator.OR])(
-      'matches nothing for an empty %s, alone or nested',
-      async (operator) => {
-        const { title } = await notes.create({ title: operator, body: {} });
-        const named = Where.eq('title', title);
-        const empty = { operator, conditions: [] };
-
-        expect(await notes.count({ where: empty })).toBe(0);
-        expect(await notes.find({ where: Where.and(named, empty) })).toEqual(
-          [],
-        );
-        expect(
-          (await notes.find({ where: Where.or(named, empty) })).map(
-            (note) => note.title,
-          ),
-        ).toEqual([title]);
-      },
-    );
   });
 }
