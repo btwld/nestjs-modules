@@ -102,6 +102,14 @@ describe(DurableMessaging.name, () => {
       await app.close();
     });
 
+    it('refuses a call outside a run, writing nothing', async () => {
+      await expect(
+        durable.publish(new AppContextHost(), [message('a')]),
+      ).rejects.toThrow(RuntimeException);
+
+      expect(store.stats(Date.now()).pending).toBe(0);
+    });
+
     it('writes the messages in the scope, and they commit with it', async () => {
       await txScope.run(new AppContextHost(), async (txCtx) => {
         await durable.publish(txCtx, [message('a'), message('b')]);
