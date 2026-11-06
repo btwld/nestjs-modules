@@ -52,7 +52,7 @@ NestJS 12.
 | Package | Notes |
 | --- | --- |
 | `@concepta/nestjs-core` | Core interfaces, hook system, and utilities |
-| `@tsyche/membrane` | Hook pipeline (`Permeator`/`Membrane`) — ^0.8.1 |
+| `@tsyche/membrane` | Hook pipeline (`Permeator`/`Membrane`) — ^0.9.0 |
 
 ### Peer Dependencies
 
@@ -61,6 +61,8 @@ NestJS 12.
 | `@nestjs/common` | Yes | NestJS core — install explicitly, no longer bundled |
 | `@nestjs/core` | Yes | Reflector for metadata — install explicitly |
 | `rxjs` | Yes | Used by `TransactionalRunner` and interceptor |
+| `@nestjs/outbox` | No | Only for [Durable Messaging](#durable-messaging) |
+| `vitest`, `vitest-mock-extended` | No | Only for `@concepta/nestjs-repository/testing` |
 
 ## Module Registration
 
@@ -293,12 +295,12 @@ it — use `upsert` for insert-or-update.
 
 This is enforced in `RepositoryAdapter` rather than left to each driver:
 `assertNotExisting` runs immediately before `doCreate`, so a driver may still
-implement `doCreate` with a save-style primitive. The guard reads through the
-protected `doFindOne`, which bypasses both hooks and row scope — deliberately,
-because the question is whether the key is taken, not whether the caller may
-see the row that took it. A scoped read cannot tell "does not exist yet" from
-"belongs to another scope", and either answer is wrong: one refuses every
-caller-supplied key, the other permits a cross-scope overwrite.
+implement `doCreate` with an insert-or-update primitive. The guard reads
+through the protected `doFindOne`, which bypasses both hooks and row scope —
+deliberately, because the question is whether the key is taken, not whether
+the caller may see the row that took it. A scoped read cannot tell "does not
+exist yet" from "belongs to another scope", and either answer is wrong: one
+refuses every caller-supplied key, the other permits a cross-scope overwrite.
 
 If your clients choose their own keys, they can find out that a key is in use
 even when another tenant holds it: `create` refuses it, and under a
@@ -311,7 +313,7 @@ untouched.
 
 **This is a check-then-write with a real race.** A row inserted between the
 check and the write is *overwritten* rather than rejected, because a driver
-implementing create as a save-by-key re-reads and updates — so no uniqueness
+implementing create as a write-by-key re-reads and updates — so no uniqueness
 constraint catches it. A transaction narrows the window but does not close it
 at READ COMMITTED, where the driver's own re-read sees the committed row.
 Losing the race requires a concurrent insert of the *same* primary key:
@@ -330,6 +332,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | `getVersionColumn()` | protected | Get the optimistic-locking version column name from metadata, if any — backs both the in-request lock and `expectedVersion` (subclass-author API) |
 | `getDeleteDateColumn()` | public | Get the soft-remove date column name from metadata, if any |
 | `toDnf(clause)` | protected | Convert `WhereClause` AST to Disjunctive Normal Form (subclass-author API) |
+| `endsTransaction(error)` | protected | Whether the database ended the caller's transaction after `error` (a deadlock); `true` fails the scope (subclass-author API) |
 | `runHooks(methodKey, payload, ctx, filter?)` | protected | Execute repository hooks for a lifecycle event; `filter` selects by hook metadata, which is how `{ replace: true }` routing works (subclass-author API) |
 | `allowsEagerRelations` | public | Whether the entity set `allowEagerRelations`, so a driver knows whether to load eager relations |
 
@@ -481,9 +484,9 @@ runRepositoryConformance(
   run committed, a deadlock, concurrent upserts of one key. Where your
   store's own limits make a write fail, the case accepts it, as long as a
   run that resolves kept all of its writes and a run that rejects kept none.
-  Report in `endsTransaction(error)` the errors after which your database
-  has ended the transaction (MySQL's deadlock); the repository then fails
-  the caller's scope.
+  Override your repository's protected `endsTransaction(error)` to report
+  the errors after which your database has ended the transaction (MySQL's
+  deadlock); the repository then fails the caller's scope.
 - **`reset`** removes every fixture's rows before each case. **`linkBookTag`**
   writes one many-to-many link, since a repository refuses those writes;
   it's needed only when you support `relations`.
@@ -1125,6 +1128,7 @@ nothing out.
 | --- | --- |
 | `where(clause)` | Wrap a `WhereClause` into `{ where: clause }` for passing to `find()` |
 | `rel(relation, condition)` | Tag a condition with a relation name |
+| `relDot(dotField, condition)` | Extract relation from `"relation.field"` dot notation |
 | `for<Entity>()` | Create a typed builder with field name checking |
 
 ## Order Clause Builder
@@ -1369,9 +1373,9 @@ await this.txScope.run(ctx, operation, {
 
 Nested and concurrent `run()` calls on the same context join a single
 transaction, which commits or rolls back when the last participant exits —
-not necessarily the first one to have entered (or immediately if any
-participant times out). After that, the context carries no transaction
-state — a later `run()` on it starts a fresh, independent transaction.
+not necessarily the first one to have entered. After that, the context
+carries no transaction state — a later `run()` on it starts a fresh,
+independent transaction.
 
 ```ts
 // Outermost — creates transaction
@@ -1457,7 +1461,7 @@ await txScope.run(ctx, async (txCtx) => {
 This is cooperative — nothing here forcibly stops an operation that ignores
 the signal. A timed-out `run()` rejects with `TransactionTimeoutException`
 at its timeout, and keeps none of its writes. The work it abandoned keeps
-running, and its transaction stays open, as your ORM's own transaction
+running, and its transaction stays open, as a database transaction
 does, until that work returns; then it rolls back and `onRollback`
 callbacks run. Until then every repository call in the scope throws
 `TransactionDoomedException`, a sibling's `run()` — nested or concurrent —
@@ -1489,6 +1493,9 @@ Each driver/datasource provides a `TransactionFactoryInterface`:
 interface TransactionFactoryInterface {
   create(ctx: AppContextHost): TransactionInterface;
   readonly supportsConcurrentTransactions?: boolean;
+  describeDatabaseError?(
+    error: unknown,
+  ): RepositoryDatabaseErrorInterface | undefined;
 }
 ```
 
@@ -1562,7 +1569,7 @@ export class OrderController {
 ```ts
 interface TransactionalOptions {
   readOnly?: boolean;
-  timeout?: number; // milliseconds (default: 30000)
+  timeout?: number; // milliseconds (default: the module's defaultTimeout)
 }
 ```
 
@@ -1623,8 +1630,8 @@ to specific entities using specifications. This section covers the
 repository-specific decorators and merge semantics; for the underlying
 mechanism (how a class becomes a hook, how it's attached to a controller,
 and how values get into `ctx`) see `@concepta/nestjs-core`'s
-[Hook Feature](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#hook-feature)
-and [Context System](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#context-system)
+[Hook Feature](../nestjs-core/README.md#hook-feature)
+and [Context System](../nestjs-core/README.md#context-system)
 sections.
 
 ### Defining a Hook
@@ -1759,7 +1766,7 @@ outside HTTP routes and RPC message handlers, so the hook does not run for a
 cron job, a seeder or a test; and it is read by every repository call that
 receives that `ctx`, so an ungated hook also runs for other entities written
 during the request. See
-[what a hook reaches](https://github.com/btwld/nestjs-modules/tree/main/packages/nestjs-core#what-a-hook-reaches).
+[what a hook reaches](../nestjs-core/README.md#what-a-hook-reaches).
 
 Prefer registration unless the hook is genuinely cross-cutting or specific to
 one route.
@@ -1849,7 +1856,7 @@ single-entity payloads and options objects (`Membrane.object` /
   and what they return is the result.
 - **`Membrane.object`** -- single-entity write operations (`create`,
   `update`, `upsert`, `replace`) and delete/lifecycle operations (`delete`,
-  `deleteMany`, `softDelete`, `restore`): hook output is merged onto the
+  `softDelete`, `restore`): hook output is merged onto the
   original, which wins on conflict — **the caller's own payload survives
   hook mutations by default.** This is right for enrichment (a hook filling
   in a default the caller is free to override) but wrong for authorization
@@ -2289,7 +2296,7 @@ refused unless it is marked [`cascade`](#cascading-writes), and a cascade
 writes each related row through its own repository, where its resolver runs.
 
 Anything that writes rows without going through a repository, such as a
-seeding library writing through your ORM, bypasses row scope entirely: it
+seeding library writing to the database directly, bypasses row scope entirely: it
 stamps no scope columns and checks nothing. Set the scope columns yourself
 there, or seed through the repository with a `ctx` carrying the scope.
 
@@ -2523,7 +2530,7 @@ routes bypass it:
 - **Foreign-key actions.** `ON DELETE CASCADE` or `SET NULL` from an
   append-only table lets a parent delete rewrite its rows. Declare those
   foreign keys `RESTRICT` or `NO ACTION`.
-- **The ORM's own repository, used directly**, the same as for row scope.
+- **Your data-access library, used directly**, the same as for row scope.
 
 ### Write-policy startup checks
 
@@ -2667,8 +2674,8 @@ store's row scope and hooks apply as for any entity.
 - Refused or failed writes, and reads.
 - A `softDelete` of a row that is already soft-deleted. A `restore` is always
   recorded, even of a row that wasn't deleted.
-- Writes outside the repository: migrations, raw SQL, the ORM's own
-  repository used directly. They leave gaps in a row's history.
+- Writes outside the repository: migrations, raw SQL, your data-access
+  library used directly. They leave gaps in a row's history.
 
 ### Personal data and retention
 
@@ -3022,5 +3029,5 @@ also exported for manual provider wiring.
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
 | `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
-| `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
-| `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle` |
+| `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
+| `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

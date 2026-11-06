@@ -10,7 +10,7 @@ export interface TransactionalOptions {
 
   /**
    * Transaction timeout in milliseconds.
-   * Defaults to 30000.
+   * Defaults to the module's `defaultTimeout`.
    */
   timeout?: number;
 }
