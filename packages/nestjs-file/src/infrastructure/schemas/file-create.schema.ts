@@ -6,6 +6,11 @@ import { fileSchema } from './file.schema.js';
 
 export const fileCreateSchema = withOpenApi(
   conformsTo<FileCreatableInterface>()(
-    fileSchema.pick({ serviceKey: true, fileName: true, contentType: true }),
+    fileSchema.pick({
+      serviceKey: true,
+      fileName: true,
+      contentType: true,
+      size: true,
+    }),
   ),
 );

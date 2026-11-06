@@ -12,6 +12,7 @@ export { FileMapper } from './infrastructure/persistence/file.mapper.js';
 // domain services
 export { FileStorageService } from './domain/services/file-storage.service.js';
 export { FileLifecycleService } from './domain/services/file-lifecycle.service.js';
+export { FileUploadPolicyService } from './domain/services/file-upload-policy.service.js';
 
 // schemas (Zod / Standard Schema)
 export { fileSchema } from './infrastructure/schemas/file.schema.js';
@@ -52,6 +53,9 @@ export { FileEntityInterface } from './infrastructure/persistence/interfaces/fil
 export { FileInterface } from './domain/interfaces/file.interface.js';
 export { FileCreatableInterface } from './domain/interfaces/file-creatable.interface.js';
 export { FileObjectInterface } from './domain/interfaces/file-object.interface.js';
+export { FileUploadTargetInterface } from './domain/interfaces/file-upload-target.interface.js';
+export { FileUploadPolicyInterface } from './domain/interfaces/file-upload-policy.interface.js';
+export { FileUploadPolicyRule } from './domain/interfaces/file-upload-policy-rule.type.js';
 export { FileOwnableInterface } from './domain/interfaces/file-ownable.interface.js';
 export { FileReadOptionsInterface } from './domain/interfaces/file-read-options.interface.js';
 export { FileStorageServiceInterface } from './domain/interfaces/file-storage-service.interface.js';
@@ -75,7 +79,8 @@ export { FileSettingsInterface } from './infrastructure/config/interfaces/file-s
 export { FileException } from './domain/exceptions/file.exception.js';
 export { FileStatusException } from './domain/exceptions/file-status.exception.js';
 export { FileStorageNotFoundException } from './domain/exceptions/file-storage-not-found.exception.js';
-export { FileUploadUrlException } from './domain/exceptions/file-upload-url.exception.js';
+export { FileUploadTargetException } from './domain/exceptions/file-upload-target.exception.js';
+export { FileUploadPolicyException } from './domain/exceptions/file-upload-policy.exception.js';
 export { FileDownloadUrlException } from './domain/exceptions/file-download-url.exception.js';
 export { FileExistsCheckException } from './domain/exceptions/file-exists-check.exception.js';
 export { FileStorageDeleteException } from './domain/exceptions/file-storage-delete.exception.js';

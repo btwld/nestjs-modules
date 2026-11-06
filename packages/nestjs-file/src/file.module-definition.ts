@@ -17,6 +17,7 @@ import { SoftDeleteFileHandler } from './application/commands/handlers/soft-dele
 import { GetFileHandler } from './application/queries/handlers/get-file.handler.js';
 import { FileLifecycleService } from './domain/services/file-lifecycle.service.js';
 import { FileStorageService } from './domain/services/file-storage.service.js';
+import { FileUploadPolicyService } from './domain/services/file-upload-policy.service.js';
 import { FILE_MODULE_SETTINGS_TOKEN } from './file.constants.js';
 import { fileDefaultConfig } from './infrastructure/config/file-default.config.js';
 import { type FileExtrasInterface } from './infrastructure/config/interfaces/file-extras.interface.js';
@@ -88,6 +89,7 @@ export function createFileProviders(options: {
   return [
     createFileSettingsProvider(),
     createFileStorageServiceProvider(),
+    createFileUploadPolicyServiceProvider(),
     FileLifecycleService,
     FileMapper,
     createFileRepositoryProvider(
@@ -117,6 +119,15 @@ function createFileStorageServiceProvider(): Provider {
     inject: [RAW_OPTIONS_TOKEN],
     useFactory: (options: FileOptionsInterface) =>
       new FileStorageService(options.storageServices),
+  };
+}
+
+function createFileUploadPolicyServiceProvider(): Provider {
+  return {
+    provide: FileUploadPolicyService,
+    inject: [RAW_OPTIONS_TOKEN],
+    useFactory: (options: FileOptionsInterface) =>
+      new FileUploadPolicyService(options.uploadPolicy),
   };
 }
 

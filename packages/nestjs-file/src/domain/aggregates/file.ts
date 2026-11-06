@@ -39,6 +39,10 @@ export class File extends MutableAggregate<FileInterface> {
     return this.props.contentType;
   }
 
+  get size() {
+    return this.props.size;
+  }
+
   get status() {
     return this.props.status;
   }
@@ -81,7 +85,7 @@ export class File extends MutableAggregate<FileInterface> {
     id: string,
     dto: FileCreatableInterface,
   ): File {
-    const { serviceKey, contentType } = dto;
+    const { serviceKey, contentType, size } = dto;
     const fileName = sanitizeFileName(dto.fileName);
 
     if (!fileName) {
@@ -92,6 +96,7 @@ export class File extends MutableAggregate<FileInterface> {
       serviceKey,
       fileName,
       contentType,
+      size,
       status: 'pending',
     });
 

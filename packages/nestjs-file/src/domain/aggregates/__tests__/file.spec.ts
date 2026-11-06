@@ -20,9 +20,11 @@ describe(File.name, () => {
       serviceKey: 's3',
       fileName: 'a.png',
       contentType: 'image/png',
+      size: 1024,
     });
 
     expect(file.status).toEqual('pending');
+    expect(file.size).toEqual(1024);
     expect(file.isSoftDeleted).toEqual(false);
     expect(file.getUncommittedEvents()).toEqual([
       new FileCreatedEvent(eventContext, file.toPlain()),
@@ -35,6 +37,7 @@ describe(File.name, () => {
       serviceKey: 's3',
       fileName: `../avatars/a${rightToLeftOverride}.png`,
       contentType: 'image/png',
+      size: 1024,
     });
 
     expect(file.fileName).toEqual('a.png');
@@ -46,6 +49,7 @@ describe(File.name, () => {
         serviceKey: 's3',
         fileName: 'avatars/',
         contentType: 'image/png',
+        size: 1024,
       }),
     ).toThrow(FileNameInvalidException);
   });

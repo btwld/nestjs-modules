@@ -31,6 +31,12 @@ export abstract class FileSqliteEntity
   contentType!: string;
 
   /**
+   * Size in bytes
+   */
+  @Column({ type: 'integer' })
+  size!: number;
+
+  /**
    * Lifecycle status
    */
   @Column({ type: 'varchar' })

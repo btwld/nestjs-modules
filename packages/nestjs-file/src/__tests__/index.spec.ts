@@ -28,7 +28,9 @@ import {
   FileStorageNotFoundException,
   FileStorageService,
   FileUploadConfirmedEvent,
-  FileUploadUrlException,
+  FileUploadPolicyException,
+  FileUploadPolicyService,
+  FileUploadTargetException,
   GetFileHandler,
   GetFileQuery,
   RemoveFileCommand,
@@ -52,6 +54,7 @@ describe('index', () => {
   it('should export domain services', () => {
     expect(FileStorageService).toBeInstanceOf(Function);
     expect(FileLifecycleService).toBeInstanceOf(Function);
+    expect(FileUploadPolicyService).toBeInstanceOf(Function);
   });
 
   it('should export schemas', () => {
@@ -102,7 +105,8 @@ describe('index', () => {
     expect(FileException).toBeInstanceOf(Function);
     expect(FileStatusException).toBeInstanceOf(Function);
     expect(FileStorageNotFoundException).toBeInstanceOf(Function);
-    expect(FileUploadUrlException).toBeInstanceOf(Function);
+    expect(FileUploadTargetException).toBeInstanceOf(Function);
+    expect(FileUploadPolicyException).toBeInstanceOf(Function);
     expect(FileDownloadUrlException).toBeInstanceOf(Function);
     expect(FileExistsCheckException).toBeInstanceOf(Function);
     expect(FileStorageDeleteException).toBeInstanceOf(Function);

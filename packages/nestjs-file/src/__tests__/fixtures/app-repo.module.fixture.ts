@@ -6,6 +6,7 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
 import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
 import { type FileStorageServiceInterface } from '../../domain/interfaces/file-storage-service.interface.js';
+import { type FileUploadPolicyInterface } from '../../domain/interfaces/file-upload-policy.interface.js';
 import { FileModule } from '../../file.module.js';
 
 import { FileEntityFixture } from './entities/file.entity.fixture.js';
@@ -15,7 +16,10 @@ const FILE_ENTITY_KEY = 'file';
 
 @Module({})
 export class AppRepoModuleFixture {
-  static register(storage: FileStorageServiceInterface): DynamicModule {
+  static register(
+    storage: FileStorageServiceInterface,
+    uploadPolicy?: FileUploadPolicyInterface,
+  ): DynamicModule {
     return {
       module: AppRepoModuleFixture,
       imports: [
@@ -31,6 +35,7 @@ export class AppRepoModuleFixture {
         }),
         FileModule.forRoot({
           storageServices: [storage],
+          uploadPolicy,
           entities: { file: FILE_ENTITY_KEY },
         }),
       ],

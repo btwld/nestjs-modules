@@ -19,12 +19,14 @@ export class FileMapper extends DomainMapper<FileEntityInterface, File> {
       serviceKey,
       fileName,
       contentType,
+      size,
       status,
     } = entity;
 
     return new File(
       id,
-      { serviceKey, fileName, contentType, status },
+      // A 64-bit integer column can hydrate as a string.
+      { serviceKey, fileName, contentType, size: Number(size), status },
       version,
       {
         dateCreated,

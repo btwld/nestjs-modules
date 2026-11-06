@@ -5,10 +5,11 @@ import { FileDownloadUrlException } from '../exceptions/file-download-url.except
 import { FileExistsCheckException } from '../exceptions/file-exists-check.exception.js';
 import { FileStorageDeleteException } from '../exceptions/file-storage-delete.exception.js';
 import { FileStorageNotFoundException } from '../exceptions/file-storage-not-found.exception.js';
-import { FileUploadUrlException } from '../exceptions/file-upload-url.exception.js';
+import { FileUploadTargetException } from '../exceptions/file-upload-target.exception.js';
 import { type FileCreatedResultInterface } from '../interfaces/file-created-result.interface.js';
 import { type FileReadResultInterface } from '../interfaces/file-read-result.interface.js';
 import { type FileStorageServiceInterface } from '../interfaces/file-storage-service.interface.js';
+import { type FileUploadTargetInterface } from '../interfaces/file-upload-target.interface.js';
 
 /**
  * Routes each call to the storage service registered for the file's
@@ -33,7 +34,7 @@ export class FileStorageService {
   }
 
   /**
-   * The file with both signed URLs, for create.
+   * The file with its upload target and signed download URL, for create.
    */
   async toCreatedResult(
     ctx: PlainLiteralObject,
@@ -41,14 +42,11 @@ export class FileStorageService {
   ): Promise<FileCreatedResultInterface> {
     const storageService = this.resolve(file.serviceKey);
 
-    let signedUploadUrl: string;
+    let upload: FileUploadTargetInterface;
     try {
-      signedUploadUrl = await storageService.getSignedUploadUrl(
-        ctx,
-        file.toPlain(),
-      );
+      upload = await storageService.getUploadTarget(ctx, file.toPlain());
     } catch (originalError) {
-      throw new FileUploadUrlException({
+      throw new FileUploadTargetException({
         serviceKey: file.serviceKey,
         originalError,
       });
@@ -56,7 +54,7 @@ export class FileStorageService {
 
     const { signedDownloadUrl } = await this.toReadResult(ctx, file);
 
-    return { file, signedUploadUrl, signedDownloadUrl };
+    return { file, upload, signedDownloadUrl };
   }
 
   /**

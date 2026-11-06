@@ -16,7 +16,8 @@ import { FileNotUploadedException } from '../domain/exceptions/file-not-uploaded
 import { FileStatusException } from '../domain/exceptions/file-status.exception.js';
 import { FileStorageDeleteException } from '../domain/exceptions/file-storage-delete.exception.js';
 import { FileStorageNotFoundException } from '../domain/exceptions/file-storage-not-found.exception.js';
-import { FileUploadUrlException } from '../domain/exceptions/file-upload-url.exception.js';
+import { FileUploadPolicyException } from '../domain/exceptions/file-upload-policy.exception.js';
+import { FileUploadTargetException } from '../domain/exceptions/file-upload-target.exception.js';
 import { FileException } from '../domain/exceptions/file.exception.js';
 
 /**
@@ -49,9 +50,14 @@ const CASES: {
     fault: 'usage',
   },
   {
-    name: 'FileUploadUrlException',
+    name: 'FileUploadPolicyException',
+    build: () => new FileUploadPolicyException('size'),
+    fault: 'client',
+  },
+  {
+    name: 'FileUploadTargetException',
     build: () =>
-      new FileUploadUrlException({ serviceKey: 'key', originalError: null }),
+      new FileUploadTargetException({ serviceKey: 'key', originalError: null }),
     fault: 'internal',
   },
   {

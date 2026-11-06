@@ -7,7 +7,7 @@ import { FileDownloadUrlException } from '../../exceptions/file-download-url.exc
 import { FileExistsCheckException } from '../../exceptions/file-exists-check.exception.js';
 import { FileStorageDeleteException } from '../../exceptions/file-storage-delete.exception.js';
 import { FileStorageNotFoundException } from '../../exceptions/file-storage-not-found.exception.js';
-import { FileUploadUrlException } from '../../exceptions/file-upload-url.exception.js';
+import { FileUploadTargetException } from '../../exceptions/file-upload-target.exception.js';
 import { FileStorageService } from '../file-storage.service.js';
 
 describe(FileStorageService.name, () => {
@@ -28,7 +28,7 @@ describe(FileStorageService.name, () => {
   });
 
   describe('toCreatedResult', () => {
-    it('returns both signed urls, passing ctx and the plain file', async () => {
+    it('returns the upload target and download url, passing ctx and the plain file with its size', async () => {
       const file = createMockFile();
       const ctx = {};
 
@@ -36,30 +36,34 @@ describe(FileStorageService.name, () => {
 
       expect(result).toEqual({
         file,
-        signedUploadUrl: 'https://upload.test/file-1',
+        upload: {
+          url: 'https://upload.test/file-1',
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Length': '1024',
+          },
+        },
         signedDownloadUrl: 'https://download.test/file-1',
       });
-      expect(storage.getSignedUploadUrl).toHaveBeenCalledWith(
-        ctx,
-        file.toPlain(),
-      );
+      expect(storage.getUploadTarget).toHaveBeenCalledWith(ctx, file.toPlain());
     });
 
-    it('wraps an async upload url failure', async () => {
+    it('wraps an async upload target failure', async () => {
       const originalError = new Error('s3 down');
-      storage.getSignedUploadUrl.mockRejectedValue(originalError);
+      storage.getUploadTarget.mockRejectedValue(originalError);
 
       const error = await service
         .toCreatedResult({}, createMockFile())
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(FileUploadUrlException);
+      expect(error).toBeInstanceOf(FileUploadTargetException);
       expect(error).toHaveProperty('cause', originalError);
     });
   });
 
   describe('toReadResult', () => {
-    it('returns the signed download url and never asks for an upload url', async () => {
+    it('returns the signed download url and never asks for an upload target', async () => {
       const file = createMockFile({ status: 'active' });
 
       const result = await service.toReadResult({}, file);
@@ -68,7 +72,7 @@ describe(FileStorageService.name, () => {
         file,
         signedDownloadUrl: 'https://download.test/file-1',
       });
-      expect(storage.getSignedUploadUrl).not.toHaveBeenCalled();
+      expect(storage.getUploadTarget).not.toHaveBeenCalled();
     });
 
     it('wraps an async download url failure', async () => {

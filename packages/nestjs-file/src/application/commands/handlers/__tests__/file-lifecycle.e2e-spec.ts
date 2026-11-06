@@ -22,7 +22,8 @@ import { FileDownloadUrlException } from '../../../../domain/exceptions/file-dow
 import { FileNameInvalidException } from '../../../../domain/exceptions/file-name-invalid.exception.js';
 import { FileStatusException } from '../../../../domain/exceptions/file-status.exception.js';
 import { FileStorageDeleteException } from '../../../../domain/exceptions/file-storage-delete.exception.js';
-import { FileUploadUrlException } from '../../../../domain/exceptions/file-upload-url.exception.js';
+import { FileUploadPolicyException } from '../../../../domain/exceptions/file-upload-policy.exception.js';
+import { FileUploadTargetException } from '../../../../domain/exceptions/file-upload-target.exception.js';
 import { type FileRepositoryInterface } from '../../../../domain/repositories/file-repository.interface.js';
 import { FILE_REPOSITORY_TOKEN } from '../../../../file.constants.js';
 import { FileNotFoundException } from '../../../exceptions/file-not-found.exception.js';
@@ -40,6 +41,7 @@ describe('file lifecycle (e2e)', () => {
     serviceKey: STORAGE_KEY,
     fileName: 'docs/a.pdf',
     contentType: 'application/pdf',
+    size: 1024,
   };
 
   let app: INestApplication;
@@ -76,9 +78,12 @@ describe('file lifecycle (e2e)', () => {
     const created = await commandBus.execute(new CreateFileCommand({}, dto));
     expect(created.file.status).toEqual('pending');
     expect(created.file.fileName).toEqual('a.pdf');
-    expect(created.signedUploadUrl).toEqual(
-      `https://upload.test/${created.file.id}`,
-    );
+    expect(created.file.size).toEqual(1024);
+    expect(created.upload).toEqual({
+      url: `https://upload.test/${created.file.id}`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf', 'Content-Length': '1024' },
+    });
 
     const confirmed = await commandBus.execute(
       new ConfirmFileUploadCommand({}, created.file.id),
@@ -92,8 +97,8 @@ describe('file lifecycle (e2e)', () => {
     expect(read.signedDownloadUrl).toEqual(
       `https://download.test/${created.file.id}`,
     );
-    // Only create asked for an upload url.
-    expect(storage.getSignedUploadUrl).toHaveBeenCalledTimes(1);
+    // Only create asked for an upload target.
+    expect(storage.getUploadTarget).toHaveBeenCalledTimes(1);
 
     await commandBus.execute(new RemoveFileCommand({}, created.file.id));
 
@@ -121,7 +126,7 @@ describe('file lifecycle (e2e)', () => {
 
     expect(second.file.id).not.toEqual(first.file.id);
     expect(second.file.fileName).toEqual(first.file.fileName);
-    expect(second.signedUploadUrl).not.toEqual(first.signedUploadUrl);
+    expect(second.upload.url).not.toEqual(first.upload.url);
   });
 
   it('refuses a name with nothing left once sanitized, writing nothing', async () => {
@@ -133,7 +138,7 @@ describe('file lifecycle (e2e)', () => {
       ),
     ).rejects.toThrow(FileNameInvalidException);
     expect(create).not.toHaveBeenCalled();
-    expect(storage.getSignedUploadUrl).not.toHaveBeenCalled();
+    expect(storage.getUploadTarget).not.toHaveBeenCalled();
   });
 
   it('leaves remove-failed when storage fails, and a retry finishes', async () => {
@@ -285,16 +290,17 @@ describe('file lifecycle (e2e)', () => {
     ).toBeNull();
   });
 
-  it('leaves nothing behind when create cannot get a signed url', async () => {
+  it('leaves nothing behind when create cannot get an upload target', async () => {
     const events: IEvent[] = [];
     app.get(EventBus).subscribe((event) => events.push(event));
-    storage.getSignedUploadUrl.mockRejectedValueOnce(new Error('s3 down'));
+    storage.getUploadTarget.mockRejectedValueOnce(new Error('s3 down'));
     const create = vi.spyOn(fileRepository, 'create');
 
     await expect(
       commandBus.execute(new CreateFileCommand({}, dto)),
-    ).rejects.toThrow(FileUploadUrlException);
+    ).rejects.toThrow(FileUploadTargetException);
 
+    expect(create).toHaveBeenCalledTimes(1);
     const [[, written]] = create.mock.calls;
     expect(
       await fileRepository.get({}, written.id, { withDeleted: true }),
@@ -473,5 +479,95 @@ describe('file lifecycle (e2e)', () => {
         OptimisticLockException,
       );
     });
+  });
+});
+
+describe('file upload policy (e2e)', () => {
+  const dto = {
+    serviceKey: STORAGE_KEY,
+    fileName: 'insurance.PDF',
+    contentType: 'Application/PDF',
+    size: 1024,
+  };
+
+  let app: INestApplication;
+  let storage: FakeStorageService;
+  let commandBus: CommandBus;
+  let fileRepository: FileRepositoryInterface;
+
+  beforeEach(async () => {
+    storage = new FakeStorageService();
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        AppRepoModuleFixture.register(storage, {
+          contentTypes: ['application/pdf'],
+          extensions: ['pdf'],
+          maxSize: 1024,
+        }),
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    commandBus = app.get(CommandBus);
+    fileRepository = app.get<FileRepositoryInterface>(FILE_REPOSITORY_TOKEN);
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  it('creates a file the policy allows, matching without regard to case', async () => {
+    const { file } = await commandBus.execute(new CreateFileCommand({}, dto));
+
+    expect(file.status).toEqual('pending');
+  });
+
+  it.each([
+    ['contentType', { contentType: 'image/svg+xml' }],
+    ['extension', { fileName: 'insurance.pdf.exe' }],
+    ['size', { size: 1025 }],
+  ])(
+    'refuses a disallowed %s before writing or issuing an upload target',
+    async (rule, override) => {
+      const create = vi.spyOn(fileRepository, 'create');
+
+      const error = await commandBus
+        .execute(new CreateFileCommand({}, { ...dto, ...override }))
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(FileUploadPolicyException);
+      expect(error).toHaveProperty('context.rule', rule);
+      expect(create).not.toHaveBeenCalled();
+      expect(storage.getUploadTarget).not.toHaveBeenCalled();
+    },
+  );
+
+  it('checks the extension of the sanitized name', async () => {
+    // As sent, the extension is `pdf.` and refused; sanitized to
+    // `insurance.pdf`, which the policy allows.
+    const { file } = await commandBus.execute(
+      new CreateFileCommand({}, { ...dto, fileName: 'insurance.pdf.' }),
+    );
+
+    expect(file.fileName).toEqual('insurance.pdf');
+  });
+
+  it('refuses an extension disguised by a right-to-left override', async () => {
+    const create = vi.spyOn(fileRepository, 'create');
+
+    // Displays as `insurance.exe.pdf`; sanitized to `insurance.pdfexe`.
+    const rightToLeftOverride = String.fromCodePoint(0x202e);
+    await expect(
+      commandBus.execute(
+        new CreateFileCommand(
+          {},
+          { ...dto, fileName: `insurance.pdf${rightToLeftOverride}exe` },
+        ),
+      ),
+    ).rejects.toThrow(FileUploadPolicyException);
+    expect(create).not.toHaveBeenCalled();
   });
 });

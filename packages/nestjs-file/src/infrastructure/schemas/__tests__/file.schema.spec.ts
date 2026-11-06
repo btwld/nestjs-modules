@@ -10,6 +10,7 @@ const validFile = {
   serviceKey: 's3',
   fileName: 'docs/a.pdf',
   contentType: 'application/pdf',
+  size: 1024,
   status: 'active',
 };
 
@@ -39,10 +40,21 @@ describe('fileCreateSchema', () => {
     serviceKey: 's3',
     fileName: 'docs/a.pdf',
     contentType: 'application/pdf',
+    size: 1024,
   };
 
   it('accepts a valid create payload', () => {
     expect(fileCreateSchema.parse(validCreate)).toEqual(validCreate);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['beyond a safe integer', Number.MAX_SAFE_INTEGER + 1],
+    ['a string', '1024'],
+  ])('rejects a size that is %s', (_label, size) => {
+    expect(() => fileCreateSchema.parse({ ...validCreate, size })).toThrow();
   });
 
   it.each(['serviceKey', 'fileName', 'contentType'])(

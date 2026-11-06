@@ -1,6 +1,7 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
 import { type FileObjectInterface } from './file-object.interface.js';
+import { type FileUploadTargetInterface } from './file-upload-target.interface.js';
 
 /**
  * A storage backend (S3, a filesystem, ...). Register one per `KEY` in the
@@ -17,12 +18,14 @@ export interface FileStorageServiceInterface {
   KEY: string;
 
   /**
-   * A signed, expiring URL the client PUTs the file's bytes to.
+   * A signed, expiring target the client uploads the file's bytes to. Sign
+   * the file's `contentType` and `size` into it, so storage refuses an
+   * upload of another type or size before writing it.
    */
-  getSignedUploadUrl(
+  getUploadTarget(
     ctx: PlainLiteralObject,
     file: FileObjectInterface,
-  ): Promise<string> | string;
+  ): Promise<FileUploadTargetInterface> | FileUploadTargetInterface;
 
   /**
    * A signed, expiring URL the client GETs the file's bytes from.

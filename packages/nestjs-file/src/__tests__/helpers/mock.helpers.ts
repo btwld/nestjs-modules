@@ -9,6 +9,7 @@ import { createMockTransaction } from '@concepta/nestjs-repository/testing';
 import { type File } from '../../domain/aggregates/file.js';
 import { type FileObjectInterface } from '../../domain/interfaces/file-object.interface.js';
 import { type FileStorageServiceInterface } from '../../domain/interfaces/file-storage-service.interface.js';
+import { type FileUploadTargetInterface } from '../../domain/interfaces/file-upload-target.interface.js';
 import { type FileRepositoryInterface } from '../../domain/repositories/file-repository.interface.js';
 import { type FileLifecycleService } from '../../domain/services/file-lifecycle.service.js';
 import { FileMapper } from '../../infrastructure/persistence/file.mapper.js';
@@ -26,9 +27,19 @@ export const STORAGE_KEY = 'fake-storage';
 export class FakeStorageService implements FileStorageServiceInterface {
   KEY = STORAGE_KEY;
 
-  getSignedUploadUrl: Mock<
-    (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<string>
-  > = vi.fn(async (_ctx, file) => `https://upload.test/${file.id}`);
+  getUploadTarget: Mock<
+    (
+      ctx: PlainLiteralObject,
+      file: FileObjectInterface,
+    ) => Promise<FileUploadTargetInterface>
+  > = vi.fn(async (_ctx, file) => ({
+    url: `https://upload.test/${file.id}`,
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.contentType,
+      'Content-Length': String(file.size),
+    },
+  }));
 
   getSignedDownloadUrl: Mock<
     (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<string>
@@ -59,6 +70,7 @@ export function createMockFileEntity(
     serviceKey: STORAGE_KEY,
     fileName: 'a.pdf',
     contentType: 'application/pdf',
+    size: 1024,
     status: 'pending',
     dateCreated: new Date('2026-01-01'),
     dateUpdated: new Date('2026-01-01'),

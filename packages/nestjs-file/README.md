@@ -41,7 +41,7 @@ yarn add @concepta/nestjs-file @concepta/nestjs-core @concepta/nestjs-repository
 With TypeORM, as in [Module Registration](#module-registration), also add:
 
 ```sh
-yarn add @concepta/nestjs-repository-typeorm @nestjs/typeorm typeorm
+yarn add @concepta/nestjs-repository-typeorm @nestjs/typeorm typeorm pg
 ```
 
 This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
@@ -95,12 +95,45 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
     FileModule.forRootAsync({
       imports: [S3Module],
       inject: [S3StorageService],
-      useFactory: (s3: S3StorageService) => ({ storageServices: [s3] }),
+      useFactory: (s3: S3StorageService) => ({
+        storageServices: [s3],
+        uploadPolicy: {
+          contentTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+          extensions: ['pdf', 'png', 'jpg', 'jpeg'],
+          maxSize: 10 * 1024 * 1024,
+        },
+      }),
       entities: { file: 'file' },
     }),
   ],
+  controllers: [FileController],
 })
 export class AppModule {}
+```
+
+`S3Module` provides the [S3 storage service](#storage-services) built from
+your configuration:
+
+```ts
+import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { S3Client } from '@aws-sdk/client-s3';
+
+@Module({
+  providers: [
+    {
+      provide: S3StorageService,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        new S3StorageService(
+          new S3Client({ region: config.getOrThrow('AWS_REGION') }),
+          config.getOrThrow('FILES_BUCKET'),
+        ),
+    },
+  ],
+  exports: [S3StorageService],
+})
+export class S3Module {}
 ```
 
 Use `forRoot({ storageServices: [...] })` when the services need no injection.
@@ -110,6 +143,7 @@ Use `forRoot({ storageServices: [...] })` when the services need no injection.
 | Option | Where | Notes |
 | --- | --- | --- |
 | `storageServices` | options | One per `KEY`. Required. |
+| `uploadPolicy` | options | Allowed content types, extensions and maximum size; see [Upload Policy](#upload-policy). Without it, any file is allowed. |
 | `entities.file` | extras | The entity key registered with `RepositoryModule`. Defaults to `'file'`. |
 | `repositories.file` | extras | A `FileRepository` subclass to use instead; see [Repository](#repository). |
 | `providers` | extras | Extra providers; the last provider for a token wins. |
@@ -118,6 +152,38 @@ Use `forRoot({ storageServices: [...] })` when the services need no injection.
 The file entity is mutable: if your deployment requires a write policy on
 every entity, register it with `writePolicy: { access: 'mutable' }`. It needs
 no other repository opt-ins.
+
+### Upload Policy
+
+```ts
+FileModule.forRoot({
+  storageServices: [s3],
+  uploadPolicy: {
+    contentTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+    extensions: ['pdf', 'png', 'jpg', 'jpeg'],
+    maxSize: 10 * 1024 * 1024,
+  },
+  entities: { file: 'file' },
+});
+```
+
+A create that breaks the policy throws `FileUploadPolicyException`, and
+nothing is saved: no file record, no upload target. `context.rule` tells you
+which rule failed (`contentType`, `extension` or `size`), so you can tell the
+user what to fix. Leave a rule out to allow anything for it.
+
+- `contentTypes` and `extensions` ignore case. List extensions without the
+  dot.
+- The extension is read from the name as stored, after
+  [sanitizing](#commands): `report.pdf.` counts as `pdf`, and an `.exe`
+  disguised as a `.pdf` with a right-to-left override counts as neither.
+- `maxSize` is in bytes.
+
+The policy checks what the client *declares*. To hold the client to it, sign
+the declared type and size into the upload target, as the
+[S3 example](#storage-services) does: storage then refuses an upload of any
+other type or size. Bytes that lie about their type still get through;
+catching those is a content scanner's job.
 
 ## Storage Services
 
@@ -133,13 +199,14 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   NotFound,
-  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   type FileObjectInterface,
   type FileStorageServiceInterface,
+  type FileUploadTargetInterface,
 } from '@concepta/nestjs-file';
 
 @Injectable()
@@ -151,21 +218,30 @@ export class S3StorageService implements FileStorageServiceInterface {
     private readonly bucket: string,
   ) {}
 
-  getSignedUploadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
-    return getSignedUrl(
-      this.client,
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: file.id,
-        ContentType: file.contentType,
-      }),
-    );
+  async getUploadTarget(
+    _ctx: PlainLiteralObject,
+    file: FileObjectInterface,
+  ): Promise<FileUploadTargetInterface> {
+    // S3 refuses a POST whose size or Content-Type differs from these.
+    const { url, fields } = await createPresignedPost(this.client, {
+      Bucket: this.bucket,
+      Key: file.id,
+      Conditions: [
+        ['content-length-range', file.size, file.size],
+        ['eq', '$Content-Type', file.contentType],
+      ],
+      Fields: { 'Content-Type': file.contentType },
+      Expires: 300,
+    });
+
+    return { url, method: 'POST', fields };
   }
 
   getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     return getSignedUrl(
       this.client,
       new GetObjectCommand({ Bucket: this.bucket, Key: file.id }),
+      { expiresIn: 300 },
     );
   }
 
@@ -190,10 +266,21 @@ export class S3StorageService implements FileStorageServiceInterface {
 }
 ```
 
-`getSignedUploadUrl` and `getSignedDownloadUrl` are required and return
-signed, expiring URLs the client uses directly. The upload URL is asked for
-only when a file is created. `exists` and `delete` are optional, and leaving
-one out is how you choose the behaviour:
+`getUploadTarget` and `getSignedDownloadUrl` are required.
+
+`getUploadTarget` runs once, when a file is created, and returns everything
+the client needs to upload: `url`, `method` (`PUT` or `POST`), and the
+`headers` or form `fields` to send with it. Sign the file's `contentType` and
+`size` into it, so storage turns away an upload that doesn't match what the
+client declared.
+
+> With S3, use a presigned POST as above: its `content-length-range`
+> condition is AWS's documented way to cap an upload's size. A presigned
+> PUT from `getSignedUrl` doesn't sign the body, and signs the
+> `Content-Type` only if you pass `signableHeaders`.
+
+`exists` and `delete` are optional, and leaving one out is how you choose the
+behaviour:
 
 - **No `exists`:** confirming an upload doesn't check storage.
 - **No `delete`:** removing a file deletes only its row and keeps the object.
@@ -209,7 +296,7 @@ pick a bucket or prefix from it.
 
 | Status | What it means for you |
 | --- | --- |
-| `pending` | Created. Upload to `signedUploadUrl`, then confirm. |
+| `pending` | Created. Upload to the `upload` target, then confirm. |
 | `active` | Confirmed and ready to download. |
 | `removing` | A removal is running, or was interrupted. The file stays readable until it's gone. Remove it again to finish. |
 | `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
@@ -227,7 +314,8 @@ it was, still hidden. Once a removal of a soft-deleted file has failed, remove
 it again rather than restore it: its object may already be gone.
 
 If two commands change the same file at once, the later one fails with
-`OptimisticLockException` instead of overwriting the first; retry it.
+`OptimisticLockException` (from `@concepta/nestjs-repository`) instead of
+overwriting the first; retry it.
 
 ## The File Aggregate
 
@@ -236,7 +324,7 @@ Commands and queries hand you a `File`:
 | Member | What you get |
 | --- | --- |
 | `id`, `version` | The record's id, and the version each write is checked against. |
-| `serviceKey`, `contentType` | What you created it with. |
+| `serviceKey`, `contentType`, `size` | What you created it with; `size` is in bytes. |
 | `fileName` | The name you created it with, sanitized (see [Commands](#commands)). |
 | `status` | `pending`, `active`, `removing` or `remove-failed`. |
 | `isSoftDeleted` | Whether it's soft-deleted. |
@@ -251,7 +339,7 @@ Change a file only through the commands; they apply the rules and write it.
 
 | Command | Returns | Does |
 | --- | --- | --- |
-| `CreateFileCommand(ctx, { serviceKey, fileName, contentType })` | `FileCreatedResultInterface` | Creates a `pending` file with a sanitized name. Throws `FileNameInvalidException` when sanitizing leaves nothing. |
+| `CreateFileCommand(ctx, { serviceKey, fileName, contentType, size })` | `FileCreatedResultInterface` | Creates a `pending` file with a sanitized name. Throws `FileNameInvalidException` when sanitizing leaves nothing, and `FileUploadPolicyException` when the [upload policy](#upload-policy) refuses the file. |
 | `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`. Confirming twice returns the file unchanged. |
 | `SoftDeleteFileCommand(ctx, id)` | `File` | Hides the file from reads and returns it, soft-deleted. |
 | `RestoreFileCommand(ctx, id)` | `File` | Brings a soft-deleted file back. Restoring a file that isn't soft-deleted returns it unchanged. |
@@ -259,39 +347,44 @@ Change a file only through the commands; they apply the rules and write it.
 
 | Result | Properties |
 | --- | --- |
-| `FileCreatedResultInterface` | `file`, `signedUploadUrl`, `signedDownloadUrl` |
+| `FileCreatedResultInterface` | `file`, `upload` (`{ url, method, headers?, fields? }`), `signedDownloadUrl` |
 | `FileReadResultInterface` | `file`, `signedDownloadUrl` |
 
-Create is the only command that gives you a `signedUploadUrl`; confirm and
-reads give you `signedDownloadUrl`. If storage can't produce a URL, you get
-`FileUploadUrlException` or `FileDownloadUrlException`, and a failed create
+Create is the only command that gives you an `upload` target; confirm and
+reads give you `signedDownloadUrl`. If storage can't produce one, you get
+`FileUploadTargetException` or `FileDownloadUrlException`, and a failed create
 leaves nothing behind.
 
 Create and confirm wait for your storage service inside a transaction, so keep
 those calls fast: past the transaction timeout (30 seconds by default) the
 command fails and leaves nothing behind.
 
-Create keeps only the last segment of `fileName` after any `/` or `\`, strips
-control and invisible formatting characters (including the right-to-left
-override that disguises an extension), normalises it to NFC, trims
-surrounding whitespace and trailing dots, and caps it at 255 characters,
-keeping the extension. So
-`../uploads/insurance.pdf` is stored as `insurance.pdf`. A name with nothing
-left, such as `..`, throws `FileNameInvalidException`. Names don't have to be
-unique: several files can be called `insurance.pdf`, each with its own `id`.
-Quotes and semicolons are kept, so encode the name when you put it in a
-`Content-Disposition` header (`filename*=UTF-8''…`, RFC 6266).
+Pass the name the user picked; create stores a safe display name.
+`../uploads/insurance.pdf` is stored as `insurance.pdf`:
+
+- any path before the last `/` or `\` is dropped;
+- control and invisible characters are removed, including the right-to-left
+  override that disguises an extension;
+- the name is normalised to NFC, trimmed of surrounding whitespace and
+  trailing dots, and capped at 255 characters, keeping the extension.
+
+A name with nothing left, such as `..`, throws `FileNameInvalidException`.
+Names don't have to be unique: several files can be called `insurance.pdf`,
+each with its own `id`. Quotes and semicolons are kept, so encode the name
+when you put it in a `Content-Disposition` header
+(`filename*=UTF-8''…`, RFC 6266).
 
 **Dispatch `RemoveFileCommand` outside any transaction**, including the
 transactional interceptor; inside one it throws
 `FileRemoveInTransactionException`.
 
 ```ts
-const { file, signedUploadUrl } = await this.commandBus.execute(
+const { file, upload } = await this.commandBus.execute(
   new CreateFileCommand(ctx, {
     serviceKey: 's3',
     fileName: 'avatar.png',
     contentType: 'image/png',
+    size: 48_213,
   }),
 );
 ```
@@ -348,18 +441,26 @@ import {
   Param,
   Post,
   Put,
+  StandardSchemaValidationPipe,
   type PlainLiteralObject,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { Ctx } from '@concepta/nestjs-core';
+import { Ctx, withOpenApi } from '@concepta/nestjs-core';
 import {
   ConfirmFileUploadCommand,
   CreateFileCommand,
+  type FileCreatableInterface,
+  fileCreateSchema,
   GetFileQuery,
   RemoveFileCommand,
   RestoreFileCommand,
   SoftDeleteFileCommand,
 } from '@concepta/nestjs-file';
+
+// The server picks the storage service; the client sends the rest.
+const fileUploadRequestSchema = withOpenApi(
+  fileCreateSchema.omit({ serviceKey: true }),
+);
 
 @Controller('files')
 export class FileController {
@@ -371,12 +472,16 @@ export class FileController {
   @Post()
   async create(
     @Ctx() ctx: PlainLiteralObject,
-    @Body() body: { fileName: string; contentType: string },
+    @Body({
+      schema: fileUploadRequestSchema,
+      pipes: [new StandardSchemaValidationPipe()],
+    })
+    body: Omit<FileCreatableInterface, 'serviceKey'>,
   ) {
-    const { file, signedUploadUrl } = await this.commandBus.execute(
+    const { file, upload } = await this.commandBus.execute(
       new CreateFileCommand(ctx, { ...body, serviceKey: 's3' }),
     );
-    return { ...file.toPlain(), signedUploadUrl };
+    return { ...file.toPlain(), upload };
   }
 
   @Put(':id/confirm')
@@ -419,8 +524,30 @@ export class FileController {
 `@Ctx()` passes the request's context, so your storage service, hooks and
 event listeners see the caller and the request's correlation id.
 
-The client uploads to `signedUploadUrl` directly, then calls
-`PUT /files/:id/confirm`. Validate request bodies with `fileCreateSchema`.
+The create route validates its body with `fileCreateSchema` minus
+`serviceKey`, so a client can neither pick another storage service nor leave
+out the `size` your storage signs into the upload.
+
+The client uploads straight to storage with the `upload` it got back, then
+calls `PUT /files/:id/confirm`:
+
+```ts
+// Browser
+const { id, upload } = await (await fetch('/files', { method: 'POST', /* ... */ })).json();
+
+if (upload.method === 'POST') {
+  const form = new FormData();
+  for (const [name, value] of Object.entries(upload.fields ?? {})) {
+    form.append(name, value);
+  }
+  form.append('file', file); // last: storage ignores fields after the file
+  await fetch(upload.url, { method: 'POST', body: form });
+} else {
+  await fetch(upload.url, { method: 'PUT', headers: upload.headers, body: file });
+}
+
+await fetch(`/files/${id}/confirm`, { method: 'PUT' });
+```
 
 To finish interrupted removals, find files in `removing` or `remove-failed`
 with your own query on the entity, then dispatch `RemoveFileCommand` for each.
@@ -460,7 +587,7 @@ provide your own `FileLifecycleService` subclass through `providers`.
 | Schema | Shape |
 | --- | --- |
 | `fileSchema` | A stored file: own columns, `status`, id, version and dates. Named OpenAPI component `File`. |
-| `fileCreateSchema` | Create body: non-empty `serviceKey`, `fileName`, `contentType`. |
+| `fileCreateSchema` | Create body: non-empty `serviceKey`, `fileName`, `contentType`, and `size` as a non-negative safe integer. |
 
 ## Exceptions
 
@@ -468,11 +595,12 @@ provide your own `FileLifecycleService` subclass through `providers`.
 | --- | --- | --- |
 | `FileNotFoundException` | client | No file matches the id (and status filter). |
 | `FileNameInvalidException` | client | The file name has nothing left once sanitized. |
+| `FileUploadPolicyException` | client | The upload policy refuses the file; `context.rule` names the rule. |
 | `FileNotUploadedException` | client | `exists` says the object isn't uploaded. |
 | `FileStatusException` | client | The status doesn't allow the operation. |
 | `FileStorageNotFoundException` | usage | No storage service has the file's `serviceKey`. |
 | `FileRemoveInTransactionException` | usage | `RemoveFileCommand` was dispatched inside a transaction. |
-| `FileUploadUrlException` | internal | Storage failed to produce an upload URL. |
+| `FileUploadTargetException` | internal | Storage failed to produce an upload target. |
 | `FileDownloadUrlException` | internal | Storage failed to produce a download URL. |
 | `FileExistsCheckException` | internal | Storage failed to check whether the object is uploaded. |
 | `FileStorageDeleteException` | internal | Storage failed to delete the object. You see it as the `cause` of `FileRemoveException`. |
@@ -486,7 +614,7 @@ exception's `cause`; for `FileRemoveException` it is one level down, on the
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-file` | Module, aggregate, commands, queries, handlers, events, `FileStorageService`, `FileLifecycleService`, repository, schemas, exceptions, domain and config interfaces |
+| `@concepta/nestjs-file` | Module, aggregate, commands, queries, handlers, events, `FileStorageService`, `FileLifecycleService`, `FileUploadPolicyService`, repository, schemas, exceptions, domain and config interfaces |
 | `@concepta/nestjs-file/optional/typeorm` | `FileSqliteEntity`, `FilePostgresEntity` |
 | `@concepta/nestjs-file/optional/seeding` | `FileFactory` |
 

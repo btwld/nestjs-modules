@@ -31,6 +31,12 @@ export abstract class FilePostgresEntity
   contentType!: string;
 
   /**
+   * Size in bytes
+   */
+  @Column({ type: 'bigint' })
+  size!: number;
+
+  /**
    * Lifecycle status
    */
   @Column({ type: 'varchar' })

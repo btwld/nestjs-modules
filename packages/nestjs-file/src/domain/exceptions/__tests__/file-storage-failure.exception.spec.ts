@@ -1,7 +1,7 @@
 import { FileDownloadUrlException } from '../file-download-url.exception.js';
 import { FileExistsCheckException } from '../file-exists-check.exception.js';
 import { FileStorageDeleteException } from '../file-storage-delete.exception.js';
-import { FileUploadUrlException } from '../file-upload-url.exception.js';
+import { FileUploadTargetException } from '../file-upload-target.exception.js';
 import { FileException } from '../file.exception.js';
 
 const originalError = new Error('s3 down');
@@ -10,10 +10,10 @@ const options = { serviceKey: 's3', originalError };
 // The four exceptions that wrap a storage service failure share one shape.
 describe.each([
   {
-    name: FileUploadUrlException.name,
-    exception: new FileUploadUrlException(options),
-    message: 'Storage service s3 failed to create an upload URL',
-    errorCode: 'FILE_UPLOAD_URL_ERROR',
+    name: FileUploadTargetException.name,
+    exception: new FileUploadTargetException(options),
+    message: 'Storage service s3 failed to create an upload target',
+    errorCode: 'FILE_UPLOAD_TARGET_ERROR',
   },
   {
     name: FileDownloadUrlException.name,

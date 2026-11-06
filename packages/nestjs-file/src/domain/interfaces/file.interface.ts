@@ -13,9 +13,15 @@ export interface FileInterface {
   fileName: string;
 
   /**
-   * MIME type of the file.
+   * MIME type of the file, as declared at create.
    */
   contentType: string;
+
+  /**
+   * Size in bytes, as declared at create. The upload target the storage
+   * service issues should refuse an upload of any other size.
+   */
+  size: number;
 
   status: FileStatus;
 }

@@ -17,14 +17,17 @@ import { FileNameInvalidException } from '../../exceptions/file-name-invalid.exc
 import { FileNotUploadedException } from '../../exceptions/file-not-uploaded.exception.js';
 import { FileStatusException } from '../../exceptions/file-status.exception.js';
 import { FileStorageNotFoundException } from '../../exceptions/file-storage-not-found.exception.js';
+import { FileUploadPolicyException } from '../../exceptions/file-upload-policy.exception.js';
 import { FileLifecycleService } from '../file-lifecycle.service.js';
 import { FileStorageService } from '../file-storage.service.js';
+import { FileUploadPolicyService } from '../file-upload-policy.service.js';
 
 describe(FileLifecycleService.name, () => {
   const dto = {
     serviceKey: STORAGE_KEY,
     fileName: 'docs/a.pdf',
     contentType: 'application/pdf',
+    size: 1024,
   };
 
   let fileRepository: ReturnType<typeof createMockFileRepository>;
@@ -52,6 +55,7 @@ describe(FileLifecycleService.name, () => {
     service = new FileLifecycleService(
       fileRepository,
       new FileStorageService([storage]),
+      new FileUploadPolicyService({ extensions: ['pdf'], maxSize: 1024 }),
     );
   });
 
@@ -73,6 +77,21 @@ describe(FileLifecycleService.name, () => {
         service.create({}, { ...dto, fileName: 'docs/..' }),
       ).rejects.toThrow(FileNameInvalidException);
       expect(fileRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a file the upload policy does not allow before writing', async () => {
+      await expect(service.create({}, { ...dto, size: 1025 })).rejects.toThrow(
+        FileUploadPolicyException,
+      );
+      expect(fileRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('checks the policy against the sanitized name', async () => {
+      // As sent, the extension is `pdf.` and refused; sanitized to `a.pdf`,
+      // which the policy allows.
+      const file = await service.create({}, { ...dto, fileName: 'a.pdf. ' });
+
+      expect(file.fileName).toEqual('a.pdf');
     });
 
     it('refuses an unknown storage key before writing', async () => {

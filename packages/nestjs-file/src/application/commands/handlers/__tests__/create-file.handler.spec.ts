@@ -6,7 +6,7 @@ import {
   FakeStorageService,
   STORAGE_KEY,
 } from '../../../../__tests__/helpers/mock.helpers.js';
-import { FileUploadUrlException } from '../../../../domain/exceptions/file-upload-url.exception.js';
+import { FileUploadTargetException } from '../../../../domain/exceptions/file-upload-target.exception.js';
 import { FileStorageService } from '../../../../domain/services/file-storage.service.js';
 import { CreateFileCommand } from '../../impl/create-file.command.js';
 import { CreateFileHandler } from '../create-file.handler.js';
@@ -16,6 +16,7 @@ describe(CreateFileHandler.name, () => {
     serviceKey: STORAGE_KEY,
     fileName: 'docs/a.pdf',
     contentType: 'application/pdf',
+    size: 1024,
   };
 
   let fileLifecycle: ReturnType<typeof createMockFileLifecycle>;
@@ -36,23 +37,23 @@ describe(CreateFileHandler.name, () => {
     );
   });
 
-  it('creates the file in a transaction and returns both signed urls', async () => {
+  it('creates the file in a transaction and returns the upload target and download url', async () => {
     const result = await handler.execute(new CreateFileCommand({}, dto));
 
     expect(fileLifecycle.create).toHaveBeenCalledWith(expect.anything(), dto);
     expect(result.file.status).toEqual('pending');
-    expect(result.signedUploadUrl).toEqual('https://upload.test/file-1');
+    expect(result.upload.url).toEqual('https://upload.test/file-1');
     expect(result.signedDownloadUrl).toEqual('https://download.test/file-1');
     expect(mocks.trxHandle.onCommit).toHaveBeenCalledTimes(1);
     expect(mocks.trxHandle.onRollback).toHaveBeenCalledTimes(1);
   });
 
-  it('fails inside the transaction when storage cannot make a url', async () => {
-    storage.getSignedUploadUrl.mockRejectedValue(new Error('s3 down'));
+  it('fails inside the transaction when storage cannot make an upload target', async () => {
+    storage.getUploadTarget.mockRejectedValue(new Error('s3 down'));
 
     await expect(
       handler.execute(new CreateFileCommand({}, dto)),
-    ).rejects.toThrow(FileUploadUrlException);
+    ).rejects.toThrow(FileUploadTargetException);
     // The file was written in the transaction the failure rolls back.
     expect(fileLifecycle.create).toHaveBeenCalledTimes(1);
     expect(mocks.trxHandle.onCommit).not.toHaveBeenCalled();

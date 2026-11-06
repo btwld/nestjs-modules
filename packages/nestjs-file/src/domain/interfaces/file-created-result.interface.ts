@@ -1,20 +1,22 @@
 import { type File } from '../aggregates/file.js';
 
+import { type FileUploadTargetInterface } from './file-upload-target.interface.js';
+
 /**
  * Returned by `CreateFileCommand`.
  */
 export interface FileCreatedResultInterface {
   /**
-   * The stored file row: id, serviceKey, fileName, contentType, status
-   * (`pending`), version, dates.
+   * The stored file row: id, serviceKey, fileName, contentType, size,
+   * status (`pending`), version, dates.
    */
   file: File;
 
   /**
-   * Signed, expiring URL the client PUTs the file's bytes to. Issued only at
+   * Where and how the client uploads the file's bytes. Issued only at
    * create.
    */
-  signedUploadUrl: string;
+  upload: FileUploadTargetInterface;
 
   /**
    * Signed, expiring URL the client GETs the file's bytes from.

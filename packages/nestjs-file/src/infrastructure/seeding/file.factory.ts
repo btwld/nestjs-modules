@@ -13,6 +13,7 @@ export class FileFactory extends Factory<FileInterface> {
     file.serviceKey = 'default';
     file.fileName = faker.system.fileName();
     file.contentType = faker.system.mimeType();
+    file.size = faker.number.int({ min: 0, max: 10_000_000 });
     file.status = 'active';
 
     return file;

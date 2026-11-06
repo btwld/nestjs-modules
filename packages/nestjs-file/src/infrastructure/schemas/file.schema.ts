@@ -18,6 +18,12 @@ export const fileSchema = withNamedComponent(
         .min(1)
         .meta({ description: 'Display name, sanitized at create' }),
       contentType: z.string().min(1).meta({ description: 'Content type' }),
+      size: z
+        .number()
+        .int()
+        .min(0)
+        .max(Number.MAX_SAFE_INTEGER)
+        .meta({ description: 'Size in bytes' }),
       status: z.enum(FILE_STATUSES).meta({ description: 'Lifecycle status' }),
     }),
   ),

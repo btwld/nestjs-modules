@@ -9,6 +9,7 @@ import { type FileCreatableInterface } from '../interfaces/file-creatable.interf
 import { FileRepositoryInterface } from '../repositories/file-repository.interface.js';
 
 import { FileStorageService } from './file-storage.service.js';
+import { FileUploadPolicyService } from './file-upload-policy.service.js';
 
 /**
  * The rules for creating, confirming, soft-deleting, restoring and removing
@@ -26,11 +27,13 @@ export class FileLifecycleService {
     @Inject(FILE_REPOSITORY_TOKEN)
     private readonly fileRepository: FileRepositoryInterface,
     private readonly fileStorage: FileStorageService,
+    private readonly uploadPolicy: FileUploadPolicyService,
   ) {}
 
   /**
    * Creates a pending file with a sanitized name. Refuses an unknown storage
-   * key, and a name that sanitizes to nothing, before writing.
+   * key, a name that sanitizes to nothing, and a file the upload policy
+   * doesn't allow, before writing.
    */
   async create(
     ctx: PlainLiteralObject,
@@ -39,6 +42,9 @@ export class FileLifecycleService {
     this.fileStorage.resolve(dto.serviceKey);
 
     const file = File.create(createEventContext(ctx, {}, {}), dto);
+
+    // The policy sees the sanitized name, as stored.
+    this.uploadPolicy.assertAllowed(file);
 
     await this.fileRepository.create(ctx, file);
 
