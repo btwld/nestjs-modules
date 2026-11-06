@@ -1,3 +1,5 @@
+import { EntityManager } from 'typeorm';
+
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
@@ -131,11 +133,14 @@ describe(TypeOrmRepository, () => {
       ],
     ] as const)('%s opens no transaction of its own', async (_name, call) => {
       const entity = await testFactory.create({ firstName: 'Alice' });
-      const run = vi.spyOn(transactionScope, 'run');
+      // How a driver would open one: `DataSource.transaction()` runs here
+      // too. TypeORM's own `save()` and `remove()` don't.
+      const transaction = vi.spyOn(EntityManager.prototype, 'transaction');
 
       await call(testRepository, entity);
 
-      expect(run).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+      transaction.mockRestore();
     });
 
     it('a repository built by hand writes a versioned row', async () => {
