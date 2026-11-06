@@ -942,7 +942,8 @@ export abstract class TypeOrmRepository<
   /**
    * `softDelete`/`restore`'s write: a read of the row `entity`'s primary key
    * names, so a row no longer stored is not found, then
-   * `softRemove()`/`recover()` of the row as stored, then a re-read, so the
+   * `softRemove()`/`recover()` of the row as stored, unless its delete date
+   * already is where the operation puts it, then a re-read, so the
    * row returned is the row as stored rather than the caller's copy. The
    * read locks the row in the caller's transaction. Guarded by the version
    * when the caller states one.
@@ -962,11 +963,21 @@ export abstract class TypeOrmRepository<
       if (!stored) {
         throw new EntityNotFoundException(this.metadata.name, operation);
       }
-      // Own columns only, as for a versioned save.
-      const row = this.toEntity(this.toResult(stored, {}));
-      await (operation === 'softDelete'
-        ? repo.softRemove(row)
-        : repo.recover(row));
+      // A row already where the operation would put it is not written, so
+      // its version stays: TypeORM 0.3 writes, and bumps the version, on any
+      // softRemove()/recover().
+      const deleteDate = this.getDeleteDateColumn();
+      const isRemoved =
+        deleteDate !== undefined &&
+        stored[deleteDate] !== null &&
+        stored[deleteDate] !== undefined;
+      if (isRemoved !== (operation === 'softDelete')) {
+        // Own columns only, as for a versioned save.
+        const row = this.toEntity(this.toResult(stored, {}));
+        await (operation === 'softDelete'
+          ? repo.softRemove(row)
+          : repo.recover(row));
+      }
       return this.reread(repo, primaryWhere, operation, inRun);
     };
 
