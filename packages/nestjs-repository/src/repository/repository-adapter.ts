@@ -1867,11 +1867,14 @@ export abstract class RepositoryAdapter<
   }
 
   /**
-   * Whether two key values are the same: identical, or binary keys with the
-   * same bytes.
+   * Whether two key values are the same: identical, dates of the same time,
+   * or binary keys with the same bytes.
    */
   private sameKey(current: unknown, key: unknown): boolean {
     if (current === key) return true;
+    if (current instanceof Date && key instanceof Date) {
+      return current.getTime() === key.getTime();
+    }
     return (
       current instanceof Uint8Array &&
       key instanceof Uint8Array &&

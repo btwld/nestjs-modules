@@ -190,6 +190,18 @@ describe('primary key immutability on update and replace', () => {
     expect(adapter.updated).toHaveLength(1);
   });
 
+  it('compares a date primary key by its time', async () => {
+    const adapter = new TestAdapter();
+    const entity: Row = { ...EXISTING, id: new Date(1000) };
+
+    await adapter.update(entity, { id: new Date(1000), name: 'Renamed' });
+    await expect(
+      adapter.update(entity, { id: new Date(2000) }),
+    ).rejects.toThrow(PrimaryKeyImmutableException);
+
+    expect(adapter.updated).toHaveLength(1);
+  });
+
   it('allows data that does not mention the primary key', async () => {
     const adapter = new TestAdapter();
 
