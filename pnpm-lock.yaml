@@ -1334,6 +1334,9 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.13
         version: 0.5.14
+      '@neondatabase/serverless':
+        specifier: ^1.2.0
+        version: 1.2.0
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -1342,7 +1345,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/drizzle':
         specifier: 0.0.2
-        version: 0.0.2(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1))(reflect-metadata@0.2.2)
+        version: 0.0.2(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1))(reflect-metadata@0.2.2)
       '@types/better-sqlite3':
         specifier: ^9.6.0
         version: 9.6.0
@@ -1354,7 +1357,7 @@ importers:
         version: 12.11.1
       drizzle-orm:
         specifier: ^0.45.4
-        version: 0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)
+        version: 0.45.4(@electric-sql/pglite@0.5.14)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)
       mysql2:
         specifier: 3.24.6
         version: 3.24.6(@types/node@20.19.43)
@@ -2535,6 +2538,10 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
       '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
+
+  '@neondatabase/serverless@1.2.0':
+    resolution: {integrity: sha512-tnaqgixUengZQNd9ZrS3ytQfamJzLKY8QxgqWQTNHHtB+KrFQWk77JTbbpg4RD+J3qE4eO2lVytvGDX5Kj6FdQ==}
+    engines: {node: '>=19.0.0'}
 
   '@nestjs-modules/mailer@1.11.2':
     resolution: {integrity: sha512-k07wyKbtCzxWMm6IqGwcGIisnXD/6sneGvUR8rBBZbxtLn1HE1FLGyiaXBrPui/0K7W41aS9x9jAIhfTawtlUg==}
@@ -10112,6 +10119,8 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
+  '@neondatabase/serverless@1.2.0': {}
+
   '@nestjs-modules/mailer@1.11.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.3)(encoding@0.1.13)(nodemailer@10.0.1)':
     dependencies:
       '@css-inline/css-inline': 0.13.0
@@ -10279,11 +10288,11 @@ snapshots:
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
 
-  '@nestjs/drizzle@0.0.2(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1))(reflect-metadata@0.2.2)':
+  '@nestjs/drizzle@0.0.2(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1))(reflect-metadata@0.2.2)':
     dependencies:
       '@nestjs/common': 12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       '@nestjs/core': 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      drizzle-orm: 0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)
+      drizzle-orm: 0.45.4(@electric-sql/pglite@0.5.14)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)
       reflect-metadata: 0.2.2
 
   '@nestjs/jwt@11.0.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))':
@@ -12610,6 +12619,17 @@ snapshots:
     dependencies:
       find-up: 3.0.0
       minimatch: 3.1.5
+
+  drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1):
+    optionalDependencies:
+      '@electric-sql/pglite': 0.5.14
+      '@neondatabase/serverless': 1.2.0
+      '@opentelemetry/api': 1.9.1
+      '@types/better-sqlite3': 9.6.0
+      '@types/pg': 8.6.1
+      better-sqlite3: 12.11.1
+      mysql2: 3.24.6(@types/node@20.19.43)
+      pg: 8.23.1
 
   drizzle-orm@0.45.4(@electric-sql/pglite@0.5.14)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(@types/pg@8.6.1)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1):
     optionalDependencies:

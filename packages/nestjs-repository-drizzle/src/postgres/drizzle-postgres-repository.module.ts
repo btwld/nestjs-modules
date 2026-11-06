@@ -61,8 +61,8 @@ export class DrizzlePostgresRepositoryModule {
 
 /**
  * The database `@nestjs/drizzle` registered, which must be a Postgres one,
- * and on node-postgres a pool: Drizzle runs every transaction on a single
- * `Client`'s one connection.
+ * and on node-postgres, Neon serverless or Vercel Postgres a pool: Drizzle
+ * runs every transaction on a single client's one connection.
  */
 export function toDrizzlePostgresClient(
   db: unknown,
@@ -74,19 +74,32 @@ export function toDrizzlePostgresClient(
       DRIZZLE_POSTGRES_DATABASE,
     );
   }
-  if (isSingleNodePgConnection(db)) {
+  if (isSinglePgConnection(db)) {
     throw new DrizzleSingleConnectionException(connection);
   }
   return db;
 }
 
 /**
- * A node-postgres database on a `Client` rather than a pool, told apart the
- * way Drizzle's own transactions tell them apart. Read without importing
- * node-postgres, which other Postgres clients don't need.
+ * The Drizzle databases that run a transaction on their client's own
+ * connection unless that client is a pool: node-postgres, Neon serverless
+ * and Vercel Postgres.
  */
-function isSingleNodePgConnection(db: DrizzlePostgresClient): boolean {
-  if (Reflect.get(db.constructor, entityKind) !== 'NodePgDatabase') {
+const POOLED_DATABASE_KINDS = [
+  'NodePgDatabase',
+  'NeonServerlessDatabase',
+  'VercelPgDatabase',
+];
+
+/**
+ * A database of one of `POOLED_DATABASE_KINDS` on a single client rather
+ * than a pool, told by the class name of the client or one it extends, as
+ * an `instanceof Pool` would. Read without importing the clients, which
+ * other Postgres databases don't need.
+ */
+function isSinglePgConnection(db: DrizzlePostgresClient): boolean {
+  const kind: unknown = Reflect.get(db.constructor, entityKind);
+  if (typeof kind !== 'string' || !POOLED_DATABASE_KINDS.includes(kind)) {
     return false;
   }
   const client: unknown = Reflect.get(db, '$client');

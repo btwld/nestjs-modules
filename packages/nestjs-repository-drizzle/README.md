@@ -68,9 +68,10 @@ with `DrizzleUnsupportedDatabaseException`.
 - In ascending order, `NULL`s sort last.
 - Writes return the rows they wrote in the same statement (`RETURNING`).
 - On a pool, transactions run concurrently, each on its own connection. On
-  node-postgres, register a `Pool` (a `connection` option or URL gives you
-  one): a single `Client` would run every transaction on its one connection,
-  so startup refuses it with `DrizzleSingleConnectionException`.
+  node-postgres, Neon serverless or Vercel Postgres, register a pool (a
+  `connection` option or URL gives you one): a single client would run every
+  transaction on its one connection, so startup refuses it with
+  `DrizzleSingleConnectionException`.
 - On a client without transactions, such as Drizzle's `neon-http` or
   `xata-http`, calls outside a run work, but a `TransactionScope.run()` that
   calls such a repository fails.

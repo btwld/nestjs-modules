@@ -1,4 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
+import * as neon from '@neondatabase/serverless';
+import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
 import { drizzle as drizzleNodePg } from 'drizzle-orm/node-postgres';
 import { drizzle } from 'drizzle-orm/pglite';
 import { drizzle as drizzleSqliteProxy } from 'drizzle-orm/sqlite-proxy';
@@ -36,6 +38,24 @@ describe(toDrizzlePostgresClient.name, () => {
     expect(() => toDrizzlePostgresClient(db, 'reports')).toThrow(
       DrizzleSingleConnectionException,
     );
+    expect(() => toDrizzlePostgresClient(db, 'reports')).toThrow(
+      'The Drizzle connection "reports" is a single connection',
+    );
+  });
+
+  it('accepts a Neon serverless pool', () => {
+    const db = drizzleNeon({
+      client: new neon.Pool({ connectionString: 'postgres://localhost/db' }),
+    });
+
+    expect(toDrizzlePostgresClient(db, 'default')).toBe(db);
+  });
+
+  it('refuses a single Neon serverless connection, naming its connection', () => {
+    const db = drizzleNeon({
+      client: new neon.Client({ connectionString: 'postgres://localhost/db' }),
+    });
+
     expect(() => toDrizzlePostgresClient(db, 'reports')).toThrow(
       'The Drizzle connection "reports" is a single connection',
     );
