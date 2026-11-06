@@ -1370,9 +1370,6 @@ importers:
       '@concepta/nestjs-repository':
         specifier: workspace:*
         version: link:../nestjs-repository
-      '@tsyche/membrane':
-        specifier: ^0.9.0
-        version: 0.9.0
     devDependencies:
       '@concepta/typeorm-seeding':
         specifier: ^4.0.0
