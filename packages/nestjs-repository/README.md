@@ -2741,13 +2741,27 @@ export class AppModule {}
 Publish next to your writes, inside a transaction scope:
 
 ```ts
-await this.txScope.run(ctx, async (txCtx) => {
-  await this.orders.create(order, { ctx: txCtx });
-  await this.durable.publish(txCtx, [
-    { topic: 'order.placed', key: order.id, payload: { orderId: order.id } },
-  ]);
-});
+@Injectable()
+export class OrdersService {
+  constructor(
+    private readonly txScope: TransactionScope,
+    private readonly durable: DurableMessaging,
+    @InjectDynamicRepository('orders')
+    private readonly orders: RepositoryInterface<Order>,
+  ) {}
+
+  async place(ctx: PlainLiteralObject, order: Order): Promise<void> {
+    await this.txScope.run(ctx, async (txCtx) => {
+      await this.orders.create(order, { ctx: txCtx });
+      await this.durable.publish(txCtx, [
+        { topic: 'order.placed', key: order.id, payload: { orderId: order.id } },
+      ]);
+    });
+  }
+}
 ```
+
+The examples below use the same `txScope` and `durable`.
 
 If `publish` fails, the run fails with it, even if you catch the error:
 none of the run's writes are kept.

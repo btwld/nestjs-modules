@@ -721,7 +721,9 @@ export abstract class DrizzleRepository<
     const where = inArray(primary.column, keys);
     const expected = this.distinctKeys(keys).length;
     // Every row named must be there: counted first, so a missing one
-    // deletes none of the others, and checked again after.
+    // deletes none of the others, and checked again after. Outside a run
+    // the two are separate statements, so a row removed between them is
+    // caught only after the others are deleted.
     await this.withClient(options?.ctx, async (client) => {
       if (
         (await this.countRows(client, where)) < expected ||
