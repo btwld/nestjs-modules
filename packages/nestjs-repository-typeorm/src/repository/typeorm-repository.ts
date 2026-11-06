@@ -169,6 +169,15 @@ export abstract class TypeOrmRepository<
     mode: 'pessimistic_write',
   };
 
+  /**
+   * The lock a delete takes on the rows it is about to remove, as `rowLock`
+   * for a write: the strongest a read can take, which a delete needs even
+   * where an update takes a weaker one.
+   */
+  protected readonly deleteLock?: FindOneOptions<Entity>['lock'] = {
+    mode: 'pessimistic_write',
+  };
+
   /** A query the database failed, as `describeQueryFailure` reports it. */
   protected override describeDatabaseError(
     error: unknown,
@@ -725,12 +734,13 @@ export abstract class TypeOrmRepository<
     repo: Repository<Entity>,
     where: FindOptionsWhere<Entity>,
     inRun: boolean,
+    lock = this.rowLock,
   ): Promise<Entity | null> {
     return repo.findOne({
       where,
       withDeleted: true,
       loadEagerRelations: false,
-      lock: inRun ? this.rowLock : undefined,
+      lock: inRun ? lock : undefined,
     });
   }
 
@@ -776,6 +786,7 @@ export abstract class TypeOrmRepository<
       primaryWhere: FindOptionsWhere<Entity>,
       inRun: boolean,
     ) => Promise<T>,
+    lock = this.rowLock,
   ): Promise<T> {
     return this.withRepo(ctx, async (repo, inRun) => {
       const primaryWhere: FindOptionsWhere<Entity> = {};
@@ -787,7 +798,7 @@ export abstract class TypeOrmRepository<
       const lockWhere: FindOptionsWhere<Entity> = { ...primaryWhere };
       lockWhere[guard.column] = guard.value;
 
-      if (!(await this.lockRow(repo, lockWhere, inRun))) {
+      if (!(await this.lockRow(repo, lockWhere, inRun, lock))) {
         throw new OptimisticLockException(this.metadata.name);
       }
 
@@ -847,6 +858,7 @@ export abstract class TypeOrmRepository<
         options.versionGuard,
         options.ctx,
         (repo) => this.remove(repo, [entity]).then(([deleted]) => deleted),
+        this.deleteLock,
       );
     }
 
@@ -871,7 +883,7 @@ export abstract class TypeOrmRepository<
   /**
    * Refuse a delete naming a row that is not stored, before any is removed:
    * `remove()` passes over a missing row. The rows are locked in the
-   * caller's transaction (`inRun`), as `lockRow` locks one.
+   * caller's transaction (`inRun`) with `deleteLock`.
    */
   private async assertStored(
     repo: Repository<Entity>,
@@ -893,7 +905,7 @@ export abstract class TypeOrmRepository<
       where,
       withDeleted: true,
       loadEagerRelations: false,
-      lock: inRun ? this.rowLock : undefined,
+      lock: inRun ? this.deleteLock : undefined,
     });
     if (stored.length < keys.length) {
       throw new EntityNotFoundException(this.metadata.name, operation);

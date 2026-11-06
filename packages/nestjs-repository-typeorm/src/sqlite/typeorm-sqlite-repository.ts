@@ -34,6 +34,9 @@ export class TypeOrmSqliteRepository<
   protected override readonly rowLock: FindOneOptions<Entity>['lock'] =
     undefined;
 
+  protected override readonly deleteLock: FindOneOptions<Entity>['lock'] =
+    undefined;
+
   constructor(repo: Repository<Entity>, options: TypeOrmRepositoryOptions) {
     super(repo, options, TYPEORM_SQLITE_DATABASE);
     this.gate = gateOf(dataSourceOf(repo.manager));
