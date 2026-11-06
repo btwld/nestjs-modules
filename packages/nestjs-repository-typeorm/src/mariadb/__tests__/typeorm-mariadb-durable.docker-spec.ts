@@ -109,4 +109,41 @@ describe('durable messaging on MariaDB', () => {
       (await notes.find({ ctx: new AppContextHost() })).map(({ text }) => text),
     ).not.toContain('dropped');
   });
+
+  const texts = async (): Promise<string[]> =>
+    (await notes.find({ ctx: new AppContextHost() })).map(({ text }) => text);
+
+  it("runs a delivery's work once, with its write", async () => {
+    const deliver = () =>
+      txScope.run(new AppContextHost(), (txCtx) =>
+        durable.once(txCtx, 'notes', 'm-once', async () => {
+          await notes.create({ text: 'once' }, { ctx: txCtx });
+          return 'done';
+        }),
+      );
+
+    expect(await deliver()).toEqual({ duplicate: false, result: 'done' });
+    expect(await deliver()).toEqual({ duplicate: true });
+    expect((await texts()).filter((text) => text === 'once')).toHaveLength(1);
+  });
+
+  it('runs the work again after a delivery whose run rolled back', async () => {
+    await expect(
+      txScope.run(new AppContextHost(), async (txCtx) => {
+        await durable.once(txCtx, 'notes', 'm-retry', async () => {
+          await notes.create({ text: 'retry' }, { ctx: txCtx });
+        });
+        throw new Error('abandon');
+      }),
+    ).rejects.toThrow('abandon');
+
+    const again = await txScope.run(new AppContextHost(), (txCtx) =>
+      durable.once(txCtx, 'notes', 'm-retry', async () => {
+        await notes.create({ text: 'retry' }, { ctx: txCtx });
+      }),
+    );
+
+    expect(again).toEqual({ duplicate: false, result: undefined });
+    expect((await texts()).filter((text) => text === 'retry')).toHaveLength(1);
+  });
 });
