@@ -62,7 +62,7 @@
     "@nestjs/cqrs": "^12.0.0",
     "@nestjs/testing": "^12.0.1",
     "@nestjs/typeorm": "^12.0.1",
-    "supertest": "^6.3.4",
+    "supertest": "^7.3.1",
     "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
