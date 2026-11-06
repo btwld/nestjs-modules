@@ -271,6 +271,7 @@ describe(runRepositoryConformance.name, () => {
       'read translation > joins > doFind: leaves soft-deleted related rows out of a join unless asked for them',
       'counts > items > doCount: counts soft-deleted rows only when asked for them',
       'counts > joins > doCount: a joined filter leaves out soft-deleted related rows unless asked for them',
+      'counts > joins > doCount: a filter through a to-one join leaves out a soft-deleted related row unless asked for it',
       'writes > doSoftDelete and doRestore: set and clear the remove date',
       'writes > doSoftDelete and doRestore: a row deleted after it was read is not found',
       'writes > doSoftDelete and doRestore: return the row as stored, not as a stale row holds it',
@@ -293,7 +294,7 @@ describe(runRepositoryConformance.name, () => {
       ),
     );
 
-    expect(joined).toHaveLength(31);
+    expect(joined).toHaveLength(32);
     expect(supported.filter((name) => !refused.includes(name))).toEqual([
       'metadata > metadata: reports exactly the declared relations',
       "metadata > metadata: reports each relation's target by its URN and own columns",

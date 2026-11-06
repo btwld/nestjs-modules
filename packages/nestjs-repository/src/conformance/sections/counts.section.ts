@@ -161,6 +161,26 @@ export function countsSection(ctx: ConformanceContext): void {
           1,
         );
       });
+
+      it('doCount: a filter through a to-one join leaves out a soft-deleted related row unless asked for it', async () => {
+        const bob = await ctx.repo('author').findOne({
+          where: Where.eq('name', 'bob'),
+        });
+        assert.ok(bob);
+        await ctx.repo('author').softDelete(bob);
+
+        const options = {
+          join: [{ relation: 'author' }],
+          where: Where.rel('author', Where.eq('name', 'bob')),
+        };
+
+        assert.equal(await ctx.repo('book').count(options), 0);
+        assert.equal((await ctx.repo('book').findAndCount(options))[1], 0);
+        assert.equal(
+          await ctx.repo('book').count({ ...options, withDeleted: true }),
+          1,
+        );
+      });
     }
 
     it('doCount: counts roots under a many-to-many join, not junction rows', async () => {

@@ -796,6 +796,15 @@ export function readTranslationSection(ctx: ConformanceContext): void {
           join: [{ relation: 'author' }],
           withDeleted: true,
         });
+        const tagged = await ctx.repo('tag').findOne({
+          where: Where.eq('id', library.tags.tech.id),
+          join: [{ relation: 'books' }],
+        });
+        const allTagged = await ctx.repo('tag').findOne({
+          where: Where.eq('id', library.tags.tech.id),
+          join: [{ relation: 'books' }],
+          withDeleted: true,
+        });
 
         assert.deepStrictEqual(valuesOf(books?.books ?? [], 'title'), [
           'alpha',
@@ -806,6 +815,13 @@ export function readTranslationSection(ctx: ConformanceContext): void {
           'beta',
         ]);
         assert.equal(deletedAuthor?.author?.name, 'bob');
+        assert.deepStrictEqual(valuesOf(tagged?.books ?? [], 'title'), [
+          'alpha',
+        ]);
+        assert.deepStrictEqual(valuesOf(allTagged?.books ?? [], 'title'), [
+          'alpha',
+          'beta',
+        ]);
       });
     }
 
