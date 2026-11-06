@@ -61,6 +61,19 @@ describe(toDrizzlePostgresClient.name, () => {
     );
   });
 
+  it('refuses a client that is a function rather than a pool, as Vercel Postgres `sql` is', () => {
+    // A Proxy over a function that hands out a pool's methods: not a pool to
+    // Drizzle, which then runs a transaction's statements on any connection.
+    const db = drizzleNeon({
+      client: new neon.Pool({ connectionString: 'postgres://localhost/db' }),
+    });
+    Reflect.set(db, '$client', new Proxy(() => undefined, {}));
+
+    expect(() => toDrizzlePostgresClient(db, 'reports')).toThrow(
+      'The Drizzle connection "reports" is a single connection',
+    );
+  });
+
   it('refuses a database of another kind, naming its connection', () => {
     const db = drizzleSqliteProxy(async () => ({ rows: [] }));
 

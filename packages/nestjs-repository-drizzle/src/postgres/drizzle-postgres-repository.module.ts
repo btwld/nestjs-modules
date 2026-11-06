@@ -103,17 +103,25 @@ function isSinglePgConnection(db: DrizzlePostgresClient): boolean {
     return false;
   }
   const client: unknown = Reflect.get(db, '$client');
-  if (typeof client !== 'object' || client === null) return false;
+  // A client that is a function, such as Vercel Postgres's `sql`, is no
+  // pool to Drizzle either: it is walked like any other.
+  if (!isObjectOrFunction(client)) return false;
   // A class whose name, or whose ancestors' name, says Pool: what
   // `instanceof Pool` finds, without node-postgres.
   for (
     let proto: unknown = Object.getPrototypeOf(client);
-    typeof proto === 'object' && proto !== null;
+    isObjectOrFunction(proto);
     proto = Object.getPrototypeOf(proto)
   ) {
     if (proto.constructor.name.includes('Pool')) return false;
   }
   return true;
+}
+
+function isObjectOrFunction(value: unknown): value is object {
+  return (
+    (typeof value === 'object' && value !== null) || typeof value === 'function'
+  );
 }
 
 /** The Postgres adapter's definition, for the shared registration. */

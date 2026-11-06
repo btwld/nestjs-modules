@@ -71,7 +71,8 @@ with `DrizzleUnsupportedDatabaseException`.
   node-postgres, Neon serverless or Vercel Postgres, register a pool (a
   `connection` option or URL gives you one): a single client would run every
   transaction on its one connection, so startup refuses it with
-  `DrizzleSingleConnectionException`.
+  `DrizzleSingleConnectionException`. On Vercel Postgres that includes the
+  default `sql`, which Drizzle doesn't treat as a pool: pass `createPool()`.
 - On a client without transactions, such as Drizzle's `neon-http` or
   `xata-http`, calls outside a run work, but a `TransactionScope.run()` that
   calls such a repository fails.
