@@ -67,7 +67,7 @@ with `DrizzleUnsupportedDatabaseException`.
   case-sensitive.
 - In ascending order, `NULL`s sort last.
 - Writes return the rows they wrote in the same statement (`RETURNING`).
-- Transactions run concurrently, each on its own connection. On
+- On a pool, transactions run concurrently, each on its own connection. On
   node-postgres, register a `Pool` (a `connection` option or URL gives you
   one): a single `Client` would run every transaction on its one connection,
   so startup refuses it with `DrizzleSingleConnectionException`.
