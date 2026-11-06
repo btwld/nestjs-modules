@@ -781,6 +781,12 @@ Each related row is written through its own repository, so its hooks, row
 scope and write policy run just as if you had called it yourself. Its foreign
 key is always set to the entity's key, whatever the payload holds.
 
+The related rows of a `delete` or `deleteMany` are removed with one
+`deleteMany`, so their `@BeforeDeleteMany` hooks run, not `@BeforeDelete`;
+`@BeforeDestroy` runs for both. Every other related write is one call per
+row: `create`, `update` or `replace`, `delete` for a row a `replace` or
+`upsert` leaves out, `softDelete` and `restore`.
+
 | Your call | What happens to the related rows |
 | --- | --- |
 | `create`, `createMany` | each one listed is created |
@@ -1821,9 +1827,9 @@ match broad categories, and fine-grained decorators for specific operations.
 | --- | --- |
 | `@BeforeRead` | find, findOne, count, findAndCount |
 | `@AfterRead` | find, findOne (count and findAndCount have their own after-keys) |
-| `@BeforeWrite` / `@AfterWrite` | create, createMany, update, upsert, replace |
+| `@BeforeWrite` / `@AfterWrite` | create, createMany, update, upsert, replace — on createMany they receive, and must return, the array |
 | `@BeforeTransition` / `@AfterTransition` | softDelete, restore |
-| `@BeforeDestroy` / `@AfterDestroy` | delete, deleteMany (hard delete) |
+| `@BeforeDestroy` / `@AfterDestroy` | delete, deleteMany (hard delete) — on deleteMany they receive the array |
 
 #### Fine-Grained
 
@@ -2576,7 +2582,9 @@ RepositoryModule.forRoot({
 });
 ```
 
-Every write then adds one record per row it changes. The store is an
+Every write then adds one record per row it writes, even when that changes
+nothing: an `update` naming no column of its own, only cascaded relations or
+nothing at all, is recorded with `changed: []`. The store is an
 append-only entity extending your driver's activity base entity; several
 entities can share one.
 
