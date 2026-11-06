@@ -134,7 +134,9 @@ MySQL one, so register each connection with the adapter for its server.
 Use the `better-sqlite3` client; any other SQLite client stops startup with
 `DrizzleUnsupportedDatabaseException`. Open the database yourself and turn
 foreign keys on: SQLite enforces them only on a connection that asks, and
-the driver changes nothing about yours.
+the driver changes nothing about yours. Give each `@nestjs/drizzle`
+connection a database of its own: two connections on one better-sqlite3
+client share its single connection, which can't hold two transactions.
 
 ```ts
 import { sql } from 'drizzle-orm';
