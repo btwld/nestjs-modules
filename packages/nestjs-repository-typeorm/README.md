@@ -677,6 +677,11 @@ create policy tenant_isolation on orders
 create role app_user login password '...' nosuperuser nobypassrls;
 grant select, insert, update, delete on orders to app_user;
 
+-- With durable messaging: the outbox tables, which app_admin migrates.
+grant usage on schema nest_outbox to app_user;
+grant select, insert, update, delete on all tables in schema nest_outbox
+  to app_user;
+
 -- Migrations and background jobs that work across tenants use their own role.
 create role app_admin login password '...' bypassrls;
 ```
@@ -698,7 +703,9 @@ create role app_admin login password '...' bypassrls;
   tenant in their setting, or nothing without one.
 - **Leave the outbox tables without a tenant policy.** The `@nestjs/outbox`
   relay and its migrations run outside the driver's transactions, so they
-  never have a tenant.
+  never have a tenant. `app_user` can't create the tables at startup, so run
+  `nest-outbox migrate` as `app_admin` in every environment, and grant
+  `app_user` the tables as above.
 - **Include `tenant_id` in foreign keys.** Postgres checks foreign keys
   without the policies, so otherwise a row can point into another tenant.
 - **Create views with `security_invoker = true`.** Otherwise they run as
