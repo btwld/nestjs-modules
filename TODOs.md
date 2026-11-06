@@ -18,18 +18,14 @@ done — see git history for what shipped. Reference notes that are not work liv
       would need the driver to know which tables a view expression reads, and
       to resolve SQLite paths.
 
-  2. **`@Transactional` e2e specs fail intermittently under full-suite parallel load** (M)
-      — observed in `nestjs-cache`, `nestjs-crud`, `nestjs-role` and `nestjs-user`, and in
-      crud's optimistic-locking e2e. Every one passes in isolation and on a re-run of the
-      same suite. Seen as a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row and as
-      `TransactionScopeFailedException` after a timeout. The cache fixture's key collision
-      was one cause of the UNIQUE sightings and is fixed (`db40e66e`); see whether any
-      remain before chasing them here. The cost of leaving it is
-      that a red suite goes green on retry, which trains everyone to re-run rather than
-      look — so a genuine regression in a transactional path would be dismissed as this.
-      Every spec opens its own `:memory:` SQLite database, so workers share no database
-      file; suspect timeouts under CPU contention. Confirm by pinning a failing spec to a
-      single worker.
+  2. **`@Transactional` e2e specs may still fail under full-suite parallel load** (M) —
+      the 401/404 sightings were requests reaching another process on a shared port, fixed
+      by supertest 7.3.1. Not yet explained: a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row
+      and `TransactionScopeFailedException` after a timeout, seen in `nestjs-cache`,
+      `nestjs-crud`, `nestjs-role` and `nestjs-user`. Every spec opens its own `:memory:`
+      SQLite database, so suspect timeouts under CPU contention; confirm by pinning a
+      failing spec to a single worker. Drop this item if neither recurs. Leaving it trains
+      everyone to re-run a red suite rather than look.
 
   3. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
