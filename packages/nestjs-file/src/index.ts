@@ -26,7 +26,6 @@ export { RemoveFileCommand } from './application/commands/impl/remove-file.comma
 
 // queries
 export { GetFileQuery } from './application/queries/impl/get-file.query.js';
-export { GetFileByKeyQuery } from './application/queries/impl/get-file-by-key.query.js';
 
 // command handlers
 export { CreateFileHandler } from './application/commands/handlers/create-file.handler.js';
@@ -37,7 +36,6 @@ export { RemoveFileHandler } from './application/commands/handlers/remove-file.h
 
 // query handlers
 export { GetFileHandler } from './application/queries/handlers/get-file.handler.js';
-export { GetFileByKeyHandler } from './application/queries/handlers/get-file-by-key.handler.js';
 
 // events
 export { FileCreatedEvent } from './domain/events/file-created.event.js';
@@ -53,7 +51,7 @@ export { FileEntityInterface } from './infrastructure/persistence/interfaces/fil
 // domain interfaces
 export { FileInterface } from './domain/interfaces/file.interface.js';
 export { FileCreatableInterface } from './domain/interfaces/file-creatable.interface.js';
-export { FileKeyInterface } from './domain/interfaces/file-key.interface.js';
+export { FileObjectInterface } from './domain/interfaces/file-object.interface.js';
 export { FileOwnableInterface } from './domain/interfaces/file-ownable.interface.js';
 export { FileReadOptionsInterface } from './domain/interfaces/file-read-options.interface.js';
 export { FileStorageServiceInterface } from './domain/interfaces/file-storage-service.interface.js';
@@ -81,7 +79,7 @@ export { FileUploadUrlException } from './domain/exceptions/file-upload-url.exce
 export { FileDownloadUrlException } from './domain/exceptions/file-download-url.exception.js';
 export { FileExistsCheckException } from './domain/exceptions/file-exists-check.exception.js';
 export { FileStorageDeleteException } from './domain/exceptions/file-storage-delete.exception.js';
-export { FileAlreadyExistsException } from './domain/exceptions/file-already-exists.exception.js';
+export { FileNameInvalidException } from './domain/exceptions/file-name-invalid.exception.js';
 export { FileNotUploadedException } from './domain/exceptions/file-not-uploaded.exception.js';
 export { FileNotFoundException } from './application/exceptions/file-not-found.exception.js';
 export { FileRemoveException } from './application/exceptions/file-remove.exception.js';

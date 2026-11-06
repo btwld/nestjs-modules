@@ -7,7 +7,8 @@ export interface FileInterface {
   serviceKey: string;
 
   /**
-   * File name, including any path. Unique per storage service.
+   * Display name, sanitized at create (see the README's Commands section).
+   * Never a storage key; several files may share one.
    */
   fileName: string;
 

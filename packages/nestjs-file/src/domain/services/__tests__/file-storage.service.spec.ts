@@ -36,8 +36,8 @@ describe(FileStorageService.name, () => {
 
       expect(result).toEqual({
         file,
-        signedUploadUrl: 'https://upload.test/docs/a.pdf',
-        signedDownloadUrl: 'https://download.test/docs/a.pdf',
+        signedUploadUrl: 'https://upload.test/file-1',
+        signedDownloadUrl: 'https://download.test/file-1',
       });
       expect(storage.getSignedUploadUrl).toHaveBeenCalledWith(
         ctx,
@@ -66,7 +66,7 @@ describe(FileStorageService.name, () => {
 
       expect(result).toEqual({
         file,
-        signedDownloadUrl: 'https://download.test/docs/a.pdf',
+        signedDownloadUrl: 'https://download.test/file-1',
       });
       expect(storage.getSignedUploadUrl).not.toHaveBeenCalled();
     });

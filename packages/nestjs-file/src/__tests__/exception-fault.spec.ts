@@ -9,9 +9,9 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 import { FileNotFoundException } from '../application/exceptions/file-not-found.exception.js';
 import { FileRemoveInTransactionException } from '../application/exceptions/file-remove-in-transaction.exception.js';
 import { FileRemoveException } from '../application/exceptions/file-remove.exception.js';
-import { FileAlreadyExistsException } from '../domain/exceptions/file-already-exists.exception.js';
 import { FileDownloadUrlException } from '../domain/exceptions/file-download-url.exception.js';
 import { FileExistsCheckException } from '../domain/exceptions/file-exists-check.exception.js';
+import { FileNameInvalidException } from '../domain/exceptions/file-name-invalid.exception.js';
 import { FileNotUploadedException } from '../domain/exceptions/file-not-uploaded.exception.js';
 import { FileStatusException } from '../domain/exceptions/file-status.exception.js';
 import { FileStorageDeleteException } from '../domain/exceptions/file-storage-delete.exception.js';
@@ -81,9 +81,8 @@ const CASES: {
     fault: 'client',
   },
   {
-    name: 'FileAlreadyExistsException',
-    build: () =>
-      new FileAlreadyExistsException({ serviceKey: 'key', fileName: 'a.png' }),
+    name: 'FileNameInvalidException',
+    build: () => new FileNameInvalidException(),
     fault: 'client',
   },
   {

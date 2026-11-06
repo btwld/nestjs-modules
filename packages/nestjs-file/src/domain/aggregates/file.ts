@@ -12,10 +12,12 @@ import { FileRemovedEvent } from '../events/file-removed.event.js';
 import { FileRestoredEvent } from '../events/file-restored.event.js';
 import { FileSoftDeletedEvent } from '../events/file-soft-deleted.event.js';
 import { FileUploadConfirmedEvent } from '../events/file-upload-confirmed.event.js';
+import { FileNameInvalidException } from '../exceptions/file-name-invalid.exception.js';
 import { FileStatusException } from '../exceptions/file-status.exception.js';
 import { type FileCreatableInterface } from '../interfaces/file-creatable.interface.js';
 import { type FileStatus } from '../interfaces/file-status.type.js';
 import { type FileInterface } from '../interfaces/file.interface.js';
+import { sanitizeFileName } from '../utils/sanitize-file-name.js';
 
 /**
  * A file record. The stored object lives in the storage service named by
@@ -70,12 +72,22 @@ export class File extends MutableAggregate<FileInterface> {
     return File.createWithId(eventContext, randomUUID(), dto);
   }
 
+  /**
+   * Creates a pending file named with the sanitized `fileName`. Throws
+   * `FileNameInvalidException` when sanitizing leaves nothing.
+   */
   static createWithId(
     eventContext: EventContextHost,
     id: string,
     dto: FileCreatableInterface,
   ): File {
-    const { serviceKey, fileName, contentType } = dto;
+    const { serviceKey, contentType } = dto;
+    const fileName = sanitizeFileName(dto.fileName);
+
+    if (!fileName) {
+      throw new FileNameInvalidException();
+    }
+
     const file = new File(id, {
       serviceKey,
       fileName,

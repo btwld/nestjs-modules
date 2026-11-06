@@ -4,7 +4,6 @@ import { createEventContext, type ReferenceId } from '@concepta/nestjs-core';
 
 import { FILE_REPOSITORY_TOKEN } from '../../file.constants.js';
 import { File } from '../aggregates/file.js';
-import { FileAlreadyExistsException } from '../exceptions/file-already-exists.exception.js';
 import { FileNotUploadedException } from '../exceptions/file-not-uploaded.exception.js';
 import { type FileCreatableInterface } from '../interfaces/file-creatable.interface.js';
 import { FileRepositoryInterface } from '../repositories/file-repository.interface.js';
@@ -30,18 +29,14 @@ export class FileLifecycleService {
   ) {}
 
   /**
-   * Creates a pending file. Refuses an unknown storage key and a taken name,
-   * soft-deleted files included, before writing.
+   * Creates a pending file with a sanitized name. Refuses an unknown storage
+   * key, and a name that sanitizes to nothing, before writing.
    */
   async create(
     ctx: PlainLiteralObject,
     dto: FileCreatableInterface,
   ): Promise<File> {
     this.fileStorage.resolve(dto.serviceKey);
-
-    if (await this.fileRepository.existsByKey(ctx, dto)) {
-      throw new FileAlreadyExistsException(dto);
-    }
 
     const file = File.create(createEventContext(ctx, {}, {}), dto);
 

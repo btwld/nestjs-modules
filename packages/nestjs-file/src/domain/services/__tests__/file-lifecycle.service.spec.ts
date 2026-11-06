@@ -13,7 +13,7 @@ import { FileRemovedEvent } from '../../events/file-removed.event.js';
 import { FileRestoredEvent } from '../../events/file-restored.event.js';
 import { FileSoftDeletedEvent } from '../../events/file-soft-deleted.event.js';
 import { FileUploadConfirmedEvent } from '../../events/file-upload-confirmed.event.js';
-import { FileAlreadyExistsException } from '../../exceptions/file-already-exists.exception.js';
+import { FileNameInvalidException } from '../../exceptions/file-name-invalid.exception.js';
 import { FileNotUploadedException } from '../../exceptions/file-not-uploaded.exception.js';
 import { FileStatusException } from '../../exceptions/file-status.exception.js';
 import { FileStorageNotFoundException } from '../../exceptions/file-storage-not-found.exception.js';
@@ -56,33 +56,30 @@ describe(FileLifecycleService.name, () => {
   });
 
   describe('create', () => {
-    it('writes a pending file with FileCreatedEvent applied', async () => {
-      fileRepository.existsByKey.mockResolvedValue(false);
-
+    it('writes a pending file, with a sanitized name and FileCreatedEvent applied', async () => {
       const file = await service.create({}, dto);
 
       expect(file).toBeInstanceOf(File);
       expect(file.status).toEqual('pending');
+      expect(file.fileName).toEqual('a.pdf');
       expect(fileRepository.create).toHaveBeenCalledWith({}, file);
       expect(file.getUncommittedEvents()).toEqual([
         new FileCreatedEvent(expect.any(EventContextHost), file.toPlain()),
       ]);
     });
 
-    it('refuses a taken name before writing', async () => {
-      fileRepository.existsByKey.mockResolvedValue(true);
-
-      await expect(service.create({}, dto)).rejects.toThrow(
-        FileAlreadyExistsException,
-      );
+    it('refuses a name with nothing left once sanitized before writing', async () => {
+      await expect(
+        service.create({}, { ...dto, fileName: 'docs/..' }),
+      ).rejects.toThrow(FileNameInvalidException);
       expect(fileRepository.create).not.toHaveBeenCalled();
     });
 
-    it('refuses an unknown storage key before reading', async () => {
+    it('refuses an unknown storage key before writing', async () => {
       await expect(
         service.create({}, { ...dto, serviceKey: 'unknown' }),
       ).rejects.toThrow(FileStorageNotFoundException);
-      expect(fileRepository.existsByKey).not.toHaveBeenCalled();
+      expect(fileRepository.create).not.toHaveBeenCalled();
     });
   });
 

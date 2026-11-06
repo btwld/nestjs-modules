@@ -122,7 +122,9 @@ no other repository opt-ins.
 ## Storage Services
 
 A storage service implements `FileStorageServiceInterface`. A file uses the
-service whose `KEY` equals its `serviceKey`.
+service whose `KEY` equals its `serviceKey`. Key each stored object by the
+file's `id`: `fileName` is only a display name, and several files can share
+one.
 
 ```ts
 import { Injectable, type PlainLiteralObject } from '@nestjs/common';
@@ -136,7 +138,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
-  type FileInterface,
+  type FileObjectInterface,
   type FileStorageServiceInterface,
 } from '@concepta/nestjs-file';
 
@@ -149,28 +151,28 @@ export class S3StorageService implements FileStorageServiceInterface {
     private readonly bucket: string,
   ) {}
 
-  getSignedUploadUrl(_ctx: PlainLiteralObject, file: FileInterface) {
+  getSignedUploadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     return getSignedUrl(
       this.client,
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: file.fileName,
+        Key: file.id,
         ContentType: file.contentType,
       }),
     );
   }
 
-  getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileInterface) {
+  getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     return getSignedUrl(
       this.client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: file.fileName }),
+      new GetObjectCommand({ Bucket: this.bucket, Key: file.id }),
     );
   }
 
-  async exists(_ctx: PlainLiteralObject, file: FileInterface) {
+  async exists(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     try {
       await this.client.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: file.fileName }),
+        new HeadObjectCommand({ Bucket: this.bucket, Key: file.id }),
       );
       return true;
     } catch (error) {
@@ -179,10 +181,10 @@ export class S3StorageService implements FileStorageServiceInterface {
     }
   }
 
-  async delete(_ctx: PlainLiteralObject, file: FileInterface) {
+  async delete(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     // S3 deletes are idempotent: deleting a missing key succeeds.
     await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: file.fileName }),
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: file.id }),
     );
   }
 }
@@ -213,8 +215,8 @@ pick a bucket or prefix from it.
 | `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
 
 **Soft delete** a `pending` or `active` file to hide it from reads while
-keeping the stored object; **restore** it to bring it back. Its name stays
-taken until you remove it. A soft-deleted file can't change, so it keeps its
+keeping the stored object; **restore** it to bring it back. A soft-deleted
+file can't change, so it keeps its
 status until it's restored or removed.
 
 **Remove** a file to delete the stored object and then its record. If storage
@@ -234,7 +236,8 @@ Commands and queries hand you a `File`:
 | Member | What you get |
 | --- | --- |
 | `id`, `version` | The record's id, and the version each write is checked against. |
-| `serviceKey`, `fileName`, `contentType` | What you created it with. |
+| `serviceKey`, `contentType` | What you created it with. |
+| `fileName` | The name you created it with, sanitized (see [Commands](#commands)). |
 | `status` | `pending`, `active`, `removing` or `remove-failed`. |
 | `isSoftDeleted` | Whether it's soft-deleted. |
 | `isInUse` | Whether it's `pending` or `active` and not soft-deleted. |
@@ -248,7 +251,7 @@ Change a file only through the commands; they apply the rules and write it.
 
 | Command | Returns | Does |
 | --- | --- | --- |
-| `CreateFileCommand(ctx, { serviceKey, fileName, contentType })` | `FileCreatedResultInterface` | Creates a `pending` file. Throws `FileAlreadyExistsException` when the name is taken, by a soft-deleted file too. |
+| `CreateFileCommand(ctx, { serviceKey, fileName, contentType })` | `FileCreatedResultInterface` | Creates a `pending` file with a sanitized name. Throws `FileNameInvalidException` when sanitizing leaves nothing. |
 | `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`. Confirming twice returns the file unchanged. |
 | `SoftDeleteFileCommand(ctx, id)` | `File` | Hides the file from reads and returns it, soft-deleted. |
 | `RestoreFileCommand(ctx, id)` | `File` | Brings a soft-deleted file back. Restoring a file that isn't soft-deleted returns it unchanged. |
@@ -268,9 +271,16 @@ Create and confirm wait for your storage service inside a transaction, so keep
 those calls fast: past the transaction timeout (30 seconds by default) the
 command fails and leaves nothing behind.
 
-Two creates of the same name at the same moment: one wins, and the other can
-fail with `RepositoryDatabaseException` instead of
-`FileAlreadyExistsException`. Treat both as "name taken".
+Create keeps only the last segment of `fileName` after any `/` or `\`, strips
+control and invisible formatting characters (including the right-to-left
+override that disguises an extension), normalises it to NFC, trims
+surrounding whitespace and trailing dots, and caps it at 255 characters,
+keeping the extension. So
+`../uploads/insurance.pdf` is stored as `insurance.pdf`. A name with nothing
+left, such as `..`, throws `FileNameInvalidException`. Names don't have to be
+unique: several files can be called `insurance.pdf`, each with its own `id`.
+Quotes and semicolons are kept, so encode the name when you put it in a
+`Content-Disposition` header (`filename*=UTF-8''…`, RFC 6266).
 
 **Dispatch `RemoveFileCommand` outside any transaction**, including the
 transactional interceptor; inside one it throws
@@ -280,7 +290,7 @@ transactional interceptor; inside one it throws
 const { file, signedUploadUrl } = await this.commandBus.execute(
   new CreateFileCommand(ctx, {
     serviceKey: 's3',
-    fileName: `avatars/${userId}.png`,
+    fileName: 'avatar.png',
     contentType: 'image/png',
   }),
 );
@@ -291,10 +301,10 @@ const { file, signedUploadUrl } = await this.commandBus.execute(
 | Query | Returns |
 | --- | --- |
 | `GetFileQuery(ctx, id, { status? })` | `FileReadResultInterface`, or throws `FileNotFoundException` |
-| `GetFileByKeyQuery(ctx, { serviceKey, fileName }, { status? })` | `File \| null` |
 
 `status` limits the match to those statuses; without it every status matches.
-Neither query returns soft-deleted files.
+The query never returns soft-deleted files. To find a file from your own
+record, store its id (see [Referring to a File](#referring-to-a-file)).
 
 ```ts
 const { signedDownloadUrl } = await this.queryBus.execute(
@@ -457,7 +467,7 @@ provide your own `FileLifecycleService` subclass through `providers`.
 | Exception | Fault | When |
 | --- | --- | --- |
 | `FileNotFoundException` | client | No file matches the id (and status filter). |
-| `FileAlreadyExistsException` | client | The key is taken, by a soft-deleted file too. |
+| `FileNameInvalidException` | client | The file name has nothing left once sanitized. |
 | `FileNotUploadedException` | client | `exists` says the object isn't uploaded. |
 | `FileStatusException` | client | The status doesn't allow the operation. |
 | `FileStorageNotFoundException` | usage | No storage service has the file's `serviceKey`. |

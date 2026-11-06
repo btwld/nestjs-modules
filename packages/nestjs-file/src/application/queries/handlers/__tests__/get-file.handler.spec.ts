@@ -34,7 +34,7 @@ describe(GetFileHandler.name, () => {
     });
     expect(result).toEqual({
       file,
-      signedDownloadUrl: 'https://download.test/docs/a.pdf',
+      signedDownloadUrl: 'https://download.test/file-1',
     });
   });
 

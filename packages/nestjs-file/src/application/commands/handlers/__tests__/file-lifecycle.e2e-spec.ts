@@ -18,8 +18,8 @@ import { FileRemovedEvent } from '../../../../domain/events/file-removed.event.j
 import { FileRestoredEvent } from '../../../../domain/events/file-restored.event.js';
 import { FileSoftDeletedEvent } from '../../../../domain/events/file-soft-deleted.event.js';
 import { FileUploadConfirmedEvent } from '../../../../domain/events/file-upload-confirmed.event.js';
-import { FileAlreadyExistsException } from '../../../../domain/exceptions/file-already-exists.exception.js';
 import { FileDownloadUrlException } from '../../../../domain/exceptions/file-download-url.exception.js';
+import { FileNameInvalidException } from '../../../../domain/exceptions/file-name-invalid.exception.js';
 import { FileStatusException } from '../../../../domain/exceptions/file-status.exception.js';
 import { FileStorageDeleteException } from '../../../../domain/exceptions/file-storage-delete.exception.js';
 import { FileUploadUrlException } from '../../../../domain/exceptions/file-upload-url.exception.js';
@@ -28,7 +28,6 @@ import { FILE_REPOSITORY_TOKEN } from '../../../../file.constants.js';
 import { FileNotFoundException } from '../../../exceptions/file-not-found.exception.js';
 import { FileRemoveInTransactionException } from '../../../exceptions/file-remove-in-transaction.exception.js';
 import { FileRemoveException } from '../../../exceptions/file-remove.exception.js';
-import { GetFileByKeyQuery } from '../../../queries/impl/get-file-by-key.query.js';
 import { GetFileQuery } from '../../../queries/impl/get-file.query.js';
 import { ConfirmFileUploadCommand } from '../../impl/confirm-file-upload.command.js';
 import { CreateFileCommand } from '../../impl/create-file.command.js';
@@ -76,7 +75,10 @@ describe('file lifecycle (e2e)', () => {
   it('creates, confirms, reads and removes a file', async () => {
     const created = await commandBus.execute(new CreateFileCommand({}, dto));
     expect(created.file.status).toEqual('pending');
-    expect(created.signedUploadUrl).toEqual('https://upload.test/docs/a.pdf');
+    expect(created.file.fileName).toEqual('a.pdf');
+    expect(created.signedUploadUrl).toEqual(
+      `https://upload.test/${created.file.id}`,
+    );
 
     const confirmed = await commandBus.execute(
       new ConfirmFileUploadCommand({}, created.file.id),
@@ -87,7 +89,9 @@ describe('file lifecycle (e2e)', () => {
       new GetFileQuery({}, created.file.id, { status: ['active'] }),
     );
     expect(read.file.toPlain()).toEqual(confirmed.file.toPlain());
-    expect(read.signedDownloadUrl).toEqual('https://download.test/docs/a.pdf');
+    expect(read.signedDownloadUrl).toEqual(
+      `https://download.test/${created.file.id}`,
+    );
     // Only create asked for an upload url.
     expect(storage.getSignedUploadUrl).toHaveBeenCalledTimes(1);
 
@@ -105,38 +109,31 @@ describe('file lifecycle (e2e)', () => {
     await expect(
       queryBus.execute(new GetFileQuery({}, file.id, { status: ['active'] })),
     ).rejects.toThrow(FileNotFoundException);
-    expect(
-      await queryBus.execute(
-        new GetFileByKeyQuery({}, dto, { status: ['pending'] }),
+    const read = await queryBus.execute(
+      new GetFileQuery({}, file.id, { status: ['pending'] }),
+    );
+    expect(read.file.id).toEqual(file.id);
+  });
+
+  it('stores files that share a name as separate objects', async () => {
+    const first = await commandBus.execute(new CreateFileCommand({}, dto));
+    const second = await commandBus.execute(new CreateFileCommand({}, dto));
+
+    expect(second.file.id).not.toEqual(first.file.id);
+    expect(second.file.fileName).toEqual(first.file.fileName);
+    expect(second.signedUploadUrl).not.toEqual(first.signedUploadUrl);
+  });
+
+  it('refuses a name with nothing left once sanitized, writing nothing', async () => {
+    const create = vi.spyOn(fileRepository, 'create');
+
+    await expect(
+      commandBus.execute(
+        new CreateFileCommand({}, { ...dto, fileName: 'uploads/..' }),
       ),
-    ).not.toBeNull();
-  });
-
-  it('refuses a duplicate key', async () => {
-    await createFile();
-
-    await expect(
-      commandBus.execute(new CreateFileCommand({}, dto)),
-    ).rejects.toThrow(FileAlreadyExistsException);
-  });
-
-  it('keeps a soft-deleted file key taken until it is removed', async () => {
-    const file = await createFile();
-
-    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
-
-    expect(await queryBus.execute(new GetFileByKeyQuery({}, dto))).toBeNull();
-    await expect(
-      queryBus.execute(new GetFileQuery({}, file.id)),
-    ).rejects.toThrow(FileNotFoundException);
-    await expect(
-      commandBus.execute(new CreateFileCommand({}, dto)),
-    ).rejects.toThrow(FileAlreadyExistsException);
-
-    await commandBus.execute(new RemoveFileCommand({}, file.id));
-
-    const recreated = await createFile();
-    expect(recreated.id).not.toEqual(file.id);
+    ).rejects.toThrow(FileNameInvalidException);
+    expect(create).not.toHaveBeenCalled();
+    expect(storage.getSignedUploadUrl).not.toHaveBeenCalled();
   });
 
   it('leaves remove-failed when storage fails, and a retry finishes', async () => {
@@ -292,12 +289,16 @@ describe('file lifecycle (e2e)', () => {
     const events: IEvent[] = [];
     app.get(EventBus).subscribe((event) => events.push(event));
     storage.getSignedUploadUrl.mockRejectedValueOnce(new Error('s3 down'));
+    const create = vi.spyOn(fileRepository, 'create');
 
     await expect(
       commandBus.execute(new CreateFileCommand({}, dto)),
     ).rejects.toThrow(FileUploadUrlException);
 
-    expect(await queryBus.execute(new GetFileByKeyQuery({}, dto))).toBeNull();
+    const [[, written]] = create.mock.calls;
+    expect(
+      await fileRepository.get({}, written.id, { withDeleted: true }),
+    ).toBeNull();
     expect(events).toEqual([]);
   });
 

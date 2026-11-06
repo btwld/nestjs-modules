@@ -14,7 +14,6 @@ import { CreateFileHandler } from './application/commands/handlers/create-file.h
 import { RemoveFileHandler } from './application/commands/handlers/remove-file.handler.js';
 import { RestoreFileHandler } from './application/commands/handlers/restore-file.handler.js';
 import { SoftDeleteFileHandler } from './application/commands/handlers/soft-delete-file.handler.js';
-import { GetFileByKeyHandler } from './application/queries/handlers/get-file-by-key.handler.js';
 import { GetFileHandler } from './application/queries/handlers/get-file.handler.js';
 import { FileLifecycleService } from './domain/services/file-lifecycle.service.js';
 import { FileStorageService } from './domain/services/file-storage.service.js';
@@ -101,7 +100,6 @@ export function createFileProviders(options: {
     RestoreFileHandler,
     RemoveFileHandler,
     GetFileHandler,
-    GetFileByKeyHandler,
     // Consumer overrides (last provider for a token wins)
     ...(options.providers ?? []),
   ];

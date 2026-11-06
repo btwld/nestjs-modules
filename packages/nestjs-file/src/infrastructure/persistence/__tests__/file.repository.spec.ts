@@ -5,7 +5,6 @@ import { type RepositoryInterface, Where } from '@concepta/nestjs-repository';
 import {
   createMockFile,
   createMockFileEntity,
-  STORAGE_KEY,
 } from '../../../__tests__/helpers/mock.helpers.js';
 import { FileMapper } from '../file.mapper.js';
 import { FileRepository } from '../file.repository.js';
@@ -13,7 +12,6 @@ import { type FileEntityInterface } from '../interfaces/file-entity.interface.js
 
 describe(FileRepository.name, () => {
   const w = Where.for<FileEntityInterface>();
-  const key = { serviceKey: STORAGE_KEY, fileName: 'docs/a.pdf' };
 
   let repository: ReturnType<
     typeof mockDeep<RepositoryInterface<FileEntityInterface>>
@@ -54,29 +52,6 @@ describe(FileRepository.name, () => {
         ctx: {},
       });
     });
-  });
-
-  it('findByKey never reads soft-deleted rows', async () => {
-    repository.findOne.mockResolvedValue(null);
-
-    await fileRepository.findByKey({}, key);
-
-    expect(repository.findOne).toHaveBeenCalledWith({
-      where: w.and(
-        w.eq('serviceKey', key.serviceKey),
-        w.eq('fileName', key.fileName),
-      ),
-      ctx: {},
-    });
-  });
-
-  it('existsByKey counts soft-deleted rows, as the unique constraint does', async () => {
-    repository.count.mockResolvedValue(1);
-
-    expect(await fileRepository.existsByKey({}, key)).toEqual(true);
-    expect(repository.count).toHaveBeenCalledWith(
-      expect.objectContaining({ withDeleted: true }),
-    );
   });
 
   it('updateStatus stamps the file and uses the version-guarded update with only status and date', async () => {

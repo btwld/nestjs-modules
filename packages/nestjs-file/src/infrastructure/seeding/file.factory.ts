@@ -11,7 +11,7 @@ import { type FileInterface } from '../../domain/interfaces/file.interface.js';
 export class FileFactory extends Factory<FileInterface> {
   protected async entity(file: FileInterface): Promise<FileInterface> {
     file.serviceKey = 'default';
-    file.fileName = `${faker.string.uuid()}/${faker.system.fileName()}`;
+    file.fileName = faker.system.fileName();
     file.contentType = faker.system.mimeType();
     file.status = 'active';
 

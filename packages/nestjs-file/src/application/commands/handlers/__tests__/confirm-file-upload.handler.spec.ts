@@ -38,7 +38,7 @@ describe(ConfirmFileUploadHandler.name, () => {
 
     expect(result).toEqual({
       file: confirmed,
-      signedDownloadUrl: 'https://download.test/docs/a.pdf',
+      signedDownloadUrl: 'https://download.test/file-1',
     });
     expect(storage.getSignedUploadUrl).not.toHaveBeenCalled();
     expect(mocks.trxHandle.onCommit).toHaveBeenCalledTimes(1);

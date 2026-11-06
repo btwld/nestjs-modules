@@ -7,6 +7,7 @@ import { FileRemovedEvent } from '../../events/file-removed.event.js';
 import { FileRestoredEvent } from '../../events/file-restored.event.js';
 import { FileSoftDeletedEvent } from '../../events/file-soft-deleted.event.js';
 import { FileUploadConfirmedEvent } from '../../events/file-upload-confirmed.event.js';
+import { FileNameInvalidException } from '../../exceptions/file-name-invalid.exception.js';
 import { FileStatusException } from '../../exceptions/file-status.exception.js';
 import { type FileStatus } from '../../interfaces/file-status.type.js';
 import { File } from '../file.js';
@@ -26,6 +27,27 @@ describe(File.name, () => {
     expect(file.getUncommittedEvents()).toEqual([
       new FileCreatedEvent(eventContext, file.toPlain()),
     ]);
+  });
+
+  it('stores the sanitized name', () => {
+    const rightToLeftOverride = String.fromCodePoint(0x202e);
+    const file = File.create(eventContext, {
+      serviceKey: 's3',
+      fileName: `../avatars/a${rightToLeftOverride}.png`,
+      contentType: 'image/png',
+    });
+
+    expect(file.fileName).toEqual('a.png');
+  });
+
+  it('refuses a name with nothing left once sanitized', () => {
+    expect(() =>
+      File.create(eventContext, {
+        serviceKey: 's3',
+        fileName: 'avatars/',
+        contentType: 'image/png',
+      }),
+    ).toThrow(FileNameInvalidException);
   });
 
   describe('confirmUpload', () => {

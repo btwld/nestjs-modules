@@ -1,4 +1,4 @@
-import { Column, Unique } from 'typeorm';
+import { Column } from 'typeorm';
 
 import { CommonSqliteEntity } from '@concepta/nestjs-repository-typeorm/sqlite';
 
@@ -8,7 +8,6 @@ import { type FileEntityInterface } from '../interfaces/file-entity.interface.js
 /**
  * File Entity
  */
-@Unique(['serviceKey', 'fileName'])
 export abstract class FileSqliteEntity
   extends CommonSqliteEntity
   implements FileEntityInterface
@@ -20,7 +19,7 @@ export abstract class FileSqliteEntity
   serviceKey!: string;
 
   /**
-   * File name, including any path
+   * Sanitized display name
    */
   @Column()
   fileName!: string;

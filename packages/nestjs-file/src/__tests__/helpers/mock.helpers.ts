@@ -7,8 +7,8 @@ import { createMockEventPublisher } from '@concepta/nestjs-core/testing';
 import { createMockTransaction } from '@concepta/nestjs-repository/testing';
 
 import { type File } from '../../domain/aggregates/file.js';
+import { type FileObjectInterface } from '../../domain/interfaces/file-object.interface.js';
 import { type FileStorageServiceInterface } from '../../domain/interfaces/file-storage-service.interface.js';
-import { type FileInterface } from '../../domain/interfaces/file.interface.js';
 import { type FileRepositoryInterface } from '../../domain/repositories/file-repository.interface.js';
 import { type FileLifecycleService } from '../../domain/services/file-lifecycle.service.js';
 import { FileMapper } from '../../infrastructure/persistence/file.mapper.js';
@@ -27,19 +27,19 @@ export class FakeStorageService implements FileStorageServiceInterface {
   KEY = STORAGE_KEY;
 
   getSignedUploadUrl: Mock<
-    (ctx: PlainLiteralObject, file: FileInterface) => Promise<string>
-  > = vi.fn(async (_ctx, file) => `https://upload.test/${file.fileName}`);
+    (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<string>
+  > = vi.fn(async (_ctx, file) => `https://upload.test/${file.id}`);
 
   getSignedDownloadUrl: Mock<
-    (ctx: PlainLiteralObject, file: FileInterface) => Promise<string>
-  > = vi.fn(async (_ctx, file) => `https://download.test/${file.fileName}`);
+    (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<string>
+  > = vi.fn(async (_ctx, file) => `https://download.test/${file.id}`);
 
   exists?: Mock<
-    (ctx: PlainLiteralObject, file: FileInterface) => Promise<boolean>
+    (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<boolean>
   > = vi.fn(async () => true);
 
   delete?: Mock<
-    (ctx: PlainLiteralObject, file: FileInterface) => Promise<void>
+    (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<void>
   > = vi.fn(async () => {});
 }
 
@@ -57,7 +57,7 @@ export function createMockFileEntity(
   return {
     id: 'file-1',
     serviceKey: STORAGE_KEY,
-    fileName: 'docs/a.pdf',
+    fileName: 'a.pdf',
     contentType: 'application/pdf',
     status: 'pending',
     dateCreated: new Date('2026-01-01'),

@@ -1,4 +1,4 @@
-import { Column, Unique } from 'typeorm';
+import { Column } from 'typeorm';
 
 import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
 
@@ -8,7 +8,6 @@ import { type FileEntityInterface } from '../interfaces/file-entity.interface.js
 /**
  * File Entity
  */
-@Unique(['serviceKey', 'fileName'])
 export abstract class FilePostgresEntity
   extends CommonPostgresEntity
   implements FileEntityInterface
@@ -20,7 +19,7 @@ export abstract class FilePostgresEntity
   serviceKey!: string;
 
   /**
-   * File name, including any path
+   * Sanitized display name
    */
   @Column()
   fileName!: string;

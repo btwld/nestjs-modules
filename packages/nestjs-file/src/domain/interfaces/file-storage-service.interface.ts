@@ -1,11 +1,14 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type FileInterface } from './file.interface.js';
+import { type FileObjectInterface } from './file-object.interface.js';
 
 /**
  * A storage backend (S3, a filesystem, ...). Register one per `KEY` in the
  * module's `storageServices` option. A file uses the service whose `KEY`
  * equals its `serviceKey`.
+ *
+ * Key each stored object by the file's `id`. `fileName` is a display name
+ * that several files may share.
  */
 export interface FileStorageServiceInterface {
   /**
@@ -18,7 +21,7 @@ export interface FileStorageServiceInterface {
    */
   getSignedUploadUrl(
     ctx: PlainLiteralObject,
-    file: FileInterface,
+    file: FileObjectInterface,
   ): Promise<string> | string;
 
   /**
@@ -26,7 +29,7 @@ export interface FileStorageServiceInterface {
    */
   getSignedDownloadUrl(
     ctx: PlainLiteralObject,
-    file: FileInterface,
+    file: FileObjectInterface,
   ): Promise<string> | string;
 
   /**
@@ -35,7 +38,7 @@ export interface FileStorageServiceInterface {
    */
   exists?(
     ctx: PlainLiteralObject,
-    file: FileInterface,
+    file: FileObjectInterface,
   ): Promise<boolean> | boolean;
 
   /**
@@ -46,5 +49,8 @@ export interface FileStorageServiceInterface {
    * that is retried after a crash calls this again for an object it already
    * deleted.
    */
-  delete?(ctx: PlainLiteralObject, file: FileInterface): Promise<void> | void;
+  delete?(
+    ctx: PlainLiteralObject,
+    file: FileObjectInterface,
+  ): Promise<void> | void;
 }

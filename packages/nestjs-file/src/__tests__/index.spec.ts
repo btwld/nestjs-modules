@@ -5,7 +5,6 @@ import {
   CreateFileHandler,
   File,
   FILE_STATUSES,
-  FileAlreadyExistsException,
   FileCreatedEvent,
   fileCreateSchema,
   FileDownloadUrlException,
@@ -13,6 +12,7 @@ import {
   FileExistsCheckException,
   FileLifecycleService,
   FileModule,
+  FileNameInvalidException,
   FileNotFoundException,
   FileNotUploadedException,
   FileRemovedEvent,
@@ -29,8 +29,6 @@ import {
   FileStorageService,
   FileUploadConfirmedEvent,
   FileUploadUrlException,
-  GetFileByKeyHandler,
-  GetFileByKeyQuery,
   GetFileHandler,
   GetFileQuery,
   RemoveFileCommand,
@@ -80,7 +78,6 @@ describe('index', () => {
 
   it('should export queries', () => {
     expect(GetFileQuery).toBeInstanceOf(Function);
-    expect(GetFileByKeyQuery).toBeInstanceOf(Function);
   });
 
   it('should export handlers', () => {
@@ -90,7 +87,6 @@ describe('index', () => {
     expect(RestoreFileHandler).toBeInstanceOf(Function);
     expect(RemoveFileHandler).toBeInstanceOf(Function);
     expect(GetFileHandler).toBeInstanceOf(Function);
-    expect(GetFileByKeyHandler).toBeInstanceOf(Function);
   });
 
   it('should export events', () => {
@@ -110,7 +106,7 @@ describe('index', () => {
     expect(FileDownloadUrlException).toBeInstanceOf(Function);
     expect(FileExistsCheckException).toBeInstanceOf(Function);
     expect(FileStorageDeleteException).toBeInstanceOf(Function);
-    expect(FileAlreadyExistsException).toBeInstanceOf(Function);
+    expect(FileNameInvalidException).toBeInstanceOf(Function);
     expect(FileNotUploadedException).toBeInstanceOf(Function);
     expect(FileNotFoundException).toBeInstanceOf(Function);
     expect(FileRemoveException).toBeInstanceOf(Function);

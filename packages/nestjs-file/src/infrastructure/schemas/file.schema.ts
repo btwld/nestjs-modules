@@ -16,7 +16,7 @@ export const fileSchema = withNamedComponent(
       fileName: z
         .string()
         .min(1)
-        .meta({ description: 'File name, including any path' }),
+        .meta({ description: 'Display name, sanitized at create' }),
       contentType: z.string().min(1).meta({ description: 'Content type' }),
       status: z.enum(FILE_STATUSES).meta({ description: 'Lifecycle status' }),
     }),

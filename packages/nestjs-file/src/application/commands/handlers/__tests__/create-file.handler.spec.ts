@@ -41,10 +41,8 @@ describe(CreateFileHandler.name, () => {
 
     expect(fileLifecycle.create).toHaveBeenCalledWith(expect.anything(), dto);
     expect(result.file.status).toEqual('pending');
-    expect(result.signedUploadUrl).toEqual('https://upload.test/docs/a.pdf');
-    expect(result.signedDownloadUrl).toEqual(
-      'https://download.test/docs/a.pdf',
-    );
+    expect(result.signedUploadUrl).toEqual('https://upload.test/file-1');
+    expect(result.signedDownloadUrl).toEqual('https://download.test/file-1');
     expect(mocks.trxHandle.onCommit).toHaveBeenCalledTimes(1);
     expect(mocks.trxHandle.onRollback).toHaveBeenCalledTimes(1);
   });

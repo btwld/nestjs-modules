@@ -9,7 +9,6 @@ import {
 
 import { type File } from '../../domain/aggregates/file.js';
 import { type FileGetOptionsInterface } from '../../domain/interfaces/file-get-options.interface.js';
-import { type FileKeyInterface } from '../../domain/interfaces/file-key.interface.js';
 import { type FileReadOptionsInterface } from '../../domain/interfaces/file-read-options.interface.js';
 import { type FileRepositoryInterface } from '../../domain/repositories/file-repository.interface.js';
 
@@ -36,33 +35,6 @@ export class FileRepository implements FileRepositoryInterface {
     });
 
     return entity ? this.mapper.toDomain(entity) : null;
-  }
-
-  async findByKey(
-    ctx: PlainLiteralObject,
-    key: FileKeyInterface,
-    options: FileReadOptionsInterface = {},
-  ): Promise<File | null> {
-    const entity = await this.repository.findOne({
-      where: this.withStatus(this.keyClause(key), options),
-      ctx,
-    });
-
-    return entity ? this.mapper.toDomain(entity) : null;
-  }
-
-  async existsByKey(
-    ctx: PlainLiteralObject,
-    key: FileKeyInterface,
-  ): Promise<boolean> {
-    // Soft-deleted rows still hold their key in the unique constraint.
-    const count = await this.repository.count({
-      where: this.keyClause(key),
-      withDeleted: true,
-      ctx,
-    });
-
-    return count > 0;
   }
 
   async create(ctx: PlainLiteralObject, file: File): Promise<void> {
@@ -109,15 +81,6 @@ export class FileRepository implements FileRepositoryInterface {
       expectedVersion: file.version,
       ctx,
     });
-  }
-
-  private keyClause(key: FileKeyInterface): WhereClause {
-    const w = Where.for<FileEntityInterface>();
-
-    return w.and(
-      w.eq('serviceKey', key.serviceKey),
-      w.eq('fileName', key.fileName),
-    );
   }
 
   private withStatus(

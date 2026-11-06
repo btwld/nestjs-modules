@@ -42,10 +42,7 @@ Not ranked: reference notes, and work waiting on something else.
 
   * **Map common database errors to useful exceptions** — a failed query surfaces as
       `RepositoryDatabaseException`, which carries the raw `context.database` (the
-      driver's data-source type) and `context.code`, but nothing classifies them. So a
-      unique-key race in `CreateFileCommand` (two creates pass the duplicate check; the
-      second fails on the unique constraint) reaches the caller as a generic database error
-      instead of `FileAlreadyExistsException`; the file README documents this. Idea: the
+      driver's data-source type) and `context.code`, but nothing classifies them. Idea: the
       driver reports a driver-neutral classification next to the code
       (`violation?: 'unique' | 'foreign-key' | ...`), and the abstraction throws a
       dedicated exception a module can catch without knowing database codes. Unique-violation
