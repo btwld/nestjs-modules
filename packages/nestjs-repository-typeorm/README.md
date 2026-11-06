@@ -400,6 +400,9 @@ guarantees: row scope, write policy and hooks never see what it does.
   dropped from a create or update without an error. An `update` or `replace`
   whose `data` names nothing else fails with `RepositoryQueryException`, since
   TypeORM is left with nothing to set.
+- **A column `transformer`** runs on the values `eq`, `in` and the range
+  operators compare, but not on a text operator's pattern: `contains`,
+  `starts` and `ends` match the value as stored.
 - **TypeORM's `cascade`** on a relation decorator never fires: only the
   entity's own columns reach TypeORM. To write related rows with the entity,
   mark the relation `cascade: true` in `forRoot` (see
