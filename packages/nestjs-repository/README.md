@@ -534,7 +534,9 @@ re-read before writing both pass it, since each compares against its own
 fresh value. `expectedVersion` closes that gap: pass the version the caller
 last read, and `update`, `replace`, `delete`, `softDelete`, and `restore`
 all reject a mismatch with `OptimisticLockException` (409 Conflict) —
-enforced once in `RepositoryAdapter`, for every driver. Every write that
+enforced once in `RepositoryAdapter`, for every driver. Inside a
+transaction that is certain; outside one, two writers holding the same
+version can both pass (see the end of this section). Every write that
 changes a stored row bumps its version, `upsert` included, so a version read
 before any of them conflicts after it. A write whose values match what is
 already stored, such as an `update` with no data, keeps the version.
