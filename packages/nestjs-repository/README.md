@@ -503,6 +503,11 @@ the guard lives in `RepositoryAdapter` itself, above the `do*` methods, so no
 driver implementation can forget it or diverge from it. `restore()` is the
 sanctioned way back, and `delete` and `deleteMany` still remove it for good.
 
+The guard reads the delete date from the row you pass, so `update` and
+`replace` refuse a row without it, such as `{ id }` or one read with a
+`select` that left the column out, with a `RuntimeException` of
+`fault: 'usage'`. Pass the row as read.
+
 ```ts
 import { SoftDeletedImmutableException } from '@concepta/nestjs-repository';
 

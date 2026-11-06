@@ -135,7 +135,12 @@ class TestAdapter extends RepositoryAdapter<Row> {
   }
 }
 
-const EXISTING: Row = { id: 'row-1', accountId: 'acct-1', name: 'Existing' };
+const EXISTING: Row = {
+  id: 'row-1',
+  accountId: 'acct-1',
+  name: 'Existing',
+  dateDeleted: null,
+};
 
 // ─── Specs ───────────────────────────────────────────────────────────────────
 

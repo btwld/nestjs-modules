@@ -167,10 +167,11 @@ describe('activity', () => {
         urn: WIDGET_METADATA.urn,
         operation: 'create',
         recordId: widget.id,
-        changed: ['id', 'name'],
+        changed: ['id', 'name', 'color', 'secret', 'dateDeleted'],
         values: null,
         occurredAt: expect.any(Date),
         correlationId: null,
+        actorId: null,
       });
     });
 
@@ -203,7 +204,7 @@ describe('activity', () => {
       expect(store.stored[1]).toEqual(
         expect.objectContaining({
           operation: 'replace',
-          changed: ['id', 'name', 'color'],
+          changed: ['id', 'name', 'color', 'secret', 'dateDeleted'],
         }),
       );
     });
@@ -347,8 +348,13 @@ describe('activity', () => {
         store.stored.map(({ changed, values }) => ({ changed, values })),
       ).toEqual([
         {
-          changed: ['id', 'name', 'secret'],
-          values: { id: widget.id, name: 'a' },
+          changed: ['id', 'name', 'color', 'secret', 'dateDeleted'],
+          values: {
+            id: widget.id,
+            name: 'a',
+            color: null,
+            dateDeleted: null,
+          },
         },
         { changed: ['name', 'secret'], values: { name: 'b' } },
         {

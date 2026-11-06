@@ -1681,6 +1681,18 @@ export abstract class RepositoryAdapter<
     const deleteDateColumn = this.getDeleteDateColumn();
     if (!deleteDateColumn) return;
 
+    // Whether the row is soft-deleted is read from the row passed, so it
+    // must hold the column: without it a soft-deleted row would pass.
+    if (!(deleteDateColumn in entity)) {
+      throw new RuntimeException({
+        message:
+          'Cannot write "%s": the row passed holds no "%s". ' +
+          'Pass the row as read, with its delete date',
+        messageParams: [this.metadata.name, deleteDateColumn],
+        fault: 'usage',
+      });
+    }
+
     if (this.isSoftDeleted(entity, deleteDateColumn)) {
       throw new SoftDeletedImmutableException(this.metadata.name);
     }

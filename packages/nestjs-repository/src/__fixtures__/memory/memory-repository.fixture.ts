@@ -101,6 +101,11 @@ export class MemoryRepositoryFixture<
 
   protected async doCreate(entity: DeepPartial<Entity>): Promise<Entity> {
     const row = this.withKey(this.toRow(entity));
+    // A database stores every column: one the caller left out reads null.
+    const stored: PlainLiteralObject = row;
+    for (const { name } of this.metadata.columns) {
+      if (stored[name] === undefined) stored[name] = null;
+    }
     if (this.indexOf(row) !== -1) {
       throw new Error(`${this.metadata.name} primary key is already stored`);
     }

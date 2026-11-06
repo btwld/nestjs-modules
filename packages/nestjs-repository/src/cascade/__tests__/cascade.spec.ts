@@ -154,18 +154,21 @@ describe('cascading writes', () => {
         id: invoice.id,
         tenantId: 'acme',
         number: 'A-1',
+        dateDeleted: null,
         lines: [
           {
             id: widget?.id,
             tenantId: 'acme',
             invoiceId: invoice.id,
             sku: 'widget',
+            dateDeleted: null,
             notes: [
               {
                 id: widget?.notes?.[0]?.id,
                 tenantId: 'acme',
                 lineId: widget?.id,
                 text: 'fragile',
+                dateDeleted: null,
               },
             ],
           },
@@ -174,6 +177,7 @@ describe('cascading writes', () => {
             tenantId: 'acme',
             invoiceId: invoice.id,
             sku: 'gear',
+            dateDeleted: null,
           },
         ],
         receipt: {
@@ -181,6 +185,7 @@ describe('cascading writes', () => {
           tenantId: 'acme',
           invoiceId: invoice.id,
           total: 10,
+          dateDeleted: null,
         },
       });
       expect(skus()).toEqual(['widget', 'gear']);
@@ -493,7 +498,7 @@ describe('cascading into an unscoped entity', () => {
       ).rejects.toMatchObject({ httpStatus: HttpStatus.NOT_FOUND });
 
       expect(receipts.stored.map(({ dateDeleted }) => dateDeleted)).toEqual([
-        undefined,
+        null,
       ]);
     },
   );

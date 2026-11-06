@@ -122,8 +122,13 @@ const appendOnly = {
   reason: 'financial lineage is retained',
 } as const;
 
-const row: Row = { id: 'a', name: 'original' };
-const staleRow: Row = { id: 'a', name: 'original', version: 2 };
+const row: Row = { id: 'a', name: 'original', dateDeleted: null };
+const staleRow: Row = {
+  id: 'a',
+  name: 'original',
+  version: 2,
+  dateDeleted: null,
+};
 
 /**
  * Every operation that targets a stored row, and how to invoke it. Driving

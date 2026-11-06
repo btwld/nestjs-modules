@@ -233,7 +233,11 @@ describe('what a result may hold', () => {
   });
 
   describe('a write result', () => {
-    const employee: EmployeeFixture = { id: 'e1', name: 'Ada' };
+    const employee: EmployeeFixture = {
+      id: 'e1',
+      name: 'Ada',
+      dateDeleted: null,
+    };
 
     it.each([
       ['create', (repo: ResultFixture) => repo.create({ id: 'e1' })],

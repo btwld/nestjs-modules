@@ -61,6 +61,31 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
     });
   });
 
+  describe('a row passed without its delete date', () => {
+    const withoutDeleteDate = (): TestEntity => {
+      const entity = new TestEntityClass();
+      entity.id = '1';
+      entity.version = 1;
+      return entity;
+    };
+
+    it('is refused by update, without calling doUpdate', async () => {
+      await expect(
+        adapter.update(withoutDeleteDate(), { name: 'x' }),
+      ).rejects.toThrow('Pass the row as read, with its delete date');
+
+      expect(adapter.doUpdateCalls).toEqual(0);
+    });
+
+    it('is refused by replace, without calling doReplace', async () => {
+      await expect(
+        adapter.replace(withoutDeleteDate(), { name: 'x' }),
+      ).rejects.toThrow('Pass the row as read, with its delete date');
+
+      expect(adapter.doReplaceCalls).toEqual(0);
+    });
+  });
+
   describe('upsert', () => {
     /** Rewrites the payload's primary key, as a `@BeforeUpsert` hook can. */
     class KeyRewritingAdapter extends TrackingTestRepositoryAdapter {

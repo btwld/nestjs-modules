@@ -198,7 +198,13 @@ const author = (
   id: string,
   name: string,
   companyId: string | null,
-): AuthorFixture => ({ id, tenantId: 'acme', name, companyId });
+): AuthorFixture => ({
+  id,
+  tenantId: 'acme',
+  name,
+  companyId,
+  dateDeleted: null,
+});
 
 const post = (
   id: string,
@@ -211,6 +217,7 @@ const post = (
   authorId,
   title,
   published: isPublished,
+  dateDeleted: null,
 });
 
 const ANN = author('a1', 'Ann', 'c1');
@@ -934,6 +941,7 @@ describe('federated relations', () => {
               authorId: 'a1',
               title: 'A',
               published: true,
+              dateDeleted: null,
             },
           ],
         },
@@ -1101,6 +1109,7 @@ describe('federated relations', () => {
               authorId: 'a1',
               title: 'A',
               published: true,
+              dateDeleted: null,
             },
           ],
         },
