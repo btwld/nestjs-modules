@@ -31,6 +31,8 @@ import {
   FileUploadPolicyException,
   FileUploadPolicyService,
   FileUploadTargetException,
+  GetFileDownloadHandler,
+  GetFileDownloadQuery,
   GetFileHandler,
   GetFileQuery,
   RemoveFileCommand,
@@ -81,6 +83,7 @@ describe('index', () => {
 
   it('should export queries', () => {
     expect(GetFileQuery).toBeInstanceOf(Function);
+    expect(GetFileDownloadQuery).toBeInstanceOf(Function);
   });
 
   it('should export handlers', () => {
@@ -90,6 +93,7 @@ describe('index', () => {
     expect(RestoreFileHandler).toBeInstanceOf(Function);
     expect(RemoveFileHandler).toBeInstanceOf(Function);
     expect(GetFileHandler).toBeInstanceOf(Function);
+    expect(GetFileDownloadHandler).toBeInstanceOf(Function);
   });
 
   it('should export events', () => {

@@ -1,7 +1,7 @@
 import { type File } from '../aggregates/file.js';
 
 /**
- * Returned by `ConfirmFileUploadCommand` and `GetFileQuery`.
+ * Returned by `ConfirmFileUploadCommand` and `GetFileDownloadQuery`.
  */
 export interface FileReadResultInterface {
   /**

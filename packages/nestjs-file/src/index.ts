@@ -27,6 +27,7 @@ export { RemoveFileCommand } from './application/commands/impl/remove-file.comma
 
 // queries
 export { GetFileQuery } from './application/queries/impl/get-file.query.js';
+export { GetFileDownloadQuery } from './application/queries/impl/get-file-download.query.js';
 
 // command handlers
 export { CreateFileHandler } from './application/commands/handlers/create-file.handler.js';
@@ -37,6 +38,7 @@ export { RemoveFileHandler } from './application/commands/handlers/remove-file.h
 
 // query handlers
 export { GetFileHandler } from './application/queries/handlers/get-file.handler.js';
+export { GetFileDownloadHandler } from './application/queries/handlers/get-file-download.handler.js';
 
 // events
 export { FileCreatedEvent } from './domain/events/file-created.event.js';

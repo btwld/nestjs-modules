@@ -1,10 +1,8 @@
 import {
   createMockFile,
   createMockFileRepository,
-  FakeStorageService,
 } from '../../../../__tests__/helpers/mock.helpers.js';
 import { type FileGetOptionsInterface } from '../../../../domain/interfaces/file-get-options.interface.js';
-import { FileStorageService } from '../../../../domain/services/file-storage.service.js';
 import { FileNotFoundException } from '../../../exceptions/file-not-found.exception.js';
 import { GetFileQuery } from '../../impl/get-file.query.js';
 import { GetFileHandler } from '../get-file.handler.js';
@@ -15,13 +13,10 @@ describe(GetFileHandler.name, () => {
 
   beforeEach(() => {
     fileRepository = createMockFileRepository();
-    handler = new GetFileHandler(
-      fileRepository,
-      new FileStorageService([new FakeStorageService()]),
-    );
+    handler = new GetFileHandler(fileRepository);
   });
 
-  it('returns the file with its download url, passing the status filter', async () => {
+  it('returns the file as stored, passing the status filter', async () => {
     const file = createMockFile({ status: 'active' });
     fileRepository.get.mockResolvedValue(file);
 
@@ -32,18 +27,7 @@ describe(GetFileHandler.name, () => {
     expect(fileRepository.get).toHaveBeenCalledWith({}, 'file-1', {
       status: ['active'],
     });
-    expect(result).toEqual({
-      file,
-      signedDownloadUrl: 'https://download.test/file-1',
-    });
-  });
-
-  it('reads every status by default', async () => {
-    fileRepository.get.mockResolvedValue(createMockFile());
-
-    await handler.execute(new GetFileQuery({}, 'file-1'));
-
-    expect(fileRepository.get).toHaveBeenCalledWith({}, 'file-1', {});
+    expect(result).toBe(file);
   });
 
   it('never reads soft-deleted files, whatever the options hold', async () => {

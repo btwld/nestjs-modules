@@ -352,11 +352,11 @@ Change a file only through the commands; they apply the rules and write it.
 | `FileReadResultInterface` | `file`, and `signedDownloadUrl` when the file is `active` and not soft-deleted |
 
 Create is the only command that gives you an `upload` target. Confirm and
-reads give you a `signedDownloadUrl` only for an `active` file: anything not
-yet confirmed, or being removed, comes back without one, so nobody can fetch
-bytes that haven't been accepted. If storage can't produce a target or URL,
-you get `FileUploadTargetException` or `FileDownloadUrlException`, and a
-failed create leaves nothing behind.
+`GetFileDownloadQuery` give you a `signedDownloadUrl` only for an `active`
+file: anything not yet confirmed, or being removed, comes back without one,
+so nobody can fetch bytes that haven't been accepted. If storage can't
+produce a target or URL, you get `FileUploadTargetException` or
+`FileDownloadUrlException`, and a failed create leaves nothing behind.
 
 Create and confirm wait for your storage service inside a transaction, so keep
 those calls fast: past the transaction timeout (30 seconds by default) the
@@ -396,15 +396,18 @@ const { file, upload } = await this.commandBus.execute(
 
 | Query | Returns |
 | --- | --- |
-| `GetFileQuery(ctx, id, { status? })` | `FileReadResultInterface`, or throws `FileNotFoundException` |
+| `GetFileQuery(ctx, id, { status? })` | `File`, or throws `FileNotFoundException` |
+| `GetFileDownloadQuery(ctx, id, { status? })` | `FileReadResultInterface` (`file`, plus `signedDownloadUrl` when `active`), or throws `FileNotFoundException` |
 
-`status` limits the match to those statuses; without it every status matches.
-The query never returns soft-deleted files. To find a file from your own
-record, store its id (see [Referring to a File](#referring-to-a-file)).
+Use `GetFileQuery` when you need the file itself: it never touches storage.
+Use `GetFileDownloadQuery` when you're handing the caller a way to fetch the
+bytes. `status` limits the match to those statuses; without it every status
+matches. Neither query returns soft-deleted files. To find a file from your
+own record, store its id (see [Referring to a File](#referring-to-a-file)).
 
 ```ts
 const { signedDownloadUrl } = await this.queryBus.execute(
-  new GetFileQuery(ctx, id, { status: ['active'] }),
+  new GetFileDownloadQuery(ctx, id, { status: ['active'] }),
 );
 ```
 
@@ -445,7 +448,7 @@ import contentDisposition from 'content-disposition';
 // In FileController
 @Get(':id/content')
 async content(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
-  const { file } = await this.queryBus.execute(
+  const file = await this.queryBus.execute(
     new GetFileQuery(ctx, id, { status: ['active'] }),
   );
 
@@ -461,7 +464,8 @@ async content(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
 ```
 
 `GetFileQuery` with `status: ['active']` throws `FileNotFoundException` for
-anything else, so the route never streams a file that hasn't been accepted.
+anything else, so the route never streams a file that hasn't been accepted,
+and it signs no URL the route would only throw away.
 The module ships no permission check: who may read which file is yours to
 decide, in `assertCanRead`. `contentDisposition` (the
 [`content-disposition`](https://www.npmjs.com/package/content-disposition)
@@ -514,6 +518,7 @@ import {
   CreateFileCommand,
   type FileCreatableInterface,
   fileCreateSchema,
+  GetFileDownloadQuery,
   GetFileQuery,
   RemoveFileCommand,
   RestoreFileCommand,
@@ -558,7 +563,7 @@ export class FileController {
   @Get(':id')
   async read(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
     const { file, signedDownloadUrl } = await this.queryBus.execute(
-      new GetFileQuery(ctx, id, { status: ['active'] }),
+      new GetFileDownloadQuery(ctx, id, { status: ['active'] }),
     );
     return { ...file.toPlain(), signedDownloadUrl };
   }

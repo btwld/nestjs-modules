@@ -29,6 +29,7 @@ import { FILE_REPOSITORY_TOKEN } from '../../../../file.constants.js';
 import { FileNotFoundException } from '../../../exceptions/file-not-found.exception.js';
 import { FileRemoveInTransactionException } from '../../../exceptions/file-remove-in-transaction.exception.js';
 import { FileRemoveException } from '../../../exceptions/file-remove.exception.js';
+import { GetFileDownloadQuery } from '../../../queries/impl/get-file-download.query.js';
 import { GetFileQuery } from '../../../queries/impl/get-file.query.js';
 import { ConfirmFileUploadCommand } from '../../impl/confirm-file-upload.command.js';
 import { CreateFileCommand } from '../../impl/create-file.command.js';
@@ -91,7 +92,7 @@ describe('file lifecycle (e2e)', () => {
     expect(confirmed.file.status).toEqual('active');
 
     const read = await queryBus.execute(
-      new GetFileQuery({}, created.file.id, { status: ['active'] }),
+      new GetFileDownloadQuery({}, created.file.id, { status: ['active'] }),
     );
     expect(read.file.toPlain()).toEqual(confirmed.file.toPlain());
     expect(read.signedDownloadUrl).toEqual(
@@ -117,7 +118,20 @@ describe('file lifecycle (e2e)', () => {
     const read = await queryBus.execute(
       new GetFileQuery({}, file.id, { status: ['pending'] }),
     );
-    expect(read.file.id).toEqual(file.id);
+    expect(read.id).toEqual(file.id);
+  });
+
+  it('reads an active file without asking storage for anything', async () => {
+    const file = await createFile();
+    await commandBus.execute(new ConfirmFileUploadCommand({}, file.id));
+    storage.getSignedDownloadUrl.mockClear();
+
+    const read = await queryBus.execute(
+      new GetFileQuery({}, file.id, { status: ['active'] }),
+    );
+
+    expect(read.status).toEqual('active');
+    expect(storage.getSignedDownloadUrl).not.toHaveBeenCalled();
   });
 
   it('issues no download url until the upload is confirmed', async () => {
@@ -125,7 +139,7 @@ describe('file lifecycle (e2e)', () => {
     expect(created).not.toHaveProperty('signedDownloadUrl');
 
     const pending = await queryBus.execute(
-      new GetFileQuery({}, created.file.id),
+      new GetFileDownloadQuery({}, created.file.id),
     );
     expect(pending).toEqual({ file: expect.any(Object) });
     expect(pending.file.status).toEqual('pending');
@@ -208,7 +222,7 @@ describe('file lifecycle (e2e)', () => {
 
     const read = await queryBus.execute(new GetFileQuery({}, file.id));
     expect(restored.isSoftDeleted).toEqual(false);
-    expect(read.file.toPlain()).toEqual(restored.toPlain());
+    expect(read.toPlain()).toEqual(restored.toPlain());
   });
 
   it('refuses to soft-delete a file whose removal failed', async () => {
