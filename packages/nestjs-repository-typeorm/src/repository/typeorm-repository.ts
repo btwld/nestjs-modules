@@ -216,9 +216,7 @@ export abstract class TypeOrmRepository<
               fault: 'internal',
             });
           }
-          // This repository rebuilt on the transaction's manager, so a
-          // custom one from a `factory` stays itself inside a run.
-          return tx.getClient().withRepository(this.repo);
+          return tx.getClient().getRepository(this.metadata.type);
         }
       }
     }

@@ -262,7 +262,9 @@ interface TypeOrmProviderOptionsInterface<Entity extends PlainLiteralObject>
 - **`dataSource`** -- optional data source name, `DataSource` instance, or
   `DataSourceOptions`; defaults to `'default'`
 - **`factory`** -- optional factory for custom TypeORM repositories; receives
-  `DataSource`, returns `Repository<Entity>`
+  `DataSource`, returns `Repository<Entity>`. Calls outside a run use it;
+  inside a run they use the transaction's own repository for the entity, so
+  what your custom repository changes doesn't apply there
 - **`relations`**, **`rowScope`**, **`writePolicy`**, **`activity`**,
   **`allowEagerRelations`**, **`hooks`** -- the entity's declarations, read
   by `RepositoryModule.forRoot()`; the driver ignores them
