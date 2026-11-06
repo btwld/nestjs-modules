@@ -243,8 +243,8 @@ interface DrizzleProviderOptionsInterface<Entity extends PlainLiteralObject>
   entity: Type<Entity>;               // The class rows come back as
   table: Table;                       // The Drizzle table its rows live in
   connection?: string;                // @nestjs/drizzle connection (default: 'default')
-  removeDate?: keyof Entity & string; // Soft-delete date column
-  version?: keyof Entity & string;    // Version column
+  removeDate?: string;                // Key in `table` of the soft-delete date column
+  version?: string;                   // Key in `table` of the version column
   rowScope?: RowScopeRegistration;    // Declarations, bound by forRoot()
   writePolicy?: WritePolicyRegistration;
   activity?: ActivityRegistration;

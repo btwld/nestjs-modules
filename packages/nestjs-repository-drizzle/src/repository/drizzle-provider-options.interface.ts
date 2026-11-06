@@ -20,9 +20,12 @@ export interface DrizzleProviderOptionsInterface<
    */
   connection?: string;
 
-  /** The column holding the date a row was soft deleted, if any. */
-  removeDate?: keyof Entity & string;
+  /**
+   * The key in `table` of the column holding the date a row was soft
+   * deleted, if any.
+   */
+  removeDate?: string;
 
-  /** The column holding the row's version, if any. */
-  version?: keyof Entity & string;
+  /** The key in `table` of the column holding the row's version, if any. */
+  version?: string;
 }
