@@ -414,7 +414,8 @@ describe('relations in write payloads', () => {
       ],
       [
         'softDelete',
-        (repo: RecordingRepositoryFixture) => repo.softDelete(employee),
+        (repo: RecordingRepositoryFixture) =>
+          repo.softDelete({ ...employee, dateDeleted: null }),
       ],
       ['restore', (repo: RecordingRepositoryFixture) => repo.restore(employee)],
     ])('is removed before %s reaches the driver', async (_op, remove) => {
@@ -422,7 +423,12 @@ describe('relations in write payloads', () => {
 
       await remove(repo);
 
-      expect(repo.removed.map((row) => Object.keys(row))).toEqual([['id']]);
+      // Only own columns: the row's key, and its delete date where passed.
+      expect(
+        repo.removed.map((row) =>
+          Object.keys(row).filter((key) => key !== 'dateDeleted'),
+        ),
+      ).toEqual([['id']]);
     });
   });
 });

@@ -1511,6 +1511,7 @@ export abstract class RepositoryAdapter<
     // below, so a stale precondition against a row someone else already
     // deleted conflicts instead of quietly succeeding.
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
+    this.assertHoldsDeleteDate(entity, deleteDateColumn);
 
     if (this.isSoftDeleted(entity, deleteDateColumn)) {
       // The no-op below returns without reaching the permeator, so scope is
@@ -1646,6 +1647,25 @@ export abstract class RepositoryAdapter<
    * Enforced here — once, for every driver — rather than per-implementation,
    * so no driver can forget or diverge from the invariant. See #471.
    */
+  /**
+   * Whether a row is soft-deleted is read from the row passed, so it must
+   * hold the column: without it a soft-deleted row would pass as live.
+   */
+  private assertHoldsDeleteDate(
+    entity: PlainLiteralObject,
+    deleteDateColumn: keyof Entity & string,
+  ): void {
+    if (!(deleteDateColumn in entity)) {
+      throw new RuntimeException({
+        message:
+          'Cannot write "%s": the row passed holds no "%s". ' +
+          'Pass the row as read, with its delete date',
+        messageParams: [this.metadata.name, deleteDateColumn],
+        fault: 'usage',
+      });
+    }
+  }
+
   private isSoftDeleted(
     entity: PlainLiteralObject,
     deleteDateColumn: keyof Entity & string,
@@ -1685,17 +1705,7 @@ export abstract class RepositoryAdapter<
     const deleteDateColumn = this.getDeleteDateColumn();
     if (!deleteDateColumn) return;
 
-    // Whether the row is soft-deleted is read from the row passed, so it
-    // must hold the column: without it a soft-deleted row would pass.
-    if (!(deleteDateColumn in entity)) {
-      throw new RuntimeException({
-        message:
-          'Cannot write "%s": the row passed holds no "%s". ' +
-          'Pass the row as read, with its delete date',
-        messageParams: [this.metadata.name, deleteDateColumn],
-        fault: 'usage',
-      });
-    }
+    this.assertHoldsDeleteDate(entity, deleteDateColumn);
 
     if (this.isSoftDeleted(entity, deleteDateColumn)) {
       throw new SoftDeletedImmutableException(this.metadata.name);

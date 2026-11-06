@@ -84,6 +84,14 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
 
       expect(adapter.doReplaceCalls).toEqual(0);
     });
+
+    it('is refused by softDelete, without calling doSoftDelete', async () => {
+      await expect(adapter.softDelete(withoutDeleteDate())).rejects.toThrow(
+        'Pass the row as read, with its delete date',
+      );
+
+      expect(adapter.doSoftDeleteCalls).toEqual(0);
+    });
   });
 
   describe('upsert', () => {
