@@ -679,13 +679,16 @@ create policy tenant_isolation on orders
 create role app_user login password '...' nosuperuser nobypassrls;
 grant select, insert, update, delete on orders to app_user;
 
--- With durable messaging: the outbox tables, which app_admin migrates.
+-- Migrations and background jobs that work across tenants use their own role.
+create role app_admin login password '...' bypassrls;
+
+-- With durable messaging, once `nest-outbox migrate` has run as app_admin:
+-- the outbox tables, and any a later outbox migration adds.
 grant usage on schema nest_outbox to app_user;
 grant select, insert, update, delete on all tables in schema nest_outbox
   to app_user;
-
--- Migrations and background jobs that work across tenants use their own role.
-create role app_admin login password '...' bypassrls;
+alter default privileges for role app_admin in schema nest_outbox
+  grant select, insert, update, delete on tables to app_user;
 ```
 
 ### Before you turn it on
