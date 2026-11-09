@@ -1,0 +1,151 @@
+import {
+  type DynamicModule,
+  Module,
+  type PlainLiteralObject,
+  type Type,
+} from '@nestjs/common';
+
+import { HookResolverService } from '@concepta/nestjs-core';
+
+import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
+import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
+import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-token.js';
+
+import {
+  ACTIVITY_METADATA,
+  ActivityEntityFixture,
+  PAIR_METADATA,
+  PairEntityFixture,
+  TENANT_ACTIVITY_METADATA,
+  TenantActivityEntityFixture,
+  WIDGET_METADATA,
+  WidgetEntityFixture,
+} from './activity.fixture.js';
+import {
+  CATEGORY_METADATA,
+  CategoryEntityFixture,
+  INVOICE_LINE_METADATA,
+  INVOICE_METADATA,
+  InvoiceEntityFixture,
+  InvoiceLineEntityFixture,
+  LINE_NOTE_METADATA,
+  LineNoteEntityFixture,
+  PAYMENT_METADATA,
+  PaymentEntityFixture,
+  RECEIPT_METADATA,
+  ReceiptEntityFixture,
+  REFUND_METADATA,
+  RefundEntityFixture,
+  PAYOUT_METADATA,
+  PayoutEntityFixture,
+  TIP_METADATA,
+  TipEntityFixture,
+} from './cascade.fixture.js';
+import {
+  ARCHIVED_POST_METADATA,
+  ArchivedPostEntityFixture,
+  AUTHOR_METADATA,
+  AUTHOR_TAG_METADATA,
+  AuthorEntityFixture,
+  AuthorTagEntityFixture,
+  COMPANY_METADATA,
+  CompanyEntityFixture,
+  DRIFTED_AUTHOR_METADATA,
+  DriftedAuthorEntityFixture,
+  POST_METADATA,
+  PostEntityFixture,
+  PROFILE_METADATA,
+  ProfileEntityFixture,
+  TAG_METADATA,
+  TagEntityFixture,
+} from './federation.fixture.js';
+import {
+  MemoryRepositoryFixture,
+  type MemoryRepositoryOptionsFixture,
+} from './memory-repository.fixture.js';
+import {
+  ORDER_LINE_METADATA,
+  ORDER_METADATA,
+  OrderEntityFixture,
+  OrderLineEntityFixture,
+  TENANT_ORDER_LINE_METADATA,
+  TenantOrderLineEntityFixture,
+} from './order.fixture.js';
+import {
+  NOTE_METADATA,
+  NoteEntityFixture,
+  PET_METADATA,
+  PetEntityFixture,
+} from './pet-note.fixture.js';
+import {
+  DRAFT_METADATA,
+  DraftEntityFixture,
+  PROJECT_METADATA,
+  ProjectEntityFixture,
+} from './project-draft.fixture.js';
+
+const memory =
+  <Entity extends PlainLiteralObject>(
+    metadata: RepositoryMetadataInterface<Entity>,
+  ) =>
+  (key: string, options: MemoryRepositoryOptionsFixture) =>
+    new MemoryRepositoryFixture(key, metadata, options);
+
+const ADAPTERS = new Map<
+  Type,
+  (key: string, options: MemoryRepositoryOptionsFixture) => object
+>([
+  [WidgetEntityFixture, memory(WIDGET_METADATA)],
+  [ActivityEntityFixture, memory(ACTIVITY_METADATA)],
+  [TenantActivityEntityFixture, memory(TENANT_ACTIVITY_METADATA)],
+  [PairEntityFixture, memory(PAIR_METADATA)],
+  [InvoiceEntityFixture, memory(INVOICE_METADATA)],
+  [InvoiceLineEntityFixture, memory(INVOICE_LINE_METADATA)],
+  [LineNoteEntityFixture, memory(LINE_NOTE_METADATA)],
+  [ReceiptEntityFixture, memory(RECEIPT_METADATA)],
+  [PaymentEntityFixture, memory(PAYMENT_METADATA)],
+  [RefundEntityFixture, memory(REFUND_METADATA)],
+  [TipEntityFixture, memory(TIP_METADATA)],
+  [PayoutEntityFixture, memory(PAYOUT_METADATA)],
+  [CategoryEntityFixture, memory(CATEGORY_METADATA)],
+  [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
+  [ProjectEntityFixture, memory(PROJECT_METADATA)],
+  [DraftEntityFixture, memory(DRAFT_METADATA)],
+  [OrderEntityFixture, memory(ORDER_METADATA)],
+  [OrderLineEntityFixture, memory(ORDER_LINE_METADATA)],
+  [PetEntityFixture, memory(PET_METADATA)],
+  [NoteEntityFixture, memory(NOTE_METADATA)],
+  [AuthorEntityFixture, memory(AUTHOR_METADATA)],
+  [ArchivedPostEntityFixture, memory(ARCHIVED_POST_METADATA)],
+  [DriftedAuthorEntityFixture, memory(DRIFTED_AUTHOR_METADATA)],
+  [PostEntityFixture, memory(POST_METADATA)],
+  [ProfileEntityFixture, memory(PROFILE_METADATA)],
+  [CompanyEntityFixture, memory(COMPANY_METADATA)],
+  [TagEntityFixture, memory(TAG_METADATA)],
+  [AuthorTagEntityFixture, memory(AUTHOR_TAG_METADATA)],
+]);
+
+/**
+ * A driver over `MemoryRepositoryFixture`, for registering through
+ * `RepositoryModule.forRoot()`. Like a real driver, it hands each adapter the
+ * optional hook resolver, and binds nothing itself.
+ */
+@Module({})
+export class MemoryRepositoryModuleFixture {
+  static register(entities: RepositoryProviderOptions[]): DynamicModule {
+    return {
+      module: MemoryRepositoryModuleFixture,
+      providers: entities.map(({ key, entity }) => ({
+        provide: getDynamicRepositoryToken(key),
+        inject: [{ token: HookResolverService, optional: true }],
+        useFactory: (hookResolver?: HookResolverService) => {
+          const create = ADAPTERS.get(entity);
+          if (!create) {
+            throw new Error(`No memory adapter for ${entity.name}`);
+          }
+          return create(key, { hookResolver });
+        },
+      })),
+    };
+  }
+}

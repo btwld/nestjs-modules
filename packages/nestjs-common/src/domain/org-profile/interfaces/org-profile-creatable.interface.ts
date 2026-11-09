@@ -1,4 +1,6 @@
-import { OrgProfileInterface } from './org-profile.interface';
+import { type OrgProfileInterface } from './org-profile.interface';
 
-export interface OrgProfileCreatableInterface
-  extends Pick<OrgProfileInterface, 'orgId'> {}
+export interface OrgProfileCreatableInterface extends Pick<
+  OrgProfileInterface,
+  'orgId'
+> {}

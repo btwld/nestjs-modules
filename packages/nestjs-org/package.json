@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-org",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "description": "Rockets NestJS User",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,7 +18,7 @@
     "@concepta/nestjs-event": "^7.0.0-alpha.10",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",
-    "@nestjs/swagger": "^11.2.2"
+    "@nestjs/swagger": "11.2.2"
   },
   "devDependencies": {
     "@concepta/nestjs-invitation": "^7.0.0-alpha.10",

@@ -1,5 +1,5 @@
 import { Exclude, Expose, Type } from 'class-transformer';
-import { IsDate, IsNumber, IsOptional } from 'class-validator';
+import { IsDate, IsOptional } from 'class-validator';
 
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -55,15 +55,4 @@ export class AuditDto implements AuditInterface {
   @IsDate()
   @IsOptional()
   dateDeleted!: AuditDateDeleted;
-
-  /**
-   * Version
-   */
-  @Expose()
-  @ApiProperty({
-    type: 'number',
-    description: 'Version of the data',
-  })
-  @IsNumber()
-  version!: number;
 }

@@ -1,0 +1,505 @@
+import { AppContextHost } from '@concepta/nestjs-core';
+
+import { OptimisticLockException } from '../../exceptions/optimistic-lock.exception.js';
+import { RepositoryDatabaseException } from '../../exceptions/repository-database.exception.js';
+import { TransactionCommitException } from '../../exceptions/transaction-commit.exception.js';
+import { OrderBy } from '../../repository/order-by.helpers.js';
+import { Where } from '../../repository/where.helpers.js';
+import { type TransactionContextInterface } from '../../transaction/interfaces/transaction-context.interface.js';
+import { assert, assertRows, settle } from '../conformance-assert.js';
+import { type ConformanceContext } from '../conformance-context.js';
+import { type ConformanceItemInterface } from '../interfaces/conformance-item.interface.js';
+
+import { overlappingTransactions } from './overlapping-transactions.section.js';
+
+class ConformanceRollback extends Error {
+  constructor() {
+    super('conformance rollback');
+  }
+}
+
+/**
+ * How a driver takes part in the caller's transaction, and, inside one, how
+ * it guards versioned writes. A driver that refuses transactions runs
+ * without one: writes made before a throw stay.
+ */
+export function transactionsSection(ctx: ConformanceContext): void {
+  if (ctx.capabilities.transactions === 'supported') {
+    supported(ctx);
+  } else {
+    refused(ctx);
+  }
+}
+
+function run<T>(
+  ctx: ConformanceContext,
+  operation: (txCtx: TransactionContextInterface) => Promise<T>,
+): Promise<T> {
+  return ctx.transactionScope.run({}, operation);
+}
+
+function names(ctx: ConformanceContext): Promise<string[]> {
+  return ctx
+    .repo('plainItem')
+    .find()
+    .then((rows) => rows.map(({ name }) => name).sort());
+}
+
+function supported(ctx: ConformanceContext): void {
+  const { it } = ctx.test;
+  const softDelete = ctx.capabilities.softDelete === 'supported';
+
+  it('transactions: a run has a transaction', async () => {
+    await run(ctx, async (txCtx) => {
+      assert.equal(txCtx.trx.isSupported, true);
+    });
+  });
+
+  it('transactions: a run that throws leaves none of its writes', async () => {
+    await assert.rejects(
+      run(ctx, async (txCtx) => {
+        await ctx.repo('plainItem').create({ name: 'doomed' }, { ctx: txCtx });
+        throw new ConformanceRollback();
+      }),
+      ConformanceRollback,
+    );
+
+    assert.deepStrictEqual(await names(ctx), []);
+  });
+
+  it('transactions: a run that completes keeps its writes', async () => {
+    await run(ctx, (txCtx) =>
+      ctx.repo('plainItem').create({ name: 'kept' }, { ctx: txCtx }),
+    );
+
+    assert.deepStrictEqual(await names(ctx), ['kept']);
+  });
+
+  it('transactions: a call without the run’s context, made while the run is open, takes no part in it', async () => {
+    const plain = ctx.repo('plainItem');
+    let outside: Promise<unknown> = Promise.resolve();
+    let read: Promise<string[]> = Promise.resolve([]);
+
+    try {
+      await assert.rejects(
+        run(ctx, async (txCtx) => {
+          await plain.create({ name: 'inside' }, { ctx: txCtx });
+          outside = plain.create({ name: 'outside' });
+          read = plain.find().then((rows) => rows.map(({ name }) => name));
+          // A store with a connection per transaction answers the calls
+          // while the run is open; one with a single connection holds them
+          // until it ends, and the window is how long they get to reach
+          // the store, were they not kept out of the run.
+          await Promise.race([
+            Promise.all([outside, read]),
+            new Promise((resolve) => setTimeout(resolve, 200)),
+          ]);
+          throw new ConformanceRollback();
+        }),
+        ConformanceRollback,
+      );
+    } finally {
+      await Promise.all([settle(outside), settle(read)]);
+    }
+
+    assert.ok(!(await read).includes('inside'));
+    assert.deepStrictEqual(await names(ctx), ['outside']);
+  });
+
+  // Outside a run each write stands alone: a driver that leaves a
+  // transaction of its own on the caller's context would take the other
+  // write down with the failing one.
+  it('transactions: outside a run, a failing write leaves another made at once with the same context', async () => {
+    const item = ctx.repo('item');
+    const plain = ctx.repo('plainItem');
+    const stale = await item.create({ name: 's', rank: 1, note: null });
+    await item.update(stale, { rank: 2 });
+    const gonePlain = await plain.create({ name: 'gone' });
+    await plain.delete(gonePlain);
+    const goneItem = await item.create({ name: 'g', rank: 1, note: null });
+    await item.delete(goneItem);
+
+    const failing: [string, (shared: AppContextHost) => Promise<unknown>][] = [
+      [
+        'a stale versioned update',
+        (shared) => item.update(stale, { rank: 3 }, { ctx: shared }),
+      ],
+      [
+        'an update of a deleted row',
+        (shared) => plain.update(gonePlain, { name: 'back' }, { ctx: shared }),
+      ],
+    ];
+    if (softDelete) {
+      failing.push([
+        'a soft delete of a deleted row',
+        (shared) => item.softDelete(goneItem, { ctx: shared }),
+      ]);
+    }
+
+    for (const [label, write] of failing) {
+      const shared = new AppContextHost();
+      const [failed, kept] = await Promise.all([
+        settle(write(shared)),
+        settle(plain.create({ name: label }, { ctx: shared })),
+      ]);
+
+      assert.ok(!failed.ok, `${label} succeeded`);
+      assert.ok(kept.ok, `${label}: ${kept.ok ? '' : String(kept.error)}`);
+      assert.ok((await names(ctx)).includes(label), `${label}: create lost`);
+    }
+  });
+
+  it('transactions: every read in a run sees the run’s own writes', async () => {
+    const seen = await run(ctx, async (txCtx) => {
+      const plain = ctx.repo('plainItem');
+      await plain.create({ name: 'mine' }, { ctx: txCtx });
+      return {
+        found: await plain.find({ ctx: txCtx }),
+        one: await plain.findOne({
+          where: Where.eq('name', 'mine'),
+          ctx: txCtx,
+        }),
+        count: await plain.count({ ctx: txCtx }),
+        total: (await plain.findAndCount({ ctx: txCtx }))[1],
+      };
+    });
+
+    assert.deepStrictEqual(
+      seen.found.map(({ name }) => name),
+      ['mine'],
+    );
+    assert.equal(seen.one?.name, 'mine');
+    assert.equal(seen.count, 1);
+    assert.equal(seen.total, 1);
+  });
+
+  it('transactions: every write in a run that throws is undone', async () => {
+    const item = ctx.repo('item');
+    const [a, b, c, d, e, f, g, h] = await item.createMany(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((name) => ({
+        name,
+        rank: 1,
+        note: null,
+      })),
+    );
+    assert.ok(a && b && c && d && e && f && g && h);
+    const removedE = softDelete ? await item.softDelete(e) : e;
+    const snapshot = () =>
+      item.find({ withDeleted: true, order: [OrderBy.asc('name')] });
+    const before = await snapshot();
+
+    await assert.rejects(
+      run(ctx, async (txCtx) => {
+        const options = { ctx: txCtx };
+        await item.createMany([{ name: 'new', rank: 1, note: null }], options);
+        await item.update(a, { rank: 2 }, options);
+        await item.replace(b, { rank: 2 }, options);
+        await item.upsert({ id: c.id, name: 'c', rank: 2 }, options);
+        await item.upsert({ name: 'upserted', rank: 1, note: null }, options);
+        await item.delete(d, options);
+        if (softDelete) {
+          await item.restore(removedE, options);
+          await item.softDelete(f, options);
+        }
+        await item.deleteMany([g, h], options);
+        throw new ConformanceRollback();
+      }),
+      ConformanceRollback,
+    );
+
+    assertRows(await snapshot(), before);
+  });
+
+  it('doCreateMany: a duplicate key in a run fails the run and keeps no row', async () => {
+    await assert.rejects(
+      run(ctx, (txCtx) =>
+        ctx.repo('author').createMany(
+          [
+            { id: 'author-same', name: 'first' },
+            { id: 'author-same', name: 'second' },
+          ],
+          { ctx: txCtx },
+        ),
+      ),
+    );
+
+    assert.equal(await ctx.repo('author').count(), 0);
+  });
+
+  if (ctx.capabilities.deferredReferences === 'supported') {
+    it('transactions: a run whose commit the store refuses keeps none of its writes, and the next run commits', async () => {
+      await assert.rejects(
+        run(ctx, async (txCtx) => {
+          await ctx
+            .repo('plainItem')
+            .create({ name: 'refused' }, { ctx: txCtx });
+          // Accepted by the write; the store checks the author at commit.
+          await ctx
+            .repo('award')
+            .create(
+              { id: 'award-orphan', name: 'orphan', authorId: 'author-none' },
+              { ctx: txCtx },
+            );
+        }),
+        (error: unknown) => error instanceof TransactionCommitException,
+      );
+      assert.deepStrictEqual(await names(ctx), []);
+      assert.equal(await ctx.repo('award').count(), 0);
+
+      await run(ctx, (txCtx) =>
+        ctx.repo('plainItem').create({ name: 'next' }, { ctx: txCtx }),
+      );
+      assert.deepStrictEqual(await names(ctx), ['next']);
+    });
+  }
+
+  it('transactions: a run that catches a failed write keeps all of its other writes or none', async () => {
+    const committed: string[] = [];
+    const rolledBack: string[] = [];
+    await ctx.repo('uniqueItem').create({ id: 'taken', code: 'C', name: 'a' });
+
+    const outcome = await settle(
+      run(ctx, async (txCtx) => {
+        txCtx.trx.onCommit(() => void committed.push('commit'));
+        txCtx.trx.onRollback(() => void rolledBack.push('rollback'));
+        await ctx.repo('plainItem').create({ name: 'kept' }, { ctx: txCtx });
+        // Fails in the store: the code is unique.
+        await ctx
+          .repo('uniqueItem')
+          .create({ id: 'clash', code: 'C', name: 'b' }, { ctx: txCtx })
+          .catch(() => undefined);
+      }),
+    );
+
+    if (outcome.ok) {
+      assert.deepStrictEqual(await names(ctx), ['kept']);
+      assert.deepStrictEqual([committed, rolledBack], [['commit'], []]);
+    } else {
+      assert.deepStrictEqual(await names(ctx), []);
+      assert.deepStrictEqual([committed, rolledBack], [[], ['rollback']]);
+    }
+  });
+
+  it('transactions: a run that catches an upsert refused for another row’s unique column leaves that row unchanged', async () => {
+    const unique = ctx.repo('uniqueItem');
+    const other = await unique.create({ id: 'unique-a', code: 'C', name: 'a' });
+
+    let refused: unknown;
+    await settle(
+      run(ctx, async (txCtx) => {
+        refused = await unique
+          .upsert({ id: 'unique-b', code: 'C', name: 'b' }, { ctx: txCtx })
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+      }),
+    );
+
+    assert.ok(refused instanceof RepositoryDatabaseException, String(refused));
+    assertRows(await unique.find(), [other]);
+  });
+
+  it('transactions: a run that catches a write refused before the store fails keeps its other writes', async () => {
+    const gone = await ctx
+      .repo('item')
+      .create({ name: 'gone', rank: 1, note: null });
+    await ctx.repo('item').delete(gone);
+
+    await run(ctx, async (txCtx) => {
+      await assert.rejects(
+        ctx.repo('item').update(gone, { rank: 2 }, { ctx: txCtx }),
+        OptimisticLockException,
+      );
+      await ctx.repo('plainItem').create({ name: 'kept' }, { ctx: txCtx });
+    });
+
+    assert.deepStrictEqual(await names(ctx), ['kept']);
+  });
+
+  versionGuard(ctx);
+  if (ctx.capabilities.concurrentTransactions === 'supported') {
+    overlappingTransactions(ctx);
+  }
+}
+
+/**
+ * Write once through the repository, then write again with the row as it
+ * was before: the stored version has moved on, so the second write must be
+ * refused by the driver, not just by the version the caller states. Each
+ * write runs in its own transaction, since a refused one fails its run.
+ */
+function versionGuard(ctx: ConformanceContext): void {
+  const { it } = ctx.test;
+
+  const item = () => ctx.repo('item');
+
+  const create = () =>
+    run(ctx, (txCtx) =>
+      item().create({ name: 'versioned', rank: 1, note: null }, { ctx: txCtx }),
+    );
+
+  const stored = () =>
+    item().findOne({ where: Where.eq('name', 'versioned'), withDeleted: true });
+
+  const changed = (
+    before: ConformanceItemInterface,
+    after: ConformanceItemInterface,
+  ) => assert.notEqual(after.version, before.version);
+
+  it('doUpdate: changes the version, and refuses a stale row', async () => {
+    const stale = await create();
+    const updated = await run(ctx, (txCtx) =>
+      item().update(stale, { rank: 2 }, { ctx: txCtx }),
+    );
+
+    changed(stale, updated);
+    await assert.rejects(
+      run(ctx, (txCtx) => item().update(stale, { rank: 3 }, { ctx: txCtx })),
+      OptimisticLockException,
+    );
+    assert.equal((await stored())?.rank, 2);
+  });
+
+  it('doReplace: changes the version, and refuses a stale row', async () => {
+    const stale = await create();
+    const replaced = await run(ctx, (txCtx) =>
+      item().replace(stale, { rank: 2 }, { ctx: txCtx }),
+    );
+
+    changed(stale, replaced);
+    await assert.rejects(
+      run(ctx, (txCtx) => item().replace(stale, { rank: 3 }, { ctx: txCtx })),
+      OptimisticLockException,
+    );
+    assert.equal((await stored())?.rank, 2);
+  });
+
+  it('doUpdate and doReplace: a versioned row deleted since it was read is a conflict', async () => {
+    const stale = await create();
+    await run(ctx, (txCtx) => item().delete(stale, { ctx: txCtx }));
+
+    await assert.rejects(
+      run(ctx, (txCtx) => item().update(stale, { rank: 2 }, { ctx: txCtx })),
+      OptimisticLockException,
+    );
+    await assert.rejects(
+      run(ctx, (txCtx) => item().replace(stale, { rank: 2 }, { ctx: txCtx })),
+      OptimisticLockException,
+    );
+    assert.equal(await stored(), null);
+  });
+
+  it('doUpsert: changes the version of a stored row', async () => {
+    const created = await create();
+    const upserted = await run(ctx, (txCtx) =>
+      item().upsert(
+        { id: created.id, name: 'versioned', rank: 2 },
+        { ctx: txCtx },
+      ),
+    );
+
+    changed(created, upserted);
+  });
+
+  it('doDelete: refuses a stale row, and deletes a current one', async () => {
+    const stale = await create();
+    const updated = await run(ctx, (txCtx) =>
+      item().update(stale, { rank: 2 }, { ctx: txCtx }),
+    );
+
+    await assert.rejects(
+      run(ctx, (txCtx) =>
+        item().delete(stale, {
+          ctx: txCtx,
+          expectedVersion: stale.version,
+        }),
+      ),
+      OptimisticLockException,
+    );
+    assert.equal((await stored())?.rank, 2);
+
+    await run(ctx, (txCtx) =>
+      item().delete(updated, {
+        ctx: txCtx,
+        expectedVersion: updated.version,
+      }),
+    );
+    assert.equal(await stored(), null);
+  });
+
+  if (ctx.capabilities.softDelete === 'supported') {
+    it('doSoftDelete: changes the version, and refuses a stale row', async () => {
+      const stale = await create();
+      const updated = await run(ctx, (txCtx) =>
+        item().update(stale, { rank: 2 }, { ctx: txCtx }),
+      );
+
+      await assert.rejects(
+        run(ctx, (txCtx) =>
+          item().softDelete(stale, {
+            ctx: txCtx,
+            expectedVersion: stale.version,
+          }),
+        ),
+        OptimisticLockException,
+      );
+      assert.equal((await stored())?.removedAt, null);
+
+      const removed = await run(ctx, (txCtx) =>
+        item().softDelete(updated, {
+          ctx: txCtx,
+          expectedVersion: updated.version,
+        }),
+      );
+      changed(updated, removed);
+      assert.ok((await stored())?.removedAt instanceof Date);
+    });
+
+    it('doRestore: changes the version, and refuses a stale row', async () => {
+      const created = await create();
+      const stale = await run(ctx, (txCtx) =>
+        item().softDelete(created, { ctx: txCtx }),
+      );
+      const restored = await run(ctx, (txCtx) =>
+        item().restore(stale, { ctx: txCtx, expectedVersion: stale.version }),
+      );
+      changed(stale, restored);
+
+      await run(ctx, (txCtx) => item().softDelete(restored, { ctx: txCtx }));
+
+      await assert.rejects(
+        run(ctx, (txCtx) =>
+          item().restore(stale, {
+            ctx: txCtx,
+            expectedVersion: stale.version,
+          }),
+        ),
+        OptimisticLockException,
+      );
+      assert.ok((await stored())?.removedAt instanceof Date);
+    });
+  }
+}
+
+function refused(ctx: ConformanceContext): void {
+  const { it } = ctx.test;
+
+  it('transactions: a run has no transaction', async () => {
+    await run(ctx, async (txCtx) => {
+      assert.equal(txCtx.trx.isSupported, false);
+    });
+  });
+
+  it('transactions: a run that throws keeps the writes made before it', async () => {
+    await assert.rejects(
+      run(ctx, async (txCtx) => {
+        await ctx.repo('plainItem').create({ name: 'stays' }, { ctx: txCtx });
+        throw new ConformanceRollback();
+      }),
+      ConformanceRollback,
+    );
+
+    assert.deepStrictEqual(await names(ctx), ['stays']);
+  });
+}

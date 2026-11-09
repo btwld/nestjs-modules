@@ -1,10 +1,16 @@
+// Enums
+export { ActionEnum } from './enums/action.enum';
+export {
+  Operation,
+  ReadOperations,
+  WriteOperations,
+  MutateOperations,
+} from './enums/operation.enum';
+
 // DTOs
 export { AuditDto } from './audit/dto/audit.dto';
 export { CommonEntityDto } from './common/dto/common-entity.dto';
 export { ReferenceIdDto } from './reference/dto/reference-id.dto';
-
-// Decorators
-export { AuthUser } from './decorators/auth-user.decorator';
 
 // Module utilities
 export { createSettingsProvider } from './modules/utils/create-settings-provider';
@@ -17,13 +23,17 @@ export { ModuleOptionsSettingsInterface } from './modules/interfaces/module-opti
 export * from './domain';
 
 // Core types & exceptions
-export { ExceptionContext } from './core.types';
+export {
+  ExceptionContext,
+  ReadOperation,
+  WriteOperation,
+  MutateOperation,
+} from './core.types';
 export { ExceptionInterface } from './exceptions/interfaces/exception.interface';
 export { NotAnErrorException } from './exceptions/not-an-error.exception';
 
 // Utility types and functions
 export { LiteralObject } from './utils/interfaces/literal-object.interface';
-export { Type } from './utils/interfaces/type.interface';
 export { DeepPartial } from './utils/deep-partial';
 export { mapNonErrorToException } from './utils/map-non-error-to-exception.util';
 export { mapHttpStatus } from './utils/map-http-status.util';
@@ -50,6 +60,7 @@ export { ReferenceUsernameInterface } from './reference/interfaces/reference-use
 export { ReferenceUserInterface } from './reference/interfaces/reference-user.interface';
 export { ReferenceRoleInterface } from './reference/interfaces/reference-role.interface';
 export { ReferenceRolesInterface } from './reference/interfaces/reference-roles.interface';
+export { ReferenceVersionInterface } from './reference/interfaces/reference-version.interface';
 
 // model exceptions
 export { ModelQueryException } from './model/exceptions/model-query.exception';
@@ -57,12 +68,7 @@ export { ModelMutateException } from './model/exceptions/model-mutate.exception'
 export { ModelValidationException } from './model/exceptions/model-validation.exception';
 export { ModelIdNoMatchException } from './model/exceptions/model-id-no-match.exception';
 
-// model services
-export { ModelService } from './model/model.service';
-export { ModelServiceInterface } from './model/interfaces/model-service.interface';
-
 // model query interfaces
-export { FindInterface } from './model/interfaces/query/find.interface';
 export { ByEmailInterface } from './model/interfaces/query/by-email.interface';
 export { ByIdInterface } from './model/interfaces/query/by-id.interface';
 export { BySubjectInterface } from './model/interfaces/query/by-subject.interface';
@@ -73,16 +79,6 @@ export { CreateOneInterface } from './model/interfaces/mutate/create-one.interfa
 export { RemoveOneInterface } from './model/interfaces/mutate/remove-one.interface';
 export { ReplaceOneInterface } from './model/interfaces/mutate/replace-one.interface';
 export { UpdateOneInterface } from './model/interfaces/mutate/update-one.interface';
-
-// Repository interfaces
-export { RepositoryInterface } from './repository/interfaces/repository.interface';
-export { RepositoryEntityOptionInterface } from './repository/interfaces/repository-entity-option.interface';
-
-// Repository utils
-export { getDynamicRepositoryToken } from './repository/utils/get-dynamic-repository-token';
-
-// Repository decorators
-export { InjectDynamicRepository } from './repository/decorators/inject-dynamic-repository.decorator';
 
 // Audit types
 export {
@@ -96,7 +92,6 @@ export {
 export { AuditDateCreatedInterface } from './audit/interfaces/audit-date-created.interface';
 export { AuditDateDeletedInterface } from './audit/interfaces/audit-date-deleted.interface';
 export { AuditDateUpdatedInterface } from './audit/interfaces/audit-date-updated.interface';
-export { AuditVersionInterface } from './audit/interfaces/audit-version.interface';
 export { AuditInterface } from './audit/interfaces/audit.interface';
 
 // exception types
@@ -111,6 +106,3 @@ export { RuntimeExceptionInterface } from './exceptions/interfaces/runtime-excep
 
 // exceptions
 export { RuntimeException } from './exceptions/runtime.exception';
-
-// !!! THESE EXPORTS ARE TEMPORARY AND MAY BE REMOVED IN THE FUTURE !!!
-export { RepositoryInternals } from './repository/interfaces/repository-internals';

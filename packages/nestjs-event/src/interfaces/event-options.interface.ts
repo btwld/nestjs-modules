@@ -1,4 +1,4 @@
-import { EventSettingsInterface } from './event-settings.interface';
+import { type EventSettingsInterface } from './event-settings.interface';
 
 /**
  * Event module options interface

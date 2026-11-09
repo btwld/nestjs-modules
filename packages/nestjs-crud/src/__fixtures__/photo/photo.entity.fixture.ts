@@ -5,9 +5,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-import { ReferenceId } from '@concepta/nestjs-common';
+import { ReferenceId } from '@concepta/nestjs-core';
 
-import { PhotoEntityInterfaceFixture } from './interfaces/photo-entity.interface.fixture';
+import { PhotoEntityInterfaceFixture } from './interfaces/photo-entity.interface.fixture.js';
 
 @Entity()
 export class PhotoFixture implements PhotoEntityInterfaceFixture {

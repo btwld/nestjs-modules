@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 
-import { SwaggerUiSettingsInterface } from '../interfaces/swagger-ui-settings.interface';
+import { type SwaggerUiSettingsInterface } from '../interfaces/swagger-ui-settings.interface';
 import { SWAGGER_UI_DEFAULT_SETTINGS_TOKEN } from '../swagger-ui.constants';
 
 /**

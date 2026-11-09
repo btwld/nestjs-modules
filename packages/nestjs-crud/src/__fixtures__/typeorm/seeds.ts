@@ -1,26 +1,24 @@
-import { plainToClass } from 'class-transformer';
-import { MigrationInterface, Repository, QueryRunner } from 'typeorm';
+import {
+  type DeepPartial,
+  type MigrationInterface,
+  type Repository,
+  type QueryRunner,
+} from 'typeorm';
 
-import { PlainLiteralObject, Type } from '@nestjs/common';
+import { type PlainLiteralObject } from '@nestjs/common';
 
-import { CompanyEntity } from './company/company.entity';
-import { NoteEntity } from './note/note.entity';
-import { ProjectEntity } from './project/project.entity';
-import { UserProfileEntity } from './user-profile/user-profile.entity';
-import { NameEntity, UserEntity } from './users/user.entity';
+import { CompanyEntity } from './company/company.entity.js';
+import { NoteEntity } from './note/note.entity.js';
+import { ProjectEntity } from './project/project.entity.js';
+import { UserProfileEntity } from './user-profile/user-profile.entity.js';
+import { UserEntity } from './users/user.entity.js';
 
 export class Seeds implements MigrationInterface {
   private save<T extends PlainLiteralObject>(
     repo: Repository<T>,
-    data: Partial<T>[],
+    data: DeepPartial<T>[],
   ): Promise<T[]> {
-    return repo.save(
-      data.map((partial: Partial<T>) =>
-        plainToClass(repo.target as Type<T>, partial, {
-          ignoreDecorators: true,
-        }),
-      ),
-    );
+    return repo.save(data.map((partial) => repo.create(partial)));
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -171,134 +169,113 @@ export class Seeds implements MigrationInterface {
     ]);
 
     // users
-    const name: NameEntity = { first: '', last: '' };
-    const name1: NameEntity = { first: 'firstname1', last: 'lastname1' };
     await this.save(usersRepo, [
       {
         email: '1@email.com',
         isActive: true,
         companyId: 1,
-        name: name1,
+        firstName: 'firstname1',
+        lastName: 'lastname1',
       },
       {
         email: '2@email.com',
         isActive: true,
         companyId: 1,
-        name,
       },
       {
         email: '3@email.com',
         isActive: true,
         companyId: 1,
-        name,
       },
       {
         email: '4@email.com',
         isActive: true,
         companyId: 1,
-        name,
       },
       {
         email: '5@email.com',
         isActive: true,
         companyId: 1,
-        name,
       },
       {
         email: '6@email.com',
         isActive: true,
         companyId: 1,
-        name,
       },
       {
         email: '7@email.com',
         isActive: false,
         companyId: 1,
-        name,
       },
       {
         email: '8@email.com',
         isActive: false,
         companyId: 1,
-        name,
       },
       {
         email: '9@email.com',
         isActive: false,
         companyId: 1,
-        name,
       },
       {
         email: '10@email.com',
         isActive: true,
         companyId: 1,
-        name,
       },
       {
         email: '11@email.com',
         isActive: true,
         companyId: 2,
-        name,
       },
       {
         email: '12@email.com',
         isActive: true,
         companyId: 2,
-        name,
       },
       {
         email: '13@email.com',
         isActive: true,
         companyId: 2,
-        name,
       },
       {
         email: '14@email.com',
         isActive: true,
         companyId: 2,
-        name,
       },
       {
         email: '15@email.com',
         isActive: true,
         companyId: 2,
-        name,
       },
       {
         email: '16@email.com',
         isActive: true,
         companyId: 2,
-        name,
       },
       {
         email: '17@email.com',
         isActive: false,
         companyId: 2,
-        name,
       },
       {
         email: '18@email.com',
         isActive: false,
         companyId: 2,
-        name,
       },
       {
         email: '19@email.com',
         isActive: false,
         companyId: 2,
-        name,
       },
       {
         email: '20@email.com',
         isActive: false,
         companyId: 2,
-        name,
       },
       {
         email: '21@email.com',
         isActive: false,
         companyId: 2,
-        name,
       },
     ]);
 

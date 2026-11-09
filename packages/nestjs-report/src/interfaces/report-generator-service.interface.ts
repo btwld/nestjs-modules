@@ -1,6 +1,6 @@
-import { ReportCreatableInterface } from '@concepta/nestjs-common';
+import { type ReportCreatableInterface } from '@concepta/nestjs-common';
 
-import { ReportGeneratorResultInterface } from './report-generator-result.interface';
+import { type ReportGeneratorResultInterface } from './report-generator-result.interface';
 
 export interface ReportGeneratorServiceInterface {
   KEY: string;

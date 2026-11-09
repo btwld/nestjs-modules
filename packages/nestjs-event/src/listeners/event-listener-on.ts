@@ -1,7 +1,7 @@
 import { EventManager } from '../event-manager';
-import { EventClassInterface } from '../events/interfaces/event-class.interface';
-import { EventListenOnOptionsInterface } from '../services/interfaces/event-listen-on-options.interface';
-import { EventListenOnInterface } from '../services/interfaces/event-listen-on.interface';
+import { type EventClassInterface } from '../events/interfaces/event-class.interface';
+import { type EventListenOnOptionsInterface } from '../services/interfaces/event-listen-on-options.interface';
+import { type EventListenOnInterface } from '../services/interfaces/event-listen-on.interface';
 
 import { EventListener } from './event-listener';
 

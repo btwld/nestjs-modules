@@ -1,8 +1,7 @@
 import {
-  ReportUpdatableInterface,
-  ReferenceIdInterface,
+  type ReportUpdatableInterface,
+  type ReferenceIdInterface,
 } from '@concepta/nestjs-common';
 
 export interface ReportGeneratorResultInterface
-  extends ReportUpdatableInterface,
-    ReferenceIdInterface {}
+  extends ReportUpdatableInterface, ReferenceIdInterface {}

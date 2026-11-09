@@ -1,10 +1,10 @@
 import supertest from 'supertest';
 
-import { INestApplication } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { type INestApplication } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { AppModule } from './app.module';
-import { CreateOrderDto } from './order/dto/create-order.dto';
+import { type CreateOrderDto } from './order/dto/create-order.dto';
 import {
   OrderCreatedListener,
   OrderCreatedListenerAsync,

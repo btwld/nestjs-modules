@@ -1,0 +1,25 @@
+import { type PlainLiteralObject } from '@nestjs/common';
+
+/**
+ * Column metadata for repository introspection.
+ */
+export interface RepositoryColumnMetadataInterface<
+  Entity extends PlainLiteralObject = PlainLiteralObject,
+> {
+  /** Property name on the entity class */
+  name: keyof Entity & string;
+  /** Whether this is a primary key column */
+  isPrimary: boolean;
+  /**
+   * Whether this column is the soft-remove date column. Reporting one declares
+   * that the driver supports soft delete for the entity: the column holds a
+   * `Date` once set and `null` until then, `softDelete` and `restore` set and
+   * clear it, and a read without `withDeleted` leaves out rows where it is
+   * set, on the entity and on every relation the read joins. A driver that
+   * does not support soft delete refuses at startup an entity that declares
+   * a remove date, rather than reporting it as an ordinary column.
+   */
+  isRemoveDate: boolean;
+  /** Whether this column is the optimistic-locking version column */
+  isVersion: boolean;
+}

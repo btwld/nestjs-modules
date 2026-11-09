@@ -1,4 +1,4 @@
-import { ReferenceSubject } from './reference.types';
+import { type ReferenceSubject } from './reference.types';
 
 /**
  * Identifiable by subject (JWT).

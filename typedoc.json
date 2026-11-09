@@ -1,7 +1,20 @@
 {
-  "entryPoints": ["packages/*"],
+  "entryPoints": [
+    "packages/nestjs-core",
+    "packages/nestjs-repository",
+    "packages/nestjs-repository-typeorm",
+    "packages/nestjs-crud",
+    "packages/nestjs-cache",
+    "packages/nestjs-otp",
+    "packages/nestjs-role",
+    "packages/nestjs-password",
+    "packages/nestjs-user",
+    "packages/nestjs-invitation",
+    "packages/nestjs-federated",
+    "packages/nestjs-authentication",
+    "packages/nestjs-access-control"
+  ],
   "plugin": ["typedoc-plugin-coverage"],
-  "exclude": ["packages/nestjs-samples"],
   "name": "Rockets Core Documentation",
   "entryPointStrategy": "packages",
   "includeVersion": false

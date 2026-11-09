@@ -1,7 +1,7 @@
-import { Readable } from 'stream';
-import { Url } from 'url';
+import { type Readable } from 'stream';
+import { type Url } from 'url';
 
-import { LiteralObject } from '../../../utils/interfaces/literal-object.interface';
+import { type LiteralObject } from '../../../utils/interfaces/literal-object.interface';
 
 interface Address {
   name: string;

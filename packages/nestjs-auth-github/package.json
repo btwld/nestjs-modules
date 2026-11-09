@@ -1,6 +1,7 @@
 {
   "name": "@concepta/nestjs-auth-github",
   "version": "7.0.0-alpha.10",
+  "private": true,
   "description": "Rockets NestJS GitHub Authentication",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +20,7 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.9",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/swagger": "^11.2.2",
+    "@nestjs/swagger": "11.2.2",
     "passport-github": "^1.1.0"
   },
   "devDependencies": {

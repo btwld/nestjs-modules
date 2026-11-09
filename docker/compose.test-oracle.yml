@@ -1,0 +1,18 @@
+# Oracle for `pnpm test:docker:oracle`. Local only; not used by CI.
+name: rockets-test-oracle
+
+services:
+  oracle:
+    # Prebuilt database, so it starts faster; amd64 and arm64.
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment:
+      ORACLE_PASSWORD: oracle
+      APP_USER: rockets
+      APP_USER_PASSWORD: rockets
+    ports:
+      - '51521:1521'
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh']
+      interval: 2s
+      timeout: 5s
+      retries: 90

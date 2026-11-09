@@ -1,0 +1,75 @@
+{
+  "name": "@concepta/nestjs-repository-drizzle",
+  "version": "8.0.0-alpha.15",
+  "description": "Rockets NestJS Drizzle Repository Module",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btwld/nestjs-modules.git",
+    "directory": "packages/nestjs-repository-drizzle"
+  },
+  "bugs": {
+    "url": "https://github.com/btwld/nestjs-modules/issues"
+  },
+  "homepage": "https://github.com/btwld/nestjs-modules#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/__tests__/**",
+    "!dist/**/__fixtures__/**"
+  ],
+  "dependencies": {
+    "@concepta/nestjs-core": "workspace:*",
+    "@concepta/nestjs-repository": "workspace:*"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
+    "@neondatabase/serverless": "^1.2.0",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/drizzle": "0.0.2",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/pg": "8.6.1",
+    "better-sqlite3": "^12.0.0",
+    "drizzle-orm": "^0.45.4",
+    "mysql2": "3.24.6",
+    "pg": "8.23.1"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/drizzle": "^0.0.2",
+    "drizzle-orm": "^0.45.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "default": "./dist/postgres.js"
+    },
+    "./mysql": {
+      "types": "./dist/mysql.d.ts",
+      "default": "./dist/mysql.js"
+    },
+    "./mariadb": {
+      "types": "./dist/mariadb.d.ts",
+      "default": "./dist/mariadb.js"
+    },
+    "./sqlite": {
+      "types": "./dist/sqlite.d.ts",
+      "default": "./dist/sqlite.js"
+    }
+  }
+}

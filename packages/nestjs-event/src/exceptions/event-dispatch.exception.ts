@@ -1,9 +1,9 @@
 import {
-  RuntimeException,
-  RuntimeExceptionOptions,
+  type RuntimeException,
+  type RuntimeExceptionOptions,
 } from '@concepta/nestjs-common';
 
-import { EventBaseInterface } from '../events/interfaces/event-base.interface';
+import { type EventBaseInterface } from '../events/interfaces/event-base.interface';
 
 import { EventException } from './event.exception';
 
@@ -26,7 +26,7 @@ export class EventDispatchException<P, R> extends EventException {
     });
 
     this.context = {
-      ...super.context,
+      ...this.context,
       event,
     };
 

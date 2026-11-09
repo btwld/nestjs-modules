@@ -1,7 +1,7 @@
-import { ReportInterface } from '@concepta/nestjs-common';
+import { type ReportInterface } from '@concepta/nestjs-common';
 
-import { ReportCreateDto } from '../dto/report-create.dto';
-import { DoneCallback } from '../report.types';
+import { type ReportCreateDto } from '../dto/report-create.dto';
+import { type DoneCallback } from '../report.types';
 
 export interface ReportServiceInterface {
   generate(report: ReportCreateDto): Promise<ReportInterface>;

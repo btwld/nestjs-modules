@@ -1,14 +1,7 @@
-import { FederatedSettingsInterface } from './federated-settings.interface';
-import { FederatedUserModelServiceInterface } from './federated-user-model-service.interface';
+import { type FederatedUserPortSettings } from '../domain/ports/federated-user.port.js';
+import { type FederatedSettingsInterface } from '../infrastructure/config/interfaces/federated-settings.interface.js';
 
 export interface FederatedOptionsInterface {
-  /**
-   * Implementation of user model service class.
-   */
-  userModelService: FederatedUserModelServiceInterface;
-
-  /**
-   * Settings
-   */
+  userPort: FederatedUserPortSettings;
   settings?: FederatedSettingsInterface;
 }

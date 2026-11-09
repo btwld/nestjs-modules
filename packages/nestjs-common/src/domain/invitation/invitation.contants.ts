@@ -1,2 +1,0 @@
-export const INVITATION_MODULE_CATEGORY_USER_KEY = 'user';
-export const INVITATION_MODULE_CATEGORY_ORG_KEY = 'org';

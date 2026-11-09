@@ -1,6 +1,6 @@
 import {
   RuntimeException,
-  RuntimeExceptionOptions,
+  type RuntimeExceptionOptions,
 } from '@concepta/nestjs-common';
 /**
  * Generic event exception.

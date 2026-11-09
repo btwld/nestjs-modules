@@ -1,3 +1,3 @@
-import { OrgProfileInterface } from './org-profile.interface';
+import { type OrgProfileInterface } from './org-profile.interface';
 
 export interface OrgProfileEntityInterface extends OrgProfileInterface {}

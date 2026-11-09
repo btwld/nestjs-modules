@@ -1,8 +1,8 @@
 import supertest from 'supertest';
 
-import { HttpStatus, INestApplication } from '@nestjs/common';
+import { HttpStatus, type INestApplication } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { ExceptionsFilter } from './exceptions.filter';
 

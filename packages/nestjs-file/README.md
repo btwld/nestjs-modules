@@ -1,530 +1,1023 @@
-# Rockets NestJS File Manager
+# @concepta/nestjs-file
 
-Manage files for several components using one module.
+File records for NestJS using DDD/CQRS. You plug in one storage service per
+backend (S3, a filesystem, ...); the module keeps a row per file, hands out
+upload and download URLs, and tracks each file from upload to removal.
 
 ## Project
 
 [![NPM Latest](https://img.shields.io/npm/v/@concepta/nestjs-file)](https://www.npmjs.com/package/@concepta/nestjs-file)
-[![NPM Downloads](https://img.shields.io/npm/dw/@conceptadev/nestjs-file)](https://www.npmjs.com/package/@concepta/nestjs-file)
+[![NPM Downloads](https://img.shields.io/npm/dw/@concepta/nestjs-file)](https://www.npmjs.com/package/@concepta/nestjs-file)
 [![GH Last Commit](https://img.shields.io/github/last-commit/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules)
 [![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
-[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/@nestjs/common?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-core%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
+[![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-file%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
 ## Table of Contents
 
-1. [Tutorial](#tutorial)
-   1. [Integrating AWS with FileModule in NestJS](#integrating-aws-with-filemodule-in-nestjs)
-      - [Step 1: Install Required Packages](#step-1-install-required-packages)
-      - [Step 2: Configure AWS](#step-2-configure-aws)
-      - [Step 3: Create AWS Storage Service](#step-3-create-aws-storage-service)
-1. [How to Guide](#how-to-guide)
-   1. [How to Create a New Storage Service](#1-how-to-create-a-new-storage-service)
-   1. [How to Integrate a New Storage Service](#2-how-to-integrate-a-new-storage-service)
-   1. [How to Integrate with Multiple Storage Services](#3-how-to-integrate-with-multiple-storage-services)
-   1. [How to create a new File Entity](#4-how-to-create-a-new-file-entity)
-1. [Reference](#reference)
-1. [Explanation](#explanation)
-   1. [Advantages of a Generic File Module](#advantages-of-a-generic-file-module)
-   1. [Multiple Storage Services](#multiple-storage-services)
-   1. [Ease of Creating New File Module Structures](#ease-of-creating-new-file-module-structures)
+- [Installation](#installation)
+- [Module Registration](#module-registration)
+- [Storage Services](#storage-services)
+- [Scanning Uploads](#scanning-uploads)
+- [File Lifecycle](#file-lifecycle)
+- [The File Aggregate](#the-file-aggregate)
+- [Commands](#commands)
+- [Queries](#queries)
+- [Download Access](#download-access)
+- [Domain Events](#domain-events)
+- [Referring to a File](#referring-to-a-file)
+- [Writing a Controller](#writing-a-controller)
+- [Repository](#repository)
+- [Schemas](#schemas)
+- [Exceptions](#exceptions)
+- [Entry Points](#entry-points)
+- [Seeding](#seeding)
+- [Environment Variables](#environment-variables)
 
-## Tutorial
+## Installation
 
-### Integrating AWS with FileModule in NestJS
-
-This guide will walk you through the steps to integrate AWS S3 storage with
-the `FileModule` in your NestJS application. This integration allows you to
-upload and download files using AWS S3.
-
-#### Step 1: Install Required Packages
-
-First, ensure you have the necessary packages installed. You will need
-`@aws-sdk/client-s3` and `@nestjs/config`.
-
-```bash
-yarn add @concepta/nestjs-file @aws-sdk/client-s3 @nestjs/config
+```sh
+yarn add @concepta/nestjs-file @concepta/nestjs-core @concepta/nestjs-repository \
+  @nestjs/common @nestjs/config @nestjs/core @nestjs/cqrs rxjs
 ```
 
-#### Step 2: Configure AWS
+With TypeORM, as in [Module Registration](#module-registration), also add:
 
-Create a configuration file for AWS in your `config` directory.
-
-```ts
-// config/aws.config.ts
-import { registerAs } from '@nestjs/config';
-import { AwsConfigInterface } from '../aws/interfaces/aws.config.interface';
-
-export const awsConfig = registerAs('aws', (): AwsConfigInterface => ({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-  bucketName: process.env.AWS_BUCKET_NAME,
-}));
+```sh
+yarn add @concepta/nestjs-repository-typeorm @nestjs/typeorm typeorm pg
 ```
 
-#### Step 3: Create AWS Storage Service
+This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 
-Implement the AWS storage service that implements the
-`FileStorageServiceInterface` that will handle file uploads and downloads.
+### Peer Dependencies
+
+| Package | Required | Notes |
+| --- | --- | --- |
+| `@nestjs/common` | Yes | NestJS 12 framework |
+| `@nestjs/core` | Yes | Module reference and reflection |
+| `@nestjs/config` | Yes | Settings/config loading |
+| `@nestjs/cqrs` | No | Optional peer — required in practice for `CommandBus`, `QueryBus`, `EventBus` |
+| `rxjs` | Yes | Required by NestJS |
+| `typeorm` | No | Only if using the TypeORM repository adapter |
+| `@concepta/typeorm-seeding` | No | Only for database seeding |
+| `@faker-js/faker` | No | Only for database seeding |
+
+## Module Registration
+
+Extend one of the abstract entities, register it with `RepositoryModule`, then
+register `FileModule` with your storage services. Two classes below are
+yours to write: `S3StorageService`, the storage service from
+[Storage Services](#storage-services), and `FileController`, from
+[Writing a Controller](#writing-a-controller).
 
 ```ts
-// aws/aws-storage.service.ts
-import {
-  FileCreateDto,
-  FileStorageServiceInterface,
-} from '@concepta/nestjs-file';
-import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Inject } from '@nestjs/common';
-import { awsConfig } from '../config/aws.config';
-import { ConfigType } from '@nestjs/config';
+import { Entity } from 'typeorm';
+import { FilePostgresEntity } from '@concepta/nestjs-file/optional/typeorm';
 
-export class AwsStorageService implements FileStorageServiceInterface {
-  KEY = 'aws-storage';
-
-  private s3Client: S3Client;
-  private bucketName: string;
-
-  constructor(
-    @Inject(awsConfig.KEY)
-    private config: ConfigType<typeof awsConfig>,
-  ) {
-    this.s3Client = new S3Client(config);
-    this.bucketName = config.bucketName;
-  }
-
-  async getUploadUrl(file: FileCreateDto): Promise<string> {
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: file.fileName,
-      ContentType: file.contentType,
-    });
-
-    return await getSignedUrl(this.s3Client, command, {
-      expiresIn: 3600,
-    });
-  }
-
-  async getDownloadUrl(file: FileCreateDto): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucketName,
-      Key: file.fileName,
-    });
-
-    return await getSignedUrl(this.s3Client, command, {
-      expiresIn: 3600,
-    }); // URL expires in 1 hour
-  }
-}
+@Entity()
+export class FileEntity extends FilePostgresEntity {}
 ```
 
-#### Step 4: Create AWS Module
-
-Create an AWS module to provide the AWS storage service.
-
 ```ts
-// aws/aws.module.ts
 import { Module } from '@nestjs/common';
-import { AwsStorageService } from './aws-storage.service';
-import { AwsController } from './aws.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CoreModule } from '@concepta/nestjs-core';
+import { FileModule } from '@concepta/nestjs-file';
+import { RepositoryModule } from '@concepta/nestjs-repository';
+import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 @Module({
-  providers: [AwsStorageService],
-  exports: [AwsStorageService],
-  controllers: [AwsController],
+  imports: [
+    CoreModule.forRoot(),
+    TypeOrmModule.forRoot({ /* ... */ entities: [FileEntity] }),
+    RepositoryModule.forRoot({
+      drivers: [
+        {
+          driver: TypeOrmPostgresRepositoryModule,
+          entities: [{ key: 'file', entity: FileEntity }],
+        },
+      ],
+    }),
+    FileModule.forRootAsync({
+      imports: [S3Module],
+      inject: [S3StorageService],
+      useFactory: (s3: S3StorageService) => ({
+        storageServices: [s3],
+        uploadPolicy: {
+          contentTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+          extensions: ['pdf', 'png', 'jpg', 'jpeg'],
+          maxSize: 10 * 1024 * 1024,
+        },
+      }),
+      entities: { file: 'file' },
+    }),
+  ],
+  controllers: [FileController],
 })
-export class AwsModule {}
+export class AppModule {}
 ```
 
-#### Step 5: Create entity AWS DTO
-
-Define Entity and Data Transfer Object (DTO) for AWS file operations.
+`S3Module` provides the [S3 storage service](#storage-services) built from
+your configuration:
 
 ```ts
-import { FilePostgresEntity } from '@concepta/nestjs-file';
-import { Entity } from 'typeorm';
+import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { S3Client } from '@aws-sdk/client-s3';
 
-@Entity('file')
-export class FileEntity extends FilePostgresEntity {}
-
+@Module({
+  providers: [
+    {
+      provide: S3StorageService,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        new S3StorageService(
+          new S3Client({ region: config.getOrThrow('AWS_REGION') }),
+          config.getOrThrow('FILES_BUCKET'),
+        ),
+    },
+  ],
+  exports: [S3StorageService],
+})
+export class S3Module {}
 ```
 
-```ts
-// aws/dto/aws.dto.ts
-import { FileCreateDto } from '@concepta/nestjs-file';
-import { PickType } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
+`storageServices` is a list so one module can keep files in several
+backends: each service declares a `KEY`, and a file's `serviceKey` picks the
+one that holds it. With a single backend, the list has one entry:
 
-@Exclude()
-export class AwsCreateDto extends PickType(FileCreateDto, [
-  'fileName',
-  'contentType',
-] as const) {}
+```ts
+useFactory: (s3: S3StorageService, gcs: GcsStorageService) => ({
+  storageServices: [s3, gcs], // KEY 's3' and KEY 'gcs'
+}),
 ```
 
-#### Step 6: Create AWS Controller
+Use `forRoot({ storageServices: [...] })` when the services need no injection.
 
-Create a controller to handle AWS file operations.
+### Options
+
+| Option | Where | Notes |
+| --- | --- | --- |
+| `storageServices` | options | One per `KEY`. Required. |
+| `uploadPolicy` | options | Allowed content types, extensions and maximum size; see [Upload Policy](#upload-policy). Without it, any file is allowed. |
+| `scanner` | options | Holds every confirmed upload until it passes a malware scan; see [Scanning Uploads](#scanning-uploads). Requires `delete` on every storage service. |
+| `entities.file` | extras | The entity key registered with `RepositoryModule`. Defaults to `'file'`. |
+| `repositories.file` | extras | A `FileRepository` subclass to use instead; see [Repository](#repository). |
+| `providers` | extras | Extra providers; the last provider for a token wins. |
+| `global` | extras | Set by `forRoot`/`forRootAsync`. |
+
+The file entity is mutable: if your deployment requires a write policy on
+every entity, register it with `writePolicy: { access: 'mutable' }`. It needs
+no other repository opt-ins.
+
+### Upload Policy
 
 ```ts
-// aws/aws.controller.ts
-import { FileEntityInterface, FileService } from '@concepta/nestjs-file';
-import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AwsCreateDto } from './dto/aws.dto';
+FileModule.forRoot({
+  storageServices: [s3],
+  uploadPolicy: {
+    contentTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+    extensions: ['pdf', 'png', 'jpg', 'jpeg'],
+    maxSize: 10 * 1024 * 1024,
+  },
+  entities: { file: 'file' },
+});
+```
 
-@Controller('aws')
-@ApiTags('aws')
-export class AwsController {
-  constructor(private fileService: FileService) {}
+A create that breaks the policy throws `FileUploadPolicyException`, and
+nothing is saved: no file record, no upload target. `context.rule` tells you
+which rule failed (`contentType`, `extension` or `size`), so you can tell the
+user what to fix. Leave a rule out to allow anything for it.
 
-  @Post('')
-  @ApiResponse({
-    description: 'Create a file and return upload and download url',
-  })
-  async create(@Body() fileDto: AwsCreateDto): Promise<FileEntityInterface> {
-    return this.fileService.push({
-      ...fileDto,
-      serviceKey: 'aws-storage',
+- `contentTypes` and `extensions` ignore case. List extensions without the
+  dot.
+- The extension is read from the name as stored, after
+  [sanitizing](#commands): `report.pdf.` counts as `pdf`, and an `.exe`
+  disguised as a `.pdf` with a right-to-left override counts as neither.
+- `maxSize` is in bytes.
+- `requireScan: true` makes a [scanner](#scanning-uploads) mandatory: the
+  options don't compile without one. Use it when your security requirements
+  say every upload must be scanned, so a forgotten scanner can't quietly
+  turn scanning off. A registered scanner scans every upload either way.
+
+The policy checks what the client *declares*. To hold the client to it, sign
+the declared type and size into the upload target, as the
+[S3 example](#storage-services) does: storage then refuses an upload of any
+other type or size. Bytes that lie about their type still get through;
+catching those is a [scanner](#scanning-uploads)'s job.
+
+## Storage Services
+
+A storage service implements `FileStorageServiceInterface`. A file uses the
+service whose `KEY` equals its `serviceKey`. Key each stored object by the
+file's `id`: `fileName` is only a display name, and several files can share
+one.
+
+```ts
+import { Injectable, type PlainLiteralObject } from '@nestjs/common';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { create as contentDisposition } from 'content-disposition';
+import {
+  type FileObjectInterface,
+  type FileStorageServiceInterface,
+  type FileUploadTargetInterface,
+} from '@concepta/nestjs-file';
+
+@Injectable()
+export class S3StorageService implements FileStorageServiceInterface {
+  KEY = 's3';
+
+  constructor(
+    protected readonly client: S3Client,
+    protected readonly bucket: string,
+  ) {}
+
+  async getUploadTarget(
+    _ctx: PlainLiteralObject,
+    file: FileObjectInterface,
+  ): Promise<FileUploadTargetInterface> {
+    // S3 refuses a POST whose size or Content-Type differs from these.
+    const { url, fields } = await createPresignedPost(this.client, {
+      Bucket: this.bucket,
+      Key: file.id,
+      Conditions: [
+        ['content-length-range', file.size, file.size],
+        ['eq', '$Content-Type', file.contentType],
+      ],
+      Fields: { 'Content-Type': file.contentType },
+      Expires: 300,
     });
+
+    return { url, method: 'POST', fields };
   }
 
-  @Get('')
-  @ApiResponse({
-    description: 'Get file created',
-  })
-  async get(fileId: string): Promise<FileEntityInterface> {
-    return this.fileService.fetch({
-      id: fileId,
-    });
+  /**
+   * Where downloads read from: the upload bucket here.
+   */
+  protected get downloadBucket(): string {
+    return this.bucket;
+  }
+
+  getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.downloadBucket,
+        Key: file.id,
+        // Download, never render: an allowed SVG or HTML file can't run
+        // script from the bucket's origin.
+        ResponseContentDisposition: contentDisposition(file.fileName),
+      }),
+      { expiresIn: 300 },
+    );
+  }
+
+  async exists(_ctx: PlainLiteralObject, file: FileObjectInterface) {
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: file.id }),
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof NotFound) return false;
+      throw error;
+    }
+  }
+
+  async delete(_ctx: PlainLiteralObject, file: FileObjectInterface) {
+    // S3 deletes are idempotent: deleting a missing key succeeds.
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: file.id }),
+    );
   }
 }
 ```
 
-#### Step 7: Integrate AWS with FileModule
+`getUploadTarget` and `getSignedDownloadUrl` are required.
 
-Finally, integrate the AWS module with the `FileModule` in your `AppModule`.
+`getUploadTarget` runs once, when a file is created, and returns everything
+the client needs to upload: `url`, `method` (`PUT` or `POST`), and the
+`headers` or form `fields` to send with it. Sign the file's `contentType` and
+`size` into it, so storage turns away an upload that doesn't match what the
+client declared. Keep it short-lived, minutes as above: the target still
+works after the upload is confirmed.
+
+Sign download URLs with an `attachment` disposition, as above, so the
+browser saves a file instead of rendering it. Without it, an allowed SVG or
+HTML file opens on the bucket's origin and its script runs.
+
+> With S3, use a presigned POST as above: its `content-length-range`
+> condition is AWS's documented way to cap an upload's size. A presigned
+> PUT from `getSignedUrl` doesn't sign the body, and signs the
+> `Content-Type` only if you pass `signableHeaders`.
+
+`exists` and `delete` are optional, and leaving one out is how you choose the
+behaviour:
+
+- **No `exists`:** confirming an upload doesn't check storage.
+- **No `delete`:** removing a file deletes only its row and keeps the object.
+
+`delete` must be idempotent: resolve when the object is already gone. A
+removal that is retried after a crash calls it again for an object it already
+deleted.
+
+Every method receives the caller's `ctx` first, so a tenant-aware service can
+pick a bucket or prefix from it.
+
+## Scanning Uploads
+
+Register a `scanner` and no upload is downloadable until it passes a malware
+and content scan. You write three things: the scanner, which starts a scan on
+your antivirus service, queue or cloud scanner; the code that reports each
+verdict back; and a [sweep](#sweeping-stuck-scans) for scans that never
+report. Before you ship, read
+[Your scanner owns the bytes](#your-scanner-owns-the-bytes).
+
+The scanner starts the scan and returns:
 
 ```ts
-// app.module.ts
-    FileModule.forRootAsync({
-      imports: [AwsModule],
-      inject: [AwsStorageService],
-      useFactory: (awsStorageService: AwsStorageService) => ({
-        storageServices: [awsStorageService],
-      }),
-      entities: {
-        file: {
-          entity: FileEntity,
-        },
-      },
-    }),
-```
+import { Injectable, type PlainLiteralObject } from '@nestjs/common';
+import {
+  type FileScanServiceInterface,
+  type FileScanRequestInterface,
+} from '@concepta/nestjs-file';
 
-#### Step 8: Environment Variables
+@Injectable()
+export class QueueFileScanner implements FileScanServiceInterface {
+  constructor(private readonly scanQueue: ScanQueue) {} // your client
 
-Ensure you have the following environment variables set in your `.env` file:
-
-```ts
-env
-AWS_REGION=your-aws-region
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-AWS_BUCKET_NAME=your-bucket-name
-```
-
-### Uploading a file using curl
-
-After setting up the AWS integration with the `FileModule`, you can use the
-provided endpoints to upload files. Here's a step-by-step guide on how to
-upload a file using curl:
-
-- First, get a pre-signed URL for file upload:
-
-   ```bash
-   curl -X POST http://localhost:3000/aws \
-   -H "Content-Type: application/json" \
-   -d '{"fileName": "example.txt", "contentType": "text/plain"}'
-   ```
-
-   This will return a JSON response with the pre-signed URL:
-
-  ```json
-  {
-    "serviceKey": "aws-storage",
-    "fileName": "image_3.png",
-    "contentType": "image/png",
-    "dateCreated": "2024-10-01T17:56:07.420Z",
-    "dateUpdated": "2024-10-01T17:56:07.420Z",
-    "dateDeleted": null,
-    "version": 1,
-    "id": "1ef0d299-997d-409e-9ce1-dcc8fe3a280e",
-    "uploadUri": "<https://your-bucket-name.s3.amazonaws.com/example.txt>?...",
-    "downloadUrl": "<https://your-bucket-name.s3.amazonaws.com/example.txt>?.."
+  async requestScan(_ctx: PlainLiteralObject, { file, attempt }: FileScanRequestInterface) {
+    // Start the scan and return; don't wait for the verdict.
+    await this.scanQueue.publish({ fileId: file.id, objectKey: file.id, attempt });
   }
-  ```
+}
+```
 
-- Use the pre-signed URL to upload the file:
+Register it beside your storage services:
 
-   ```bash
-   curl -X PUT -T /path/to/your/example.txt \
-   -H "Content-Type: text/plain" \
-   "https://your-bucket-name.s3.amazonaws.com/example.txt?AWSAccessKeyId=..."
-   ```
+```ts
+FileModule.forRootAsync({
+  imports: [S3Module, ScanModule],
+  inject: [S3ScannedStorageService, QueueFileScanner],
+  useFactory: (s3: S3ScannedStorageService, scanner: QueueFileScanner) => ({
+    storageServices: [s3],
+    uploadPolicy: { requireScan: true }, // compile error if `scanner` goes missing
+    scanner,
+  }),
+  entities: { file: 'file' },
+});
+```
 
-   Replace `/path/to/your/example.txt` with the actual path to your file, and
-   use the full URL returned from step 1.
+Have `S3Module` provide `S3ScannedStorageService` (shown in
+[Your scanner owns the bytes](#your-scanner-owns-the-bytes)) in place of
+`S3StorageService`:
 
-- After successful upload, you can use the file ID to retrieve the file
-information:
+```ts
+{
+  provide: S3ScannedStorageService,
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) =>
+    new S3ScannedStorageService(
+      new S3Client({ region: config.getOrThrow('AWS_REGION') }),
+      config.getOrThrow('FILES_UPLOAD_BUCKET'),
+      config.getOrThrow('FILES_SCAN_BUCKET'),
+      config.getOrThrow('FILES_SERVED_BUCKET'),
+    ),
+}
+```
 
-  ```bash
-  curl -X GET http://localhost:3000/aws/{fileId}
-  ```
+When the verdict comes back, record it, handing back the `attempt` you were
+given. `fileScanOutcomeSchema` checks the message first:
 
-   Replace `{fileId}` with the actual file ID returned when you created the
-   file record.
+```ts
+// In your queue consumer or scanner webhook
+const scan = fileScanOutcomeSchema.parse({
+  attempt: message.attempt,
+  result: message.verdict, // 'clean' | 'infected' | 'uncertain'
+});
 
-- To get a download URL for the file:
+await this.commandBus.execute(
+  new RecordFileScanResultCommand(ctx, message.fileId, scan),
+);
+```
 
-   ```bash
-   curl -X GET http://localhost:3000/aws/download-url/{fileId}
-   ```
+`RecordFileScanResultCommand` is the scanner's voice: whoever can dispatch it
+can pass a file. Dispatch it only from your scanner's own path (the queue
+consumer, or a webhook that verifies the scanner's signature), never from a
+route your users can call. And don't dispatch it from inside `requestScan`
+with the `ctx` you were handed: under a caller's transaction that `ctx` still
+carries it, and the command refuses to run there.
 
-   This will return a JSON response with the download URL:
+What you get:
 
-   ```json
-   {
-     //...
-     "downloadUrl": "https://your-bucket-name.s3.amazonaws.com/example.txt?AWSAccessKeyId=..."
-   }
-   ```
+- **Confirm holds the file.** `ConfirmFileUploadCommand` makes it `scanning`
+  instead of `active`, and asks your scanner once the confirm commits. A
+  scanning file has no download URL.
+- **Clean** makes it `active`, and `FileScanPassedEvent` is published. That
+  is your "ready" signal: `FileUploadConfirmedEvent` still fires at confirm,
+  but it now means uploaded, not yet scanned.
+- **Uncertain** gets one rescan: the file becomes `rescanning` and your
+  scanner is asked again with `attempt: 2`. A second uncertain result rejects
+  it. When a scan times out or can't run, your scanner records `uncertain`:
+  only it knows whether the scan really ran.
+- **Infected**, or uncertain twice, rejects the file: its stored object is
+  deleted and the record stays, `rejected`, as proof of what was refused.
+  Removing it is refused with `FileStatusException`. `FileRejectedEvent`
+  carries the file, the deciding `scan`, and the `eventContext`.
+- **Nothing bypasses the scan.** The module has no release command and no
+  option to skip it; a file becomes `active` only by passing. Replacing
+  `FileScanService` or `FileLifecycleService` through `providers` changes
+  that, and is yours to answer for.
+- **Repeats are safe.** A result for an attempt the file is no longer waiting
+  on changes nothing, so a redelivered message can't reject a file twice or
+  undo a pass. If the file is waiting on the rescan, a repeated first result
+  sends the rescan again, so a queue that redelivers after a refused request
+  recovers by itself.
 
-By following these steps, you can upload a file to your AWS S3 bucket using the
-pre-signed URLs generated by your NestJS application.
+**Dispatch `RecordFileScanResultCommand` outside any transaction**, like
+`RemoveFileCommand`: inside one it throws
+`FileScanResultInTransactionException`. If storage fails to delete a rejected
+object, you get `FileRejectException` and the file stays `rejecting`, still
+not downloadable; record the result again to retry. Two results for one
+`rejecting` file at once both delete its object, and the second to commit
+throws `OptimisticLockException`; the file is rejected either way.
 
-### Conclusion
+Files that were already `active` before you registered a scanner were never
+scanned; scan them out of band if that matters to you.
 
-You have now integrated AWS S3 with the `FileModule` in your NestJS application.
-You can use the endpoints defined in the `AwsController` to upload and download
-files from your S3 bucket.
+### Your scanner owns the bytes
 
-## How to Guide
+Report `clean` only when the bytes downloads will serve are the bytes you
+scanned, and the uploader can no longer change them. The upload target can
+still be valid after confirm, so a scanner that scans the object in place and
+passes it would let the uploader swap the bytes between the scan and the
+download. Pick whichever your storage supports:
 
-### 1. How to Create a New Storage Service
+- **Move it out of reach.** Copy the upload to a location the uploader can't
+  write, scan that copy, and serve it once it passes. This is how Google
+  Cloud's reference design works, with unscanned, clean and quarantined
+  buckets.
+- **Pin the version you scanned.** With object versioning, serve only the
+  version that passed. AWS GuardDuty works this way: it tags each scanned
+  version, and a bucket policy denies reads of any version not tagged clean.
+- **Make uploads final.** Refuse to overwrite an object once it exists, for
+  example with S3 conditional writes (`If-None-Match: *`).
 
-To create a new storage service, you need to implement the
-`FileStorageServiceInterface`. Here's a step-by-step guide:
+Your storage service then serves from wherever the passed bytes live, and its
+`delete` removes every copy your scanner made: a scanner requires every
+storage service to implement `delete` (`FileScannedStorageServiceInterface`),
+and the compiler tells you if one doesn't. For the first approach on S3:
 
-1. Create a new file for your storage service (e.g., `my-storage.service.ts`).
-1. Import the necessary interfaces and implement the
-`FileStorageServiceInterface`.
-1. Implement the required methods: `getUploadUrl` and `getDownloadUrl`.
-1. Define the key for the storage service.
+```ts
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { type FileScannedStorageServiceInterface } from '@concepta/nestjs-file';
 
-Here's an example of a custom storage service:
+/**
+ * Uploads land in the upload bucket. Your scanner copies each one into the
+ * scan bucket, scans that copy, and on a pass copies it into the served
+ * bucket; downloads come only from there.
+ */
+@Injectable()
+export class S3ScannedStorageService
+  extends S3StorageService
+  implements FileScannedStorageServiceInterface
+{
+  constructor(
+    client: S3Client,
+    uploadBucket: string,
+    private readonly scanBucket: string,
+    private readonly servedBucket: string,
+  ) {
+    super(client, uploadBucket); // uploads and `exists` use the upload bucket
+  }
+
+  // Downloads, and the streaming read in Download Access, read only passed bytes.
+  protected override get downloadBucket(): string {
+    return this.servedBucket;
+  }
+
+  async delete(ctx: PlainLiteralObject, file: FileObjectInterface) {
+    await super.delete(ctx, file); // the upload bucket
+    for (const Bucket of [this.scanBucket, this.servedBucket]) {
+      await this.client.send(new DeleteObjectCommand({ Bucket, Key: file.id }));
+    }
+  }
+}
+```
+
+Grant your upload credentials write access to the upload bucket only.
+
+**A rejected upload can come back.** Deleting a rejected file's objects
+doesn't revoke its upload target: until the target expires, the uploader can
+put bytes back under the same id. Nothing serves them, because the file stays
+`rejected`, but nothing deletes them either. Keep upload targets short-lived,
+and clear out what returns:
+
+- **Moving it out of reach:** add a lifecycle rule that expires every object
+  in the upload bucket a day after it lands. Your scanner copies out what it
+  scans, so the upload bucket only ever stages.
+- **Otherwise:** once the targets you issue have expired, delete the objects
+  of `rejected` files again, with your storage service's `delete`.
+
+### Telling the uploader
+
+`FileRejectedEvent` is your security event: log it and notify whoever
+uploaded the file. The module doesn't know your users, so look the uploader up
+in your own record of the upload, by file id:
+
+```ts
+import { EventsHandler, type IEventHandler } from '@nestjs/cqrs';
+import { FileRejectedEvent } from '@concepta/nestjs-file';
+
+@EventsHandler(FileRejectedEvent)
+export class FileRejectedHandler implements IEventHandler<FileRejectedEvent> {
+  constructor(
+    private readonly uploads: UploadRepository, // yours
+    private readonly notifier: Notifier, // yours
+    private readonly audit: AuditLog, // yours
+  ) {}
+
+  async handle({ file, scan, eventContext }: FileRejectedEvent) {
+    const upload = await this.uploads.findByFileId(file.id);
+
+    this.audit.warn('upload rejected', {
+      fileId: file.id,
+      fileName: file.fileName,
+      result: scan.result,
+      uploadedBy: upload.userId,
+      at: eventContext.headers.recordedAt,
+    });
+
+    await this.notifier.uploadRejected(upload.userId, file.fileName);
+  }
+}
+```
+
+### Sweeping stuck scans
+
+**With a scanner registered, a sweep is required.** A file waiting on a scan
+stays blocked until a result arrives, and nothing else moves it on.
+
+A file gets stuck when its request never reached your scanner, or your
+scanner lost it:
+
+- your scanner refused the first request: the confirm has already
+  committed, so the refusal is only logged, as
+  `Transaction onCommit Callback Error`;
+- your scanner refused the rescan: `RecordFileScanResultCommand` threw
+  `FileScanRequestException`;
+- your scanner accepted a request and never reported back.
+
+On a schedule, find files in `scanning` or `rescanning` whose `dateUpdated`
+is older than your deadline, with your own query on the entity, and send each
+one's request again:
+
+```ts
+for (const file of stuck) {
+  await this.commandBus.execute(new RequestFileScanCommand(ctx, file.id));
+}
+```
+
+`RequestFileScanCommand` changes nothing on the file, so a file that keeps
+waiting is sent again on every run until your scanner answers. Set the
+deadline above your scanner's usual time to keep repeat scans rare. A repeat
+is harmless: it carries the same `attempt`, and only the first result for an
+attempt counts.
+
+The sweep never decides a file's fate. Timeouts are your scanner's to
+report, as `uncertain`, so a scanner that is down leaves files blocked, never
+rejected. Alert on files that have waited far past your deadline.
+
+Include files still `rejecting`: record any result for them to finish
+deleting objects a storage failure left behind.
+
+## File Lifecycle
+
+| Status | What it means for you |
+| --- | --- |
+| `pending` | Created. Upload to the `upload` target, then confirm. No download URL yet. |
+| `scanning` | Confirmed, and waiting on its [scan](#scanning-uploads). Only with a scanner. No download URL. |
+| `rescanning` | The first scan was uncertain; waiting on the one rescan. No download URL. |
+| `active` | Confirmed and, with a scanner, passed its scan. Ready to download: the only status that gets a download URL. |
+| `rejecting` | Rejected by its scan; its stored object is being deleted. Record the result again to finish if storage failed. No download URL. |
+| `rejected` | Rejected, and its stored object is deleted. The record stays as proof of what was refused, and can't be removed. |
+| `removing` | A removal is running, or was interrupted. You can still read the record, without a download URL, until it's gone. Remove it again to finish. |
+| `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
+
+**Soft delete** a `pending` or `active` file to hide it from reads while
+keeping the stored object; **restore** it to bring it back. A soft-deleted
+file can't change, so it keeps its status until it's restored or removed.
+
+**Remove** a file to delete the stored object and then its record. If storage
+fails, you get `FileRemoveException`; dispatch `RemoveFileCommand` again to
+retry. A live file is left `remove-failed`, so its record never points at a
+deleted object without its status saying so. A soft-deleted file is left as
+it was, still hidden. Once a removal of a soft-deleted file has failed, remove
+it again rather than restore it: its object may already be gone. A
+`rejecting` or `rejected` file can't be removed: `RemoveFileCommand` throws
+`FileStatusException`, and the record stays.
+
+If two commands change the same file at once, the later one fails with
+`OptimisticLockException` (from `@concepta/nestjs-repository`) instead of
+overwriting the first; retry it.
+
+## The File Aggregate
+
+Commands and queries hand you a `File`:
+
+| Member | What you get |
+| --- | --- |
+| `id`, `version` | The record's id, and the version each write is checked against. |
+| `serviceKey`, `contentType`, `size` | What you created it with; `size` is in bytes. |
+| `fileName` | The name you created it with, sanitized (see [Commands](#commands)). |
+| `status` | One of the [lifecycle](#file-lifecycle) statuses. |
+| `isSoftDeleted` | Whether it's soft-deleted. |
+| `isInUse` | Whether it's `pending` or `active` and not soft-deleted. |
+| `isUploadConfirmed` | Whether the upload is confirmed: scanning, rescanning, active, rejecting or rejected. |
+| `isDownloadable` | Whether it gets a download URL: `active` and not soft-deleted. |
+| `scanAttempt` | The scan it waits on: `1` while `scanning`, `2` while `rescanning`, otherwise `undefined`. |
+| `meta` | `dateCreated`, `dateUpdated`, `dateDeleted`. |
+| `toPlain()` | The whole record as a plain object, to return from a controller. |
+
+Change a file only through the commands; they apply the rules and write it.
+
+## Commands
+
+| Command | Returns | Does |
+| --- | --- | --- |
+| `CreateFileCommand(ctx, { serviceKey, fileName, contentType, size })` | `FileCreatedResultInterface` | Creates a `pending` file with a sanitized name. Throws `FileNameInvalidException` when sanitizing leaves nothing, and `FileUploadPolicyException` when the [upload policy](#upload-policy) refuses the file. |
+| `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`: `active`, or `scanning` with a scanner. Confirming twice returns the file unchanged. |
+| `RecordFileScanResultCommand(ctx, id, { attempt, result })` | `File` | Records a scan verdict (see [Scanning Uploads](#scanning-uploads)). Dispatch it outside any transaction. |
+| `RequestFileScanCommand(ctx, id)` | `File` | Sends your scanner the request a `scanning` or `rescanning` file is waiting on, again, changing nothing (see [Sweeping stuck scans](#sweeping-stuck-scans)). |
+| `SoftDeleteFileCommand(ctx, id)` | `File` | Hides the file from reads and returns it, soft-deleted. |
+| `RestoreFileCommand(ctx, id)` | `File` | Brings a soft-deleted file back. Restoring a file that isn't soft-deleted returns it unchanged. |
+| `RemoveFileCommand(ctx, id)` | `File` | Deletes the stored object and the file (see [File Lifecycle](#file-lifecycle)). |
+
+| Result | Properties |
+| --- | --- |
+| `FileCreatedResultInterface` | `file`, `upload` (`{ url, method, headers?, fields? }`) |
+| `FileReadResultInterface` | `file`, and `signedDownloadUrl` when the file is `active` and not soft-deleted |
+
+Create is the only command that gives you an `upload` target. Confirm and
+`GetFileDownloadQuery` give you a `signedDownloadUrl` only for an `active`
+file: anything not yet confirmed, or being removed, comes back without one,
+so nobody can fetch bytes that haven't been accepted. If storage can't
+produce a target or URL, you get `FileUploadTargetException` or
+`FileDownloadUrlException`, and a failed create leaves nothing behind.
+
+Create and confirm wait for your storage service inside a transaction, so keep
+those calls fast: past the transaction timeout (30 seconds by default) the
+command fails and leaves nothing behind.
+
+Pass the name the user picked; create stores a safe display name.
+`../uploads/insurance.pdf` is stored as `insurance.pdf`:
+
+- any path before the last `/` or `\` is dropped;
+- control and invisible characters are removed, including the right-to-left
+  override that disguises an extension;
+- the name is normalised to NFC, trimmed of surrounding whitespace and
+  trailing dots, and capped at 255 characters, keeping the extension.
+
+A name with nothing left, such as `..`, throws `FileNameInvalidException`.
+Names don't have to be unique: several files can be called `insurance.pdf`,
+each with its own `id`. Quotes, apostrophes and semicolons are kept, so build
+a `Content-Disposition` header with the `content-disposition` package rather
+than by hand (see [Download Access](#download-access)).
+
+**Dispatch `RemoveFileCommand` outside any transaction**, including the
+transactional interceptor; inside one it throws
+`FileRemoveInTransactionException`.
+
+```ts
+const { file, upload } = await this.commandBus.execute(
+  new CreateFileCommand(ctx, {
+    serviceKey: 's3',
+    fileName: 'avatar.png',
+    contentType: 'image/png',
+    size: 48_213,
+  }),
+);
+```
+
+## Queries
+
+| Query | Returns |
+| --- | --- |
+| `GetFileQuery(ctx, id, { status? })` | `File`, or throws `FileNotFoundException` |
+| `GetFileDownloadQuery(ctx, id, { status? })` | `FileReadResultInterface` (`file`, plus `signedDownloadUrl` when `active`), or throws `FileNotFoundException` |
+
+Use `GetFileQuery` when you need the file itself: it never touches storage.
+Use `GetFileDownloadQuery` when you're handing the caller a way to fetch the
+bytes. `status` limits the match to those statuses; without it every status
+matches. Neither query returns soft-deleted files. To find a file from your
+own record, store its id (see [Referring to a File](#referring-to-a-file)).
+
+```ts
+const { signedDownloadUrl } = await this.queryBus.execute(
+  new GetFileDownloadQuery(ctx, id, { status: ['active'] }),
+);
+```
+
+## Download Access
+
+A file is private: the module hands out its bytes only through a signed
+download URL, and only for an `active` file. But a signed URL is a bearer
+token.
+Anyone holding it can download the file until it expires, even after you
+take their permission away. So:
+
+- **Keep expiries short.** Sign download URLs for minutes, not days (the S3
+  example uses 300 seconds), and sign a fresh one per request.
+- **Serve through your own route when access must stop at once.** Your
+  controller checks the caller's permission on every request and streams the
+  object itself, so revoking permission takes effect on the next request:
+
+```ts
+import { Readable } from 'node:stream';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+
+// In S3StorageService, reading where getSignedDownloadUrl does
+async openReadStream(file: FileObjectInterface): Promise<Readable> {
+  const { Body } = await this.client.send(
+    new GetObjectCommand({ Bucket: this.downloadBucket, Key: file.id }),
+  );
+  if (!(Body instanceof Readable)) {
+    throw new Error(`No readable body for file ${file.id}`);
+  }
+  return Body;
+}
+```
+
+```ts
+import { Get, Param, StreamableFile, type PlainLiteralObject } from '@nestjs/common';
+import { create as contentDisposition } from 'content-disposition';
+
+// In FileController
+@Get(':id/content')
+async content(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+  const file = await this.queryBus.execute(
+    new GetFileQuery(ctx, id, { status: ['active'] }),
+  );
+
+  // Your rule: tenant, role, and the record the file belongs to.
+  await this.fileAccess.assertCanRead(ctx, file);
+
+  return new StreamableFile(await this.s3.openReadStream(file.toPlain()), {
+    type: file.contentType,
+    length: file.size,
+    disposition: contentDisposition(file.fileName),
+  });
+}
+```
+
+`GetFileQuery` with `status: ['active']` throws `FileNotFoundException` for
+anything else, so the route never streams a file that hasn't been accepted,
+and it signs no URL the route would only throw away.
+The module ships no permission check: who may read which file is yours to
+decide, in `assertCanRead`. `contentDisposition` (`create` from the
+[`content-disposition`](https://www.npmjs.com/package/content-disposition)
+package Express uses, version 2 or later) builds an `attachment` header that
+encodes any file name safely.
+
+## Domain Events
+
+| Event | Published when |
+| --- | --- |
+| `FileCreatedEvent` | a file is created |
+| `FileUploadConfirmedEvent` | an upload is confirmed; with a scanner, before the scan, so wait for `FileScanPassedEvent` to know it's ready |
+| `FileSoftDeletedEvent` | a file is soft-deleted |
+| `FileRestoredEvent` | a soft-deleted file is restored |
+| `FileRemoveFailedEvent` | a removal is recorded as failed (`remove-failed`) |
+| `FileRemovedEvent` | the row is deleted, after the object |
+| `FileScanPassedEvent` | a scan finds the file clean, and it becomes `active` |
+| `FileScanRetriedEvent` | a first scan is uncertain; the one rescan is requested next |
+| `FileRejectedEvent` | a scan rejects the file; also carries the deciding `scan` (`{ attempt, result }`) |
+
+Each event carries `eventContext` and the plain `file` as stored, and is
+published once the write that produced it commits; a write that rolls back
+publishes nothing. Two commands throw and still publish: a failed removal
+publishes `FileRemoveFailedEvent` once `remove-failed` commits, and a
+rejection whose object storage fails to delete publishes `FileRejectedEvent`
+once `rejecting` commits.
+
+## Referring to a File
+
+Give your own entity a `fileId` column and implement `FileOwnableInterface`
+(`{ fileId }`) to point at a file, for example a report's output or a user's
+avatar.
+
+## Writing a Controller
+
+The module ships no HTTP routes. Write a controller that dispatches the
+commands and queries:
 
 ```ts
 import {
-  FileCreateDto,
-  FileStorageServiceInterface,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  StandardSchemaValidationPipe,
+  type PlainLiteralObject,
+} from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { Ctx, withOpenApi } from '@concepta/nestjs-core';
+import {
+  ConfirmFileUploadCommand,
+  CreateFileCommand,
+  type FileCreatableInterface,
+  fileCreateSchema,
+  GetFileDownloadQuery,
+  GetFileQuery,
+  RemoveFileCommand,
+  RestoreFileCommand,
+  SoftDeleteFileCommand,
 } from '@concepta/nestjs-file';
-import { Inject } from '@nestjs/common';
 
-export class MyStorageService implements FileStorageServiceInterface {
-  KEY = 'my-storage';
+// The server picks the storage service; the client sends the rest.
+const fileUploadRequestSchema = withOpenApi(
+  fileCreateSchema.omit({ serviceKey: true }),
+);
 
-  constructor( ) {
-    
+@Controller('files')
+export class FileController {
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
+
+  @Post()
+  async create(
+    @Ctx() ctx: PlainLiteralObject,
+    @Body({
+      schema: fileUploadRequestSchema,
+      pipes: [new StandardSchemaValidationPipe()],
+    })
+    body: Omit<FileCreatableInterface, 'serviceKey'>,
+  ) {
+    const { file, upload } = await this.commandBus.execute(
+      new CreateFileCommand(ctx, { ...body, serviceKey: 's3' }),
+    );
+    return { ...file.toPlain(), upload };
   }
 
-  async getUploadUrl(file: FileCreateDto): Promise<string> {
-    // Implement your logic to generate an upload URL
+  @Put(':id/confirm')
+  async confirm(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const { file, signedDownloadUrl } = await this.commandBus.execute(
+      new ConfirmFileUploadCommand(ctx, id),
+    );
+    return { ...file.toPlain(), signedDownloadUrl };
   }
 
-  async getDownloadUrl(file: FileCreateDto): Promise<string> {
-    // Implement your logic to generate a download URL
+  @Get(':id')
+  async read(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const { file, signedDownloadUrl } = await this.queryBus.execute(
+      new GetFileDownloadQuery(ctx, id, { status: ['active'] }),
+    );
+    return { ...file.toPlain(), signedDownloadUrl };
+  }
+
+  @Put(':id/soft-delete')
+  async softDelete(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const file = await this.commandBus.execute(
+      new SoftDeleteFileCommand(ctx, id),
+    );
+    return file.toPlain();
+  }
+
+  @Put(':id/restore')
+  async restore(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    const file = await this.commandBus.execute(new RestoreFileCommand(ctx, id));
+    return file.toPlain();
+  }
+
+  @Delete(':id')
+  async remove(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
+    await this.commandBus.execute(new RemoveFileCommand(ctx, id));
   }
 }
 ```
 
-### 2. How to Integrate a New Storage Service
+`@Ctx()` passes the request's context, so your storage service, hooks and
+event listeners see the caller and the request's correlation id.
 
-To integrate a new storage service into the `FileModule`, follow these steps:
+The create route validates its body with `fileCreateSchema` minus
+`serviceKey`, so a client can neither pick another storage service nor leave
+out the `size` your storage signs into the upload.
 
-1. Import the new storage service module into your `AppModule`.
-1. Configure the `FileModule` with the new storage service.
-
-Here's an example of how to integrate the `MyStorageService` into the
-`FileModule`:
+The client uploads straight to storage with the `upload` it got back, then
+calls `PUT /files/:id/confirm`:
 
 ```ts
-// ...
+// Browser
+const { id, upload } = await (await fetch('/files', { method: 'POST', /* ... */ })).json();
+
+if (upload.method === 'POST') {
+  const form = new FormData();
+  for (const [name, value] of Object.entries(upload.fields ?? {})) {
+    form.append(name, value);
+  }
+  form.append('file', file); // last: storage ignores fields after the file
+  await fetch(upload.url, { method: 'POST', body: form });
+} else {
+  await fetch(upload.url, { method: 'PUT', headers: upload.headers, body: file });
+}
+
+await fetch(`/files/${id}/confirm`, { method: 'PUT' });
+```
+
+To finish interrupted removals, find files in `removing` or `remove-failed`
+with your own query on the entity, then dispatch `RemoveFileCommand` for each.
+A soft-deleted file has no removal status, so track the ones you mean to
+remove yourself and dispatch it again for those. If your sweep catches a
+removal that is still running, the later one takes over and the other fails
+with `OptimisticLockException`, possibly after its object was already deleted.
+Both are safe to retry, and the file ends up removed either way.
+
+## Repository
+
+`FileRepository` implements `FileRepositoryInterface` over the repository
+registered for `entities.file`. To change how files are read or written,
+extend it and pass the class as `repositories.file`; the module builds it with
+the same repository and `FileMapper`, so `this.repository` and `this.mapper`
+are there for you:
+
+```ts
+import { FileRepository } from '@concepta/nestjs-file';
+
+export class MyFileRepository extends FileRepository {
+  // override any method, following the contract on FileRepositoryInterface
+}
+
 FileModule.forRoot({
-  storageServices: [new MyStorageService],
-  // ...
-}),
-//...
-```
-
-### 3. How to Integrate with Multiple Storage Services
-
-Repeat the previous step but define a different key for the storage service.
-
-Here's an example of how to set multiple custom storage service:
-
-```ts
-// ...
-FileModule.forRoot({
-  storageServices: [new MyStorageService(), new MySecondStorageService()],
-  // ...
-}),
-//...
-```
-
-```ts
-// to access MyStorageService
-this.fileService.push({
-  ...fileDto,
-  serviceKey: 'my-storage',
+  storageServices: [s3],
+  entities: { file: 'file' },
+  repositories: { file: MyFileRepository },
 });
-// ... 
 ```
+
+To change how files are created, confirmed, soft-deleted, restored or removed,
+provide your own `FileLifecycleService` subclass through `providers`.
+
+## Schemas
+
+| Schema | Shape |
+| --- | --- |
+| `fileSchema` | A stored file: own columns, `status`, id, version and dates. Named OpenAPI component `File`. |
+| `fileCreateSchema` | Create body: non-empty `serviceKey`, `fileName`, `contentType`, and `size` as a non-negative safe integer. |
+| `fileScanOutcomeSchema` | A scanner's report: `attempt` (`1` or `2`) and `result` (`clean`, `infected` or `uncertain`). |
+
+## Exceptions
+
+| Exception | Fault | When |
+| --- | --- | --- |
+| `FileNotFoundException` | client | No file matches the id (and status filter). |
+| `FileNameInvalidException` | client | The file name has nothing left once sanitized. |
+| `FileUploadPolicyException` | client | The upload policy refuses the file; `context.rule` names the rule. |
+| `FileNotUploadedException` | client | `exists` says the object isn't uploaded. |
+| `FileStatusException` | client | The status doesn't allow the operation, such as a scan result for a `pending` file, or removing a `rejected` one. |
+| `FileStorageNotFoundException` | usage | No storage service has the file's `serviceKey`. |
+| `FileRemoveInTransactionException` | usage | `RemoveFileCommand` was dispatched inside a transaction. |
+| `FileScanResultInTransactionException` | usage | `RecordFileScanResultCommand` was dispatched inside a transaction. |
+| `FileScanRequestException` | internal | The scanner refused a rescan request, or one sent again by `RequestFileScanCommand`. The file keeps waiting until a request goes through. (A refused first request on confirm is logged, not thrown.) |
+| `FileRejectException` | internal | Storage failed to delete a rejected file's object; the file stays `rejecting`. Record the result again to retry. |
+| `FileUploadTargetException` | internal | Storage failed to produce an upload target. |
+| `FileDownloadUrlException` | internal | Storage failed to produce a download URL. |
+| `FileExistsCheckException` | internal | Storage failed to check whether the object is uploaded. |
+| `FileStorageDeleteException` | internal | Storage failed to delete the object. You see it as the `cause` of `FileRemoveException` or `FileRejectException`. |
+| `FileRemoveException` | internal | Storage failed to delete the object. A live file is `remove-failed`, unless `context.statusError` says that couldn't be recorded either; a soft-deleted file is left as it was. Remove it again to retry. |
+
+All extend `FileException`. For the `internal` ones, the storage error is the
+exception's `cause`; for `FileRemoveException` it is one level down, on the
+`FileStorageDeleteException` that is its `cause`.
+
+## Entry Points
+
+| Import Path | Contents |
+| --- | --- |
+| `@concepta/nestjs-file` | Module, aggregate, commands, queries, handlers, events, `FileStorageService`, `FileLifecycleService`, `FileUploadPolicy`, `FileScanService`, repository, schemas, exceptions, domain and config interfaces |
+| `@concepta/nestjs-file/optional/typeorm` | `FileSqliteEntity`, `FilePostgresEntity` |
+| `@concepta/nestjs-file/optional/seeding` | `FileFactory` |
+
+## Seeding
+
+`FileFactory` seeds `active` files with `serviceKey` `'default'`. Override
+`serviceKey` to one of your storage services:
 
 ```ts
-// to access MySecondStorageService
-this.fileService.push({
-  ...fileDto,
-  serviceKey: 'my-second-storage',
-});
-// ... 
+import { FileFactory } from '@concepta/nestjs-file/optional/seeding';
 ```
 
-### 4. How to create a new File Entity
+## Environment Variables
 
-To create a new entity, follow these steps:
-
-1. Create a new file for your entity (e.g., `my-entity.entity.ts`).
-1. Extend the `FilePostgresEntity` or `FileMongoEntity` class and add your
-custom fields.
-1. Register the new entity in the `FileModule`.
-
-Here's an example of a custom entity:
-
-```ts
-import { FilePostgresEntity } from '@concepta/nestjs-file';
-import { Entity } from 'typeorm';
-
-@Entity('my-entity')
-export class MyEntity extends FilePostgresEntity {}
-```
-
-```ts
-// ...
-FileModule.forRootAsync({
-  entities: {
-    file: {
-      entity: MyEntity,
-    },
-  },
-  // ...
-}),
-// ...
-```
-
-## Reference
-
-For detailed API documentation, please refer to our
-[API Reference](https://www.rockets.tools/reference/rockets/nestjs-file/README).
-This comprehensive guide provides in-depth information about all available
-methods, interfaces, and configurations for the `@concepta/nestjs-file`
-package.
-
-## Explanation
-
-### Advantages of a Generic File Module
-
-The `@concepta/nestjs-file` module offers a generic, flexible approach to file
-handling in NestJS applications. This design provides several key advantages:
-
-1. **Abstraction**: By abstracting file operations, developers can work with
-   files without worrying about the underlying storage mechanism. This
-   separation of concerns simplifies application logic and improves
-   maintainability.
-
-1. **Flexibility**: The module's design allows for easy integration with
-   various storage services. Whether using local storage, cloud services like
-   AWS S3, Google Cloud Storage, or any custom solution, the module can
-   accommodate your needs.
-
-1. **Consistency**: With a standardized interface for file operations, your
-   application maintains consistent behavior across different storage services.
-   This consistency simplifies development and reduces errors when switching
-   between or combining different storage solutions.
-
-1. **Scalability**: As your application grows, you can easily add new storage
-   services or switch between them without significant changes to your
-   application code. This scalability is crucial for applications that may need
-   to adapt to changing requirements or infrastructure.
-
-1. **Testability**: The abstraction layer makes it easier to mock file
-   operations in unit tests, allowing for more comprehensive and isolated
-   testing of your application logic.
-
-### Multiple Storage Services
-
-Supporting multiple storage services within the same module offers several
-benefits:
-
-1. **Versatility**: Different parts of your application may have different
-   storage requirements. With support for multiple services, you can use the
-   most appropriate storage solution for each use case within a single
-   application.
-
-1. **Migration**: If you need to migrate from one storage service to another,
-   you can do so gradually by running multiple services in parallel during the
-   transition period.
-
-1. **Redundancy**: For critical applications, you can implement redundancy by
-   storing files across multiple services simultaneously.
-
-1. **Cost Optimization**: Different storage services have different pricing
-   models. By supporting multiple services, you can optimize costs by choosing
-   the most cost-effective solution for each type of data or usage pattern.
-
-### Ease of Creating New File Module Structures
-
-The `@concepta/nestjs-file` module is designed with extensibility in mind,
-making it straightforward to create new file module structures:
-
-1. **Standardized Interface**: By implementing the
-   `FileStorageServiceInterface`, you can easily create new storage services
-   that seamlessly integrate with the existing module structure.
-
-1. **Minimal Boilerplate**: The module provides base classes and interfaces
-   that handle much of the common functionality, allowing you to focus on the
-   specific implementation details of your new storage service.
-
-1. **Plug-and-Play**: Once a new storage service is implemented, it can be
-   easily plugged into the existing module configuration without requiring
-   changes to other parts of your application.
-
-1. **Customizable Entities**: The module allows for easy creation and
-   registration of custom file entities, enabling you to tailor the data model
-   to your specific needs while still leveraging the module's core
-   functionality.
-
-1. **Dependency Injection**: Leveraging NestJS's dependency injection system,
-   new services and entities can be easily integrated and made available
-   throughout your application.
-
-This design philosophy ensures that extending the file module to support new
-storage services or customize existing functionality is a straightforward
-process, promoting adaptability and reducing development time for custom file
-handling solutions.
+None. Everything is configured through the module options.

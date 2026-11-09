@@ -1,6 +1,6 @@
-import { EventListenerInterface } from '../../listeners/interfaces/event-listener.interface';
+import { type EventListenerInterface } from '../../listeners/interfaces/event-listener.interface';
 
-import { EventListenOnOptionsInterface } from './event-listen-on-options.interface';
+import { type EventListenOnOptionsInterface } from './event-listen-on-options.interface';
 
 /**
  * The interface that defines Event Listen On signature.

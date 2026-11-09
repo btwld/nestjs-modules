@@ -1,23 +1,28 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CommandBus, CqrsModule, QueryBus } from '@nestjs/cqrs';
 
-import { createSettingsProvider } from '@concepta/nestjs-common';
+import { createSettingsProvider } from '@concepta/nestjs-core';
+import { RepositoryModule } from '@concepta/nestjs-repository';
 
-import { federatedDefaultConfig } from './config/federated-default.config';
+import { CreateIdentityHandler } from './application/commands/handlers/create-identity.handler.js';
+import { FindIdentityByProviderHandler } from './application/queries/handlers/find-identity-by-provider.handler.js';
+import { FederatedUserPort } from './domain/ports/federated-user.port.js';
+import { FederatedOAuthService } from './domain/services/federated-oauth.service.js';
 import {
+  FEDERATED_MODULE_DEFAULT_ENTITY_KEY,
   FEDERATED_MODULE_SETTINGS_TOKEN,
-  FEDERATED_MODULE_USER_MODEL_SERVICE_TOKEN,
-} from './federated.constants';
-import { FederatedOptionsExtrasInterface } from './interfaces/federated-options-extras.interface';
-import { FederatedOptionsInterface } from './interfaces/federated-options.interface';
-import { FederatedSettingsInterface } from './interfaces/federated-settings.interface';
-import { FederatedModelService } from './services/federated-model.service';
-import { FederatedOAuthService } from './services/federated-oauth.service';
-import { FederatedService } from './services/federated.service';
+} from './federated.constants.js';
+import { federatedDefaultConfig } from './infrastructure/config/federated-default.config.js';
+import { type FederatedSettingsInterface } from './infrastructure/config/interfaces/federated-settings.interface.js';
+import { IdentityMapper } from './infrastructure/persistence/identity.mapper.js';
+import { createIdentityRepositoryProvider } from './infrastructure/utils/create-identity-repository-provider.js';
+import { type FederatedOptionsExtrasInterface } from './interfaces/federated-options-extras.interface.js';
+import { type FederatedOptionsInterface } from './interfaces/federated-options.interface.js';
 
 const RAW_OPTIONS_TOKEN = Symbol('__FEDERATED_MODULE_RAW_OPTIONS_TOKEN__');
 
@@ -30,7 +35,10 @@ export const {
   optionsInjectionToken: RAW_OPTIONS_TOKEN,
 })
   .setExtras<FederatedOptionsExtrasInterface>(
-    { global: false },
+    {
+      global: false,
+      entities: { identity: FEDERATED_MODULE_DEFAULT_ENTITY_KEY },
+    },
     definitionTransform,
   )
   .build();
@@ -47,23 +55,35 @@ function definitionTransform(
   extras: FederatedOptionsExtrasInterface,
 ): DynamicModule {
   const { imports = [], providers = [] } = definition;
-  const { global = false } = extras;
+  const { global = false, entities, repositories } = extras;
+  const entityKey = entities?.identity ?? FEDERATED_MODULE_DEFAULT_ENTITY_KEY;
 
   return {
     ...definition,
     global,
-    imports: createFederatedImports({ imports }),
-    providers: createFederatedProviders({ providers }),
+    imports: createFederatedImports({
+      imports,
+      // A custom repository replaces the one injected under the key.
+      repositoryKeys: repositories?.identity ? [] : [entityKey],
+    }),
+    providers: createFederatedProviders({
+      providers,
+      entityKey,
+      repositories,
+    }),
     exports: [ConfigModule, RAW_OPTIONS_TOKEN, ...createFederatedExports()],
   };
 }
 
 export function createFederatedImports(options: {
   imports: DynamicModule['imports'];
+  repositoryKeys: string[];
 }): DynamicModule['imports'] {
   return [
     ...(options.imports || []),
     ConfigModule.forFeature(federatedDefaultConfig),
+    CqrsModule.forRoot(),
+    RepositoryModule.forFeature(options.repositoryKeys),
   ];
 }
 
@@ -72,24 +92,31 @@ export function createFederatedExports(): Required<
 >['exports'] {
   return [
     FEDERATED_MODULE_SETTINGS_TOKEN,
-    FEDERATED_MODULE_USER_MODEL_SERVICE_TOKEN,
-    FederatedService,
     FederatedOAuthService,
-    FederatedModelService,
+    IdentityMapper,
   ];
 }
 
 export function createFederatedProviders(options: {
   overrides?: FederatedOptions;
   providers?: Provider[];
+  entityKey: string;
+  repositories?: FederatedOptionsExtrasInterface['repositories'];
 }): Provider[] {
   return [
     ...(options.providers ?? []),
-    createFederatedSettingsProvider(options.overrides),
-    createFederatedUserModelServiceProvider(options.overrides),
-    FederatedService,
     FederatedOAuthService,
-    FederatedModelService,
+    createFederatedSettingsProvider(options.overrides),
+    ...createIdentityRepositoryProvider(
+      options.entityKey,
+      options.repositories?.identity,
+    ),
+    createFederatedUserPortProvider(),
+    IdentityMapper,
+    // command handlers
+    CreateIdentityHandler,
+    // query handlers
+    FindIdentityByProviderHandler,
   ];
 }
 
@@ -107,13 +134,14 @@ export function createFederatedSettingsProvider(
   });
 }
 
-export function createFederatedUserModelServiceProvider(
-  optionsOverrides?: FederatedOptions,
-): Provider {
+function createFederatedUserPortProvider(): Provider {
   return {
-    provide: FEDERATED_MODULE_USER_MODEL_SERVICE_TOKEN,
-    inject: [RAW_OPTIONS_TOKEN],
-    useFactory: async (options: FederatedOptionsInterface) =>
-      optionsOverrides?.userModelService ?? options.userModelService,
+    provide: FederatedUserPort,
+    inject: [RAW_OPTIONS_TOKEN, QueryBus, CommandBus],
+    useFactory: (
+      options: FederatedOptionsInterface,
+      queryBus: QueryBus,
+      commandBus: CommandBus,
+    ) => new FederatedUserPort(options.userPort, queryBus, commandBus),
   };
 }

@@ -1,16 +1,17 @@
-import { Severity } from 'coralogix-logger';
+import { type Severity } from 'coralogix-logger';
 
 import {
-  LoggerSettingsInterface,
-  LoggerTransportSettingsInterface,
+  type LoggerSettingsInterface,
+  type LoggerTransportSettingsInterface,
 } from '@concepta/nestjs-logger';
 
-import { LoggerCoralogixConfigInterface } from './logger-coralogix-config.interface';
+import { type LoggerCoralogixConfigInterface } from './logger-coralogix-config.interface';
 /**
  * Coralogix options interface.
  */
 export interface LoggerCoralogixSettingsInterface
-  extends Partial<Pick<LoggerSettingsInterface, 'logLevel'>>,
+  extends
+    Partial<Pick<LoggerSettingsInterface, 'logLevel'>>,
     LoggerTransportSettingsInterface<Severity> {
   /**
    *
