@@ -7,12 +7,15 @@ import {
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
 import { FileNotFoundException } from '../application/exceptions/file-not-found.exception.js';
+import { FileRejectException } from '../application/exceptions/file-reject.exception.js';
 import { FileRemoveInTransactionException } from '../application/exceptions/file-remove-in-transaction.exception.js';
 import { FileRemoveException } from '../application/exceptions/file-remove.exception.js';
+import { FileScanResultInTransactionException } from '../application/exceptions/file-scan-result-in-transaction.exception.js';
 import { FileDownloadUrlException } from '../domain/exceptions/file-download-url.exception.js';
 import { FileExistsCheckException } from '../domain/exceptions/file-exists-check.exception.js';
 import { FileNameInvalidException } from '../domain/exceptions/file-name-invalid.exception.js';
 import { FileNotUploadedException } from '../domain/exceptions/file-not-uploaded.exception.js';
+import { FileScanRequestException } from '../domain/exceptions/file-scan-request.exception.js';
 import { FileStatusException } from '../domain/exceptions/file-status.exception.js';
 import { FileStorageDeleteException } from '../domain/exceptions/file-storage-delete.exception.js';
 import { FileStorageNotFoundException } from '../domain/exceptions/file-storage-not-found.exception.js';
@@ -105,6 +108,22 @@ const CASES: {
     name: 'FileRemoveInTransactionException',
     build: () => new FileRemoveInTransactionException(),
     fault: 'usage',
+  },
+  {
+    name: 'FileScanResultInTransactionException',
+    build: () => new FileScanResultInTransactionException(),
+    fault: 'usage',
+  },
+  {
+    name: 'FileScanRequestException',
+    build: () =>
+      new FileScanRequestException({ id: 'id', originalError: null }),
+    fault: 'internal',
+  },
+  {
+    name: 'FileRejectException',
+    build: () => new FileRejectException({ id: 'id', originalError: null }),
+    fault: 'internal',
   },
 ];
 

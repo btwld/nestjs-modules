@@ -17,6 +17,7 @@ upload and download URLs, and tracks each file from upload to removal.
 - [Installation](#installation)
 - [Module Registration](#module-registration)
 - [Storage Services](#storage-services)
+- [Scanning Uploads](#scanning-uploads)
 - [File Lifecycle](#file-lifecycle)
 - [The File Aggregate](#the-file-aggregate)
 - [Commands](#commands)
@@ -63,7 +64,10 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 ## Module Registration
 
 Extend one of the abstract entities, register it with `RepositoryModule`, then
-register `FileModule` with your storage services:
+register `FileModule` with your storage services. Two classes below are
+yours to write: `S3StorageService`, the storage service from
+[Storage Services](#storage-services), and `FileController`, from
+[Writing a Controller](#writing-a-controller).
 
 ```ts
 import { Entity } from 'typeorm';
@@ -137,6 +141,16 @@ import { S3Client } from '@aws-sdk/client-s3';
 export class S3Module {}
 ```
 
+`storageServices` is a list so one module can keep files in several
+backends: each service declares a `KEY`, and a file's `serviceKey` picks the
+one that holds it. With a single backend, the list has one entry:
+
+```ts
+useFactory: (s3: S3StorageService, gcs: GcsStorageService) => ({
+  storageServices: [s3, gcs], // KEY 's3' and KEY 'gcs'
+}),
+```
+
 Use `forRoot({ storageServices: [...] })` when the services need no injection.
 
 ### Options
@@ -145,6 +159,7 @@ Use `forRoot({ storageServices: [...] })` when the services need no injection.
 | --- | --- | --- |
 | `storageServices` | options | One per `KEY`. Required. |
 | `uploadPolicy` | options | Allowed content types, extensions and maximum size; see [Upload Policy](#upload-policy). Without it, any file is allowed. |
+| `scanner` | options | Holds every confirmed upload until it passes a malware scan; see [Scanning Uploads](#scanning-uploads). Requires `delete` on every storage service. |
 | `entities.file` | extras | The entity key registered with `RepositoryModule`. Defaults to `'file'`. |
 | `repositories.file` | extras | A `FileRepository` subclass to use instead; see [Repository](#repository). |
 | `providers` | extras | Extra providers; the last provider for a token wins. |
@@ -179,12 +194,16 @@ user what to fix. Leave a rule out to allow anything for it.
   [sanitizing](#commands): `report.pdf.` counts as `pdf`, and an `.exe`
   disguised as a `.pdf` with a right-to-left override counts as neither.
 - `maxSize` is in bytes.
+- `requireScan: true` makes a [scanner](#scanning-uploads) mandatory: the
+  options don't compile without one. Use it when your security requirements
+  say every upload must be scanned, so a forgotten scanner can't quietly
+  turn scanning off. A registered scanner scans every upload either way.
 
 The policy checks what the client *declares*. To hold the client to it, sign
 the declared type and size into the upload target, as the
 [S3 example](#storage-services) does: storage then refuses an upload of any
 other type or size. Bytes that lie about their type still get through;
-catching those is a content scanner's job.
+catching those is a [scanner](#scanning-uploads)'s job.
 
 ## Storage Services
 
@@ -215,8 +234,8 @@ export class S3StorageService implements FileStorageServiceInterface {
   KEY = 's3';
 
   constructor(
-    private readonly client: S3Client,
-    private readonly bucket: string,
+    protected readonly client: S3Client,
+    protected readonly bucket: string,
   ) {}
 
   async getUploadTarget(
@@ -238,10 +257,17 @@ export class S3StorageService implements FileStorageServiceInterface {
     return { url, method: 'POST', fields };
   }
 
+  /**
+   * Where downloads read from: the upload bucket here.
+   */
+  protected get downloadBucket(): string {
+    return this.bucket;
+  }
+
   getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     return getSignedUrl(
       this.client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: file.id }),
+      new GetObjectCommand({ Bucket: this.downloadBucket, Key: file.id }),
       { expiresIn: 300 },
     );
   }
@@ -293,19 +319,264 @@ deleted.
 Every method receives the caller's `ctx` first, so a tenant-aware service can
 pick a bucket or prefix from it.
 
+## Scanning Uploads
+
+Register a `scanner` and no upload is downloadable until it passes a malware
+and content scan. You write three things: the scanner, which starts a scan on
+your antivirus service, queue or cloud scanner; the code that reports each
+verdict back; and a [sweep](#sweeping-stuck-scans) for scans that never
+report. Before you ship, read
+[Your scanner owns the bytes](#your-scanner-owns-the-bytes).
+
+The scanner starts the scan and returns:
+
+```ts
+import { Injectable, type PlainLiteralObject } from '@nestjs/common';
+import {
+  type FileScanServiceInterface,
+  type FileScanRequestInterface,
+} from '@concepta/nestjs-file';
+
+@Injectable()
+export class QueueFileScanner implements FileScanServiceInterface {
+  constructor(private readonly scanQueue: ScanQueue) {} // your client
+
+  async requestScan(_ctx: PlainLiteralObject, { file, attempt }: FileScanRequestInterface) {
+    // Start the scan and return; don't wait for the verdict.
+    await this.scanQueue.publish({ fileId: file.id, objectKey: file.id, attempt });
+  }
+}
+```
+
+Register it beside your storage services:
+
+```ts
+FileModule.forRootAsync({
+  imports: [S3Module, ScanModule],
+  inject: [S3ScannedStorageService, QueueFileScanner],
+  useFactory: (s3: S3ScannedStorageService, scanner: QueueFileScanner) => ({
+    storageServices: [s3],
+    uploadPolicy: { requireScan: true }, // compile error if `scanner` goes missing
+    scanner,
+  }),
+  entities: { file: 'file' },
+});
+```
+
+Have `S3Module` provide `S3ScannedStorageService` (shown in
+[Your scanner owns the bytes](#your-scanner-owns-the-bytes)) in place of
+`S3StorageService`:
+
+```ts
+{
+  provide: S3ScannedStorageService,
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) =>
+    new S3ScannedStorageService(
+      new S3Client({ region: config.getOrThrow('AWS_REGION') }),
+      config.getOrThrow('FILES_UPLOAD_BUCKET'),
+      config.getOrThrow('FILES_SCAN_BUCKET'),
+      config.getOrThrow('FILES_SERVED_BUCKET'),
+    ),
+}
+```
+
+When the verdict comes back, record it, handing back the `attempt` you were
+given. `fileScanOutcomeSchema` checks the message first:
+
+```ts
+// In your queue consumer or scanner webhook
+const scan = fileScanOutcomeSchema.parse({
+  attempt: message.attempt,
+  result: message.verdict, // 'clean' | 'infected' | 'uncertain'
+});
+
+await this.commandBus.execute(
+  new RecordFileScanResultCommand(ctx, message.fileId, scan),
+);
+```
+
+`RecordFileScanResultCommand` is the scanner's voice: whoever can dispatch it
+can pass a file. Dispatch it only from your scanner's own path (the queue
+consumer, or a webhook that verifies the scanner's signature), never from a
+route your users can call. And don't dispatch it from inside `requestScan`
+with the `ctx` you were handed: under a caller's transaction that `ctx` still
+carries it, and the command refuses to run there.
+
+What you get:
+
+- **Confirm holds the file.** `ConfirmFileUploadCommand` makes it `scanning`
+  instead of `active`, and asks your scanner once the confirm commits. A
+  scanning file has no download URL.
+- **Clean** makes it `active`, and `FileScanPassedEvent` is published.
+- **Uncertain** gets one rescan: the file becomes `rescanning` and your
+  scanner is asked again with `attempt: 2`. A second uncertain result rejects
+  it. Record a scan that timed out or failed to run as `uncertain`.
+- **Infected**, or uncertain twice, rejects the file: its stored object is
+  deleted and the record stays, `rejected`, as proof of what was refused.
+  `FileRejectedEvent` carries the file, the deciding `scan`, and the
+  `eventContext`.
+- **Nothing bypasses the scan.** There is no release command and no option to
+  skip it; a file becomes `active` only by passing.
+- **Repeats are safe.** A result for an attempt the file is no longer waiting
+  on changes nothing, so a redelivered message can't reject a file twice or
+  undo a pass.
+
+**Dispatch `RecordFileScanResultCommand` outside any transaction**, like
+`RemoveFileCommand`: inside one it throws
+`FileScanResultInTransactionException`. If storage fails to delete a rejected
+object, you get `FileRejectException` and the file stays `rejecting`, still
+not downloadable; record the result again to retry.
+
+Files that were already `active` before you registered a scanner were never
+scanned; scan them out of band if that matters to you.
+
+### Your scanner owns the bytes
+
+Report `clean` only when the bytes downloads will serve are the bytes you
+scanned, and the uploader can no longer change them. The upload target can
+still be valid after confirm, so a scanner that scans the object in place and
+passes it would let the uploader swap the bytes between the scan and the
+download. Pick whichever your storage supports:
+
+- **Move it out of reach.** Copy the upload to a location the uploader can't
+  write, scan that copy, and serve it once it passes. This is how Google
+  Cloud's reference design works, with unscanned, clean and quarantined
+  buckets.
+- **Pin the version you scanned.** With object versioning, serve only the
+  version that passed. AWS GuardDuty works this way: it tags each scanned
+  version, and a bucket policy denies reads of any version not tagged clean.
+- **Make uploads final.** Refuse to overwrite an object once it exists, for
+  example with S3 conditional writes (`If-None-Match: *`).
+
+Your storage service then serves from wherever the passed bytes live, and its
+`delete` removes every copy your scanner made: a scanner requires every
+storage service to implement `delete` (`FileScannedStorageServiceInterface`),
+and the compiler tells you if one doesn't. For the first approach on S3:
+
+```ts
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { type FileScannedStorageServiceInterface } from '@concepta/nestjs-file';
+
+/**
+ * Uploads land in the upload bucket. Your scanner copies each one into the
+ * scan bucket, scans that copy, and on a pass copies it into the served
+ * bucket; downloads come only from there.
+ */
+@Injectable()
+export class S3ScannedStorageService
+  extends S3StorageService
+  implements FileScannedStorageServiceInterface
+{
+  constructor(
+    client: S3Client,
+    uploadBucket: string,
+    private readonly scanBucket: string,
+    private readonly servedBucket: string,
+  ) {
+    super(client, uploadBucket); // uploads and `exists` use the upload bucket
+  }
+
+  // Downloads, and the streaming read in Download Access, read only passed bytes.
+  protected override get downloadBucket(): string {
+    return this.servedBucket;
+  }
+
+  async delete(ctx: PlainLiteralObject, file: FileObjectInterface) {
+    await super.delete(ctx, file); // the upload bucket
+    for (const Bucket of [this.scanBucket, this.servedBucket]) {
+      await this.client.send(new DeleteObjectCommand({ Bucket, Key: file.id }));
+    }
+  }
+}
+```
+
+Grant your upload credentials write access to the upload bucket only.
+
+### Telling the uploader
+
+`FileRejectedEvent` is your security event: log it and notify whoever
+uploaded the file. The module doesn't know your users, so look the uploader up
+in your own record of the upload, by file id:
+
+```ts
+import { EventsHandler, type IEventHandler } from '@nestjs/cqrs';
+import { FileRejectedEvent } from '@concepta/nestjs-file';
+
+@EventsHandler(FileRejectedEvent)
+export class FileRejectedHandler implements IEventHandler<FileRejectedEvent> {
+  constructor(
+    private readonly uploads: UploadRepository, // yours
+    private readonly notifier: Notifier, // yours
+    private readonly audit: AuditLog, // yours
+  ) {}
+
+  async handle({ file, scan, eventContext }: FileRejectedEvent) {
+    const upload = await this.uploads.findByFileId(file.id);
+
+    this.audit.warn('upload rejected', {
+      fileId: file.id,
+      fileName: file.fileName,
+      result: scan.result,
+      uploadedBy: upload.userId,
+      at: eventContext.headers.recordedAt,
+    });
+
+    await this.notifier.uploadRejected(upload.userId, file.fileName);
+  }
+}
+```
+
+### Sweeping stuck scans
+
+**With a scanner registered, a sweep is required.** A file waiting on a scan
+stays blocked until a result arrives, and nothing else moves it on.
+
+A file gets stuck when:
+
+- your scanner never reports back;
+- your scanner refused the first request: the confirm has already
+  committed, so the refusal is only logged, as
+  `Transaction onCommit Callback Error`;
+- your scanner refused the rescan: `RecordFileScanResultCommand` threw
+  `FileScanRequestException`.
+
+On a schedule, find files in `scanning` or `rescanning` whose `dateUpdated`
+is older than your deadline, with your own query on the entity, and record
+each as uncertain. A first attempt then earns its rescan, and a timed-out
+rescan is rejected:
+
+```ts
+for (const file of stuck) {
+  await this.commandBus.execute(
+    new RecordFileScanResultCommand(ctx, file.id, {
+      attempt: file.status === 'scanning' ? 1 : 2,
+      result: 'uncertain',
+    }),
+  );
+}
+```
+
+Include files still `rejecting`, recording any result for them, to finish
+deleting objects a storage failure left behind. A sweep that races a real
+result for the same file loses with `OptimisticLockException`; skip it.
+
 ## File Lifecycle
 
 | Status | What it means for you |
 | --- | --- |
 | `pending` | Created. Upload to the `upload` target, then confirm. No download URL yet. |
-| `active` | Confirmed and ready to download. The only status that gets a download URL. |
+| `scanning` | Confirmed, and waiting on its [scan](#scanning-uploads). Only with a scanner. No download URL. |
+| `rescanning` | The first scan was uncertain; waiting on the one rescan. No download URL. |
+| `active` | Confirmed and, with a scanner, passed its scan. Ready to download: the only status that gets a download URL. |
+| `rejecting` | Rejected by its scan; its stored object is being deleted. Record the result again to finish if storage failed. No download URL. |
+| `rejected` | Rejected, and its stored object is deleted. The record stays as proof of what was refused. |
 | `removing` | A removal is running, or was interrupted. You can still read the record, without a download URL, until it's gone. Remove it again to finish. |
 | `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
 
 **Soft delete** a `pending` or `active` file to hide it from reads while
 keeping the stored object; **restore** it to bring it back. A soft-deleted
-file can't change, so it keeps its
-status until it's restored or removed.
+file can't change, so it keeps its status until it's restored or removed.
 
 **Remove** a file to delete the stored object and then its record. If storage
 fails, you get `FileRemoveException`; dispatch `RemoveFileCommand` again to
@@ -327,10 +598,12 @@ Commands and queries hand you a `File`:
 | `id`, `version` | The record's id, and the version each write is checked against. |
 | `serviceKey`, `contentType`, `size` | What you created it with; `size` is in bytes. |
 | `fileName` | The name you created it with, sanitized (see [Commands](#commands)). |
-| `status` | `pending`, `active`, `removing` or `remove-failed`. |
+| `status` | One of the [lifecycle](#file-lifecycle) statuses. |
 | `isSoftDeleted` | Whether it's soft-deleted. |
 | `isInUse` | Whether it's `pending` or `active` and not soft-deleted. |
-| `isUploadConfirmed` | Whether the upload is confirmed (`active`). |
+| `isUploadConfirmed` | Whether the upload is confirmed: scanning, rescanning, active, rejecting or rejected. |
+| `isDownloadable` | Whether it gets a download URL: `active` and not soft-deleted. |
+| `scanAttempt` | The scan it waits on: `1` while `scanning`, `2` while `rescanning`, otherwise `undefined`. |
 | `meta` | `dateCreated`, `dateUpdated`, `dateDeleted`. |
 | `toPlain()` | The whole record as a plain object, to return from a controller. |
 
@@ -341,7 +614,8 @@ Change a file only through the commands; they apply the rules and write it.
 | Command | Returns | Does |
 | --- | --- | --- |
 | `CreateFileCommand(ctx, { serviceKey, fileName, contentType, size })` | `FileCreatedResultInterface` | Creates a `pending` file with a sanitized name. Throws `FileNameInvalidException` when sanitizing leaves nothing, and `FileUploadPolicyException` when the [upload policy](#upload-policy) refuses the file. |
-| `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`. Confirming twice returns the file unchanged. |
+| `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`: `active`, or `scanning` with a scanner. Confirming twice returns the file unchanged. |
+| `RecordFileScanResultCommand(ctx, id, { attempt, result })` | `File` | Records a scan verdict (see [Scanning Uploads](#scanning-uploads)). Dispatch it outside any transaction. |
 | `SoftDeleteFileCommand(ctx, id)` | `File` | Hides the file from reads and returns it, soft-deleted. |
 | `RestoreFileCommand(ctx, id)` | `File` | Brings a soft-deleted file back. Restoring a file that isn't soft-deleted returns it unchanged. |
 | `RemoveFileCommand(ctx, id)` | `File` | Deletes the stored object and the file (see [File Lifecycle](#file-lifecycle)). |
@@ -429,10 +703,10 @@ take their permission away. So:
 import { Readable } from 'node:stream';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 
-// In S3StorageService
+// In S3StorageService, reading where getSignedDownloadUrl does
 async openReadStream(file: FileObjectInterface): Promise<Readable> {
   const { Body } = await this.client.send(
-    new GetObjectCommand({ Bucket: this.bucket, Key: file.id }),
+    new GetObjectCommand({ Bucket: this.downloadBucket, Key: file.id }),
   );
   if (!(Body instanceof Readable)) {
     throw new Error(`No readable body for file ${file.id}`);
@@ -482,11 +756,16 @@ any file name safely.
 | `FileRestoredEvent` | a soft-deleted file is restored |
 | `FileRemoveFailedEvent` | a removal is recorded as failed (`remove-failed`) |
 | `FileRemovedEvent` | the row is deleted, after the object |
+| `FileScanPassedEvent` | a scan finds the file clean, and it becomes `active` |
+| `FileScanRetriedEvent` | a first scan is uncertain; the one rescan is requested next |
+| `FileRejectedEvent` | a scan rejects the file; also carries the deciding `scan` (`{ attempt, result }`) |
 
 Each event carries `eventContext` and the plain `file` as stored, and is
 published once the write that produced it commits; a write that rolls back
-publishes nothing. A failed removal is the one command that throws and still
-publishes: `FileRemoveFailedEvent` goes out once `remove-failed` commits.
+publishes nothing. Two commands throw and still publish: a failed removal
+publishes `FileRemoveFailedEvent` once `remove-failed` commits, and a
+rejection whose object storage fails to delete publishes `FileRejectedEvent`
+once `rejecting` commits.
 
 ## Referring to a File
 
@@ -656,6 +935,7 @@ provide your own `FileLifecycleService` subclass through `providers`.
 | --- | --- |
 | `fileSchema` | A stored file: own columns, `status`, id, version and dates. Named OpenAPI component `File`. |
 | `fileCreateSchema` | Create body: non-empty `serviceKey`, `fileName`, `contentType`, and `size` as a non-negative safe integer. |
+| `fileScanOutcomeSchema` | A scanner's report: `attempt` (`1` or `2`) and `result` (`clean`, `infected` or `uncertain`). |
 
 ## Exceptions
 
@@ -665,13 +945,16 @@ provide your own `FileLifecycleService` subclass through `providers`.
 | `FileNameInvalidException` | client | The file name has nothing left once sanitized. |
 | `FileUploadPolicyException` | client | The upload policy refuses the file; `context.rule` names the rule. |
 | `FileNotUploadedException` | client | `exists` says the object isn't uploaded. |
-| `FileStatusException` | client | The status doesn't allow the operation. |
+| `FileStatusException` | client | The status doesn't allow the operation, such as a scan result for a `pending` file. |
 | `FileStorageNotFoundException` | usage | No storage service has the file's `serviceKey`. |
 | `FileRemoveInTransactionException` | usage | `RemoveFileCommand` was dispatched inside a transaction. |
+| `FileScanResultInTransactionException` | usage | `RecordFileScanResultCommand` was dispatched inside a transaction. |
+| `FileScanRequestException` | internal | The scanner refused a rescan request. The file stays `rescanning` until your sweep records it. (A refused first request on confirm is logged, not thrown.) |
+| `FileRejectException` | internal | Storage failed to delete a rejected file's object; the file stays `rejecting`. Record the result again to retry. |
 | `FileUploadTargetException` | internal | Storage failed to produce an upload target. |
 | `FileDownloadUrlException` | internal | Storage failed to produce a download URL. |
 | `FileExistsCheckException` | internal | Storage failed to check whether the object is uploaded. |
-| `FileStorageDeleteException` | internal | Storage failed to delete the object. You see it as the `cause` of `FileRemoveException`. |
+| `FileStorageDeleteException` | internal | Storage failed to delete the object. You see it as the `cause` of `FileRemoveException` or `FileRejectException`. |
 | `FileRemoveException` | internal | Storage failed to delete the object. A live file is `remove-failed`, unless `context.statusError` says that couldn't be recorded either; a soft-deleted file is left as it was. Remove it again to retry. |
 
 All extend `FileException`. For the `internal` ones, the storage error is the
@@ -682,7 +965,7 @@ exception's `cause`; for `FileRemoveException` it is one level down, on the
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-file` | Module, aggregate, commands, queries, handlers, events, `FileStorageService`, `FileLifecycleService`, `FileUploadPolicyService`, repository, schemas, exceptions, domain and config interfaces |
+| `@concepta/nestjs-file` | Module, aggregate, commands, queries, handlers, events, `FileStorageService`, `FileLifecycleService`, `FileUploadPolicy`, `FileScanService`, repository, schemas, exceptions, domain and config interfaces |
 | `@concepta/nestjs-file/optional/typeorm` | `FileSqliteEntity`, `FilePostgresEntity` |
 | `@concepta/nestjs-file/optional/seeding` | `FileFactory` |
 

@@ -7,17 +7,34 @@ import {
 import { MutableAggregate } from '@concepta/nestjs-core/aggregate';
 
 import { FileCreatedEvent } from '../events/file-created.event.js';
+import { FileRejectedEvent } from '../events/file-rejected.event.js';
 import { FileRemoveFailedEvent } from '../events/file-remove-failed.event.js';
 import { FileRemovedEvent } from '../events/file-removed.event.js';
 import { FileRestoredEvent } from '../events/file-restored.event.js';
+import { FileScanPassedEvent } from '../events/file-scan-passed.event.js';
+import { FileScanRetriedEvent } from '../events/file-scan-retried.event.js';
 import { FileSoftDeletedEvent } from '../events/file-soft-deleted.event.js';
 import { FileUploadConfirmedEvent } from '../events/file-upload-confirmed.event.js';
 import { FileNameInvalidException } from '../exceptions/file-name-invalid.exception.js';
 import { FileStatusException } from '../exceptions/file-status.exception.js';
 import { type FileCreatableInterface } from '../interfaces/file-creatable.interface.js';
+import { type FileScanAttempt } from '../interfaces/file-scan-attempt.type.js';
+import { type FileScanOutcomeInterface } from '../interfaces/file-scan-outcome.interface.js';
+import { type FileScanResult } from '../interfaces/file-scan-result.type.js';
 import { type FileStatus } from '../interfaces/file-status.type.js';
 import { type FileInterface } from '../interfaces/file.interface.js';
 import { sanitizeFileName } from '../utils/sanitize-file-name.js';
+
+/**
+ * The statuses of a file whose upload is confirmed.
+ */
+const CONFIRMED_STATUSES: FileStatus[] = [
+  'scanning',
+  'rescanning',
+  'active',
+  'rejecting',
+  'rejected',
+];
 
 /**
  * A file record. The stored object lives in the storage service named by
@@ -52,8 +69,8 @@ export class File extends MutableAggregate<FileInterface> {
   }
 
   /**
-   * Whether the file is live and `pending` or `active`: not soft-deleted,
-   * and no removal has started.
+   * Whether the file is `pending` or `active` and not soft-deleted: the
+   * statuses a soft delete leaves alone and a restore brings back.
    */
   get isInUse(): boolean {
     return (
@@ -70,10 +87,27 @@ export class File extends MutableAggregate<FileInterface> {
   }
 
   /**
-   * Whether the upload is confirmed: confirming again changes nothing.
+   * Whether the upload is confirmed: it is being scanned, passed, or was
+   * rejected. Confirming again changes nothing.
    */
   get isUploadConfirmed(): boolean {
-    return this.status === 'active';
+    return CONFIRMED_STATUSES.includes(this.status);
+  }
+
+  /**
+   * The scan the file is waiting on: 1 while `scanning`, 2 while
+   * `rescanning`, otherwise none.
+   */
+  get scanAttempt(): FileScanAttempt | undefined {
+    if (this.status === 'scanning') {
+      return 1;
+    }
+
+    if (this.status === 'rescanning') {
+      return 2;
+    }
+
+    return undefined;
   }
 
   static create(
@@ -120,11 +154,12 @@ export class File extends MutableAggregate<FileInterface> {
   }
 
   /**
-   * Moves a pending file to active.
+   * Moves a pending file to `scanning` when a scanner will check it, or
+   * straight to `active` when none is registered.
    */
-  confirmUpload(): void {
+  confirmUpload(options: { scan: boolean }): void {
     this.assertConfirmable();
-    this.changeStatus('active');
+    this.changeStatus(options.scan ? 'scanning' : 'active');
   }
 
   /**
@@ -132,8 +167,74 @@ export class File extends MutableAggregate<FileInterface> {
    * the confirm, so the event carries the new version.
    */
   uploadConfirmed(eventContext: EventContextHost): void {
-    this.assertStatus('announce the confirmed upload of', ['active']);
+    this.assertStatus('announce the confirmed upload of', [
+      'scanning',
+      'active',
+    ]);
     this.apply(new FileUploadConfirmedEvent(eventContext, this.toPlain()));
+  }
+
+  /**
+   * Refuses a `pending` file: a scan result can't arrive before the upload
+   * is confirmed.
+   */
+  assertScanRequested(): void {
+    if (this.status === 'pending') {
+      throw new FileStatusException({
+        id: this.id,
+        status: this.status,
+        action: 'record a scan of',
+      });
+    }
+  }
+
+  /**
+   * Records a scan of a `scanning` or `rescanning` file. Clean makes it
+   * `active`; infected makes it `rejecting`; uncertain makes a first scan
+   * `rescanning` and a rescan `rejecting`.
+   */
+  recordScan(result: FileScanResult): void {
+    this.assertStatus('record a scan of', ['scanning', 'rescanning']);
+
+    if (result === 'clean') {
+      this.changeStatus('active');
+    } else if (result === 'uncertain' && this.status === 'scanning') {
+      this.changeStatus('rescanning');
+    } else {
+      this.changeStatus('rejecting');
+    }
+  }
+
+  /**
+   * Applies the event for the scan just recorded: `FileScanPassedEvent`,
+   * `FileScanRetriedEvent` or `FileRejectedEvent`. Call it on the file as
+   * stored after the scan is written.
+   */
+  scanRecorded(
+    eventContext: EventContextHost,
+    scan: FileScanOutcomeInterface,
+  ): void {
+    this.assertStatus('announce the scan of', [
+      'active',
+      'rescanning',
+      'rejecting',
+    ]);
+
+    if (this.status === 'active') {
+      this.apply(new FileScanPassedEvent(eventContext, this.toPlain()));
+    } else if (this.status === 'rescanning') {
+      this.apply(new FileScanRetriedEvent(eventContext, this.toPlain()));
+    } else {
+      this.apply(new FileRejectedEvent(eventContext, this.toPlain(), scan));
+    }
+  }
+
+  /**
+   * Records that a rejected file's stored object is deleted.
+   */
+  markRejected(): void {
+    this.assertStatus('finish rejecting', ['rejecting']);
+    this.changeStatus('rejected');
   }
 
   /**

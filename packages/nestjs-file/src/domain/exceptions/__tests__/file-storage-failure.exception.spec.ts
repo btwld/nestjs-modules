@@ -7,7 +7,7 @@ import { FileException } from '../file.exception.js';
 const originalError = new Error('s3 down');
 const options = { serviceKey: 's3', originalError };
 
-// The four exceptions that wrap a storage service failure share one shape.
+// The exceptions that wrap a storage service failure share one shape.
 describe.each([
   {
     name: FileUploadTargetException.name,

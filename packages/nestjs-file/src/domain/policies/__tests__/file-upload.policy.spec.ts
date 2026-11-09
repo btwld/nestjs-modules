@@ -1,7 +1,7 @@
 import { FileUploadPolicyException } from '../../exceptions/file-upload-policy.exception.js';
-import { FileUploadPolicyService } from '../file-upload-policy.service.js';
+import { FileUploadPolicy } from '../file-upload.policy.js';
 
-describe(FileUploadPolicyService.name, () => {
+describe(FileUploadPolicy.name, () => {
   const file = {
     fileName: 'insurance.pdf',
     contentType: 'application/pdf',
@@ -9,7 +9,7 @@ describe(FileUploadPolicyService.name, () => {
   };
 
   function ruleRefused(
-    service: FileUploadPolicyService,
+    service: FileUploadPolicy,
     candidate: typeof file,
   ): unknown {
     try {
@@ -23,7 +23,7 @@ describe(FileUploadPolicyService.name, () => {
   }
 
   it('allows every file without a policy', () => {
-    const service = new FileUploadPolicyService();
+    const service = new FileUploadPolicy();
 
     expect(
       ruleRefused(service, {
@@ -35,7 +35,7 @@ describe(FileUploadPolicyService.name, () => {
   });
 
   describe('contentTypes', () => {
-    const service = new FileUploadPolicyService({
+    const service = new FileUploadPolicy({
       contentTypes: ['Application/PDF', 'image/png'],
     });
 
@@ -62,7 +62,7 @@ describe(FileUploadPolicyService.name, () => {
   });
 
   describe('extensions', () => {
-    const service = new FileUploadPolicyService({ extensions: ['PDF', 'gz'] });
+    const service = new FileUploadPolicy({ extensions: ['PDF', 'gz'] });
 
     it.each(['a.pdf', 'a.PDF', 'archive.tar.gz'])('allows %s', (fileName) => {
       expect(ruleRefused(service, { ...file, fileName })).toBeUndefined();
@@ -79,7 +79,7 @@ describe(FileUploadPolicyService.name, () => {
   });
 
   describe('maxSize', () => {
-    const service = new FileUploadPolicyService({ maxSize: 1024 });
+    const service = new FileUploadPolicy({ maxSize: 1024 });
 
     it('allows the maximum', () => {
       expect(ruleRefused(service, { ...file, size: 1024 })).toBeUndefined();
@@ -90,20 +90,20 @@ describe(FileUploadPolicyService.name, () => {
     });
 
     it('applies a maximum of zero', () => {
-      const empty = new FileUploadPolicyService({ maxSize: 0 });
+      const empty = new FileUploadPolicy({ maxSize: 0 });
 
       expect(ruleRefused(empty, { ...file, size: 1 })).toEqual('size');
     });
   });
 
   it('refuses everything when a list is empty', () => {
-    const service = new FileUploadPolicyService({ contentTypes: [] });
+    const service = new FileUploadPolicy({ contentTypes: [] });
 
     expect(ruleRefused(service, file)).toEqual('contentType');
   });
 
   it('names the first rule broken: content type, then extension, then size', () => {
-    const service = new FileUploadPolicyService({
+    const service = new FileUploadPolicy({
       contentTypes: ['image/png'],
       extensions: ['png'],
       maxSize: 1,

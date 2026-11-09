@@ -6,7 +6,13 @@ import {
   FileOptions,
 } from './file.module-definition.js';
 
-type FileRegistrationOptions = Omit<FileOptions, 'global'>;
+// Distributes over the scanned and unscanned option shapes, so `Omit` keeps
+// them apart.
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
+
+type FileRegistrationOptions = DistributiveOmit<FileOptions, 'global'>;
 type FileAsyncRegistrationOptions = Omit<FileAsyncOptions, 'global'>;
 
 @Module({})

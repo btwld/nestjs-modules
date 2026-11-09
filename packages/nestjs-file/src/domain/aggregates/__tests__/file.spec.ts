@@ -2,13 +2,19 @@ import { createTestEventContext } from '@concepta/nestjs-core/testing';
 
 import { createMockFile } from '../../../__tests__/helpers/mock.helpers.js';
 import { FileCreatedEvent } from '../../events/file-created.event.js';
+import { FileRejectedEvent } from '../../events/file-rejected.event.js';
 import { FileRemoveFailedEvent } from '../../events/file-remove-failed.event.js';
 import { FileRemovedEvent } from '../../events/file-removed.event.js';
 import { FileRestoredEvent } from '../../events/file-restored.event.js';
+import { FileScanPassedEvent } from '../../events/file-scan-passed.event.js';
+import { FileScanRetriedEvent } from '../../events/file-scan-retried.event.js';
 import { FileSoftDeletedEvent } from '../../events/file-soft-deleted.event.js';
 import { FileUploadConfirmedEvent } from '../../events/file-upload-confirmed.event.js';
 import { FileNameInvalidException } from '../../exceptions/file-name-invalid.exception.js';
 import { FileStatusException } from '../../exceptions/file-status.exception.js';
+import { type FileScanAttempt } from '../../interfaces/file-scan-attempt.type.js';
+import { type FileScanOutcomeInterface } from '../../interfaces/file-scan-outcome.interface.js';
+import { type FileScanResult } from '../../interfaces/file-scan-result.type.js';
 import { type FileStatus } from '../../interfaces/file-status.type.js';
 import { File } from '../file.js';
 
@@ -55,42 +61,191 @@ describe(File.name, () => {
   });
 
   describe('confirmUpload', () => {
-    it('moves pending to active without an event', () => {
+    it('moves pending to active without an event when nothing scans it', () => {
       const file = createMockFile({ status: 'pending' });
 
-      file.confirmUpload();
+      file.confirmUpload({ scan: false });
 
       expect(file.status).toEqual('active');
       expect(file.getUncommittedEvents()).toEqual([]);
     });
 
-    it.each<FileStatus>(['active', 'removing', 'remove-failed'])(
-      'refuses %s',
-      (status) => {
-        const file = createMockFile({ status });
+    it('moves pending to scanning when a scanner checks it', () => {
+      const file = createMockFile({ status: 'pending' });
 
-        expect(() => file.confirmUpload()).toThrow(FileStatusException);
-        expect(file.status).toEqual(status);
-      },
-    );
+      file.confirmUpload({ scan: true });
+
+      expect(file.status).toEqual('scanning');
+      expect(file.scanAttempt).toEqual(1);
+    });
+
+    it.each<FileStatus>([
+      'scanning',
+      'rescanning',
+      'active',
+      'rejecting',
+      'rejected',
+      'removing',
+      'remove-failed',
+    ])('refuses %s', (status) => {
+      const file = createMockFile({ status });
+
+      expect(() => file.confirmUpload({ scan: true })).toThrow(
+        FileStatusException,
+      );
+      expect(file.status).toEqual(status);
+    });
   });
 
   describe('uploadConfirmed', () => {
-    it('applies FileUploadConfirmedEvent to an active file', () => {
-      const file = createMockFile({ status: 'active', version: 2 });
+    it.each<FileStatus>(['scanning', 'active'])(
+      'applies FileUploadConfirmedEvent to a %s file',
+      (status) => {
+        const file = createMockFile({ status, version: 2 });
 
-      file.uploadConfirmed(eventContext);
+        file.uploadConfirmed(eventContext);
 
-      expect(file.getUncommittedEvents()).toEqual([
-        new FileUploadConfirmedEvent(eventContext, file.toPlain()),
-      ]);
-    });
+        expect(file.getUncommittedEvents()).toEqual([
+          new FileUploadConfirmedEvent(eventContext, file.toPlain()),
+        ]);
+      },
+    );
 
-    it('refuses a file that is not active', () => {
+    it('refuses a file that is not confirmed', () => {
       expect(() =>
         createMockFile({ status: 'pending' }).uploadConfirmed(eventContext),
       ).toThrow(FileStatusException);
     });
+  });
+
+  describe('recordScan', () => {
+    it.each<[FileStatus, FileScanResult, FileStatus]>([
+      ['scanning', 'clean', 'active'],
+      ['scanning', 'uncertain', 'rescanning'],
+      ['scanning', 'infected', 'rejecting'],
+      ['rescanning', 'clean', 'active'],
+      ['rescanning', 'uncertain', 'rejecting'],
+      ['rescanning', 'infected', 'rejecting'],
+    ])('moves %s with a %s result to %s', (from, result, to) => {
+      const file = createMockFile({ status: from });
+
+      file.recordScan(result);
+
+      expect(file.status).toEqual(to);
+      expect(file.getUncommittedEvents()).toEqual([]);
+    });
+
+    it.each<FileStatus>([
+      'pending',
+      'active',
+      'rejecting',
+      'rejected',
+      'removing',
+      'remove-failed',
+    ])('refuses %s', (status) => {
+      const file = createMockFile({ status });
+
+      expect(() => file.recordScan('clean')).toThrow(FileStatusException);
+      expect(file.status).toEqual(status);
+    });
+  });
+
+  describe('assertScanRequested', () => {
+    it('refuses a pending file', () => {
+      expect(() =>
+        createMockFile({ status: 'pending' }).assertScanRequested(),
+      ).toThrow(FileStatusException);
+    });
+
+    it.each<FileStatus>([
+      'scanning',
+      'rescanning',
+      'active',
+      'rejecting',
+      'rejected',
+      'removing',
+      'remove-failed',
+    ])('allows %s', (status) => {
+      expect(() =>
+        createMockFile({ status }).assertScanRequested(),
+      ).not.toThrow();
+    });
+  });
+
+  describe('scanRecorded', () => {
+    const scan: FileScanOutcomeInterface = {
+      attempt: 2,
+      result: 'uncertain',
+    };
+
+    it('applies FileScanPassedEvent to an active file', () => {
+      const file = createMockFile({ status: 'active', version: 3 });
+
+      file.scanRecorded(eventContext, { attempt: 1, result: 'clean' });
+
+      expect(file.getUncommittedEvents()).toEqual([
+        new FileScanPassedEvent(eventContext, file.toPlain()),
+      ]);
+    });
+
+    it('applies FileScanRetriedEvent to a rescanning file', () => {
+      const file = createMockFile({ status: 'rescanning', version: 3 });
+
+      file.scanRecorded(eventContext, { attempt: 1, result: 'uncertain' });
+
+      expect(file.getUncommittedEvents()).toEqual([
+        new FileScanRetriedEvent(eventContext, file.toPlain()),
+      ]);
+    });
+
+    it('applies FileRejectedEvent, with the deciding scan, to a rejecting file', () => {
+      const file = createMockFile({ status: 'rejecting', version: 3 });
+
+      file.scanRecorded(eventContext, scan);
+
+      expect(file.getUncommittedEvents()).toEqual([
+        new FileRejectedEvent(eventContext, file.toPlain(), scan),
+      ]);
+    });
+
+    it.each<FileStatus>(['pending', 'scanning', 'rejected', 'removing'])(
+      'refuses %s',
+      (status) => {
+        expect(() =>
+          createMockFile({ status }).scanRecorded(eventContext, scan),
+        ).toThrow(FileStatusException);
+      },
+    );
+  });
+
+  describe('markRejected', () => {
+    it('moves rejecting to rejected', () => {
+      const file = createMockFile({ status: 'rejecting' });
+
+      file.markRejected();
+
+      expect(file.status).toEqual('rejected');
+    });
+
+    it.each<FileStatus>(['scanning', 'rescanning', 'active', 'rejected'])(
+      'refuses %s',
+      (status) => {
+        expect(() => createMockFile({ status }).markRejected()).toThrow(
+          FileStatusException,
+        );
+      },
+    );
+  });
+
+  it.each<[FileStatus, FileScanAttempt | undefined]>([
+    ['pending', undefined],
+    ['scanning', 1],
+    ['rescanning', 2],
+    ['active', undefined],
+    ['rejecting', undefined],
+    ['rejected', undefined],
+  ])('scanAttempt is %s → %s', (status, expected) => {
+    expect(createMockFile({ status }).scanAttempt).toEqual(expected);
   });
 
   describe('markRemoving', () => {
@@ -153,7 +308,11 @@ describe(File.name, () => {
 
   it.each<[FileStatus, boolean]>([
     ['pending', false],
+    ['scanning', true],
+    ['rescanning', true],
     ['active', true],
+    ['rejecting', true],
+    ['rejected', true],
     ['removing', false],
     ['remove-failed', false],
   ])('isUploadConfirmed is %s → %s', (status, expected) => {
@@ -163,7 +322,11 @@ describe(File.name, () => {
   describe('isDownloadable', () => {
     it.each<[FileStatus, boolean]>([
       ['pending', false],
+      ['scanning', false],
+      ['rescanning', false],
       ['active', true],
+      ['rejecting', false],
+      ['rejected', false],
       ['removing', false],
       ['remove-failed', false],
     ])('is %s → %s', (status, expected) => {
@@ -226,14 +389,21 @@ describe(File.name, () => {
       ]);
     });
 
-    it.each<FileStatus>(['removing', 'remove-failed'])(
-      'refuses %s',
-      (status) => {
-        expect(() =>
-          createMockFile({ status }).softDeleted(eventContext),
-        ).toThrow(FileStatusException);
-      },
-    );
+    it.each<FileStatus>([
+      'scanning',
+      'rescanning',
+      'rejecting',
+      'rejected',
+      'removing',
+      'remove-failed',
+    ])('refuses %s', (status) => {
+      expect(() =>
+        createMockFile({ status }).softDeleted(eventContext),
+      ).toThrow(FileStatusException);
+      expect(() => createMockFile({ status }).assertSoftDeletable()).toThrow(
+        FileStatusException,
+      );
+    });
   });
 
   it('restored applies FileRestoredEvent', () => {
@@ -269,7 +439,7 @@ describe(File.name, () => {
     const file = createMockFile({ status: 'pending', version: 3 });
     const meta = file.meta;
 
-    file.confirmUpload();
+    file.confirmUpload({ scan: false });
 
     expect(file.meta).toEqual(meta);
   });

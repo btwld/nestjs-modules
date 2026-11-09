@@ -16,6 +16,15 @@ import {
   FileNotFoundException,
   FileNotUploadedException,
   FileRemovedEvent,
+  FileRejectedEvent,
+  FileRejectException,
+  FileScanPassedEvent,
+  FileScanRequestException,
+  FileScanResultInTransactionException,
+  FileScanRetriedEvent,
+  FileScanService,
+  RecordFileScanResultCommand,
+  RecordFileScanResultHandler,
   FileRemoveException,
   FileRemoveFailedEvent,
   FileStorageDeleteException,
@@ -29,7 +38,7 @@ import {
   FileStorageService,
   FileUploadConfirmedEvent,
   FileUploadPolicyException,
-  FileUploadPolicyService,
+  FileUploadPolicy,
   FileUploadTargetException,
   GetFileDownloadHandler,
   GetFileDownloadQuery,
@@ -56,7 +65,8 @@ describe('index', () => {
   it('should export domain services', () => {
     expect(FileStorageService).toBeInstanceOf(Function);
     expect(FileLifecycleService).toBeInstanceOf(Function);
-    expect(FileUploadPolicyService).toBeInstanceOf(Function);
+    expect(FileUploadPolicy).toBeInstanceOf(Function);
+    expect(FileScanService).toBeInstanceOf(Function);
   });
 
   it('should export schemas', () => {
@@ -67,7 +77,11 @@ describe('index', () => {
   it('should export the statuses', () => {
     expect(FILE_STATUSES).toEqual([
       'pending',
+      'scanning',
+      'rescanning',
       'active',
+      'rejecting',
+      'rejected',
       'removing',
       'remove-failed',
     ]);
@@ -79,6 +93,7 @@ describe('index', () => {
     expect(SoftDeleteFileCommand).toBeInstanceOf(Function);
     expect(RestoreFileCommand).toBeInstanceOf(Function);
     expect(RemoveFileCommand).toBeInstanceOf(Function);
+    expect(RecordFileScanResultCommand).toBeInstanceOf(Function);
   });
 
   it('should export queries', () => {
@@ -92,6 +107,7 @@ describe('index', () => {
     expect(SoftDeleteFileHandler).toBeInstanceOf(Function);
     expect(RestoreFileHandler).toBeInstanceOf(Function);
     expect(RemoveFileHandler).toBeInstanceOf(Function);
+    expect(RecordFileScanResultHandler).toBeInstanceOf(Function);
     expect(GetFileHandler).toBeInstanceOf(Function);
     expect(GetFileDownloadHandler).toBeInstanceOf(Function);
   });
@@ -103,6 +119,9 @@ describe('index', () => {
     expect(FileRestoredEvent).toBeInstanceOf(Function);
     expect(FileRemoveFailedEvent).toBeInstanceOf(Function);
     expect(FileRemovedEvent).toBeInstanceOf(Function);
+    expect(FileScanPassedEvent).toBeInstanceOf(Function);
+    expect(FileScanRetriedEvent).toBeInstanceOf(Function);
+    expect(FileRejectedEvent).toBeInstanceOf(Function);
   });
 
   it('should export exceptions', () => {
@@ -119,5 +138,8 @@ describe('index', () => {
     expect(FileNotFoundException).toBeInstanceOf(Function);
     expect(FileRemoveException).toBeInstanceOf(Function);
     expect(FileRemoveInTransactionException).toBeInstanceOf(Function);
+    expect(FileScanRequestException).toBeInstanceOf(Function);
+    expect(FileRejectException).toBeInstanceOf(Function);
+    expect(FileScanResultInTransactionException).toBeInstanceOf(Function);
   });
 });

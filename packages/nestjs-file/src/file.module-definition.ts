@@ -11,14 +11,16 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
 
 import { ConfirmFileUploadHandler } from './application/commands/handlers/confirm-file-upload.handler.js';
 import { CreateFileHandler } from './application/commands/handlers/create-file.handler.js';
+import { RecordFileScanResultHandler } from './application/commands/handlers/record-file-scan-result.handler.js';
 import { RemoveFileHandler } from './application/commands/handlers/remove-file.handler.js';
 import { RestoreFileHandler } from './application/commands/handlers/restore-file.handler.js';
 import { SoftDeleteFileHandler } from './application/commands/handlers/soft-delete-file.handler.js';
 import { GetFileDownloadHandler } from './application/queries/handlers/get-file-download.handler.js';
 import { GetFileHandler } from './application/queries/handlers/get-file.handler.js';
+import { FileUploadPolicy } from './domain/policies/file-upload.policy.js';
 import { FileLifecycleService } from './domain/services/file-lifecycle.service.js';
+import { FileScanService } from './domain/services/file-scan.service.js';
 import { FileStorageService } from './domain/services/file-storage.service.js';
-import { FileUploadPolicyService } from './domain/services/file-upload-policy.service.js';
 import { FILE_MODULE_SETTINGS_TOKEN } from './file.constants.js';
 import { fileDefaultConfig } from './infrastructure/config/file-default.config.js';
 import { type FileExtrasInterface } from './infrastructure/config/interfaces/file-extras.interface.js';
@@ -90,7 +92,8 @@ export function createFileProviders(options: {
   return [
     createFileSettingsProvider(),
     createFileStorageServiceProvider(),
-    createFileUploadPolicyServiceProvider(),
+    createFileUploadPolicyProvider(),
+    createFileScanServiceProvider(),
     FileLifecycleService,
     FileMapper,
     createFileRepositoryProvider(
@@ -102,6 +105,7 @@ export function createFileProviders(options: {
     SoftDeleteFileHandler,
     RestoreFileHandler,
     RemoveFileHandler,
+    RecordFileScanResultHandler,
     GetFileHandler,
     GetFileDownloadHandler,
     // Consumer overrides (last provider for a token wins)
@@ -124,12 +128,21 @@ function createFileStorageServiceProvider(): Provider {
   };
 }
 
-function createFileUploadPolicyServiceProvider(): Provider {
+function createFileUploadPolicyProvider(): Provider {
   return {
-    provide: FileUploadPolicyService,
+    provide: FileUploadPolicy,
     inject: [RAW_OPTIONS_TOKEN],
     useFactory: (options: FileOptionsInterface) =>
-      new FileUploadPolicyService(options.uploadPolicy),
+      new FileUploadPolicy(options.uploadPolicy),
+  };
+}
+
+function createFileScanServiceProvider(): Provider {
+  return {
+    provide: FileScanService,
+    inject: [RAW_OPTIONS_TOKEN],
+    useFactory: (options: FileOptionsInterface) =>
+      new FileScanService(options.scanner),
   };
 }
 

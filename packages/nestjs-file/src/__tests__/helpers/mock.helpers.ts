@@ -8,6 +8,9 @@ import { createMockTransaction } from '@concepta/nestjs-repository/testing';
 
 import { type File } from '../../domain/aggregates/file.js';
 import { type FileObjectInterface } from '../../domain/interfaces/file-object.interface.js';
+import { type FileScanRequestInterface } from '../../domain/interfaces/file-scan-request.interface.js';
+import { type FileScanServiceInterface } from '../../domain/interfaces/file-scan-service.interface.js';
+import { type FileScannedStorageServiceInterface } from '../../domain/interfaces/file-scanned-storage-service.interface.js';
 import { type FileStorageServiceInterface } from '../../domain/interfaces/file-storage-service.interface.js';
 import { type FileUploadTargetInterface } from '../../domain/interfaces/file-upload-target.interface.js';
 import { type FileRepositoryInterface } from '../../domain/repositories/file-repository.interface.js';
@@ -51,6 +54,37 @@ export class FakeStorageService implements FileStorageServiceInterface {
 
   delete?: Mock<
     (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<void>
+  > = vi.fn(async () => {});
+}
+
+/**
+ * A fake storage service with `delete` always there, as a module with a
+ * scanner requires.
+ */
+export class FakeScannedStorageService
+  extends FakeStorageService
+  implements FileScannedStorageServiceInterface
+{
+  declare delete: Mock<
+    (ctx: PlainLiteralObject, file: FileObjectInterface) => Promise<void>
+  >;
+
+  constructor() {
+    super();
+    this.delete = vi.fn(async () => {});
+  }
+}
+
+/**
+ * A scanner that records each request and returns; the test reports the
+ * result.
+ */
+export class FakeScanner implements FileScanServiceInterface {
+  requestScan: Mock<
+    (
+      ctx: PlainLiteralObject,
+      request: FileScanRequestInterface,
+    ) => Promise<void>
   > = vi.fn(async () => {});
 }
 

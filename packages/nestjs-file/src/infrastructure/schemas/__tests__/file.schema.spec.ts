@@ -1,3 +1,4 @@
+import { FILE_STATUSES } from '../../../domain/interfaces/file-status.type.js';
 import { fileCreateSchema } from '../file-create.schema.js';
 import { fileSchema } from '../file.schema.js';
 
@@ -20,7 +21,7 @@ describe('fileSchema', () => {
   });
 
   it('accepts every status', () => {
-    for (const status of ['pending', 'active', 'removing', 'remove-failed']) {
+    for (const status of FILE_STATUSES) {
       expect(fileSchema.parse({ ...validFile, status }).status).toEqual(status);
     }
   });

@@ -1,23 +1,49 @@
-import { Injectable } from '@nestjs/common';
-
 import { FileUploadPolicyException } from '../exceptions/file-upload-policy.exception.js';
-import { type FileUploadPolicyInterface } from '../interfaces/file-upload-policy.interface.js';
 import { type FileInterface } from '../interfaces/file.interface.js';
 
 /**
- * Checks a new file against the module's `uploadPolicy`. Without a policy,
- * every file is allowed.
+ * What a file may be. Each rule left out allows everything.
  */
-@Injectable()
-export class FileUploadPolicyService {
+export interface FileUploadPolicySettings {
+  /**
+   * MIME types allowed, such as `application/pdf`. Compared without regard
+   * to case.
+   */
+  contentTypes?: string[];
+
+  /**
+   * Extensions allowed, without the dot, such as `pdf`. Matched against the
+   * sanitized name's last extension, without regard to case; a name without
+   * one is refused.
+   */
+  extensions?: string[];
+
+  /**
+   * Largest size allowed, in bytes.
+   */
+  maxSize?: number;
+
+  /**
+   * Whether every upload must pass a malware scan before it is served. When
+   * `true`, the module's options require a `scanner`. A registered scanner
+   * scans every upload either way.
+   */
+  requireScan?: boolean;
+}
+
+/**
+ * The rules a new file must meet, checked at create before anything is
+ * written or an upload target issued.
+ */
+export class FileUploadPolicy {
   private readonly contentTypes?: Set<string>;
   private readonly extensions?: Set<string>;
   private readonly maxSize?: number;
 
-  constructor(policy: FileUploadPolicyInterface = {}) {
-    this.contentTypes = lowerCaseSet(policy.contentTypes);
-    this.extensions = lowerCaseSet(policy.extensions);
-    this.maxSize = policy.maxSize;
+  constructor(settings: FileUploadPolicySettings = {}) {
+    this.contentTypes = lowerCaseSet(settings.contentTypes);
+    this.extensions = lowerCaseSet(settings.extensions);
+    this.maxSize = settings.maxSize;
   }
 
   /**

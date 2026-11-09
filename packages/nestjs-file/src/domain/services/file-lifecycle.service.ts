@@ -6,18 +6,33 @@ import { FILE_REPOSITORY_TOKEN } from '../../file.constants.js';
 import { File } from '../aggregates/file.js';
 import { FileNotUploadedException } from '../exceptions/file-not-uploaded.exception.js';
 import { type FileCreatableInterface } from '../interfaces/file-creatable.interface.js';
+import { type FileLifecycleStepInterface } from '../interfaces/file-lifecycle-step.interface.js';
+import { type FileScanOutcomeInterface } from '../interfaces/file-scan-outcome.interface.js';
+import { FileUploadPolicy } from '../policies/file-upload.policy.js';
 import { FileRepositoryInterface } from '../repositories/file-repository.interface.js';
 
+import { FileScanService } from './file-scan.service.js';
 import { FileStorageService } from './file-storage.service.js';
-import { FileUploadPolicyService } from './file-upload-policy.service.js';
 
 /**
- * The rules for creating, confirming, soft-deleting, restoring and removing
- * a file. Every database method runs inside the caller's transaction and
- * never opens one, every write is guarded on the version the file was read
- * at, and every file returned is as stored, with its event applied for the
- * caller to commit; the event context comes from `ctx`. A method that finds
- * no file returns `null`.
+ * The file as stored, with the scan request its status calls for: one is
+ * due when a step leaves the file waiting on a scan.
+ */
+function toStep(file: File): FileLifecycleStepInterface {
+  const attempt = file.scanAttempt;
+
+  return attempt
+    ? { file, scanRequest: { file: file.toPlain(), attempt } }
+    : { file };
+}
+
+/**
+ * The rules for creating, confirming, scanning, soft-deleting, restoring and
+ * removing a file. Every database method runs inside the caller's
+ * transaction and never opens one, every write is guarded on the version
+ * the file was read at, and every file returned is as stored, with its
+ * event applied for the caller to commit; the event context comes from
+ * `ctx`. A method that finds no file returns `null`.
  * `deleteStoredObject` touches only storage, and is called outside any
  * transaction.
  */
@@ -27,7 +42,9 @@ export class FileLifecycleService {
     @Inject(FILE_REPOSITORY_TOKEN)
     private readonly fileRepository: FileRepositoryInterface,
     private readonly fileStorage: FileStorageService,
-    private readonly uploadPolicy: FileUploadPolicyService,
+    private readonly uploadPolicy: FileUploadPolicy,
+    // Without a scanner, a confirmed upload is active at once.
+    private readonly fileScan: FileScanService = new FileScanService(),
   ) {}
 
   /**
@@ -53,17 +70,23 @@ export class FileLifecycleService {
 
   /**
    * Confirms a pending file's upload, after asking storage if it implements
-   * `exists`. Returns an active file unchanged. Refuses a file that is being
-   * removed before storage is asked.
+   * `exists`. With a scanner, the file becomes `scanning` and the step
+   * carries the first scan request; without one, it becomes `active`.
+   * Returns a file whose upload is already confirmed unchanged, with no scan
+   * request. Refuses a file that is being removed before storage is asked.
    */
   async confirmUpload(
     ctx: PlainLiteralObject,
     id: ReferenceId,
-  ): Promise<File | null> {
+  ): Promise<FileLifecycleStepInterface | null> {
     const existing = await this.fileRepository.get(ctx, id);
 
-    if (!existing || existing.isUploadConfirmed) {
-      return existing;
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.isUploadConfirmed) {
+      return { file: existing };
     }
 
     existing.assertConfirmable();
@@ -73,13 +96,61 @@ export class FileLifecycleService {
       throw new FileNotUploadedException(id);
     }
 
-    existing.confirmUpload();
+    existing.confirmUpload({ scan: this.fileScan.isEnabled });
 
     const stored = await this.fileRepository.updateStatus(ctx, existing);
 
     stored.uploadConfirmed(createEventContext(ctx, {}, {}));
 
-    return stored;
+    return toStep(stored);
+  }
+
+  /**
+   * Records a scan result for a `scanning` or `rescanning` file. A first
+   * uncertain result carries the rescan request; an infected result, or a
+   * second uncertain one, leaves the file `rejecting` with
+   * `FileRejectedEvent` applied, for `deleteStoredObject` and
+   * `finishRejection`. A result for another attempt than the one the file
+   * waits on, or for a file no longer waiting, is returned unchanged.
+   * Refuses a result for a `pending` file: no scan was requested.
+   */
+  async recordScanResult(
+    ctx: PlainLiteralObject,
+    id: ReferenceId,
+    scan: FileScanOutcomeInterface,
+  ): Promise<FileLifecycleStepInterface | null> {
+    const existing = await this.fileRepository.get(ctx, id);
+
+    if (!existing) {
+      return null;
+    }
+
+    existing.assertScanRequested();
+
+    if (existing.scanAttempt !== scan.attempt) {
+      return { file: existing };
+    }
+
+    existing.recordScan(scan.result);
+
+    const stored = await this.fileRepository.updateStatus(ctx, existing);
+
+    stored.scanRecorded(createEventContext(ctx, {}, {}), scan);
+
+    return toStep(stored);
+  }
+
+  /**
+   * Finishes a rejection once its object is deleted: writes `rejected` and
+   * returns the file as stored.
+   */
+  async finishRejection(
+    ctx: PlainLiteralObject,
+    rejecting: File,
+  ): Promise<File> {
+    rejecting.markRejected();
+
+    return this.fileRepository.updateStatus(ctx, rejecting);
   }
 
   /**
@@ -159,15 +230,13 @@ export class FileLifecycleService {
   }
 
   /**
-   * Deletes the stored object. Call it outside any transaction, between
-   * `beginRemoval` and `finishRemoval` or `failRemoval`. A storage failure
-   * throws `FileStorageDeleteException`.
+   * Deletes the stored object. Call it outside any transaction: between
+   * `beginRemoval` and `finishRemoval` or `failRemoval`, or between a
+   * rejection and `finishRejection`. A storage failure throws
+   * `FileStorageDeleteException`.
    */
-  async deleteStoredObject(
-    ctx: PlainLiteralObject,
-    removing: File,
-  ): Promise<void> {
-    await this.fileStorage.delete(ctx, removing);
+  async deleteStoredObject(ctx: PlainLiteralObject, file: File): Promise<void> {
+    await this.fileStorage.delete(ctx, file);
   }
 
   /**
