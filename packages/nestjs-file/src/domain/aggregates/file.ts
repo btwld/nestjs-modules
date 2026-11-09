@@ -110,6 +110,17 @@ export class File extends MutableAggregate<FileInterface> {
     return undefined;
   }
 
+  /**
+   * Whether `attempt` is a scan the file has already moved past while still
+   * waiting on a later one: a first scan's result arriving again while the
+   * file is `rescanning`.
+   */
+  isWaitingPast(attempt: FileScanAttempt): boolean {
+    const waitingOn = this.scanAttempt;
+
+    return waitingOn !== undefined && attempt < waitingOn;
+  }
+
   static create(
     eventContext: EventContextHost,
     dto: FileCreatableInterface,
@@ -164,7 +175,8 @@ export class File extends MutableAggregate<FileInterface> {
 
   /**
    * Applies `FileUploadConfirmedEvent`. Call it on the file as stored after
-   * the confirm, so the event carries the new version.
+   * the confirm, so the event carries the new version. With a scanner, the
+   * file is uploaded but not yet scanned.
    */
   uploadConfirmed(eventContext: EventContextHost): void {
     this.assertStatus('announce the confirmed upload of', [
@@ -238,10 +250,19 @@ export class File extends MutableAggregate<FileInterface> {
   }
 
   /**
-   * Starts a removal. Allowed from every status, so a removal that crashed
-   * or failed can run again.
+   * Starts a removal. Allowed again from `removing` and `remove-failed`, so
+   * a removal that crashed or failed can run again. Refuses a `rejecting` or
+   * `rejected` file: its record stays as proof of what was refused.
    */
   markRemoving(): void {
+    this.assertStatus('remove', [
+      'pending',
+      'scanning',
+      'rescanning',
+      'active',
+      'removing',
+      'remove-failed',
+    ]);
     this.changeStatus('removing');
   }
 

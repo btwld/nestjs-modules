@@ -248,15 +248,45 @@ describe(File.name, () => {
     expect(createMockFile({ status }).scanAttempt).toEqual(expected);
   });
 
+  it.each<[FileStatus, FileScanAttempt, boolean]>([
+    ['rescanning', 1, true],
+    ['rescanning', 2, false],
+    ['scanning', 1, false],
+    ['active', 1, false],
+    ['rejecting', 1, false],
+    ['pending', 1, false],
+  ])(
+    'isWaitingPast: a %s file, attempt %s → %s',
+    (status, attempt, expected) => {
+      expect(createMockFile({ status }).isWaitingPast(attempt)).toEqual(
+        expected,
+      );
+    },
+  );
+
   describe('markRemoving', () => {
-    it.each<FileStatus>(['pending', 'active', 'removing', 'remove-failed'])(
-      'is allowed from %s',
+    it.each<FileStatus>([
+      'pending',
+      'scanning',
+      'rescanning',
+      'active',
+      'removing',
+      'remove-failed',
+    ])('is allowed from %s', (status) => {
+      const file = createMockFile({ status });
+
+      file.markRemoving();
+
+      expect(file.status).toEqual('removing');
+    });
+
+    it.each<FileStatus>(['rejecting', 'rejected'])(
+      'refuses a %s file, keeping its record',
       (status) => {
         const file = createMockFile({ status });
 
-        file.markRemoving();
-
-        expect(file.status).toEqual('removing');
+        expect(() => file.markRemoving()).toThrow(FileStatusException);
+        expect(file.status).toEqual(status);
       },
     );
 

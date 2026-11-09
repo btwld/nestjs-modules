@@ -48,8 +48,10 @@ export class FileUploadPolicy {
 
   /**
    * Throws `FileUploadPolicyException` naming the first rule the file
-   * breaks: content type, then extension, then size. Pass the file with its
-   * sanitized name.
+   * breaks: content type, then extension, then size. A size that isn't a
+   * whole number of bytes from 0 up to `Number.MAX_SAFE_INTEGER` breaks the
+   * size rule, with or without `maxSize`. Pass the file with its sanitized
+   * name.
    */
   assertAllowed(
     file: Pick<FileInterface, 'fileName' | 'contentType' | 'size'>,
@@ -65,7 +67,11 @@ export class FileUploadPolicy {
       throw new FileUploadPolicyException('extension');
     }
 
-    if (this.maxSize !== undefined && file.size > this.maxSize) {
+    if (
+      !Number.isSafeInteger(file.size) ||
+      file.size < 0 ||
+      (this.maxSize !== undefined && file.size > this.maxSize)
+    ) {
       throw new FileUploadPolicyException('size');
     }
   }

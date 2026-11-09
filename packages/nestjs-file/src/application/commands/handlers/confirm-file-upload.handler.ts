@@ -14,7 +14,7 @@ import { ConfirmFileUploadCommand } from '../impl/confirm-file-upload.command.js
  * requested once the confirm commits, so the scanner never sees a file whose
  * confirm rolled back. A request the scanner refuses is logged by the
  * transaction, as a failed commit callback, and leaves the file `scanning`,
- * blocked, for a sweep to record as uncertain.
+ * blocked, until `RequestFileScanCommand` sends it again.
  */
 @CommandHandler(ConfirmFileUploadCommand)
 export class ConfirmFileUploadHandler implements ICommandHandler<ConfirmFileUploadCommand> {

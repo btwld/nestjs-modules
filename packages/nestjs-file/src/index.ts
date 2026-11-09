@@ -32,6 +32,7 @@ export { SoftDeleteFileCommand } from './application/commands/impl/soft-delete-f
 export { RestoreFileCommand } from './application/commands/impl/restore-file.command.js';
 export { RemoveFileCommand } from './application/commands/impl/remove-file.command.js';
 export { RecordFileScanResultCommand } from './application/commands/impl/record-file-scan-result.command.js';
+export { RequestFileScanCommand } from './application/commands/impl/request-file-scan.command.js';
 
 // queries
 export { GetFileQuery } from './application/queries/impl/get-file.query.js';
@@ -44,6 +45,7 @@ export { SoftDeleteFileHandler } from './application/commands/handlers/soft-dele
 export { RestoreFileHandler } from './application/commands/handlers/restore-file.handler.js';
 export { RemoveFileHandler } from './application/commands/handlers/remove-file.handler.js';
 export { RecordFileScanResultHandler } from './application/commands/handlers/record-file-scan-result.handler.js';
+export { RequestFileScanHandler } from './application/commands/handlers/request-file-scan.handler.js';
 
 // query handlers
 export { GetFileHandler } from './application/queries/handlers/get-file.handler.js';

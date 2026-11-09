@@ -4,8 +4,8 @@ import { FileException } from './file.exception.js';
 
 /**
  * The scanner failed to accept a scan request; its error is the `cause`.
- * The file stays `scanning` or `rescanning`, blocked, until a result is
- * recorded.
+ * The file stays `scanning` or `rescanning`, blocked, until
+ * `RequestFileScanCommand` sends the request again.
  */
 export class FileScanRequestException extends FileException {
   declare context: RuntimeException['context'] & {

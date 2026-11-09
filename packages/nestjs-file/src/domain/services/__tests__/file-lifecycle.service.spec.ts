@@ -23,6 +23,7 @@ import { FileNotUploadedException } from '../../exceptions/file-not-uploaded.exc
 import { FileStatusException } from '../../exceptions/file-status.exception.js';
 import { FileStorageNotFoundException } from '../../exceptions/file-storage-not-found.exception.js';
 import { FileUploadPolicyException } from '../../exceptions/file-upload-policy.exception.js';
+import { type FileScanAttempt } from '../../interfaces/file-scan-attempt.type.js';
 import { type FileScanOutcomeInterface } from '../../interfaces/file-scan-outcome.interface.js';
 import { type FileStatus } from '../../interfaces/file-status.type.js';
 import { FileUploadPolicy } from '../../policies/file-upload.policy.js';
@@ -309,10 +310,29 @@ describe(FileLifecycleService.name, () => {
       expect(event).toHaveProperty('scan', scan);
     });
 
+    it.each<FileScanOutcomeInterface>([
+      { attempt: 1, result: 'uncertain' },
+      { attempt: 1, result: 'clean' },
+    ])(
+      'asks for the rescan again, writing nothing, when a first result %o arrives during it',
+      async (scan) => {
+        const existing = createMockFile({ status: 'rescanning' });
+        fileRepository.get.mockResolvedValue(existing);
+
+        expect(
+          await scannedService().recordScanResult({}, 'file-1', scan),
+        ).toEqual({
+          file: existing,
+          scanRequest: { file: existing.toPlain(), attempt: 2 },
+        });
+        expect(fileRepository.updateStatus).not.toHaveBeenCalled();
+        expect(existing.getUncommittedEvents()).toEqual([]);
+      },
+    );
+
     it.each<[FileStatus, FileScanOutcomeInterface]>([
-      // A late result for the first scan while the rescan runs.
-      ['rescanning', { attempt: 1, result: 'uncertain' }],
-      ['rescanning', { attempt: 1, result: 'clean' }],
+      // A result for the rescan while the first scan runs.
+      ['scanning', { attempt: 2, result: 'infected' }],
       // A repeated delivery once the file has moved on.
       ['active', { attempt: 1, result: 'infected' }],
       ['rejected', { attempt: 2, result: 'clean' }],
@@ -349,6 +369,43 @@ describe(FileLifecycleService.name, () => {
           result: 'clean',
         }),
       ).toBeNull();
+    });
+  });
+
+  describe('getScanStep', () => {
+    it.each<[FileStatus, FileScanAttempt]>([
+      ['scanning', 1],
+      ['rescanning', 2],
+    ])(
+      'returns a %s file with the request for attempt %s, writing nothing',
+      async (status, attempt) => {
+        const existing = createMockFile({ status });
+        fileRepository.get.mockResolvedValue(existing);
+
+        expect(await service.getScanStep({}, 'file-1')).toEqual({
+          file: existing,
+          scanRequest: { file: existing.toPlain(), attempt },
+        });
+        expect(fileRepository.updateStatus).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each<FileStatus>(['pending', 'active', 'rejecting', 'rejected'])(
+      'returns a %s file with no request',
+      async (status) => {
+        const existing = createMockFile({ status });
+        fileRepository.get.mockResolvedValue(existing);
+
+        expect(await service.getScanStep({}, 'file-1')).toEqual({
+          file: existing,
+        });
+      },
+    );
+
+    it('returns null when the file does not exist', async () => {
+      fileRepository.get.mockResolvedValue(null);
+
+      expect(await service.getScanStep({}, 'missing')).toBeNull();
     });
   });
 
@@ -505,6 +562,18 @@ describe(FileLifecycleService.name, () => {
       );
       expect(fileRepository.updateStatus).not.toHaveBeenCalled();
     });
+
+    it.each<FileStatus>(['rejecting', 'rejected'])(
+      'refuses a %s file before writing',
+      async (status) => {
+        fileRepository.get.mockResolvedValue(createMockFile({ status }));
+
+        await expect(service.beginRemoval({}, 'file-1')).rejects.toThrow(
+          FileStatusException,
+        );
+        expect(fileRepository.updateStatus).not.toHaveBeenCalled();
+      },
+    );
 
     it('returns null when the file does not exist', async () => {
       fileRepository.get.mockResolvedValue(null);

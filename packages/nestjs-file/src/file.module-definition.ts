@@ -13,6 +13,7 @@ import { ConfirmFileUploadHandler } from './application/commands/handlers/confir
 import { CreateFileHandler } from './application/commands/handlers/create-file.handler.js';
 import { RecordFileScanResultHandler } from './application/commands/handlers/record-file-scan-result.handler.js';
 import { RemoveFileHandler } from './application/commands/handlers/remove-file.handler.js';
+import { RequestFileScanHandler } from './application/commands/handlers/request-file-scan.handler.js';
 import { RestoreFileHandler } from './application/commands/handlers/restore-file.handler.js';
 import { SoftDeleteFileHandler } from './application/commands/handlers/soft-delete-file.handler.js';
 import { GetFileDownloadHandler } from './application/queries/handlers/get-file-download.handler.js';
@@ -106,6 +107,7 @@ export function createFileProviders(options: {
     RestoreFileHandler,
     RemoveFileHandler,
     RecordFileScanResultHandler,
+    RequestFileScanHandler,
     GetFileHandler,
     GetFileDownloadHandler,
     // Consumer overrides (last provider for a token wins)

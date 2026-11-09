@@ -25,6 +25,8 @@ import {
   FileScanService,
   RecordFileScanResultCommand,
   RecordFileScanResultHandler,
+  RequestFileScanCommand,
+  RequestFileScanHandler,
   FileRemoveException,
   FileRemoveFailedEvent,
   FileStorageDeleteException,
@@ -94,6 +96,7 @@ describe('index', () => {
     expect(RestoreFileCommand).toBeInstanceOf(Function);
     expect(RemoveFileCommand).toBeInstanceOf(Function);
     expect(RecordFileScanResultCommand).toBeInstanceOf(Function);
+    expect(RequestFileScanCommand).toBeInstanceOf(Function);
   });
 
   it('should export queries', () => {
@@ -108,6 +111,7 @@ describe('index', () => {
     expect(RestoreFileHandler).toBeInstanceOf(Function);
     expect(RemoveFileHandler).toBeInstanceOf(Function);
     expect(RecordFileScanResultHandler).toBeInstanceOf(Function);
+    expect(RequestFileScanHandler).toBeInstanceOf(Function);
     expect(GetFileHandler).toBeInstanceOf(Function);
     expect(GetFileDownloadHandler).toBeInstanceOf(Function);
   });

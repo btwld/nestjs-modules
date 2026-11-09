@@ -14,6 +14,8 @@ import { type File } from '../../../../domain/aggregates/file.js';
 import { FileRejectedEvent } from '../../../../domain/events/file-rejected.event.js';
 import { FileScanPassedEvent } from '../../../../domain/events/file-scan-passed.event.js';
 import { FileScanRetriedEvent } from '../../../../domain/events/file-scan-retried.event.js';
+import { FileScanRequestException } from '../../../../domain/exceptions/file-scan-request.exception.js';
+import { FileStatusException } from '../../../../domain/exceptions/file-status.exception.js';
 import { type FileScanOutcomeInterface } from '../../../../domain/interfaces/file-scan-outcome.interface.js';
 import { FileRejectException } from '../../../exceptions/file-reject.exception.js';
 import { FileScanResultInTransactionException } from '../../../exceptions/file-scan-result-in-transaction.exception.js';
@@ -22,6 +24,8 @@ import { GetFileQuery } from '../../../queries/impl/get-file.query.js';
 import { ConfirmFileUploadCommand } from '../../impl/confirm-file-upload.command.js';
 import { CreateFileCommand } from '../../impl/create-file.command.js';
 import { RecordFileScanResultCommand } from '../../impl/record-file-scan-result.command.js';
+import { RemoveFileCommand } from '../../impl/remove-file.command.js';
+import { RequestFileScanCommand } from '../../impl/request-file-scan.command.js';
 
 describe('file scanning (e2e)', () => {
   const dto = {
@@ -175,15 +179,90 @@ describe('file scanning (e2e)', () => {
     expect(storage.delete).not.toHaveBeenCalled();
   });
 
-  it('ignores a repeated first result while the rescan runs', async () => {
+  it('asks for the rescan again, changing nothing, when the first result is repeated during it', async () => {
     const file = await uploadedFile();
     await record(file, { attempt: 1, result: 'uncertain' });
 
     const unchanged = await record(file, { attempt: 1, result: 'uncertain' });
 
     expect(unchanged.status).toEqual('rescanning');
-    expect(scanner.requestScan).toHaveBeenCalledTimes(2);
+    expect(unchanged.version).toEqual((await read(file)).version);
+    expect(scanner.requestScan).toHaveBeenCalledTimes(3);
+    expect(scanner.requestScan).toHaveBeenLastCalledWith(
+      {},
+      { file: expect.objectContaining({ id: file.id }), attempt: 2 },
+    );
     expect(storage.delete).not.toHaveBeenCalled();
+  });
+
+  it('recovers a refused rescan request when the message is redelivered, without rejecting the file', async () => {
+    const file = await uploadedFile();
+    scanner.requestScan.mockRejectedValueOnce(new Error('queue down'));
+
+    await expect(
+      record(file, { attempt: 1, result: 'uncertain' }),
+    ).rejects.toThrow(FileScanRequestException);
+    expect((await read(file)).status).toEqual('rescanning');
+
+    // The queue redelivers the message whose handling threw.
+    await record(file, { attempt: 1, result: 'uncertain' });
+
+    // Confirm's request, the refused rescan, and the rescan sent again.
+    expect(scanner.requestScan).toHaveBeenCalledTimes(3);
+    expect(scanner.requestScan).toHaveBeenLastCalledWith(
+      {},
+      { file: expect.objectContaining({ id: file.id }), attempt: 2 },
+    );
+    expect((await read(file)).status).toEqual('rescanning');
+    expect(storage.delete).not.toHaveBeenCalled();
+
+    const passed = await record(file, { attempt: 2, result: 'clean' });
+
+    expect(passed.status).toEqual('active');
+  });
+
+  it('sends a refused first request again from a sweep, and the file passes', async () => {
+    scanner.requestScan.mockRejectedValueOnce(new Error('queue down'));
+    const file = await uploadedFile();
+    expect((await read(file)).status).toEqual('scanning');
+
+    const waiting = await commandBus.execute(
+      new RequestFileScanCommand({}, file.id),
+    );
+
+    expect(waiting.status).toEqual('scanning');
+    expect(scanner.requestScan).toHaveBeenCalledTimes(2);
+    expect(scanner.requestScan).toHaveBeenLastCalledWith(
+      {},
+      { file: expect.objectContaining({ id: file.id }), attempt: 1 },
+    );
+
+    const passed = await record(file, { attempt: 1, result: 'clean' });
+
+    expect(passed.status).toEqual('active');
+  });
+
+  it('sends no request for a file no longer waiting on a scan', async () => {
+    const file = await uploadedFile();
+    await record(file, { attempt: 1, result: 'clean' });
+
+    const active = await commandBus.execute(
+      new RequestFileScanCommand({}, file.id),
+    );
+
+    expect(active.status).toEqual('active');
+    expect(scanner.requestScan).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the record of a rejected file: removing it is refused', async () => {
+    const file = await uploadedFile();
+    await record(file, { attempt: 1, result: 'infected' });
+
+    await expect(
+      commandBus.execute(new RemoveFileCommand({}, file.id)),
+    ).rejects.toThrow(FileStatusException);
+    expect((await read(file)).status).toEqual('rejected');
+    expect(storage.delete).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a result for a file that has passed', async () => {

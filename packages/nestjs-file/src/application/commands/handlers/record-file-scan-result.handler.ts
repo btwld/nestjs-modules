@@ -21,7 +21,9 @@ import { RecordFileScanResultCommand } from '../impl/record-file-scan-result.com
  *   thrown; recording a result for it again retries the delete.
  *
  * `FileRejectedEvent` is published once `rejecting` commits, before the
- * object is deleted.
+ * object is deleted. When two results for a `rejecting` file run at once,
+ * both delete the object and the one that commits `rejected` second throws
+ * `OptimisticLockException`; the file is rejected either way.
  */
 @CommandHandler(RecordFileScanResultCommand)
 export class RecordFileScanResultHandler implements ICommandHandler<RecordFileScanResultCommand> {

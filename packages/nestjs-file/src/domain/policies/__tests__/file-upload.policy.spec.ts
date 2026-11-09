@@ -96,6 +96,18 @@ describe(FileUploadPolicy.name, () => {
     });
   });
 
+  it.each([
+    ['not a number', Number.NaN],
+    ['infinite', Number.POSITIVE_INFINITY],
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['past the safe integers', Number.MAX_SAFE_INTEGER + 1],
+  ])('refuses a size that is %s, without maxSize', (_label, size) => {
+    expect(ruleRefused(new FileUploadPolicy(), { ...file, size })).toEqual(
+      'size',
+    );
+  });
+
   it('refuses everything when a list is empty', () => {
     const service = new FileUploadPolicy({ contentTypes: [] });
 

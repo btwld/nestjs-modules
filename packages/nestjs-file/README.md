@@ -223,6 +223,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { create as contentDisposition } from 'content-disposition';
 import {
   type FileObjectInterface,
   type FileStorageServiceInterface,
@@ -267,7 +268,13 @@ export class S3StorageService implements FileStorageServiceInterface {
   getSignedDownloadUrl(_ctx: PlainLiteralObject, file: FileObjectInterface) {
     return getSignedUrl(
       this.client,
-      new GetObjectCommand({ Bucket: this.downloadBucket, Key: file.id }),
+      new GetObjectCommand({
+        Bucket: this.downloadBucket,
+        Key: file.id,
+        // Download, never render: an allowed SVG or HTML file can't run
+        // script from the bucket's origin.
+        ResponseContentDisposition: contentDisposition(file.fileName),
+      }),
       { expiresIn: 300 },
     );
   }
@@ -299,7 +306,12 @@ export class S3StorageService implements FileStorageServiceInterface {
 the client needs to upload: `url`, `method` (`PUT` or `POST`), and the
 `headers` or form `fields` to send with it. Sign the file's `contentType` and
 `size` into it, so storage turns away an upload that doesn't match what the
-client declared.
+client declared. Keep it short-lived, minutes as above: the target still
+works after the upload is confirmed.
+
+Sign download URLs with an `attachment` disposition, as above, so the
+browser saves a file instead of rendering it. Without it, an allowed SVG or
+HTML file opens on the bucket's origin and its script runs.
 
 > With S3, use a presigned POST as above: its `content-length-range`
 > condition is AWS's documented way to cap an upload's size. A presigned
@@ -408,25 +420,34 @@ What you get:
 - **Confirm holds the file.** `ConfirmFileUploadCommand` makes it `scanning`
   instead of `active`, and asks your scanner once the confirm commits. A
   scanning file has no download URL.
-- **Clean** makes it `active`, and `FileScanPassedEvent` is published.
+- **Clean** makes it `active`, and `FileScanPassedEvent` is published. That
+  is your "ready" signal: `FileUploadConfirmedEvent` still fires at confirm,
+  but it now means uploaded, not yet scanned.
 - **Uncertain** gets one rescan: the file becomes `rescanning` and your
   scanner is asked again with `attempt: 2`. A second uncertain result rejects
-  it. Record a scan that timed out or failed to run as `uncertain`.
+  it. When a scan times out or can't run, your scanner records `uncertain`:
+  only it knows whether the scan really ran.
 - **Infected**, or uncertain twice, rejects the file: its stored object is
   deleted and the record stays, `rejected`, as proof of what was refused.
-  `FileRejectedEvent` carries the file, the deciding `scan`, and the
-  `eventContext`.
-- **Nothing bypasses the scan.** There is no release command and no option to
-  skip it; a file becomes `active` only by passing.
+  Removing it is refused with `FileStatusException`. `FileRejectedEvent`
+  carries the file, the deciding `scan`, and the `eventContext`.
+- **Nothing bypasses the scan.** The module has no release command and no
+  option to skip it; a file becomes `active` only by passing. Replacing
+  `FileScanService` or `FileLifecycleService` through `providers` changes
+  that, and is yours to answer for.
 - **Repeats are safe.** A result for an attempt the file is no longer waiting
   on changes nothing, so a redelivered message can't reject a file twice or
-  undo a pass.
+  undo a pass. If the file is waiting on the rescan, a repeated first result
+  sends the rescan again, so a queue that redelivers after a refused request
+  recovers by itself.
 
 **Dispatch `RecordFileScanResultCommand` outside any transaction**, like
 `RemoveFileCommand`: inside one it throws
 `FileScanResultInTransactionException`. If storage fails to delete a rejected
 object, you get `FileRejectException` and the file stays `rejecting`, still
-not downloadable; record the result again to retry.
+not downloadable; record the result again to retry. Two results for one
+`rejecting` file at once both delete its object, and the second to commit
+throws `OptimisticLockException`; the file is rejected either way.
 
 Files that were already `active` before you registered a scanner were never
 scanned; scan them out of band if that matters to you.
@@ -493,6 +514,18 @@ export class S3ScannedStorageService
 
 Grant your upload credentials write access to the upload bucket only.
 
+**A rejected upload can come back.** Deleting a rejected file's objects
+doesn't revoke its upload target: until the target expires, the uploader can
+put bytes back under the same id. Nothing serves them, because the file stays
+`rejected`, but nothing deletes them either. Keep upload targets short-lived,
+and clear out what returns:
+
+- **Moving it out of reach:** add a lifecycle rule that expires every object
+  in the upload bucket a day after it lands. Your scanner copies out what it
+  scans, so the upload bucket only ever stages.
+- **Otherwise:** once the targets you issue have expired, delete the objects
+  of `rejected` files again, with your storage service's `delete`.
+
 ### Telling the uploader
 
 `FileRejectedEvent` is your security event: log it and notify whoever
@@ -532,34 +565,38 @@ export class FileRejectedHandler implements IEventHandler<FileRejectedEvent> {
 **With a scanner registered, a sweep is required.** A file waiting on a scan
 stays blocked until a result arrives, and nothing else moves it on.
 
-A file gets stuck when:
+A file gets stuck when its request never reached your scanner, or your
+scanner lost it:
 
-- your scanner never reports back;
 - your scanner refused the first request: the confirm has already
   committed, so the refusal is only logged, as
   `Transaction onCommit Callback Error`;
 - your scanner refused the rescan: `RecordFileScanResultCommand` threw
-  `FileScanRequestException`.
+  `FileScanRequestException`;
+- your scanner accepted a request and never reported back.
 
 On a schedule, find files in `scanning` or `rescanning` whose `dateUpdated`
-is older than your deadline, with your own query on the entity, and record
-each as uncertain. A first attempt then earns its rescan, and a timed-out
-rescan is rejected:
+is older than your deadline, with your own query on the entity, and send each
+one's request again:
 
 ```ts
 for (const file of stuck) {
-  await this.commandBus.execute(
-    new RecordFileScanResultCommand(ctx, file.id, {
-      attempt: file.status === 'scanning' ? 1 : 2,
-      result: 'uncertain',
-    }),
-  );
+  await this.commandBus.execute(new RequestFileScanCommand(ctx, file.id));
 }
 ```
 
-Include files still `rejecting`, recording any result for them, to finish
-deleting objects a storage failure left behind. A sweep that races a real
-result for the same file loses with `OptimisticLockException`; skip it.
+`RequestFileScanCommand` changes nothing on the file, so a file that keeps
+waiting is sent again on every run until your scanner answers. Set the
+deadline above your scanner's usual time to keep repeat scans rare. A repeat
+is harmless: it carries the same `attempt`, and only the first result for an
+attempt counts.
+
+The sweep never decides a file's fate. Timeouts are your scanner's to
+report, as `uncertain`, so a scanner that is down leaves files blocked, never
+rejected. Alert on files that have waited far past your deadline.
+
+Include files still `rejecting`: record any result for them to finish
+deleting objects a storage failure left behind.
 
 ## File Lifecycle
 
@@ -570,7 +607,7 @@ result for the same file loses with `OptimisticLockException`; skip it.
 | `rescanning` | The first scan was uncertain; waiting on the one rescan. No download URL. |
 | `active` | Confirmed and, with a scanner, passed its scan. Ready to download: the only status that gets a download URL. |
 | `rejecting` | Rejected by its scan; its stored object is being deleted. Record the result again to finish if storage failed. No download URL. |
-| `rejected` | Rejected, and its stored object is deleted. The record stays as proof of what was refused. |
+| `rejected` | Rejected, and its stored object is deleted. The record stays as proof of what was refused, and can't be removed. |
 | `removing` | A removal is running, or was interrupted. You can still read the record, without a download URL, until it's gone. Remove it again to finish. |
 | `remove-failed` | A removal didn't finish: storage couldn't delete the object, or the file was restored while its object was being deleted. Remove the file again to retry. |
 
@@ -583,7 +620,9 @@ fails, you get `FileRemoveException`; dispatch `RemoveFileCommand` again to
 retry. A live file is left `remove-failed`, so its record never points at a
 deleted object without its status saying so. A soft-deleted file is left as
 it was, still hidden. Once a removal of a soft-deleted file has failed, remove
-it again rather than restore it: its object may already be gone.
+it again rather than restore it: its object may already be gone. A
+`rejecting` or `rejected` file can't be removed: `RemoveFileCommand` throws
+`FileStatusException`, and the record stays.
 
 If two commands change the same file at once, the later one fails with
 `OptimisticLockException` (from `@concepta/nestjs-repository`) instead of
@@ -616,6 +655,7 @@ Change a file only through the commands; they apply the rules and write it.
 | `CreateFileCommand(ctx, { serviceKey, fileName, contentType, size })` | `FileCreatedResultInterface` | Creates a `pending` file with a sanitized name. Throws `FileNameInvalidException` when sanitizing leaves nothing, and `FileUploadPolicyException` when the [upload policy](#upload-policy) refuses the file. |
 | `ConfirmFileUploadCommand(ctx, id)` | `FileReadResultInterface` | Marks the upload done, after checking storage if your service implements `exists`: `active`, or `scanning` with a scanner. Confirming twice returns the file unchanged. |
 | `RecordFileScanResultCommand(ctx, id, { attempt, result })` | `File` | Records a scan verdict (see [Scanning Uploads](#scanning-uploads)). Dispatch it outside any transaction. |
+| `RequestFileScanCommand(ctx, id)` | `File` | Sends your scanner the request a `scanning` or `rescanning` file is waiting on, again, changing nothing (see [Sweeping stuck scans](#sweeping-stuck-scans)). |
 | `SoftDeleteFileCommand(ctx, id)` | `File` | Hides the file from reads and returns it, soft-deleted. |
 | `RestoreFileCommand(ctx, id)` | `File` | Brings a soft-deleted file back. Restoring a file that isn't soft-deleted returns it unchanged. |
 | `RemoveFileCommand(ctx, id)` | `File` | Deletes the stored object and the file (see [File Lifecycle](#file-lifecycle)). |
@@ -717,7 +757,7 @@ async openReadStream(file: FileObjectInterface): Promise<Readable> {
 
 ```ts
 import { Get, Param, StreamableFile, type PlainLiteralObject } from '@nestjs/common';
-import contentDisposition from 'content-disposition';
+import { create as contentDisposition } from 'content-disposition';
 
 // In FileController
 @Get(':id/content')
@@ -741,17 +781,17 @@ async content(@Ctx() ctx: PlainLiteralObject, @Param('id') id: string) {
 anything else, so the route never streams a file that hasn't been accepted,
 and it signs no URL the route would only throw away.
 The module ships no permission check: who may read which file is yours to
-decide, in `assertCanRead`. `contentDisposition` (the
+decide, in `assertCanRead`. `contentDisposition` (`create` from the
 [`content-disposition`](https://www.npmjs.com/package/content-disposition)
-package Express uses; add `@types/content-disposition` for its types) encodes
-any file name safely.
+package Express uses, version 2 or later) builds an `attachment` header that
+encodes any file name safely.
 
 ## Domain Events
 
 | Event | Published when |
 | --- | --- |
 | `FileCreatedEvent` | a file is created |
-| `FileUploadConfirmedEvent` | an upload is confirmed |
+| `FileUploadConfirmedEvent` | an upload is confirmed; with a scanner, before the scan, so wait for `FileScanPassedEvent` to know it's ready |
 | `FileSoftDeletedEvent` | a file is soft-deleted |
 | `FileRestoredEvent` | a soft-deleted file is restored |
 | `FileRemoveFailedEvent` | a removal is recorded as failed (`remove-failed`) |
@@ -945,11 +985,11 @@ provide your own `FileLifecycleService` subclass through `providers`.
 | `FileNameInvalidException` | client | The file name has nothing left once sanitized. |
 | `FileUploadPolicyException` | client | The upload policy refuses the file; `context.rule` names the rule. |
 | `FileNotUploadedException` | client | `exists` says the object isn't uploaded. |
-| `FileStatusException` | client | The status doesn't allow the operation, such as a scan result for a `pending` file. |
+| `FileStatusException` | client | The status doesn't allow the operation, such as a scan result for a `pending` file, or removing a `rejected` one. |
 | `FileStorageNotFoundException` | usage | No storage service has the file's `serviceKey`. |
 | `FileRemoveInTransactionException` | usage | `RemoveFileCommand` was dispatched inside a transaction. |
 | `FileScanResultInTransactionException` | usage | `RecordFileScanResultCommand` was dispatched inside a transaction. |
-| `FileScanRequestException` | internal | The scanner refused a rescan request. The file stays `rescanning` until your sweep records it. (A refused first request on confirm is logged, not thrown.) |
+| `FileScanRequestException` | internal | The scanner refused a rescan request, or one sent again by `RequestFileScanCommand`. The file keeps waiting until a request goes through. (A refused first request on confirm is logged, not thrown.) |
 | `FileRejectException` | internal | Storage failed to delete a rejected file's object; the file stays `rejecting`. Record the result again to retry. |
 | `FileUploadTargetException` | internal | Storage failed to produce an upload target. |
 | `FileDownloadUrlException` | internal | Storage failed to produce a download URL. |

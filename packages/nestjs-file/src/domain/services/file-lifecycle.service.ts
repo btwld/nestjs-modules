@@ -111,7 +111,9 @@ export class FileLifecycleService {
    * second uncertain one, leaves the file `rejecting` with
    * `FileRejectedEvent` applied, for `deleteStoredObject` and
    * `finishRejection`. A result for another attempt than the one the file
-   * waits on, or for a file no longer waiting, is returned unchanged.
+   * waits on, or for a file no longer waiting, is returned unchanged; when
+   * the file is still waiting on a later attempt, the step carries that
+   * request again, in case sending it failed the first time.
    * Refuses a result for a `pending` file: no scan was requested.
    */
   async recordScanResult(
@@ -127,6 +129,10 @@ export class FileLifecycleService {
 
     existing.assertScanRequested();
 
+    if (existing.isWaitingPast(scan.attempt)) {
+      return toStep(existing);
+    }
+
     if (existing.scanAttempt !== scan.attempt) {
       return { file: existing };
     }
@@ -141,8 +147,22 @@ export class FileLifecycleService {
   }
 
   /**
+   * Returns the file with the scan request it is waiting on, writing
+   * nothing: one while `scanning` or `rescanning`, none otherwise.
+   */
+  async getScanStep(
+    ctx: PlainLiteralObject,
+    id: ReferenceId,
+  ): Promise<FileLifecycleStepInterface | null> {
+    const existing = await this.fileRepository.get(ctx, id);
+
+    return existing && toStep(existing);
+  }
+
+  /**
    * Finishes a rejection once its object is deleted: writes `rejected` and
-   * returns the file as stored.
+   * returns the file as stored. A concurrent duplicate that finished first
+   * makes this write throw `OptimisticLockException`.
    */
   async finishRejection(
     ctx: PlainLiteralObject,
@@ -201,7 +221,8 @@ export class FileLifecycleService {
 
   /**
    * Starts a removal; soft-deleted files are found too. Refuses an unknown
-   * storage key before writing. A live file is marked `removing`, even when
+   * storage key, and a `rejecting` or `rejected` file, before writing. A
+   * live file is marked `removing`, even when
    * it already is, so the version advances and a concurrent removal fails.
    * A soft-deleted file can't change status and is hidden from reads
    * already, so it is returned as it is.
