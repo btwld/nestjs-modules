@@ -1,11 +1,12 @@
-import { type AccessControl, type IQueryInfo } from 'accesscontrol';
+import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
-import { type ExecutionContext } from '@nestjs/common';
+import { type AccessAbility } from './access-ability.type.js';
+import { type AccessQueryInterface } from './access-query.interface.js';
 
 export interface AccessControlContextArgsInterface {
-  user: unknown;
+  ctx: PlainLiteralObject;
+  query: AccessQueryInterface;
+  ability: AccessAbility;
   request: unknown;
-  query: IQueryInfo;
-  accessControl: AccessControl;
   executionContext: ExecutionContext;
 }

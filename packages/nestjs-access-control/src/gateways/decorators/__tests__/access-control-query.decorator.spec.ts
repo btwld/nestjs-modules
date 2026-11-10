@@ -1,8 +1,11 @@
 import { Controller } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 
 import { ACCESS_CONTROL_MODULE_QUERY_METADATA } from '../../../access-control.constants.js';
+import { AccessControlException } from '../../../domain/exceptions/access-control.exception.js';
 import { AccessControlContextInterface } from '../../../domain/interfaces/access-control-context.interface.js';
-import { CanAccess } from '../../../domain/policies/can-access.policy.js';
+import { CanAccess } from '../../../domain/interfaces/can-access.interface.js';
+import { AccessControlGuard } from '../../http/access-control.guard.js';
 import { AccessControlQuery } from '../access-control-query.decorator.js';
 
 describe('@AccessControlQuery', () => {
@@ -36,6 +39,21 @@ describe('@AccessControlQuery', () => {
           service: TestQueryService,
         },
       ]);
+    });
+
+    it('refuses no services, which would clear a controller’s', () => {
+      expect(() => AccessControlQuery()).toThrow(
+        expect.objectContaining({
+          constructor: AccessControlException,
+          fault: 'usage',
+        }),
+      );
+    });
+
+    it('applies the access control guard, so a route without a grant fails', () => {
+      expect(
+        Reflect.getMetadata(GUARDS_METADATA, controller.createOne),
+      ).toEqual([AccessControlGuard]);
     });
   });
 });

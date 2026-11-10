@@ -1,14 +1,19 @@
 import {
-  ACCESS_CONTROL_PORT_TOKEN,
+  ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
+  ACCESS_REFUSAL_REASONS,
   AccessControlContext,
   AccessControlCreateMany,
   AccessControlCreateOne,
   AccessControlDeleteOne,
+  AccessControlException,
   AccessControlFilter,
   AccessControlGrant,
   AccessControlGuard,
   AccessControlModule,
-  AccessControlPort,
+  accessGrantsProblems,
+  accessRuleProblems,
+  createAccessAbility,
+  AccessControlOwnInHandler,
   AccessControlQuery,
   AccessControlReadMany,
   AccessControlReadOne,
@@ -16,14 +21,16 @@ import {
   AccessControlReplaceOne,
   AccessControlService,
   AccessControlUpdateOne,
-  CheckAccessHandler,
-  CheckAccessQuery,
-  DEFAULT_ACCESS_CONTROL_PORT_SETTINGS,
-  FilterResponseAttributesHandler,
-  FilterResponseAttributesQuery,
+  AccessCtx,
+  AccessCtxActorResolver,
+  AccessCtxDecisionSource,
+  AccessRefusedException,
+  AccessRulesInvalidException,
+  accessFieldPaths,
+  AccessContextOverlay,
+  normalizeAccessFieldPath,
   PossessionEnum,
-  ResolveUserRolesHandler,
-  ResolveUserRolesQuery,
+  StaticAccessGrantsProvider,
 } from '../index.js';
 
 describe('Index', () => {
@@ -33,30 +40,43 @@ describe('Index', () => {
     expect(AccessControlFilter).toEqual(expect.any(Function));
     expect(AccessControlContext).toEqual(expect.any(Function));
     expect(AccessControlService).toEqual(expect.any(Function));
+    expect(accessRuleProblems).toEqual(expect.any(Function));
+    expect(accessGrantsProblems).toEqual(expect.any(Function));
+    expect(createAccessAbility).toEqual(expect.any(Function));
+    expect(AccessCtxActorResolver).toEqual(expect.any(Function));
+    expect(AccessCtxDecisionSource).toEqual(expect.any(Function));
+    expect(StaticAccessGrantsProvider).toEqual(expect.any(Function));
+    expect(typeof ACCESS_CONTROL_MODULE_SETTINGS_TOKEN).toEqual('string');
   });
 
-  it('exports the access-control port surface', () => {
-    expect(AccessControlPort).toEqual(expect.any(Function));
-    expect(typeof ACCESS_CONTROL_PORT_TOKEN).toEqual('symbol');
-    expect(DEFAULT_ACCESS_CONTROL_PORT_SETTINGS).toEqual({
-      checkAccessQuery: CheckAccessQuery,
-      filterResponseAttributesQuery: FilterResponseAttributesQuery,
-      resolveUserRolesQuery: ResolveUserRolesQuery,
-    });
+  it('exports the actor overlay and field path helpers', () => {
+    expect(AccessCtx.name).toEqual('withAccess');
+    expect(accessFieldPaths).toEqual(expect.any(Function));
+    expect(normalizeAccessFieldPath).toEqual(expect.any(Function));
   });
 
-  it('exports all CQRS queries and handlers', () => {
-    expect(CheckAccessQuery).toEqual(expect.any(Function));
-    expect(CheckAccessHandler).toEqual(expect.any(Function));
-    expect(FilterResponseAttributesQuery).toEqual(expect.any(Function));
-    expect(FilterResponseAttributesHandler).toEqual(expect.any(Function));
-    expect(ResolveUserRolesQuery).toEqual(expect.any(Function));
-    expect(ResolveUserRolesHandler).toEqual(expect.any(Function));
+  it('exports the exceptions and refusal reasons', () => {
+    expect(AccessControlException).toEqual(expect.any(Function));
+    expect(AccessRefusedException).toEqual(expect.any(Function));
+    expect(AccessRulesInvalidException).toEqual(expect.any(Function));
+    expect(ACCESS_REFUSAL_REASONS).toEqual([
+      'no-actor',
+      'no-grant',
+      'denied',
+      'field',
+      'access-query',
+      'own-unchecked',
+    ]);
+  });
+
+  it('exports the actor overlay interceptor', () => {
+    expect(AccessContextOverlay).toEqual(expect.any(Function));
   });
 
   it('exports all grant decorators', () => {
     expect(AccessControlGrant).toEqual(expect.any(Function));
     expect(AccessControlQuery).toEqual(expect.any(Function));
+    expect(AccessControlOwnInHandler).toEqual(expect.any(Function));
     expect(AccessControlCreateMany).toEqual(expect.any(Function));
     expect(AccessControlCreateOne).toEqual(expect.any(Function));
     expect(AccessControlDeleteOne).toEqual(expect.any(Function));

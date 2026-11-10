@@ -6,18 +6,20 @@ export {
 } from './access-control.module-definition.js';
 
 // Constants
-export {
-  ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
-  ACCESS_CONTROL_PORT_TOKEN,
-} from './access-control.constants.js';
+export { ACCESS_CONTROL_MODULE_SETTINGS_TOKEN } from './access-control.constants.js';
 
 // Gateways
 export { AccessControlGuard } from './gateways/http/access-control.guard.js';
 export { AccessControlFilter } from './gateways/http/access-control.filter.js';
+export { AccessCtx } from './gateways/interfaces/access-context.interface.js';
+export { AccessCtxActorResolver } from './gateways/access-ctx-actor.resolver.js';
+export { AccessCtxDecisionSource } from './gateways/access-ctx-decision.source.js';
+export { AccessContextOverlay } from './gateways/access-context.overlay.js';
 
 // Decorators
 export { AccessControlGrant } from './gateways/decorators/access-control-grant.decorator.js';
 export { AccessControlQuery } from './gateways/decorators/access-control-query.decorator.js';
+export { AccessControlOwnInHandler } from './gateways/decorators/access-control-own-in-handler.decorator.js';
 export { AccessControlCreateMany } from './gateways/decorators/access-control-create-many.decorator.js';
 export { AccessControlCreateOne } from './gateways/decorators/access-control-create-one.decorator.js';
 export { AccessControlDeleteOne } from './gateways/decorators/access-control-delete-one.decorator.js';
@@ -27,41 +29,46 @@ export { AccessControlRecoverOne } from './gateways/decorators/access-control-re
 export { AccessControlReplaceOne } from './gateways/decorators/access-control-replace-one.decorator.js';
 export { AccessControlUpdateOne } from './gateways/decorators/access-control-update-one.decorator.js';
 
-// Domain types
+// Domain
 export { AccessControlContext } from './domain/access-control.context.js';
 export { PossessionEnum } from './domain/enums/possession.enum.js';
-export { CanAccess } from './domain/policies/can-access.policy.js';
+export { CanAccess } from './domain/interfaces/can-access.interface.js';
+export {
+  accessGrantsProblems,
+  accessRuleProblems,
+} from './domain/utils/access-rule-problems.util.js';
+export { createAccessAbility } from './domain/utils/create-access-ability.util.js';
+export { AccessControlService } from './domain/services/access-control.service.js';
+export { AccessControlException } from './domain/exceptions/access-control.exception.js';
+export { AccessRefusedException } from './domain/exceptions/access-refused.exception.js';
+export { AccessRulesInvalidException } from './domain/exceptions/access-rules-invalid.exception.js';
+export {
+  accessFieldPaths,
+  normalizeAccessFieldPath,
+} from './domain/utils/access-field-paths.util.js';
+export { AccessAbility } from './domain/interfaces/access-ability.type.js';
+export { AccessActor } from './domain/interfaces/access-actor.type.js';
+export { AccessActorResolverInterface } from './domain/interfaces/access-actor-resolver.interface.js';
+export { AccessCheckOptionsInterface } from './domain/interfaces/access-check-options.interface.js';
 export { AccessControlContextInterface } from './domain/interfaces/access-control-context.interface.js';
 export { AccessControlGrantOptionInterface } from './domain/interfaces/access-control-grant-option.interface.js';
 export { AccessControlQueryOptionInterface } from './domain/interfaces/access-control-query-option.interface.js';
-export { AccessControlMetadataInterface } from './domain/interfaces/access-control-metadata.interface.js';
-export { AccessControlServiceInterface } from './domain/ports/access-control-service.interface.js';
-
-// Port
+export { AccessDecisionInterface } from './domain/interfaces/access-decision.interface.js';
+export { AccessDecisionSourceInterface } from './domain/interfaces/access-decision-source.interface.js';
+export { AccessGrants } from './domain/interfaces/access-grants.type.js';
+export { AccessGrantsProviderInterface } from './domain/interfaces/access-grants-provider.interface.js';
+export { AccessQueryInterface } from './domain/interfaces/access-query.interface.js';
 export {
-  AccessControlPort,
-  AccessControlPortSettings,
-  CheckAccessQueryInterface,
-  FilterResponseAttributesQueryInterface,
-  ResolveUserRolesQueryInterface,
-} from './application/ports/access-control.port.js';
-export { DEFAULT_ACCESS_CONTROL_PORT_SETTINGS } from './access-control.module-definition.js';
+  ACCESS_REFUSAL_REASONS,
+  AccessRefusalReason,
+} from './domain/interfaces/access-refusal-reason.type.js';
+export { AccessRefusedDetailsInterface } from './domain/interfaces/access-refused-details.interface.js';
+export { AccessResolutionInterface } from './domain/interfaces/access-resolution.interface.js';
+export { AccessRoleActorInterface } from './domain/interfaces/access-role-actor.interface.js';
+export { AccessRuleInterface } from './domain/interfaces/access-rule.interface.js';
+export { AccessSystemActorInterface } from './domain/interfaces/access-system-actor.interface.js';
 
 // Infrastructure
-export { AccessControlService } from './infrastructure/services/access-control.service.js';
+export { StaticAccessGrantsProvider } from './infrastructure/grants/static-access-grants.provider.js';
 export { AccessControlOptionsInterface } from './infrastructure/config/interfaces/access-control-options.interface.js';
 export { AccessControlSettingsInterface } from './infrastructure/config/interfaces/access-control-settings.interface.js';
-
-// Application — queries + handlers
-export { CheckAccessQuery } from './application/queries/impl/check-access.query.js';
-export { FilterResponseAttributesQuery } from './application/queries/impl/filter-response-attributes.query.js';
-export { ResolveUserRolesQuery } from './application/queries/impl/resolve-user-roles.query.js';
-export { CheckAccessHandler } from './application/queries/handlers/check-access.handler.js';
-export { FilterResponseAttributesHandler } from './application/queries/handlers/filter-response-attributes.handler.js';
-export { ResolveUserRolesHandler } from './application/queries/handlers/resolve-user-roles.handler.js';
-
-/**
- * @deprecated Kept for v7 consumer compatibility. Will be removed once
- * external callers migrate off it.
- */
-export { AccessControllerException } from './domain/exceptions/access-controller.exception.js';

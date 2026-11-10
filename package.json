@@ -71,7 +71,7 @@
     "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=./junit.xml",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "pretest:e2e": "tsc -b && pnpm typecheck:examples",
-    "typecheck:examples": "tsc -p packages/nestjs-repository/examples/tsconfig.json",
+    "typecheck:examples": "tsc -p packages/nestjs-repository/examples/tsconfig.json && tsc -p packages/nestjs-access-control/examples/tsconfig.json",
     "test:e2e": "vitest run --config ./vitest.config-e2e.ts",
     "test:all": "pnpm test && pnpm test:e2e",
     "pretest:docker": "tsc -b",

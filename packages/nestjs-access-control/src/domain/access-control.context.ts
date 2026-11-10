@@ -1,42 +1,40 @@
-import { type AccessControl, type IQueryInfo } from 'accesscontrol';
+import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
-import { type ExecutionContext } from '@nestjs/common';
-
+import { type AccessAbility } from './interfaces/access-ability.type.js';
+import { type AccessActor } from './interfaces/access-actor.type.js';
 import { type AccessControlContextArgsInterface } from './interfaces/access-control-context-args.interface.js';
 import { type AccessControlContextInterface } from './interfaces/access-control-context.interface.js';
+import { type AccessQueryInterface } from './interfaces/access-query.interface.js';
 
 export class AccessControlContext implements AccessControlContextInterface {
   constructor(private readonly ctxArgs: AccessControlContextArgsInterface) {}
 
-  protected hasProp<K extends string>(
-    obj: unknown,
-    key: K,
-  ): obj is Record<K, unknown> {
-    return (
-      key !== null && obj !== null && typeof obj === 'object' && key in obj
-    );
+  getContext(): PlainLiteralObject {
+    return this.ctxArgs.ctx;
   }
 
-  protected getProp(obj: unknown, prop: string) {
-    return this.hasProp(obj, prop) ? obj[prop] : undefined;
+  getActor(): AccessActor {
+    return this.ctxArgs.query.actor;
   }
 
-  getRequest(property?: string): unknown {
-    return property?.length
-      ? this.getProp(this.ctxArgs.request, property)
-      : this.ctxArgs.request;
-  }
-
-  getUser(): unknown {
-    return this.ctxArgs.user;
-  }
-
-  getQuery(): IQueryInfo {
+  getQuery(): AccessQueryInterface {
     return this.ctxArgs.query;
   }
 
-  getAccessControl(): AccessControl {
-    return this.ctxArgs.accessControl;
+  getAbility(): AccessAbility {
+    return this.ctxArgs.ability;
+  }
+
+  getRequest(property?: string): unknown {
+    const { request } = this.ctxArgs;
+
+    if (!property) {
+      return request;
+    }
+
+    return typeof request === 'object' && request !== null
+      ? Reflect.get(request, property)
+      : undefined;
   }
 
   getExecutionContext(): ExecutionContext {

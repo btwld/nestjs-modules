@@ -31,7 +31,7 @@ const v8Packages = [
 // Packages with runnable examples beside `src` (`examples/`, never
 // published). Each has its own `examples/tsconfig.json`, which maps the
 // package name to its source.
-const examplePackages = ['nestjs-repository'];
+const examplePackages = ['nestjs-repository', 'nestjs-access-control'];
 const exampleFiles = examplePackages.map(
   (name) => `packages/${name}/examples/**/*.ts`,
 );

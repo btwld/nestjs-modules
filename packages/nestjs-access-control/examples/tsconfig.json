@@ -1,0 +1,17 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "typeRoots": [
+      "../node_modules/@types",
+      "../../../node_modules/@types",
+      "../../../node_modules"
+    ],
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@concepta/nestjs-access-control": ["../src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

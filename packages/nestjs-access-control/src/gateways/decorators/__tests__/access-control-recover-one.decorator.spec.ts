@@ -5,7 +5,7 @@ import { ActionEnum } from '@concepta/nestjs-core';
 import { ACCESS_CONTROL_MODULE_GRANT_METADATA } from '../../../access-control.constants.js';
 import { AccessControlRecoverOne } from '../access-control-recover-one.decorator.js';
 
-describe('@AccessControlCreateOne', () => {
+describe('@AccessControlRecoverOne', () => {
   const resource = 'a_protected_resource';
 
   @Controller()
@@ -19,7 +19,7 @@ describe('@AccessControlCreateOne', () => {
   const controller = new TestController();
 
   describe('enhance controller method with access control', () => {
-    it('should have grants metadata', () => {
+    it('should have update grants metadata, as CRUD restore is an update', () => {
       const grants = Reflect.getMetadata(
         ACCESS_CONTROL_MODULE_GRANT_METADATA,
         controller.recoverOne,
@@ -28,7 +28,7 @@ describe('@AccessControlCreateOne', () => {
       expect(grants).toEqual([
         {
           resource: resource,
-          action: ActionEnum.CREATE,
+          action: ActionEnum.UPDATE,
         },
       ]);
     });

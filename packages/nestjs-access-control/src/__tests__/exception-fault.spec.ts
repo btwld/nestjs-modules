@@ -6,7 +6,9 @@ import {
 } from '@concepta/nestjs-core';
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
-import { AccessControllerException } from '../domain/exceptions/access-controller.exception.js';
+import { AccessControlException } from '../domain/exceptions/access-control.exception.js';
+import { AccessRefusedException } from '../domain/exceptions/access-refused.exception.js';
+import { AccessRulesInvalidException } from '../domain/exceptions/access-rules-invalid.exception.js';
 
 /**
  * Anti-drift check: every `RuntimeException` subclass in this package states
@@ -18,8 +20,23 @@ const CASES: {
   fault: RuntimeExceptionFault;
 }[] = [
   {
-    name: 'AccessControllerException',
-    build: () => new AccessControllerException('failure'),
+    name: 'AccessControlException',
+    build: () => new AccessControlException(),
+    fault: 'internal',
+  },
+  {
+    name: 'AccessRefusedException',
+    build: () =>
+      new AccessRefusedException({
+        action: 'read:any',
+        subject: 'user',
+        reason: 'no-grant',
+      }),
+    fault: 'client',
+  },
+  {
+    name: 'AccessRulesInvalidException',
+    build: () => new AccessRulesInvalidException(['problem']),
     fault: 'usage',
   },
 ];
@@ -39,5 +56,33 @@ describe('exception fault classification', () => {
     const expected = new Set(CASES.map((c) => c.build().constructor.name));
     const missing = discovered.filter((name) => !expected.has(name));
     expect(missing).toEqual([]);
+  });
+
+  it.each<[string, RuntimeException]>([
+    ['ACCESS_CONTROL_ERROR', new AccessControlException()],
+    [
+      'ACCESS_REFUSED_ERROR',
+      new AccessRefusedException({
+        action: 'read:any',
+        subject: 'user',
+        reason: 'denied',
+      }),
+    ],
+    [
+      'ACCESS_RULES_INVALID_ERROR',
+      new AccessRulesInvalidException(['problem']),
+    ],
+  ])('sets error code %s', (errorCode, exception) => {
+    expect(exception.errorCode).toEqual(errorCode);
+  });
+
+  it('refuses with 403', () => {
+    expect(
+      new AccessRefusedException({
+        action: 'read:any',
+        subject: 'user',
+        reason: 'denied',
+      }).getStatus(),
+    ).toEqual(403);
   });
 });
