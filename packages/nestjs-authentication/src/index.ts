@@ -91,6 +91,7 @@ export { JwtStrategy } from './infrastructure/strategies/jwt/jwt.strategy.js';
 export { JwtGuard } from './infrastructure/strategies/jwt/jwt.guard.js';
 export { JwtAuthenticationException } from './infrastructure/strategies/jwt/exceptions/jwt-authentication.exception.js';
 export { JwtUnauthorizedException } from './infrastructure/strategies/jwt/exceptions/jwt-unauthorized.exception.js';
+export { AuthUserConflictException } from './infrastructure/exceptions/auth-user-conflict.exception.js';
 
 // auth-local feature
 export { LocalService } from './application/services/local/local.service.js';

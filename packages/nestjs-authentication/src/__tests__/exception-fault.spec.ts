@@ -17,6 +17,7 @@ import { AuthenticationEmailException } from '../domain/exceptions/authenticatio
 import { AuthenticationException } from '../domain/exceptions/authentication.exception.js';
 import { TokenAlreadyRevokedException } from '../domain/exceptions/token-already-revoked.exception.js';
 import { TokenException } from '../domain/exceptions/token.exception.js';
+import { AuthUserConflictException } from '../infrastructure/exceptions/auth-user-conflict.exception.js';
 import { AuthenticationFeatureConfigException } from '../infrastructure/exceptions/authentication-feature-config.exception.js';
 import { JwtVerifyException } from '../infrastructure/jwt/exceptions/jwt-verify.exception.js';
 import { JwtException } from '../infrastructure/jwt/exceptions/jwt.exception.js';
@@ -175,6 +176,11 @@ const CASES: {
   {
     name: 'JwtUnauthorizedException',
     build: () => new JwtUnauthorizedException(),
+    fault: 'client',
+  },
+  {
+    name: 'AuthUserConflictException',
+    build: () => new AuthUserConflictException(),
     fault: 'client',
   },
   {

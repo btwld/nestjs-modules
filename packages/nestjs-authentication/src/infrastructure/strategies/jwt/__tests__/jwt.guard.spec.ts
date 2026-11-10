@@ -28,7 +28,7 @@ describe(JwtGuard, () => {
     jwtGuard = moduleRef.get<JwtGuard>(JwtGuard);
     spyCanActivate = vi
       .spyOn(JwtGuard.prototype, 'canActivate')
-      .mockImplementation(() => true);
+      .mockResolvedValue(true);
     user = { id: randomUUID() };
   });
 

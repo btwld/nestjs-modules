@@ -70,12 +70,12 @@ describe(RefreshGuard.name, () => {
   });
 
   describe('canActivate', () => {
-    it('should delegate to the passport canActivate', () => {
+    it('should delegate to the passport canActivate', async () => {
       const spy = vi
         .spyOn(RefreshGuard.prototype, 'canActivate')
-        .mockReturnValue(true);
+        .mockResolvedValue(true);
 
-      const result = guard.canActivate(context);
+      const result = await guard.canActivate(context);
 
       expect(spy).toHaveBeenCalledWith(context);
       expect(result).toBe(true);

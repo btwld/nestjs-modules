@@ -545,7 +545,14 @@ that enforces JWT verification on every route. Token extraction defaults to
 - `@AuthPublic()` — exempts a route handler from the global guard. At class
   level, pass `@AuthPublic({ classLevel: true })` to make the intent explicit;
   a class-level `@AuthPublic()` without the option triggers a runtime warning
-  on every request.
+  on every request. A public route never authenticates, so it sees no user
+  even when the caller sends a valid token.
+- `@AuthPublic({ optional: true })` — a public route that still recognises a
+  signed-in caller: a valid token signs them in, and a missing or invalid one
+  leaves the call anonymous rather than refusing it. Any authentication
+  failure counts, a failing user lookup included, so an outage of your user
+  store makes signed-in callers anonymous there. A method's plain
+  `@AuthPublic()` overrides a controller's `{ optional: true }`.
 - `@AuthUser()` — injects the verified user object into a route parameter.
 
 ```typescript
@@ -556,6 +563,12 @@ import { AuthPublic, AuthUser } from '@concepta/nestjs-authentication';
 export class PublicController {
   @Get()
   open() { return 'no token needed'; }
+
+  @Get('catalog')
+  @AuthPublic({ optional: true })
+  catalog(@AuthUser() user?: AuthenticatedUserInterface) {
+    return user ? 'catalog with your prices' : 'catalog';
+  }
 }
 
 @Controller('private')
@@ -1330,6 +1343,13 @@ To protect only specific routes, leave the global guard enabled and use
 `@AuthPublic()` on handlers (or `@AuthPublic({ classLevel: true })` on
 controllers) that should be publicly accessible.
 
+`settings.guards.disable` is a callback that skips authentication for any
+call it returns `true` for. It runs on every request, so base it on the
+route, never on what the client sends: a callback that skips JWT when an
+`x-api-key` header is present lets any client turn authentication off by
+sending that header. For callers authenticated another way, such as API
+keys, authenticate them in a guard of their own instead.
+
 To replace the default `JwtGuard` with a custom guard as the global APP_GUARD:
 
 ```typescript
@@ -1347,21 +1367,45 @@ AuthenticationModule.forRoot({
 
 ### Context Overlay
 
-`AuthUserContextOverlay` is registered as an `APP_INTERCEPTOR` and publishes
-`request.user` into the Rockets `AppContextHost` via the `AuthUserCtx`
-overlay reference:
+The authenticated user is published into the Rockets `AppContextHost` as the
+`AuthUserCtx` overlay:
 
 ```typescript
 import { AuthUserCtx } from '@concepta/nestjs-authentication';
 import { getAppContext } from '@concepta/nestjs-core';
 
-// In a handler or interceptor:
+// In a handler or an interceptor:
 const { user } = getAppContext(request).with(AuthUserCtx);
+
+// In a guard that runs after authentication, where it is absent on a
+// call nobody authenticated:
+const ctx = getAppContext(request);
+const user = ctx.supports(AuthUserCtx) ? ctx.with(AuthUserCtx).user : undefined;
 ```
 
 This is exactly how the `@AuthUser()` decorator resolves the user, and it is
 useful in command/query handlers that need access to the authenticated user
 without taking it as a parameter.
+
+The guard that authenticates a call defines it, immutably, so guards that run
+after it, such as an authorization guard, can read it, and nothing later in
+the call can change who the user is. A second guard on the same call that
+authenticates the same user changes nothing; one that authenticates someone
+else refuses the call with `AuthUserConflictException` (401), since one call
+acts for one user. On a call no guard authenticated, such as a public route,
+`AuthUserContextOverlay` (an `APP_INTERCEPTOR`) defines it with no user —
+after every guard, so a guard finds it absent there. Don't define
+`AuthUserCtx` yourself on HTTP: it is already defined by then, and
+redefining it fails.
+
+A guard that runs *before* authentication sees neither `request.user` nor
+`AuthUserCtx`: keep authentication global, or list its guard first.
+
+The JWT and refresh strategies accept a user `UserPort.getBySubject`
+returns, without checking `active`: only local login refuses an inactive
+user. Until they do, a disabled user keeps access until their token
+expires; refuse inactive users in `getBySubject`, or keep access tokens
+short.
 
 The overlay reads `request.user`, so it attaches on HTTP only. In RPC message
 handlers, define `AuthUserCtx` from your own overlay that reads the user from
@@ -1553,7 +1597,7 @@ gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 | Symbol | Description |
 |---|---|
 | `AuthUserCtx` | `OverlayRef` for the authenticated user context |
-| `AuthUserContextOverlay` | `APP_INTERCEPTOR` that publishes `request.user` |
+| `AuthUserContextOverlay` | `APP_INTERCEPTOR` that defines `AuthUserCtx` on calls no guard authenticated |
 | `AuthUserContextInterface` | Shape of the user context overlay |
 
 ### OAuth Utilities

@@ -1,9 +1,17 @@
-import { SetMetadata } from '@nestjs/common';
+import { applyDecorators, SetMetadata } from '@nestjs/common';
 
-import { AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN } from '../../authentication.constants.js';
+import {
+  AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+  AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+} from '../../authentication.constants.js';
 
 export interface AuthPublicOptions {
   classLevel?: boolean;
+  /**
+   * Authenticate a caller who sends credentials, and let one who sends
+   * none, or bad ones, through as nobody: never refused.
+   */
+  optional?: boolean;
 }
 
 export type AuthPublicMetadata = true | 'classLevel';
@@ -14,6 +22,10 @@ export type AuthPublicMetadata = true | 'classLevel';
  * When applied at the **class level**, pass `{ classLevel: true }` to
  * make the intent explicit and suppress the runtime warning. Without this option,
  * a warning is emitted on every request where the class-level decorator is active.
+ *
+ * Pass `{ optional: true }` for a public route that still recognises a
+ * signed-in caller: credentials, when sent and valid, sign the caller in;
+ * missing or invalid ones leave the call anonymous instead of refusing it.
  *
  * @example Method-level (default, no warning):
  * ```ts
@@ -28,9 +40,26 @@ export type AuthPublicMetadata = true | 'classLevel';
  * @Controller('public')
  * class PublicController {}
  * ```
+ *
+ * @example Optional authentication:
+ * ```ts
+ * @Get('catalog')
+ * @AuthPublic({ optional: true })
+ * getCatalog(@AuthUser() user?: AuthenticatedUserInterface) {}
+ * ```
  */
-export const AuthPublic = (options?: AuthPublicOptions) =>
-  SetMetadata<string, AuthPublicMetadata>(
-    AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
-    options?.classLevel ? 'classLevel' : true,
+export const AuthPublic = (
+  options?: AuthPublicOptions,
+): ReturnType<typeof applyDecorators> =>
+  applyDecorators(
+    SetMetadata<string, AuthPublicMetadata>(
+      AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+      options?.classLevel ? 'classLevel' : true,
+    ),
+    // Set either way, so a method's plain `@AuthPublic()` overrides a
+    // controller's `{ optional: true }`.
+    SetMetadata(
+      AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+      options?.optional === true,
+    ),
   );
