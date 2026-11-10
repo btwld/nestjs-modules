@@ -431,6 +431,33 @@ export class AppModule {}
 The correlation id comes from an HTTP header, so on other transports each
 event context starts a fresh pair.
 
+### Actor and Authority
+
+`ActorCtx` carries who is acting on a call: a person through their roles, or
+a system acting on its own authority. Whatever established the caller defines
+it once, immutably, and every package that decides access reads it from the
+same place:
+
+```ts
+import { ActorCtx } from '@concepta/nestjs-core';
+
+ctx.defineOverlay(
+  ActorCtx,
+  { kind: 'role', roles: ['clerk'], userId: user.id },
+  { immutable: true },
+);
+ctx.defineOverlay(ActorCtx, { kind: 'system', name: 'billing-sync' }, { immutable: true });
+```
+
+`AuthorityInterface` is the contract for deciding access: given the actor, an
+object, an action and the object's columns, `decide()` allows (optionally
+only some columns) or refuses (optionally naming a decision still pending).
+Core ships no implementation; `@concepta/nestjs-repository` enforces one on
+every repository call and ships a CASL-backed one — see its
+[Object Authority](../nestjs-repository/README.md#object-authority).
+`actorKeys(actor)` gives the keys an actor's permissions are usually stored
+under: `role:<name>` for each role, `system:<name>` for a system.
+
 ### RPC (preview)
 
 > RPC support is a preview and may change in a minor release.
@@ -1098,6 +1125,12 @@ exercise correlation behavior directly.
 | `CorrelationCtx` | `OverlayRef` token for the correlation overlay. Use with `ctx.with(CorrelationCtx)` or `@Ctx(CorrelationCtx)`. |
 | `CorrelationContextOverlay` | Seeds `correlationId`/`causationId` from the `x-correlation-id` request header. Registered by `CoreModule`. |
 | `CorrelationContextInterface` | Shape of the resolved overlay: `{ correlationId, causationId }`. |
+| `ActorCtx` | `OverlayRef` token for who is acting on a call. Define it `{ immutable: true }` — see [Actor and Authority](#actor-and-authority). |
+| `Actor`, `RoleActorInterface`, `SystemActorInterface` | `{ kind: 'role', roles, userId? }` or `{ kind: 'system', name }`. |
+| `actorKeys(actor)` | `role:<name>` for each role, or `system:<name>`. |
+| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
+| `AuthorityRequestInterface` | `{ actor, object, action, columns }`. |
+| `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns? }` or `{ effect: 'refuse', gate? }`. |
 
 ### Exceptions Exports
 

@@ -8,6 +8,9 @@ import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing
 
 import { ActivityBootException } from '../activity/exceptions/activity-boot.exception.js';
 import { ActivityWriteException } from '../activity/exceptions/activity-write.exception.js';
+import { AuthorityBootException } from '../authority/exceptions/authority-boot.exception.js';
+import { AuthorityRefusedException } from '../authority/exceptions/authority-refused.exception.js';
+import { AuthorityUnboundException } from '../authority/exceptions/authority-unbound.exception.js';
 import { UnsupportedDurableDriverException } from '../durable/exceptions/unsupported-durable-driver.exception.js';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
@@ -174,6 +177,21 @@ const CASES: {
     name: 'RowScopeBootException',
     build: () => new RowScopeBootException(['some failure']),
     fault: 'usage',
+  },
+  {
+    name: 'AuthorityBootException',
+    build: () => new AuthorityBootException(['some failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'AuthorityUnboundException',
+    build: () => new AuthorityUnboundException('orders'),
+    fault: 'usage',
+  },
+  {
+    name: 'AuthorityRefusedException',
+    build: () => new AuthorityRefusedException('Order', 'read'),
+    fault: 'client',
   },
   {
     name: 'RowScopeUnboundException',

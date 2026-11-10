@@ -3,6 +3,7 @@ import { type Type, type PlainLiteralObject } from '@nestjs/common';
 import { type HookOption } from '@concepta/nestjs-core';
 
 import { type ActivityRegistration } from '../activity/interfaces/activity-registration.interface.js';
+import { type AuthorityRegistration } from '../authority/interfaces/authority-registration.interface.js';
 import { type WhereCondition } from '../repository/interfaces/where-clause.interface.js';
 import { type RowScopeRegistration } from '../row-scope/interfaces/row-scope-registration.interface.js';
 import { type WritePolicyRegistration } from '../write-policy/interfaces/write-policy-registration.interface.js';
@@ -61,6 +62,15 @@ export interface RepositoryProviderOptions<
    * entity is deliberately public along with the reason.
    */
   rowScope?: RowScopeRegistration;
+
+  /**
+   * Who may read and write this entity.
+   *
+   * Either names the authority that decides each call from the caller's
+   * actor (`ActorCtx`), or records that the entity is deliberately open along
+   * with the reason. A governed entity refuses a call with no actor.
+   */
+  authority?: AuthorityRegistration;
 
   /**
    * Whether stored rows of this entity may change.

@@ -8,6 +8,10 @@ import {
 import { SCOPE_OPTIONS_METADATA } from '@nestjs/common/constants.js';
 import { ModuleRef } from '@nestjs/core';
 
+import { type AuthorityInterface } from '@concepta/nestjs-core';
+
+import { AuthorityBootException } from './authority/exceptions/authority-boot.exception.js';
+import { isAuthorityGoverned } from './authority/interfaces/authority-registration.interface.js';
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
 import { RepositoryDuplicateKeyException } from './exceptions/repository-duplicate-key.exception.js';
 import {
@@ -65,6 +69,7 @@ export function createRepositoryRootModule(params: {
         options: {
           ...options,
           rowScope: options.rowScope && { ...options.rowScope },
+          authority: options.authority && { ...options.authority },
           hooks: options.hooks && [...options.hooks],
           writePolicy: options.writePolicy && { ...options.writePolicy },
           activity: options.activity && {
@@ -154,6 +159,26 @@ export function createRepositoryRootModule(params: {
         },
       ];
     }),
+    // Authority — one provider per governed entity, kept apart from the
+    // binding for the same reason as the row scope resolvers above.
+    ...entries.flatMap(({ options }) => {
+      const registration = options.authority;
+      if (!isAuthorityGoverned(registration)) return [];
+
+      return [
+        {
+          provide: Symbol(`AUTHORITY_BINDING_${options.key}`),
+          inject: [REPOSITORY_BINDING, registration.authority],
+          useFactory: (
+            binding: RepositoryBinding,
+            authority: AuthorityInterface,
+          ) => {
+            binding.get(options.key)?.setAuthority(authority);
+            return true;
+          },
+        },
+      ];
+    }),
     ...transactionFactories.map((descriptor) => ({
       provide: Symbol(`TX_FACTORY_${descriptor.key}`),
       inject: [TRANSACTION_FACTORY_REGISTRY, ...descriptor.inject],
@@ -228,17 +253,7 @@ function assertResolversNotRequestScoped(
   const failures = entries.flatMap(({ options }) => {
     const registration = options.rowScope;
     if (!isRowScopeScoped(registration)) return [];
-
-    const scopeOptions: unknown = Reflect.getMetadata(
-      SCOPE_OPTIONS_METADATA,
-      registration.resolver,
-    );
-    const requestScoped =
-      typeof scopeOptions === 'object' &&
-      scopeOptions !== null &&
-      'scope' in scopeOptions &&
-      scopeOptions.scope === Scope.REQUEST;
-    if (!requestScoped) return [];
+    if (!isRequestScoped(registration.resolver)) return [];
 
     return [
       `"${options.key}" declares the request-scoped resolver ` +
@@ -250,6 +265,35 @@ function assertResolversNotRequestScoped(
   if (failures.length > 0) {
     throw new RowScopeBootException(failures);
   }
+
+  const authorityFailures = entries.flatMap(({ options }) => {
+    const registration = options.authority;
+    if (!isAuthorityGoverned(registration)) return [];
+    if (!isRequestScoped(registration.authority)) return [];
+
+    return [
+      `"${options.key}" declares the request-scoped authority ` +
+        `${registration.authority.name}. Authorities are bound once, at ` +
+        'startup; make it singleton-scoped and read the caller from ctx.',
+    ];
+  });
+
+  if (authorityFailures.length > 0) {
+    throw new AuthorityBootException(authorityFailures);
+  }
+}
+
+function isRequestScoped(type: Type): boolean {
+  const scopeOptions: unknown = Reflect.getMetadata(
+    SCOPE_OPTIONS_METADATA,
+    type,
+  );
+  return (
+    typeof scopeOptions === 'object' &&
+    scopeOptions !== null &&
+    'scope' in scopeOptions &&
+    scopeOptions.scope === Scope.REQUEST
+  );
 }
 
 function assertDistinctTransactionKeys(keys: string[]): void {

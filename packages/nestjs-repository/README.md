@@ -25,6 +25,7 @@ nesting, and a two-level repository hook system.
 - [Transactional Decorator](#transactional-decorator)
 - [Repository Hooks](#repository-hooks)
 - [Row Scope](#row-scope)
+- [Object Authority](#object-authority)
 - [Write Policy](#write-policy)
 - [Activity Log](#activity-log)
 - [Durable Messaging](#durable-messaging)
@@ -62,6 +63,7 @@ NestJS 12.
 | `@nestjs/core` | Yes | Reflector for metadata — install explicitly |
 | `rxjs` | Yes | Used by `TransactionalRunner` and interceptor |
 | `@nestjs/outbox` | No | Only for [Durable Messaging](#durable-messaging) |
+| `@casl/ability` | No | Only for `CaslAuthority` — see [Rules with CASL](#rules-with-casl) |
 | `vitest`, `vitest-mock-extended` | No | Only for `@concepta/nestjs-repository/testing` |
 
 ## Module Registration
@@ -202,6 +204,7 @@ interface RepositoryModuleOptionsInterface {
   defaultTimeout?: number; // Transaction timeout in milliseconds (default: 30000)
   requireRowScopeDeclaration?: boolean; // Fail startup on an entity with no rowScope (default: false)
   requireWritePolicyDeclaration?: boolean; // Fail startup on an entity with no writePolicy (default: false)
+  requireAuthorityDeclaration?: boolean; // Fail startup on an entity with no authority (default: false)
   federation?: { maxKeys?: number }; // Bound on federated reads (default: 1000) — see `maxKeys`
 }
 ```
@@ -215,7 +218,8 @@ an undeclared entity is a mistake depends on the deployment: an application
 that scopes everything wants it on, one that scopes a handful of entities
 among many does not — see [Row Scope](#row-scope).
 `requireWritePolicyDeclaration` does the same for `writePolicy` — see
-[Write Policy](#write-policy).
+[Write Policy](#write-policy) — and `requireAuthorityDeclaration` for
+`authority` — see [Object Authority](#object-authority).
 
 ## Architecture Overview
 
@@ -2451,6 +2455,227 @@ as `nestjs-repository-typeorm` on Postgres, Oracle or SQL Server, which sets
 the caller's tenant on every transaction from the same `RowScopeCtx` overlay.
 See its [adapter sections](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
+## Object Authority
+
+Object authority decides what a caller may *do* with an entity: which of
+create, read, update and delete, and on which columns. Row scope decides which
+rows; authority decides which actions and which columns, so the two combine.
+Like row scope, it holds for every repository call, not only for calls that
+come through a controller: a queue consumer, a job or another module's service
+is decided the same way.
+
+Runnable [examples](./examples) show it end to end: roles and a system over
+one entity, rules an admin edits at runtime, and invoices combining
+authority with row scope, cascades and joins.
+
+### Governing an entity
+
+Every entity is governed, open, or undeclared:
+
+```ts
+RepositoryModule.forRoot({
+  imports: [AuthorityModule],
+  drivers: [
+    {
+      driver: MyDriverModule,
+      entities: [
+        {
+          key: 'orders',
+          entity: OrderEntity,
+          authority: { access: 'governed', authority: CaslAuthority },
+        },
+        {
+          key: 'countries',
+          entity: CountryEntity,
+          authority: { access: 'open', reason: 'public reference data' },
+        },
+      ],
+    },
+  ],
+});
+```
+
+`authority` is a provider, resolved from `forRoot({ imports })` like a row
+scope resolver. `open` requires a reason because it is a decision someone has
+to defend later. Undeclared is allowed unless the deployment sets
+`requireAuthorityDeclaration`.
+
+### The actor
+
+An authority decides for an actor: a person acting through their roles, or a
+system acting on its own authority. Whatever established the caller —
+authentication, a queue consumer, a scheduled job — defines it once on the
+call's `ctx`, immutably:
+
+```ts
+import { ActorCtx } from '@concepta/nestjs-core';
+
+ctx.defineOverlay(
+  ActorCtx,
+  { kind: 'role', roles: ['clerk'], userId: user.id },
+  { immutable: true },
+);
+
+// A job acting as itself, never as the account it runs under
+ctx.defineOverlay(
+  ActorCtx,
+  { kind: 'system', name: 'billing-sync' },
+  { immutable: true },
+);
+```
+
+A governed entity refuses a call whose `ctx` carries no actor. The actor is
+read from the `ctx` the call arrived with, before hooks run, so a hook that
+hands on another `ctx` cannot change who is decided.
+
+### Rules with CASL
+
+`@concepta/nestjs-repository/optional/casl` ships an authority that answers
+from [CASL](https://casl.js.org) rules. You supply the rules for each actor,
+from settings, a table, or another service:
+
+```ts
+import { Injectable, Module, type PlainLiteralObject } from '@nestjs/common';
+
+import { type Actor, actorKeys } from '@concepta/nestjs-core';
+import {
+  CaslAuthority,
+  type CaslAuthorityRule,
+  type CaslAuthorityRulesInterface,
+} from '@concepta/nestjs-repository/optional/casl';
+
+const RULES: Record<string, CaslAuthorityRule[]> = {
+  'role:clerk': [
+    { action: ['create', 'read', 'update'], subject: 'orders' },
+    // Clerks never change a total, whatever else allows it
+    { action: 'update', subject: 'orders', fields: ['total'], inverted: true },
+  ],
+  'role:auditor': [{ action: 'read', subject: 'orders' }],
+  'system:billing-sync': [
+    { action: 'update', subject: 'orders', fields: ['total', 'status'] },
+  ],
+};
+
+@Injectable()
+class OrderRules implements CaslAuthorityRulesInterface {
+  rulesFor(_ctx: PlainLiteralObject, actor: Actor): CaslAuthorityRule[] {
+    return actorKeys(actor).flatMap((key) => RULES[key] ?? []);
+  }
+}
+
+@Module({
+  providers: [
+    OrderRules,
+    {
+      provide: CaslAuthority,
+      inject: [OrderRules],
+      useFactory: (rules: OrderRules) => new CaslAuthority(rules),
+    },
+  ],
+  exports: [CaslAuthority],
+})
+export class AuthorityModule {}
+```
+
+- **`subject`** is the entity's `forRoot()` key; **`action`** is `create`,
+  `read`, `update` or `delete`.
+- **`fields`** limits a rule to those columns, by exact name. A rule naming no
+  fields covers every column.
+- **A deny (`inverted`) always wins**, whatever order the rules come in, and
+  whichever of an actor's roles it belongs to.
+- **A deny's `reason`** is reported as a decision still pending — say, a
+  permission nobody has approved yet — in the refusal's context, for logs.
+  Only a deny of the whole entity reports one, and only when every deny that
+  applies has a reason: a deny without one is final.
+- **`manage` and `all`** are CASL's words for every action and every entity,
+  so don't key an entity `all`.
+- **No `conditions`.** Which rows a caller reaches is row scope's to decide; a
+  rule with conditions throws rather than being ignored.
+- `actorKeys` keys a person by each role (`role:<name>`) and a system by its
+  name (`system:<name>`). Rules for one person alone are yours to look up, for
+  example by `actor.userId`.
+- Rules are asked for once per `ctx`, so every check in one call reads the
+  same rules even when they are stored and edited at runtime.
+
+Any other engine plugs in the same way: implement `AuthorityInterface` from
+`@concepta/nestjs-core`. Its `decide(ctx, request)` is given the actor, the
+entity's key (`object`), the action and every column of the entity, and
+answers `{ effect: 'allow' }`, `{ effect: 'allow', columns }` to allow only
+some columns, or `{ effect: 'refuse', gate? }`.
+
+### What is decided
+
+Each operation is decided at its entry, before hooks run and before the
+repository reads anything for itself, so a refusal never depends on what is
+stored: a refused caller's create naming a taken key, or delete of a missing
+row, is a `403`, never a `409` or `404` that would tell them the row exists.
+
+| Operation | Action |
+| --- | --- |
+| `find`, `findOne`, `count`, `findAndCount` | read |
+| `create`, `createMany` | create |
+| `update`, `replace`, `restore` | update |
+| `delete`, `deleteMany`, `softDelete` | delete |
+| `upsert` | create **and** update — it does either, depending on what is stored, and deciding both never reveals which |
+
+**Columns:**
+
+- **Reads.** A read that selects, filters or sorts on a column the actor may
+  not read is refused. A read selecting nothing returns only the columns the
+  actor may read. An actor who may read no column at all is refused.
+- **Writes.** Every column a write sets must be writable; the primary key is
+  not checked, since it names the row. A `replace` erases what it leaves out,
+  so it needs every column writable. Columns row scope stamps (a tenant id)
+  are not counted against the actor.
+- **Write results** hold the columns the actor may read, and the primary key.
+  A write needs no read permission of its own: an actor who may only create
+  gets back the new row's key.
+
+**Relations:**
+
+- **Joins** into a governed entity, or through a governed junction, are
+  decided as the caller, even when the entity read is not governed. Joined
+  rows hold only the columns the actor may read of them, and a filter or sort
+  on any other is refused. A federated relation is read through its own
+  repository, which decides it there.
+- **Cascades** are decided before the parent is written, since the
+  repository opens no transaction: a create needs create on each related
+  entity it writes; an update needs update and create (and delete, for a
+  to-one set to `null`); a `replace` or `upsert` also needs delete. A delete,
+  soft delete or restore finds every related row first, then decides each
+  related entity it touches before writing any. The foreign key a cascade
+  links a related row by is not counted against the actor. A related row's
+  other columns are checked when it is written, after its parent.
+
+### What is not decided
+
+The repository's own calls: the activity record of a write already decided,
+the read `RowScopeBase` makes to check a row is the caller's before writing
+it, and a cascade's reads finding the related rows to write. They are marked
+inside the package, and nothing outside it can mark a call. Everything else is
+decided as its caller — hooks calling other repositories, and cascade writes,
+included.
+
+As with row scope, an ORM's own repository used directly, or SQL that
+bypasses the repository, is outside it.
+
+### Refusals
+
+`AuthorityRefusedException` is a `403`. Its message names only the action and
+the entity (`Not allowed to read Order`); the columns refused and any pending
+decision (`gate`) are in its `context`, for logs, never in the response.
+
+### Authority startup checks
+
+- an authority must be singleton-scoped, and so must everything it depends
+  on, checked the same way as row scope resolvers;
+- no entity that sets `allowEagerRelations` has a relation into governed
+  rows, which an eager relation would read undecided;
+- with `requireAuthorityDeclaration`, every entity carries a declaration.
+
+A governed entity whose authority never arrived refuses every call
+(`AuthorityUnboundException`) rather than run undecided.
+
 ## Write Policy
 
 Row scope restricts *which* rows a caller may touch. Write policy restricts
@@ -3047,6 +3272,9 @@ also exported for manual provider wiring.
 | `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
+| `AuthorityRefusedException` | The authority governing an entity refused the caller's action or a column it names, or the call carried no actor (403). The message names the action and entity only; `context.columns` and `context.gate` are for logs — see [Refusals](#refusals) |
+| `AuthorityUnboundException` | A governed entity was asked to serve an operation before its authority was attached — used from another provider's constructor during startup. It refuses rather than running undecided |
+| `AuthorityBootException` | One or more authority checks failed at startup; the message lists every failure — see [Authority startup checks](#authority-startup-checks) |
 | `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. Append a correcting record instead |
 | `WritePolicyBootException` | One or more structural write-policy checks failed at startup; the message lists every failure |
 | `ActivityWriteException` | A write's activity record couldn't be stored. A refusal by the store, such as its row scope, keeps its status (a `403` stays a `403`); anything else is a `500`. Without a transaction, the write itself is already stored — see [Transactions](#transactions) |
@@ -3059,5 +3287,6 @@ also exported for manual provider wiring.
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
 | `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
+| `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityRule`, `CaslAuthorityRulesInterface`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

@@ -135,6 +135,18 @@ export {
 } from './infrastructure/context/correlation-context.overlay.js';
 export { CorrelationContextInterface } from './infrastructure/context/interfaces/correlation-context.interface.js';
 
+// Actor and authority
+export { ActorCtx } from './infrastructure/context/actor.context.js';
+export { Actor } from './domain/authority/interfaces/actor.type.js';
+export { RoleActorInterface } from './domain/authority/interfaces/role-actor.interface.js';
+export { SystemActorInterface } from './domain/authority/interfaces/system-actor.interface.js';
+export { actorKeys } from './domain/authority/utils/actor-keys.util.js';
+export { AuthorityInterface } from './domain/authority/interfaces/authority.interface.js';
+export { AuthorityRequestInterface } from './domain/authority/interfaces/authority-request.interface.js';
+export { AuthorityDecision } from './domain/authority/interfaces/authority-decision.type.js';
+export { AuthorityAllowInterface } from './domain/authority/interfaces/authority-allow.interface.js';
+export { AuthorityRefuseInterface } from './domain/authority/interfaces/authority-refuse.interface.js';
+
 // Event context
 export { EventContextHost } from './domain/events/causal-context/event-context.host.js';
 export { EventContextInterface } from './domain/events/causal-context/interfaces/event-context.interface.js';

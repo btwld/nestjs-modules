@@ -3,6 +3,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type HookOption } from '@concepta/nestjs-core';
 
 import { type ActivityBinding } from '../../activity/interfaces/activity-binding.interface.js';
+import { type AuthorityRegistration } from '../../authority/interfaces/authority-registration.interface.js';
 import { type CascadeRelation } from '../../cascade/cascade-relation.interface.js';
 import { type FederatedRelation } from '../../federation/federated-relation.interface.js';
 import { type FederationReader } from '../../federation/federation-reader.service.js';
@@ -19,6 +20,9 @@ import { type RepositoryAdapter } from '../repository-adapter.js';
 export interface RepositoryBindingInterface {
   /** Whether the entity's rows are scoped, and by which resolver class. */
   readonly rowScope?: RowScopeRegistration;
+
+  /** Whether an authority decides the entity's calls, and which. */
+  readonly authority?: AuthorityRegistration;
 
   /** Hooks registered for the entity. */
   readonly hooks?: HookOption[];
@@ -39,6 +43,16 @@ export interface RepositoryBindingInterface {
   readonly relationsIntoScoped?: ReadonlyMap<
     string,
     RepositoryAdapter<PlainLiteralObject> | undefined
+  >;
+
+  /**
+   * The relations whose rows, or whose junction rows, an authority governs,
+   * each with the repositories of those rows. A join reads them through this
+   * entity's driver, so each is decided as the caller.
+   */
+  readonly relationsIntoGoverned?: ReadonlyMap<
+    string,
+    readonly RepositoryAdapter<PlainLiteralObject>[]
   >;
 
   /** The entity's federated relations, and how they are read. */

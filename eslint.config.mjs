@@ -28,7 +28,17 @@ const v8Packages = [
   'nestjs-access-control',
   'nestjs-file',
 ];
-const v8Files = v8Packages.map((name) => `packages/${name}/src/**/*.ts`);
+// Packages with runnable examples beside `src` (`examples/`, never
+// published). Each has its own `examples/tsconfig.json`, which maps the
+// package name to its source.
+const examplePackages = ['nestjs-repository'];
+const exampleFiles = examplePackages.map(
+  (name) => `packages/${name}/examples/**/*.ts`,
+);
+const v8Files = [
+  ...v8Packages.map((name) => `packages/${name}/src/**/*.ts`),
+  ...exampleFiles,
+];
 
 // Guard the optional/* entry-point boundary (see the root README's Entry
 // Points section): an optional peer dependency may only be imported from the
@@ -106,6 +116,19 @@ const OPTIONAL_DEP_RESTRICTED_PATTERNS = [
   ),
 ];
 
+const CASL_RESTRICTED_PATTERN = optionalDepPattern(
+  '@casl/ability',
+  "Only the repository's optional/casl entry point may import this (src/casl/**) — see the root README's Entry Points section.",
+);
+const CASL_RESTRICTED_FILES = ['packages/nestjs-repository/src/**/*.ts'];
+const CASL_ALLOWED_FILES = [
+  'packages/nestjs-repository/src/casl/**/*.ts',
+  'packages/nestjs-repository/src/**/__tests__/**/*.ts',
+  'packages/nestjs-repository/src/**/__fixtures__/**/*.ts',
+  'packages/nestjs-repository/src/**/*.spec.ts',
+  'packages/nestjs-repository/src/**/*.fixture.ts',
+];
+
 // The optional-dep-free packages are exempt only from the deps they exist
 // for: `@nestjs/outbox` is optional for them too, so their main entry must
 // not reach it either.
@@ -146,7 +169,12 @@ export default tseslint.config(
     ],
     languageOptions: {
       parserOptions: {
-        project: './tsconfig.eslint.json',
+        project: [
+          './tsconfig.eslint.json',
+          ...examplePackages.map(
+            (name) => `./packages/${name}/examples/tsconfig.json`,
+          ),
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -236,6 +264,19 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
     },
   },
+  // `@casl/ability` is optional for the repository only (its optional/casl
+  // entry point); other packages may depend on it outright.
+  {
+    files: CASL_RESTRICTED_FILES,
+    // Also every file the boundary above already allows its own peer in.
+    ignores: [...CASL_ALLOWED_FILES, ...optionalDepAllowedFiles],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [...OPTIONAL_DEP_RESTRICTED_PATTERNS, CASL_RESTRICTED_PATTERN] },
+      ],
+    },
+  },
   {
     files: outboxRestrictedFiles,
     rules: {
@@ -249,12 +290,38 @@ export default tseslint.config(
     },
   },
 
+  // Examples show the package, not OpenAPI: their controllers carry no
+  // Swagger decorators. They are applications, so what they run on (a
+  // driver, its database) comes from the workspace root, never from the
+  // package they show.
+  {
+    files: exampleFiles,
+    rules: {
+      '@darraghor/nestjs-typed/controllers-should-supply-api-tags': 'off',
+      '@darraghor/nestjs-typed/api-method-should-specify-api-response': 'off',
+      'import/no-extraneous-dependencies': [
+        'error',
+        {
+          packageDir: [
+            import.meta.dirname,
+            ...examplePackages.map(
+              (name) => `${import.meta.dirname}/packages/${name}`,
+            ),
+          ],
+        },
+      ],
+    },
+  },
+
   // Spec and fixture files override
   {
-    files: v8Packages.flatMap((name) => [
-      `packages/${name}/src/**/*.spec.ts`,
-      `packages/${name}/src/**/*.fixture.ts`,
-    ]),
+    files: [
+      ...v8Packages.flatMap((name) => [
+        `packages/${name}/src/**/*.spec.ts`,
+        `packages/${name}/src/**/*.fixture.ts`,
+      ]),
+      ...exampleFiles.map((glob) => glob.replace(/\*\.ts$/, '*.e2e-spec.ts')),
+    ],
     rules: {
       '@darraghor/nestjs-typed/controllers-should-supply-api-tags': 'off',
       '@darraghor/nestjs-typed/api-method-should-specify-api-response': 'off',

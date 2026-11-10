@@ -1,7 +1,11 @@
 import { HttpStatus, type PlainLiteralObject, type Type } from '@nestjs/common';
 
 import {
+  ActionEnum,
+  type Actor,
+  ActorCtx,
   AppContextHost,
+  type AuthorityInterface,
   type DeepPartial,
   isObject,
   RuntimeException,
@@ -14,6 +18,15 @@ import {
 } from '@concepta/nestjs-core';
 
 import { ActivityWriter } from '../activity/activity-writer.js';
+import { AuthorityBootException } from '../authority/exceptions/authority-boot.exception.js';
+import { AuthorityRefusedException } from '../authority/exceptions/authority-refused.exception.js';
+import { AuthorityUnboundException } from '../authority/exceptions/authority-unbound.exception.js';
+import {
+  type AuthorityRegistration,
+  isAuthorityGoverned,
+} from '../authority/interfaces/authority-registration.interface.js';
+import { type AuthorizedCallInterface } from '../authority/interfaces/authorized-call.interface.js';
+import { isInternalCall, linkedColumns } from '../authority/internal-call.js';
 import { type CascadeRelation } from '../cascade/cascade-relation.interface.js';
 import { CascadeWriter } from '../cascade/cascade-writer.js';
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
@@ -124,6 +137,7 @@ export abstract class RepositoryAdapter<
   private _binding?: RepositoryBindingInterface;
   private _hooks: HookWithSpec[] = [];
   private _rowScope?: RowScopeInterface;
+  private _authority?: AuthorityInterface;
   private _cascade?: CascadeWriter;
   private _activity?: ActivityWriter;
   private readonly _warnedDuplicates = new Set<Type>();
@@ -243,6 +257,47 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * Attach the authority instance, after `bind()` declared the entity
+   * governed.
+   *
+   * Separate from `bind()` because the instance comes from DI, through a
+   * provider of its own. Until it is attached, the entity refuses every
+   * operation rather than run undecided. Attaches once.
+   */
+  setAuthority(authority: AuthorityInterface): void {
+    if (!isAuthorityGoverned(this._binding?.authority)) {
+      throw new AuthorityBootException([
+        `"${this.entityKey}" is not bound as governed, so it takes no ` +
+          'authority.',
+      ]);
+    }
+    if (this._authority) {
+      throw new AuthorityBootException([
+        `"${this.entityKey}" already has an authority attached. ` +
+          'Authorities are attached once, at startup, and cannot be replaced.',
+      ]);
+    }
+
+    this._authority = authority;
+  }
+
+  /**
+   * Whether an authority is attached. Read by the startup check that every
+   * governed entity got one.
+   */
+  get hasAuthority(): boolean {
+    return this._authority !== undefined;
+  }
+
+  /**
+   * The bound authority declaration, or `undefined` if the entity declared
+   * none. Read by the boot checks.
+   */
+  get authorityDeclaration(): AuthorityRegistration | undefined {
+    return this._binding?.authority;
+  }
+
+  /**
    * Whether a resolver is attached. Read by the startup check that every
    * scoped entity got one.
    */
@@ -284,6 +339,35 @@ export abstract class RepositoryAdapter<
     RepositoryAdapter<PlainLiteralObject> | undefined
   > {
     return this._binding?.relationsIntoScoped ?? new Map();
+  }
+
+  /**
+   * The relations whose rows, or whose junction rows, an authority governs,
+   * each with the repositories of those rows. Read by the join check and the
+   * boot checks.
+   */
+  get relationsIntoGoverned(): ReadonlyMap<
+    string,
+    readonly RepositoryAdapter<PlainLiteralObject>[]
+  > {
+    return this._binding?.relationsIntoGoverned ?? new Map();
+  }
+
+  /**
+   * Decide `actions` on this entity for the actor on `ctx`, exactly as its
+   * own operations do, for a call that reaches its rows through another
+   * entity: a join, or a cascade deciding its related rows before the root
+   * is written.
+   *
+   * Refuses as its operations do. Returns what was allowed, or `undefined`
+   * when no authority governs the entity.
+   */
+  async authorizeReach(
+    actions: ActionEnum[],
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<AuthorizedCallInterface | undefined> {
+    this.requireBinding();
+    return this.authorize(actions, { ctx });
   }
 
   /**
@@ -414,6 +498,322 @@ export abstract class RepositoryAdapter<
     return undefined;
   }
 
+  /**
+   * The attached authority, refusing to serve a governed entity whose
+   * authority never arrived rather than run it undecided.
+   */
+  private requireAuthority(): AuthorityInterface | undefined {
+    if (this._authority) return this._authority;
+
+    if (isAuthorityGoverned(this.authorityDeclaration)) {
+      throw new AuthorityUnboundException(this.entityKey);
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Refuse the call unless the entity's authority allows the caller every
+   * one of `actions` on it.
+   *
+   * Called at each operation's entry, before hooks, and before any read the
+   * operation makes for itself, so a refusal never depends on what is stored.
+   * The actor is read from the caller's own `ctx`, for the reason row scope
+   * resolves its scope there: a hook cannot choose who is decided.
+   *
+   * A call the repository makes itself (see `internalCall`) is not decided:
+   * the write it belongs to already was.
+   *
+   * Returns what was allowed, for the column checks, or `undefined` when
+   * nothing decides the call. A write also asks whether the actor may read,
+   * without refusing, to know which columns its result may hold.
+   */
+  private async authorize(
+    actions: ActionEnum[],
+    options: PlainLiteralObject | undefined,
+  ): Promise<AuthorizedCallInterface | undefined> {
+    const authority = this.requireAuthority();
+    if (!authority || isInternalCall(options)) return undefined;
+
+    const ctx: PlainLiteralObject | undefined = options?.ctx;
+    const actor = this.resolveActor(ctx);
+    if (!ctx || !actor) {
+      const [action = ActionEnum.READ] = actions;
+      throw new AuthorityRefusedException(this.metadata.name, action);
+    }
+
+    const columns = this.metadata.columns.map((column) => column.name);
+    const allowed = new Map<ActionEnum, ReadonlySet<string> | undefined>();
+    for (const action of actions) {
+      const decision = await authority.decide(ctx, {
+        actor,
+        object: this.entityKey,
+        action,
+        columns,
+      });
+
+      if (decision.effect !== 'allow') {
+        throw new AuthorityRefusedException(this.metadata.name, action, {
+          gate: decision.gate,
+        });
+      }
+
+      allowed.set(action, decision.columns && new Set(decision.columns));
+    }
+
+    const linked = new Set(linkedColumns(options));
+    if (allowed.has(ActionEnum.READ)) {
+      return {
+        actions: allowed,
+        readable: allowed.get(ActionEnum.READ),
+        linked,
+      };
+    }
+
+    const read = await authority.decide(ctx, {
+      actor,
+      object: this.entityKey,
+      action: ActionEnum.READ,
+      columns,
+    });
+
+    return {
+      actions: allowed,
+      readable:
+        read.effect === 'allow'
+          ? read.columns && new Set(read.columns)
+          : new Set(),
+      linked,
+    };
+  }
+
+  /**
+   * Refuse a read naming a column the actor may not read, in what it selects,
+   * filters or sorts on; and when it selects nothing, select only what the
+   * actor may read.
+   *
+   * Checked on the query as the caller and its hooks shaped it, before row
+   * scope adds its own columns, so the actor needs no rights on those.
+   */
+  private toReadableQuery<Options extends RepositoryFindOneOptions<Entity>>(
+    call: AuthorizedCallInterface | undefined,
+    options: Options,
+  ): Options {
+    const readable = call?.readable;
+    if (!readable) return options;
+
+    const leaves = options.where ? this.whereConditions(options.where) : [];
+    const named = [
+      ...(options.select ?? []).map(String),
+      ...leaves.filter((leaf) => !leaf.relation).map((leaf) => leaf.field),
+      ...(options.order ?? [])
+        .filter((key) => !key.relation)
+        .map((key) => key.field),
+      // A federated relation is read by one of this entity's columns.
+      ...this.federatedJoins(options.join).map(
+        ({ relation }) => relation.on.from,
+      ),
+    ];
+    const refused = [...new Set(named)].filter(
+      (column) => !readable.has(column),
+    );
+    if (refused.length > 0) {
+      throw new AuthorityRefusedException(this.metadata.name, ActionEnum.READ, {
+        columns: refused,
+      });
+    }
+
+    // An empty select reads every column, in every driver, so it selects
+    // nothing here either.
+    if (options.select?.length) return options;
+
+    const columns = this.metadata.columns.map((column) => column.name);
+    if (columns.every((column) => readable.has(column))) return options;
+
+    const select = columns.filter((column) => readable.has(column));
+    if (select.length === 0) {
+      throw new AuthorityRefusedException(this.metadata.name, ActionEnum.READ);
+    }
+
+    return { ...options, select };
+  }
+
+  /**
+   * Decide each relation `query` joins whose rows an authority governs, as
+   * the caller of `ctx`, the `ctx` the call arrived with. A filter or sort on
+   * a column of one the actor may not read is refused.
+   *
+   * Returns the columns each joined relation's rows may hold, for
+   * `toReadableJoins`. A federated relation is read through its own
+   * repository, which decides it there.
+   */
+  private async authorizeJoins(
+    query: RepositoryFindOneOptions<Entity>,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<Map<string, ReadonlySet<string>>> {
+    const readable = new Map<string, ReadonlySet<string>>();
+    const leaves = query.where ? this.whereConditions(query.where) : [];
+
+    for (const { relation } of query.join ?? []) {
+      if (this.federatedRelations.has(relation)) continue;
+
+      let columns: ReadonlySet<string> | undefined;
+      for (const reached of this.relationsIntoGoverned.get(relation) ?? []) {
+        const decided = await reached.authorizeReach([ActionEnum.READ], ctx);
+        if (
+          reached.metadata.urn ===
+          this.metadata.relations?.find(({ name }) => name === relation)
+            ?.targetUrn
+        ) {
+          columns = decided?.readable;
+        }
+      }
+      if (!columns) continue;
+      readable.set(relation, columns);
+
+      const refused = [
+        ...new Set(
+          [...leaves, ...(query.order ?? [])]
+            .filter((key) => key.relation === relation)
+            .map((key) => key.field)
+            .filter((field) => !columns.has(field)),
+        ),
+      ];
+      if (refused.length > 0) {
+        throw new AuthorityRefusedException(
+          this.metadata.name,
+          ActionEnum.READ,
+          {
+            columns: refused.map((field) => `${relation}.${field}`),
+          },
+        );
+      }
+    }
+
+    return readable;
+  }
+
+  /**
+   * `rows`, with each joined relation's rows holding only the columns the
+   * actor may read of them. A join cannot name the columns it reads, so they
+   * are removed from what the driver returned, which is the caller's alone.
+   */
+  private toReadableJoins(
+    rows: (Entity | null)[],
+    readable: ReadonlyMap<string, ReadonlySet<string>>,
+  ): void {
+    if (readable.size === 0) return;
+
+    for (const row of rows) {
+      if (!row) continue;
+      const values: PlainLiteralObject = row;
+      for (const [relation, columns] of readable) {
+        const related: unknown = values[relation];
+        for (const each of Array.isArray(related) ? related : [related]) {
+          if (!isObject(each)) continue;
+          for (const field of Object.keys(each)) {
+            if (!columns.has(field)) Reflect.deleteProperty(each, field);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Refuse `values` if any writes a column the actor may not write for one of
+   * the call's actions. The primary key is not checked: it names the row, and
+   * no write can change it. Nor is the foreign key a cascade links a related
+   * row by: the repository sets it to the parent's key.
+   *
+   * Checked before row scope stamps its columns, so the actor needs no rights
+   * on those.
+   */
+  private assertWritable(
+    call: AuthorizedCallInterface | undefined,
+    values: PlainLiteralObject[],
+  ): void {
+    if (!call) return;
+
+    const primaryColumn = this.getPrimaryColumn();
+    const written = [
+      ...new Set(values.flatMap((value) => Object.keys(value))),
+    ].filter((column) => column !== primaryColumn && !call.linked.has(column));
+
+    for (const [action, writable] of call.actions) {
+      const refused = writable
+        ? written.filter((column) => !writable.has(column))
+        : [];
+      if (refused.length > 0) {
+        throw new AuthorityRefusedException(this.metadata.name, action, {
+          columns: refused,
+        });
+      }
+    }
+  }
+
+  /**
+   * Refuse a replace unless the actor may write every column but the primary
+   * key: a replace erases what it leaves out, so it writes them all.
+   */
+  private assertReplaceable(call: AuthorizedCallInterface | undefined): void {
+    if (!call) return;
+
+    const primaryColumn = this.getPrimaryColumn();
+    this.assertWritable(call, [
+      Object.fromEntries(
+        this.metadata.columns
+          .filter((column) => column.name !== primaryColumn)
+          .map((column) => [column.name, true]),
+      ),
+    ]);
+  }
+
+  /**
+   * `row`, a write's result, holding only its primary key and the columns
+   * the actor may read. Relations a cascade wrote are left to their own
+   * repositories, which have already narrowed them.
+   *
+   * Removes the rest from the row the driver returned, which is the
+   * caller's alone.
+   */
+  private toReadableRow(
+    call: AuthorizedCallInterface | undefined,
+    row: Entity,
+  ): Entity {
+    const readable = call?.readable;
+    if (!readable) return row;
+
+    const primaryColumn = this.getPrimaryColumn();
+    for (const { name } of this.metadata.columns) {
+      if (name !== primaryColumn && !readable.has(name)) {
+        Reflect.deleteProperty(row, name);
+      }
+    }
+    return row;
+  }
+
+  /**
+   * The actor on the caller's `ctx`, copied so nothing downstream can change
+   * what was decided, or `undefined` when there is none.
+   */
+  private resolveActor(ctx?: PlainLiteralObject): Actor | undefined {
+    if (!ctx) return undefined;
+
+    const appCtx = AppContextHost.from(ctx);
+    if (!appCtx.supports(ActorCtx)) return undefined;
+
+    const actor = appCtx.with(ActorCtx);
+    if (actor.kind === 'system') {
+      return { kind: 'system', name: actor.name };
+    }
+
+    return {
+      kind: 'role',
+      roles: [...actor.roles],
+      ...(actor.userId === undefined ? {} : { userId: actor.userId }),
+    };
+  }
+
   protected get permeator(): RepoPermeatorFactory<Entity> {
     if (!this._permeator) {
       this._permeator = new RepoPermeatorFactory<Entity>(
@@ -519,16 +919,18 @@ export abstract class RepositoryAdapter<
     operation: RowScopeQueryOperation,
     options: Options,
     scope: PlainLiteralObject | undefined,
+    call: AuthorizedCallInterface | undefined,
   ): Promise<Options> {
+    const readable = this.toReadableQuery(call, options);
     const rowScope = this.requireRowScope();
     const scoped = rowScope
       ? await rowScope.scopeQuery({
           operation,
-          options,
-          ctx: options.ctx,
+          options: readable,
+          ctx: readable.ctx,
           scope,
         })
-      : options;
+      : readable;
 
     this.assertReadable(scoped, operation, scope);
 
@@ -1099,6 +1501,7 @@ export abstract class RepositoryAdapter<
 
   async find(options: RepositoryFindOptions<Entity> = {}): Promise<Entity[]> {
     this.requireBinding();
+    const call = await this.authorize([ActionEnum.READ], options);
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.find.permeate(
@@ -1108,12 +1511,15 @@ export abstract class RepositoryAdapter<
           RowScopeOperation.FIND,
           scoped,
           scope,
+          call,
         );
+        const joins = await this.authorizeJoins(query, options.ctx);
         const rows = await this.doFind(
           await this.toDriverQuery(query, { ctx: options.ctx, scope }),
         );
         await this.attachFederated(rows, query, { ctx: options.ctx, scope });
         this.assertRows(rows, query.join);
+        this.toReadableJoins(rows, joins);
         return rows;
       },
       this.entityCtx(options.ctx),
@@ -1128,6 +1534,7 @@ export abstract class RepositoryAdapter<
     options: RepositoryFindOneOptions<Entity>,
   ): Promise<Entity | null> {
     this.requireBinding();
+    const call = await this.authorize([ActionEnum.READ], options);
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.findOne.permeate(
@@ -1137,12 +1544,15 @@ export abstract class RepositoryAdapter<
           RowScopeOperation.FIND_ONE,
           scoped,
           scope,
+          call,
         );
+        const joins = await this.authorizeJoins(query, options.ctx);
         const row = await this.doFindOne(
           await this.toDriverQuery(query, { ctx: options.ctx, scope }),
         );
         await this.attachFederated([row], query, { ctx: options.ctx, scope });
         this.assertRows([row], query.join);
+        this.toReadableJoins([row], joins);
         return row;
       },
       this.entityCtx(options.ctx),
@@ -1155,13 +1565,21 @@ export abstract class RepositoryAdapter<
 
   async count(options: RepositoryFindOptions<Entity> = {}): Promise<number> {
     this.requireBinding();
+    const call = await this.authorize([ActionEnum.READ], options);
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.count.permeate(
       options,
       async (scoped) => {
+        const query = await this.applyQueryScope(
+          RowScopeOperation.COUNT,
+          scoped,
+          scope,
+          call,
+        );
+        await this.authorizeJoins(query, options.ctx);
         const { where, join, withDeleted, ctx } = await this.toDriverQuery(
-          await this.applyQueryScope(RowScopeOperation.COUNT, scoped, scope),
+          query,
           { ctx: options.ctx, scope },
         );
         // Only these decide how many rows match. The rest shape or page the
@@ -1181,6 +1599,7 @@ export abstract class RepositoryAdapter<
     options: RepositoryFindOptions<Entity> = {},
   ): Promise<[Entity[], number]> {
     this.requireBinding();
+    const call = await this.authorize([ActionEnum.READ], options);
     const scope = this.resolveRowScopeContext(options.ctx);
 
     return this.permeator.findAndCount.permeate(
@@ -1190,12 +1609,15 @@ export abstract class RepositoryAdapter<
           RowScopeOperation.FIND_AND_COUNT,
           scoped,
           scope,
+          call,
         );
+        const joins = await this.authorizeJoins(query, options.ctx);
         const [rows, total] = await this.doFindAndCount(
           await this.toDriverQuery(query, { ctx: options.ctx, scope }),
         );
         await this.attachFederated(rows, query, { ctx: options.ctx, scope });
         this.assertRows(rows, query.join);
+        this.toReadableJoins(rows, joins);
         return [rows, total];
       },
       this.entityCtx(options.ctx),
@@ -1213,14 +1635,18 @@ export abstract class RepositoryAdapter<
     options?: RepositoryCreateOptions,
   ): Promise<Entity> {
     this.requireBinding();
+    const call = await this.authorize([ActionEnum.CREATE], options);
     return this.permeator.create.permeate(
       entity,
       async (scoped) => {
         const { own, children } = this.cascade.peel(scoped);
+        const values = this.toOwnColumns(own);
+        this.assertWritable(call, [values]);
+        await this.cascade.authorize(children, 'create', options?.ctx);
         const value = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.CREATE,
-            this.toOwnColumns(own),
+            values,
             undefined,
             options?.ctx,
           ),
@@ -1228,10 +1654,8 @@ export abstract class RepositoryAdapter<
         await this.assertNotExisting(value, options?.ctx);
         const row = this.checkedRow(await this.doCreate(value, options));
         await this.activity?.record('create', [row], options?.ctx);
-        return this.withRelated(
-          row,
-          await this.cascade.create(row, children, options?.ctx),
-        );
+        const related = await this.cascade.create(row, children, options?.ctx);
+        return this.withRelated(this.toReadableRow(call, row), related);
       },
       this.entityCtx(options?.ctx),
     );
@@ -1247,14 +1671,20 @@ export abstract class RepositoryAdapter<
     options?: RepositoryCreateOptions,
   ): Promise<Entity[]> {
     this.requireBinding();
+    const call = await this.authorize([ActionEnum.CREATE], options);
     return this.permeator.createMany.permeate(
       entities,
       async (scoped) => {
         const peeled = scoped.map((entity) => this.cascade.peel(entity));
+        const owned = peeled.map(({ own }) => this.toOwnColumns(own));
+        this.assertWritable(call, owned);
+        for (const { children } of peeled) {
+          await this.cascade.authorize(children, 'create', options?.ctx);
+        }
         const values = (
           await this.applyWriteScopeMany(
             RowScopeOperation.CREATE_MANY,
-            peeled.map(({ own }) => this.toOwnColumns(own)),
+            owned,
             [],
             options?.ctx,
           )
@@ -1268,15 +1698,13 @@ export abstract class RepositoryAdapter<
         await this.activity?.record('create', rows, options?.ctx);
         const written: Entity[] = [];
         for (const [index, row] of rows.entries()) {
+          const related = await this.cascade.create(
+            row,
+            peeled[index]?.children ?? new Map(),
+            options?.ctx,
+          );
           written.push(
-            this.withRelated(
-              row,
-              await this.cascade.create(
-                row,
-                peeled[index]?.children ?? new Map(),
-                options?.ctx,
-              ),
-            ),
+            this.withRelated(this.toReadableRow(call, row), related),
           );
         }
         return written;
@@ -1299,6 +1727,7 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('update');
+    const call = await this.authorize([ActionEnum.UPDATE], options);
     const stored = this.toStoredRow(entity);
     const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
     this.assertMutable(stored);
@@ -1310,6 +1739,8 @@ export abstract class RepositoryAdapter<
         // either could move the write to another row.
         const values = this.toOwnColumns(own);
         this.assertKeyUnchanged(stored, values);
+        this.assertWritable(call, [values]);
+        await this.cascade.authorize(children, 'merge', options?.ctx);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.UPDATE,
@@ -1323,10 +1754,13 @@ export abstract class RepositoryAdapter<
           await this.doUpdate(stored, written, { ...options, versionGuard }),
         );
         await this.activity?.record('update', [row], options?.ctx, written);
-        return this.withRelated(
+        const related = await this.cascade.sync(
           row,
-          await this.cascade.sync(row, children, 'merge', options?.ctx),
+          children,
+          'merge',
+          options?.ctx,
         );
+        return this.withRelated(this.toReadableRow(call, row), related);
       },
       this.entityCtx(options?.ctx),
     );
@@ -1344,11 +1778,19 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('upsert');
+    // Either, depending on what is stored: deciding both keeps the answer
+    // from revealing which.
+    const call = await this.authorize(
+      [ActionEnum.CREATE, ActionEnum.UPDATE],
+      options,
+    );
     return this.permeator.upsert.permeate(
       entity,
       async (scoped) => {
         const { own, children } = this.cascade.peel(scoped);
         const reduced = this.toOwnColumns(own);
+        this.assertWritable(call, [reduced]);
+        await this.cascade.authorize(children, 'replace', options?.ctx);
         // After hooks, so the row found is the row the payload now names.
         const stored = await this.findByKey(reduced, options?.ctx);
         const written = this.toOwnColumns(
@@ -1365,10 +1807,13 @@ export abstract class RepositoryAdapter<
         this.assertKeyUnchanged(reduced, written);
         const row = this.checkedRow(await this.doUpsert(written, options));
         await this.activity?.record('upsert', [row], options?.ctx, written);
-        return this.withRelated(
+        const related = await this.cascade.sync(
           row,
-          await this.cascade.sync(row, children, 'replace', options?.ctx),
+          children,
+          'replace',
+          options?.ctx,
         );
+        return this.withRelated(this.toReadableRow(call, row), related);
       },
       this.entityCtx(options?.ctx),
     );
@@ -1386,6 +1831,8 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('replace');
+    const call = await this.authorize([ActionEnum.UPDATE], options);
+    this.assertReplaceable(call);
     const stored = this.toStoredRow(entity);
     const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
     this.assertMutable(stored);
@@ -1395,6 +1842,7 @@ export abstract class RepositoryAdapter<
         const { own, children } = this.cascade.peel(scoped);
         const values = this.toOwnColumns(own);
         this.assertKeyUnchanged(stored, values);
+        await this.cascade.authorize(children, 'replace', options?.ctx);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
             RowScopeOperation.REPLACE,
@@ -1408,10 +1856,13 @@ export abstract class RepositoryAdapter<
           await this.doReplace(stored, written, { ...options, versionGuard }),
         );
         await this.activity?.record('replace', [row], options?.ctx);
-        return this.withRelated(
+        const related = await this.cascade.sync(
           row,
-          await this.cascade.sync(row, children, 'replace', options?.ctx),
+          children,
+          'replace',
+          options?.ctx,
         );
+        return this.withRelated(this.toReadableRow(call, row), related);
       },
       this.entityCtx(options?.ctx),
     );
@@ -1431,6 +1882,7 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('delete');
+    const call = await this.authorize([ActionEnum.DELETE], options);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
       entity,
@@ -1444,12 +1896,12 @@ export abstract class RepositoryAdapter<
             options?.ctx,
           ),
         );
-        await this.cascade.remove(value, 'delete', options?.ctx);
+        await this.cascade.remove([value], 'delete', options?.ctx);
         const row = this.checkedRow(
           await this.doDelete(value, { ...options, versionGuard }),
         );
         await this.activity?.record('delete', [value], options?.ctx);
-        return row;
+        return this.toReadableRow(call, row);
       },
       this.entityCtx(options?.ctx),
     );
@@ -1467,6 +1919,7 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity[]> {
     this.requireBinding();
     this.assertAppendable('deleteMany');
+    const call = await this.authorize([ActionEnum.DELETE], options);
     return this.permeator.deleteMany.permeate(
       entities,
       async (scoped) => {
@@ -1482,14 +1935,14 @@ export abstract class RepositoryAdapter<
         if (this.cascadeRelations.size > 0) {
           await this.assertAllStored(values, options?.ctx);
         }
-        for (const value of values) {
-          await this.cascade.remove(value, 'delete', options?.ctx);
-        }
+        // Every row's related rows at once, so a refusal for one row leaves
+        // every other row's related rows as they were.
+        await this.cascade.remove(values, 'delete', options?.ctx);
         const rows = await this.doDeleteMany(values, options);
         this.assertRows(rows);
         this.assertRowCount('deleteMany', rows, values);
         await this.activity?.record('delete', values, options?.ctx);
-        return rows;
+        return rows.map((row) => this.toReadableRow(call, row));
       },
       this.entityCtx(options?.ctx),
     );
@@ -1507,6 +1960,9 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('softDelete');
     const deleteDateColumn = this.requireDeleteDateColumn('softDelete');
+    // Ahead of the no-op for a row already deleted, so that answer is given
+    // only to a caller allowed to delete.
+    const call = await this.authorize([ActionEnum.DELETE], options);
     // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
     // below, so a stale precondition against a row someone else already
     // deleted conflicts instead of quietly succeeding.
@@ -1543,12 +1999,12 @@ export abstract class RepositoryAdapter<
             options?.ctx,
           ),
         );
-        await this.cascade.remove(value, 'softDelete', options?.ctx);
+        await this.cascade.remove([value], 'softDelete', options?.ctx);
         const row = this.checkedRow(
           await this.doSoftDelete(value, { ...options, versionGuard }),
         );
         await this.activity?.record('softDelete', [row], options?.ctx);
-        return row;
+        return this.toReadableRow(call, row);
       },
       this.entityCtx(options?.ctx),
     );
@@ -1567,6 +2023,7 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('restore');
     this.requireDeleteDateColumn('restore');
+    const call = await this.authorize([ActionEnum.UPDATE], options);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,
@@ -1580,12 +2037,12 @@ export abstract class RepositoryAdapter<
             options?.ctx,
           ),
         );
-        await this.cascade.remove(value, 'restore', options?.ctx);
+        await this.cascade.remove([value], 'restore', options?.ctx);
         const row = this.checkedRow(
           await this.doRestore(value, { ...options, versionGuard }),
         );
         await this.activity?.record('restore', [row], options?.ctx);
-        return row;
+        return this.toReadableRow(call, row);
       },
       this.entityCtx(options?.ctx),
     );

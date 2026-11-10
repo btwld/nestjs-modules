@@ -1,7 +1,8 @@
 import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
 
-import { isObject } from '@concepta/nestjs-core';
+import { ActionEnum, isObject } from '@concepta/nestjs-core';
 
+import { internalCall, linkedCall } from '../authority/internal-call.js';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { type RepositoryRelationMetadataInterface } from '../repository/interfaces/repository-relation-metadata.interface.js';
 import { type RepositoryInterface } from '../repository/interfaces/repository.interface.js';
@@ -48,6 +49,40 @@ export class CascadeWriter {
     return { own, children };
   }
 
+  /**
+   * Decide, before the parent is written, every action a write of `children`
+   * could take on each related entity: the repository opens no transaction,
+   * so a refusal from a related repository after the parent was written
+   * would leave the parent changed without its related rows.
+   *
+   * `create` creates; `merge` updates and creates, and deletes a to-one set
+   * to `null`; `replace` also deletes. Which of them a write takes depends
+   * on what is stored, so each one it could take is decided. Each related
+   * repository decides again, and checks columns, when it is written.
+   */
+  async authorize(
+    children: CascadeChildren,
+    mode: 'create' | CascadeSync,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<void> {
+    for (const [name, { relation, target }] of this.relations) {
+      if (!children.has(name)) continue;
+
+      const actions =
+        mode === 'create'
+          ? [ActionEnum.CREATE]
+          : [
+              ActionEnum.UPDATE,
+              ActionEnum.CREATE,
+              ...(mode === 'replace' ||
+              (relation.cardinality === 'one' && children.get(name) === null)
+                ? [ActionEnum.DELETE]
+                : []),
+            ];
+      await target.authorizeReach(actions, ctx);
+    }
+  }
+
   /** Create the related rows of a new `row`, returning them by relation. */
   async create(
     row: PlainLiteralObject,
@@ -61,7 +96,10 @@ export class CascadeWriter {
       const rows: PlainLiteralObject[] = [];
       for (const child of this.listOf(relation, children.get(name))) {
         rows.push(
-          await target.create(this.linked(relation, child, row), { ctx }),
+          await target.create(
+            this.linked(relation, child, row),
+            this.linkedOptions(relation, ctx),
+          ),
         );
       }
       written[name] = this.shaped(relation, rows);
@@ -88,8 +126,14 @@ export class CascadeWriter {
     for (const [name, { relation, target }] of this.relations) {
       if (!children.has(name)) continue;
       const list = this.listOf(relation, children.get(name));
+      // Finding the rows to write is the repository's own read; the writes
+      // themselves are decided.
       const existing = new Map(
-        (await target.find({ where: this.childrenOf(relation, row), ctx }))
+        (
+          await target.find(
+            internalCall({ where: this.childrenOf(relation, row), ctx }),
+          )
+        )
           .map((stored) => [this.keyOf(target, stored), stored] as const)
           .filter(
             (entry): entry is readonly [string, PlainLiteralObject] =>
@@ -121,11 +165,21 @@ export class CascadeWriter {
           kept.add(key);
           rows.push(
             mode === 'replace'
-              ? await target.replace(stored, data, { ctx })
-              : await target.update(stored, data, { ctx }),
+              ? await target.replace(
+                  stored,
+                  data,
+                  this.linkedOptions(relation, ctx),
+                )
+              : await target.update(
+                  stored,
+                  data,
+                  this.linkedOptions(relation, ctx),
+                ),
           );
         } else {
-          rows.push(await target.create(data, { ctx }));
+          rows.push(
+            await target.create(data, this.linkedOptions(relation, ctx)),
+          );
         }
       }
 
@@ -143,36 +197,59 @@ export class CascadeWriter {
   }
 
   /**
-   * Pass a delete, soft delete or restore of `row` on to its related rows,
-   * before the row itself is written.
+   * Pass a delete, soft delete or restore of `rows` on to their related rows,
+   * before the rows themselves are written.
+   *
+   * Every related row of every one of `rows` is found, and each related
+   * entity with rows to write decided, before any is written, so a refusal
+   * leaves them all as they were. Finding the rows is the repository's own
+   * read; the writes themselves are decided.
    */
   async remove(
-    row: PlainLiteralObject,
+    rows: readonly PlainLiteralObject[],
     operation: CascadeRemoval,
     ctx: PlainLiteralObject | undefined,
   ): Promise<void> {
-    for (const { relation, target } of this.relations.values()) {
-      const where = this.childrenOf(relation, row);
+    const removals: {
+      target: CascadeRelation['target'];
+      children: PlainLiteralObject[];
+    }[] = [];
 
-      if (operation === 'softDelete') {
-        for (const child of await target.find({ where, ctx })) {
-          await target.softDelete(child, { ctx });
-        }
-        continue;
+    for (const row of rows) {
+      for (const { relation, target } of this.relations.values()) {
+        const where = this.childrenOf(relation, row);
+        const found = await target.find(
+          internalCall({ where, withDeleted: operation !== 'softDelete', ctx }),
+        );
+        const deleteDate = target.metadata.columns.find(
+          (column) => column.isRemoveDate,
+        )?.name;
+        const children =
+          operation === 'restore'
+            ? found.filter(
+                (child) =>
+                  deleteDate !== undefined && child[deleteDate] != null,
+              )
+            : found;
+        if (children.length > 0) removals.push({ target, children });
       }
+    }
 
-      const children = await target.find({ where, withDeleted: true, ctx });
+    const action =
+      operation === 'restore' ? ActionEnum.UPDATE : ActionEnum.DELETE;
+    for (const target of new Set(removals.map(({ target }) => target))) {
+      await target.authorizeReach([action], ctx);
+    }
 
+    for (const { target, children } of removals) {
       if (operation === 'delete') {
-        if (children.length > 0) await target.deleteMany(children, { ctx });
+        await target.deleteMany(children, { ctx });
         continue;
       }
-
-      const deleteDate = target.metadata.columns.find(
-        (column) => column.isRemoveDate,
-      )?.name;
       for (const child of children) {
-        if (deleteDate !== undefined && child[deleteDate] != null) {
+        if (operation === 'softDelete') {
+          await target.softDelete(child, { ctx });
+        } else {
           await target.restore(child, { ctx });
         }
       }
@@ -209,6 +286,17 @@ export class CascadeWriter {
     row: PlainLiteralObject,
   ): PlainLiteralObject {
     return { ...child, [relation.on.to]: row[relation.on.from] };
+  }
+
+  /**
+   * The options of a write `linked` shaped: the related repository decides it
+   * as the caller, without counting the foreign key it sets.
+   */
+  private linkedOptions(
+    relation: RepositoryRelationMetadataInterface,
+    ctx: PlainLiteralObject | undefined,
+  ): { ctx: PlainLiteralObject | undefined } {
+    return linkedCall({ ctx }, [relation.on.to]);
   }
 
   private childrenOf(
