@@ -9,14 +9,17 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { createSettingsProvider } from '@concepta/nestjs-core';
 
 import {
-  CRUD_DEFAULT_RESOLVER_TOKEN,
   CRUD_MODULE_SETTINGS_TOKEN,
+  CRUD_REQUEST_POLICY_TOKEN,
+  CRUD_ROOT_REQUEST_POLICY_TOKEN,
 } from './crud.constants.js';
 import { crudDefaultConfig } from './infrastructure/config/crud-default.config.js';
 import { type CrudModuleOptionsExtrasInterface } from './infrastructure/config/interfaces/crud-module-options-extras.interface.js';
 import { type CrudModuleOptionsInterface } from './infrastructure/config/interfaces/crud-module-options.interface.js';
 import { type CrudModuleSettingsInterface } from './infrastructure/config/interfaces/crud-module-settings.interface.js';
 import { CrudContextOverlay } from './infrastructure/interceptors/crud-context.overlay.js';
+import { CrudAllowAllPolicy } from './infrastructure/policies/crud-allow-all.policy.js';
+import { type CrudRequestPolicyInterface } from './infrastructure/policies/interfaces/crud-request-policy.interface.js';
 import { CrudAdapterResolver } from './infrastructure/resolvers/crud-adapter.resolver.js';
 import { CrudOperationResolver } from './infrastructure/resolvers/crud-operation.resolver.js';
 import { CrudMetaview } from './infrastructure/services/crud-metaview.service.js';
@@ -45,18 +48,32 @@ function definitionTransform(
   extras: CrudModuleOptionsExtrasInterface,
 ): DynamicModule {
   const { providers = [] } = definition;
-  const { global = false, imports, defaultResolver } = extras;
+  const { global = false, imports } = extras;
 
   return {
     ...definition,
     global,
     imports: createCrudImports({ imports }),
-    providers: createCrudProviders({ providers, defaultResolver }),
+    providers: [
+      ...createCrudProviders({ providers }),
+      ...(global ? [createCrudRootRequestPolicyProvider()] : []),
+    ],
     exports: [
       ConfigModule,
       RAW_OPTIONS_TOKEN,
-      ...createCrudExports({ defaultResolver }),
+      ...createCrudExports(),
+      ...(global ? [CRUD_ROOT_REQUEST_POLICY_TOKEN] : []),
     ],
+  };
+}
+
+/** The policy `forRoot()` was given, for every module registering CRUD. */
+function createCrudRootRequestPolicyProvider(): Provider {
+  return {
+    provide: CRUD_ROOT_REQUEST_POLICY_TOKEN,
+    inject: [RAW_OPTIONS_TOKEN],
+    useFactory: (options: CrudModuleOptionsInterface) =>
+      options.requestPolicy ?? new CrudAllowAllPolicy(),
   };
 }
 
@@ -72,29 +89,21 @@ export function createCrudImports(
   }
 }
 
-export function createCrudExports(options?: {
-  defaultResolver?: CrudModuleOptionsExtrasInterface['defaultResolver'];
-}) {
-  const resolverClass = options?.defaultResolver ?? CrudAdapterResolver;
-
+export function createCrudExports() {
   return [
     CRUD_MODULE_SETTINGS_TOKEN,
+    CRUD_REQUEST_POLICY_TOKEN,
     CrudContextOverlay,
     CrudMetaview,
     CrudAdapterResolver,
     CrudOperationResolver,
-    CRUD_DEFAULT_RESOLVER_TOKEN,
-    resolverClass,
   ];
 }
 
 export function createCrudProviders(options: {
   providers?: Provider[];
-  defaultResolver?: CrudModuleOptionsExtrasInterface['defaultResolver'];
 }): Provider[] {
-  const { providers = [], defaultResolver } = options;
-
-  const resolverClass = defaultResolver ?? CrudAdapterResolver;
+  const { providers = [] } = options;
 
   return [
     ...providers,
@@ -102,12 +111,20 @@ export function createCrudProviders(options: {
     CrudMetaview,
     CrudAdapterResolver,
     CrudOperationResolver,
-    resolverClass,
-    {
-      provide: CRUD_DEFAULT_RESOLVER_TOKEN,
-      useExisting: resolverClass,
-    },
     createCrudSettingsProvider(),
+    // A module's own policy, else the root's — injected, so it is built
+    // first — and only with neither does every request run.
+    {
+      provide: CRUD_REQUEST_POLICY_TOKEN,
+      inject: [
+        RAW_OPTIONS_TOKEN,
+        { token: CRUD_ROOT_REQUEST_POLICY_TOKEN, optional: true },
+      ],
+      useFactory: (
+        options: CrudModuleOptionsInterface,
+        root?: CrudRequestPolicyInterface,
+      ) => options.requestPolicy ?? root ?? new CrudAllowAllPolicy(),
+    },
     { provide: APP_INTERCEPTOR, useClass: CrudContextOverlay },
   ];
 }

@@ -14,6 +14,15 @@ export default defineConfig({
           new URL('./packages/nestjs-access-control/src/index.ts', import.meta.url),
         ),
       },
+      {
+        find: /^@concepta\/nestjs-access-control\/optional\/crud$/,
+        replacement: fileURLToPath(
+          new URL(
+            './packages/nestjs-access-control/src/optional-crud.ts',
+            import.meta.url,
+          ),
+        ),
+      },
     ],
   },
   test: {

@@ -1,12 +1,14 @@
-import { Injectable, PlainLiteralObject, Type } from '@nestjs/common';
+import { Inject, Injectable, PlainLiteralObject, Type } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 
 import { DeepPartial } from '@concepta/nestjs-core';
 
+import { CRUD_REQUEST_POLICY_TOKEN } from '../../crud.constants.js';
 import { CrudAdapter } from '../adapters/crud.adapter.js';
 import { CrudContextInterface } from '../interceptors/interfaces/crud-context.interface.js';
 import { CrudCreateBatchInterface } from '../interfaces/crud-create-batch.interface.js';
 import { CrudResponsePaginatedInterface } from '../interfaces/crud-response-paginated.interface.js';
+import { CrudRequestPolicyInterface } from '../policies/interfaces/crud-request-policy.interface.js';
 import { resolveCrudAdapter } from '../utils/resolve-crud-adapter.js';
 
 import { CrudResolverInterface } from './interfaces/crud-resolver.interface.js';
@@ -17,10 +19,16 @@ import { CrudResolverInterface } from './interfaces/crud-resolver.interface.js';
  * This is the simplest resolver. It bypasses query/command handlers entirely
  * and calls the adapter methods directly. Use this when you don't need
  * custom handler logic.
+ *
+ * Every operation asks the module's request policy first.
  */
 @Injectable()
 export class CrudAdapterResolver implements CrudResolverInterface {
-  constructor(private readonly moduleRef: ModuleRef) {}
+  constructor(
+    private readonly moduleRef: ModuleRef,
+    @Inject(CRUD_REQUEST_POLICY_TOKEN)
+    private readonly policy: CrudRequestPolicyInterface,
+  ) {}
 
   /**
    * No-op - handlers not used by this resolver.
@@ -42,12 +50,14 @@ export class CrudAdapterResolver implements CrudResolverInterface {
   async list<Entity extends PlainLiteralObject>(
     ctx: CrudContextInterface<Entity>,
   ): Promise<CrudResponsePaginatedInterface<Entity>> {
+    await this.policy.check({ ctx });
     return this.resolveAdapter(ctx).list(ctx);
   }
 
   async read<Entity extends PlainLiteralObject>(
     ctx: CrudContextInterface<Entity>,
   ): Promise<Entity> {
+    await this.policy.check({ ctx });
     return this.resolveAdapter(ctx).read(ctx);
   }
 
@@ -55,6 +65,7 @@ export class CrudAdapterResolver implements CrudResolverInterface {
     ctx: CrudContextInterface<Entity>,
     dto: DeepPartial<Entity>,
   ): Promise<Entity> {
+    await this.policy.check({ ctx, body: dto });
     return this.resolveAdapter(ctx).create(ctx, dto);
   }
 
@@ -62,6 +73,7 @@ export class CrudAdapterResolver implements CrudResolverInterface {
     ctx: CrudContextInterface<Entity>,
     dto: CrudCreateBatchInterface<DeepPartial<Entity>>,
   ): Promise<Entity[]> {
+    await this.policy.check({ ctx, body: dto });
     return this.resolveAdapter(ctx).createBatch(ctx, dto);
   }
 
@@ -69,6 +81,7 @@ export class CrudAdapterResolver implements CrudResolverInterface {
     ctx: CrudContextInterface<Entity>,
     dto: DeepPartial<Entity>,
   ): Promise<Entity> {
+    await this.policy.check({ ctx, body: dto });
     return this.resolveAdapter(ctx).update(ctx, dto);
   }
 
@@ -76,24 +89,28 @@ export class CrudAdapterResolver implements CrudResolverInterface {
     ctx: CrudContextInterface<Entity>,
     dto: DeepPartial<Entity>,
   ): Promise<Entity> {
+    await this.policy.check({ ctx, body: dto });
     return this.resolveAdapter(ctx).replace(ctx, dto);
   }
 
   async delete<Entity extends PlainLiteralObject>(
     ctx: CrudContextInterface<Entity>,
   ): Promise<Entity | null> {
+    await this.policy.check({ ctx });
     return this.resolveAdapter(ctx).delete(ctx);
   }
 
   async softDelete<Entity extends PlainLiteralObject>(
     ctx: CrudContextInterface<Entity>,
   ): Promise<Entity | null> {
+    await this.policy.check({ ctx });
     return this.resolveAdapter(ctx).softDelete(ctx);
   }
 
   async restore<Entity extends PlainLiteralObject>(
     ctx: CrudContextInterface<Entity>,
   ): Promise<Entity | null> {
+    await this.policy.check({ ctx });
     return this.resolveAdapter(ctx).restore(ctx);
   }
 

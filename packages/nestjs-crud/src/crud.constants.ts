@@ -2,6 +2,15 @@ import { type CrudParamsOptionsInterface } from './infrastructure/interfaces/cru
 
 export const CRUD_MODULE_SETTINGS_TOKEN = 'CRUD_MODULE_SETTINGS_TOKEN';
 
+/** The request policy every built-in resolver asks before it dispatches. */
+export const CRUD_REQUEST_POLICY_TOKEN = 'CRUD_REQUEST_POLICY_TOKEN';
+
+/**
+ * The policy `CrudModule.forRoot()` was given, for a module registering CRUD
+ * without one of its own.
+ */
+export const CRUD_ROOT_REQUEST_POLICY_TOKEN = 'CRUD_ROOT_REQUEST_POLICY_TOKEN';
+
 export const CRUD_MODULE_DEFAULT_SETTINGS_TOKEN =
   'CRUD_MODULE_DEFAULT_SETTINGS_TOKEN';
 
@@ -119,10 +128,6 @@ export const CRUD_MODULE_ROUTE_COMMAND_HANDLER_METADATA =
 
 // Resolver metadata keys
 export const CRUD_MODULE_RESOLVER_METADATA = 'CRUD_MODULE_RESOLVER_METADATA';
-
-export const CRUD_DEFAULT_RESOLVER_TOKEN = Symbol(
-  'CRUD_DEFAULT_RESOLVER_TOKEN',
-);
 
 export const CRUD_MODULE_DEFAULT_PARAMS_OPTIONS: CrudParamsOptionsInterface<{
   id?: { field?: string };

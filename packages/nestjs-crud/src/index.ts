@@ -123,11 +123,16 @@ export { CrudSpec } from './infrastructure/specifications/crud-spec.factory.js';
 export { OperationSpecification } from './infrastructure/specifications/operation.specification.js';
 export { ActionSpecification } from './infrastructure/specifications/action.specification.js';
 
+// request policy
+export { CRUD_REQUEST_POLICY_TOKEN } from './crud.constants.js';
+export { CrudRequestPolicyInterface } from './infrastructure/policies/interfaces/crud-request-policy.interface.js';
+export { CrudRequestInterface } from './infrastructure/policies/interfaces/crud-request.interface.js';
+export { CrudAllowAllPolicy } from './infrastructure/policies/crud-allow-all.policy.js';
+
 // resolvers
 export { CrudResolverInterface } from './infrastructure/resolvers/interfaces/crud-resolver.interface.js';
 export { CrudAdapterResolver } from './infrastructure/resolvers/crud-adapter.resolver.js';
 export { CrudOperationResolver } from './infrastructure/resolvers/crud-operation.resolver.js';
-export { CrudCqrsResolver } from './infrastructure/resolvers/crud-cqrs.resolver.js';
 export { CrudResolver } from './infrastructure/decorators/routes/crud-resolver.decorator.js';
 
 // operations (queries/commands)

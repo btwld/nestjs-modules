@@ -1,4 +1,4 @@
-import { Injectable, PlainLiteralObject, Type } from '@nestjs/common';
+import { Inject, Injectable, PlainLiteralObject, Type } from '@nestjs/common';
 import {
   CommandBus,
   CommandHandler,
@@ -8,9 +8,11 @@ import {
 
 import { DeepPartial } from '@concepta/nestjs-core';
 
+import { CRUD_REQUEST_POLICY_TOKEN } from '../../crud.constants.js';
 import { CrudContextInterface } from '../interceptors/interfaces/crud-context.interface.js';
 import { CrudCreateBatchInterface } from '../interfaces/crud-create-batch.interface.js';
 import { CrudResponsePaginatedInterface } from '../interfaces/crud-response-paginated.interface.js';
+import { CrudRequestPolicyInterface } from '../policies/interfaces/crud-request-policy.interface.js';
 
 import { CrudResolverInterface } from './interfaces/crud-resolver.interface.js';
 
@@ -21,18 +23,16 @@ import { CrudResolverInterface } from './interfaces/crud-resolver.interface.js';
  * through their respective buses, enabling CQRS features like sagas, events,
  * and cross-module routing.
  *
- * Requires `@nestjs/cqrs` as a dependency.
+ * Every operation asks the module's request policy before it is dispatched.
+ *
+ * Requires `@nestjs/cqrs`; import it from `@concepta/nestjs-crud/optional/cqrs`.
  *
  * @example
  * ```typescript
- * @Module({
- *   imports: [
- *     CrudModule.forRoot({
- *       defaultResolver: CrudCqrsResolver,
- *     }),
- *   ],
- * })
- * export class AppModule {}
+ * new ConfigurableCrudBuilder<UserEntity>({
+ *   controller: { path: 'users', entity: 'user', resolver: CrudCqrsResolver },
+ *   operations: [{ operation: Operation.List }],
+ * });
  * ```
  */
 @Injectable()
@@ -40,6 +40,8 @@ export class CrudCqrsResolver implements CrudResolverInterface {
   constructor(
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
+    @Inject(CRUD_REQUEST_POLICY_TOKEN)
+    private readonly policy: CrudRequestPolicyInterface,
   ) {}
 
   /**
@@ -63,6 +65,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!QueryClass) {
       throw new Error('No query configured for list operation');
     }
+    await this.policy.check({ ctx });
     return this.queryBus.execute(new QueryClass(ctx));
   }
 
@@ -73,6 +76,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!QueryClass) {
       throw new Error('No query configured for read operation');
     }
+    await this.policy.check({ ctx });
     return this.queryBus.execute(new QueryClass(ctx));
   }
 
@@ -84,6 +88,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for create operation');
     }
+    await this.policy.check({ ctx, body: dto });
     return this.commandBus.execute(new CommandClass(ctx, dto));
   }
 
@@ -95,6 +100,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for createBatch operation');
     }
+    await this.policy.check({ ctx, body: dto });
     return this.commandBus.execute(new CommandClass(ctx, dto));
   }
 
@@ -106,6 +112,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for update operation');
     }
+    await this.policy.check({ ctx, body: dto });
     return this.commandBus.execute(new CommandClass(ctx, dto));
   }
 
@@ -117,6 +124,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for replace operation');
     }
+    await this.policy.check({ ctx, body: dto });
     return this.commandBus.execute(new CommandClass(ctx, dto));
   }
 
@@ -127,6 +135,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for delete operation');
     }
+    await this.policy.check({ ctx });
     return this.commandBus.execute(new CommandClass(ctx));
   }
 
@@ -137,6 +146,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for soft delete operation');
     }
+    await this.policy.check({ ctx });
     return this.commandBus.execute(new CommandClass(ctx));
   }
 
@@ -147,6 +157,7 @@ export class CrudCqrsResolver implements CrudResolverInterface {
     if (!CommandClass) {
       throw new Error('No command configured for restore operation');
     }
+    await this.policy.check({ ctx });
     return this.commandBus.execute(new CommandClass(ctx));
   }
 }

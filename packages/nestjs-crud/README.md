@@ -26,6 +26,7 @@ build modes: fully generated, pre-decorated, and hybrid.
 - [Serialization and Validation](#serialization-and-validation)
 - [OpenAPI Documents](#openapi-documents)
 - [Resolvers](#resolvers)
+- [Request Policy](#request-policy)
 - [CQRS Integration](#cqrs-integration)
 - [Specifications and Hooks](#specifications-and-hooks)
 - [Exceptions](#exceptions)
@@ -64,7 +65,7 @@ schemas (Standard Schema) — `zod` is a direct dependency.
 | `@nestjs/swagger` | Yes | OpenAPI decorator support — install explicitly |
 | `rxjs` | Yes | Interceptor pipeline |
 | `@concepta/nestjs-repository-typeorm` | No | TypeORM repository driver |
-| `@nestjs/cqrs` | No | Optional peer — only when using `CrudCqrsResolver` |
+| `@nestjs/cqrs` | No | Only for `CrudCqrsResolver`, from `@concepta/nestjs-crud/optional/cqrs` |
 
 ## Quick Start
 
@@ -1109,17 +1110,11 @@ adapter.
 | `CrudOperationResolver` | Resolves handler via `ModuleRef` | Custom handler logic without CQRS |
 | `CrudCqrsResolver` | Dispatches via `QueryBus` / `CommandBus` | Full CQRS with sagas and events |
 
-### Setting the Default Resolver
+### Choosing a Resolver
 
-Globally:
-
-```ts
-CrudModule.forRoot({
-  defaultResolver: CrudOperationResolver,
-})
-```
-
-Per-controller:
+A controller dispatches through `CrudAdapterResolver` unless it names
+another, in its controller options or with `@CrudResolver()` on the class
+or a method:
 
 ```ts
 @CrudController({
@@ -1129,6 +1124,40 @@ Per-controller:
   ...
 })
 ```
+
+A controller built by `ConfigurableCrudBuilder` gets the resolver it names
+among the builder's `providers`. A hand-written controller injects the
+resolver it names, so provide it in that controller's module, unless it is
+`CrudAdapterResolver` or `CrudOperationResolver`, which `CrudModule`
+provides.
+
+## Request Policy
+
+A request policy decides whether a CRUD request may run, before its
+resolver dispatches it. Every built-in resolver asks it, for every
+operation, however the controller was built: with the CRUD context (the
+operation, the parsed query, the route parameters) and, for a write, the
+validated body. It refuses by throwing.
+
+```ts
+import { type CrudRequestPolicyInterface } from '@concepta/nestjs-crud';
+
+class NoBulkDeletesPolicy implements CrudRequestPolicyInterface {
+  check({ ctx, body }) {
+    // throw to refuse
+  }
+}
+
+CrudModule.forRoot({ requestPolicy: new NoBulkDeletesPolicy() });
+```
+
+Give it to `forRoot` (or `forRootAsync`): a module importing
+`CrudModule.register()` without a `requestPolicy` of its own uses the root
+one. Without any, every request runs. What it checks for is yours; CRUD knows
+nothing of who is asking. `@concepta/nestjs-access-control/optional/crud`
+ships one that checks each request's query and body against the caller's
+grant. A custom resolver asks the policy the same way, by injecting
+`CRUD_REQUEST_POLICY_TOKEN`, or nothing does.
 
 ## CQRS Integration
 
@@ -1144,17 +1173,24 @@ yarn add @nestjs/cqrs
 ```ts
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
-import { CrudModule, CrudCqrsResolver } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
 
 @Module({
-  imports: [
-    CqrsModule.forRoot(),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
-  ],
+  imports: [CqrsModule.forRoot(), CrudModule.forRoot({})],
 })
 export class AppModule {}
+```
+
+Then name the resolver on each controller that dispatches through the
+buses:
+
+```ts
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
+
+new ConfigurableCrudBuilder<PhotoEntity>({
+  controller: { path: 'photos', entity: 'photo', resolver: CrudCqrsResolver },
+  operations: [{ operation: Operation.List }],
+});
 ```
 
 ### Built-in Queries and Commands
@@ -1425,4 +1461,5 @@ Hook method decorators from `@concepta/nestjs-repository`:
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-crud` | Module, adapter, decorators, resolvers, CQRS queries/commands/handlers, schema factories (`paginatedSchema`, `createBatchSchema`), specifications, exceptions |
+| `@concepta/nestjs-crud` | Module, adapter, decorators, the adapter and operation resolvers, queries/commands/handlers, request policy, schema factories (`paginatedSchema`, `createBatchSchema`), specifications, exceptions |
+| `@concepta/nestjs-crud/optional/cqrs` | `CrudCqrsResolver`. Requires `@nestjs/cqrs` |

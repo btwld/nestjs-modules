@@ -33,6 +33,8 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@concepta/nestjs-crud": "workspace:*",
+    "@concepta/nestjs-repository": "workspace:*",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1",
@@ -43,14 +45,24 @@
     "vitest-mock-extended": "^4.0.0"
   },
   "peerDependencies": {
+    "@concepta/nestjs-crud": "8.0.0-alpha.15",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@concepta/nestjs-crud": {
+      "optional": true
+    }
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./optional/crud": {
+      "types": "./dist/optional-crud.d.ts",
+      "default": "./dist/optional-crud.js"
     }
   }
 }

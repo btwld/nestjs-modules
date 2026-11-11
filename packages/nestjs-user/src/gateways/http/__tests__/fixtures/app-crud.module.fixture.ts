@@ -4,7 +4,8 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CoreModule, UseHooks, Operation } from '@concepta/nestjs-core';
-import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import {
   CreatePasswordCommand,
   PasswordModule,
@@ -63,9 +64,7 @@ const USER_CREDENTIALS_ENTITY_KEY_FIXTURE = 'user-credentials';
         },
       ],
     }),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
+    CrudModule.forRoot({}),
     CoreModule.forRoot(),
     PasswordModule.forRoot({}),
     UserModule.forRoot({

@@ -437,8 +437,8 @@ gateway request/handler classes are exported from
 `@concepta/nestjs-cache/optional/crud`.
 
 The CRUD gateway needs the surrounding modules registered as well:
-`CqrsModule.forRoot()`, `CrudModule.forRoot()` (with `CrudCqrsResolver` as
-the default resolver), `CoreModule.forRoot()` (context overlays), and a
+`CqrsModule.forRoot()`, `CrudModule.forRoot()`, `CoreModule.forRoot()`
+(context overlays), and a
 `RepositoryModule.forRoot()` entry mapping the entity key to your cache entity
 class.
 
@@ -451,7 +451,8 @@ section of `@concepta/nestjs-repository`.
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { CoreModule, Operation } from '@concepta/nestjs-core';
-import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import { CachePostgresEntity } from '@concepta/nestjs-cache/optional/typeorm';
 import { RepositoryModule } from '@concepta/nestjs-repository';
 import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
@@ -496,9 +497,7 @@ export class UserCacheEntity extends CachePostgresEntity {}
         },
       ],
     }),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
+    CrudModule.forRoot({}),
     CoreModule.forRoot(),
     CacheModule.forFeature(['userCache']),
     CrudModule.forFeature<CacheInterface>({

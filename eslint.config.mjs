@@ -129,6 +129,21 @@ const CASL_ALLOWED_FILES = [
   'packages/nestjs-repository/src/**/*.fixture.ts',
 ];
 
+// `@nestjs/cqrs` is optional for CRUD: only its optional/cqrs resolver may
+// import it.
+const CQRS_RESTRICTED_PATTERN = optionalDepPattern(
+  '@nestjs/cqrs',
+  "Only CRUD's optional/cqrs entry point may import this (src/infrastructure/resolvers/crud-cqrs.resolver.ts) — see the root README's Entry Points section.",
+);
+const CQRS_RESTRICTED_FILES = ['packages/nestjs-crud/src/**/*.ts'];
+const CQRS_ALLOWED_FILES = [
+  'packages/nestjs-crud/src/infrastructure/resolvers/crud-cqrs.resolver.ts',
+  'packages/nestjs-crud/src/**/__tests__/**/*.ts',
+  'packages/nestjs-crud/src/**/__fixtures__/**/*.ts',
+  'packages/nestjs-crud/src/**/*.spec.ts',
+  'packages/nestjs-crud/src/**/*.fixture.ts',
+];
+
 // The optional-dep-free packages are exempt only from the deps they exist
 // for: `@nestjs/outbox` is optional for them too, so their main entry must
 // not reach it either.
@@ -287,6 +302,17 @@ export default tseslint.config(
     files: outboxAllowedFiles,
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  {
+    files: CQRS_RESTRICTED_FILES,
+    // Also every file the outbox boundary above already allows.
+    ignores: [...CQRS_ALLOWED_FILES, ...outboxAllowedFiles],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [...OUTBOX_RESTRICTED_PATTERNS, CQRS_RESTRICTED_PATTERN] },
+      ],
     },
   },
 

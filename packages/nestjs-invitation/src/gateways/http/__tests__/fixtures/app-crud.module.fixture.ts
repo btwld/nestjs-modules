@@ -3,7 +3,8 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Operation } from '@concepta/nestjs-core';
-import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import {
   CreateOtpCommand,
   ConsumeOtpCommand,
@@ -91,9 +92,7 @@ const USER_OTP_ENTITY_KEY = 'user-otp';
         },
       ],
     }),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
+    CrudModule.forRoot({}),
     PasswordModule.forRoot({}),
     OtpModule.forRoot({}),
     OtpModule.forFeature([USER_OTP_ENTITY_KEY]),

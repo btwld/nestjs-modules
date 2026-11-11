@@ -10,7 +10,8 @@
     ],
     "types": ["node", "vitest/globals"],
     "paths": {
-      "@concepta/nestjs-access-control": ["../src/index.ts"]
+      "@concepta/nestjs-access-control": ["../src/index.ts"],
+      "@concepta/nestjs-access-control/optional/crud": ["../src/optional-crud.ts"]
     }
   },
   "include": ["**/*.ts"]

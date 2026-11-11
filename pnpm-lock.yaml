@@ -246,6 +246,9 @@ importers:
       vitest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/nestjs-access-control:
     dependencies:
@@ -259,6 +262,12 @@ importers:
         specifier: ^7.8.1
         version: 7.8.2
     devDependencies:
+      '@concepta/nestjs-crud':
+        specifier: workspace:*
+        version: link:../nestjs-crud
+      '@concepta/nestjs-repository':
+        specifier: workspace:*
+        version: link:../nestjs-repository
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)

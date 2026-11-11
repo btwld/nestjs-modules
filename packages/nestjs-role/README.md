@@ -528,7 +528,8 @@ the role request handlers:
 ```ts
 import { Module } from '@nestjs/common';
 import { Operation } from '@concepta/nestjs-core';
-import { CrudModule, CrudCqrsResolver } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import {
   RoleInterface,
   roleCreateSchema,

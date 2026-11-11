@@ -3,7 +3,8 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CoreModule, Operation } from '@concepta/nestjs-core';
-import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import { RepositoryModule } from '@concepta/nestjs-repository';
 import { TypeOrmSqliteRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlite';
 
@@ -52,9 +53,7 @@ import { ReadCacheRequest } from '../../queries/impl/read-cache.request.js';
         },
       ],
     }),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
+    CrudModule.forRoot({}),
     CoreModule.forRoot(),
     CacheModule.forRoot({
       settings: {
