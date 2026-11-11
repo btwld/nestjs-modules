@@ -8,6 +8,9 @@ import {
 import { type ModuleRef, Reflector } from '@nestjs/core';
 
 import {
+  type Actor,
+  ActorCtx,
+  type AuthorityInterface,
   OverlayImmutableException,
   requireAppContext,
 } from '@concepta/nestjs-core';
@@ -19,14 +22,13 @@ import {
 } from '../../../access-control.constants.js';
 import { PossessionEnum } from '../../../domain/enums/possession.enum.js';
 import { AccessControlException } from '../../../domain/exceptions/access-control.exception.js';
-import { type AccessActor } from '../../../domain/interfaces/access-actor.type.js';
 import { type AccessControlContextInterface } from '../../../domain/interfaces/access-control-context.interface.js';
 import { type AccessGrantsProviderInterface } from '../../../domain/interfaces/access-grants-provider.interface.js';
+import { type AccessGrants } from '../../../domain/interfaces/access-grants.type.js';
 import { type CanAccess } from '../../../domain/interfaces/can-access.interface.js';
 import { AccessControlService } from '../../../domain/services/access-control.service.js';
 import { createAccessAbility } from '../../../domain/utils/create-access-ability.util.js';
 import { StaticAccessGrantsProvider } from '../../../infrastructure/grants/static-access-grants.provider.js';
-import { AccessCtx } from '../../interfaces/access-context.interface.js';
 import { AccessDecisionCtx } from '../../interfaces/access-decision-context.interface.js';
 import { AccessControlGuard } from '../access-control.guard.js';
 
@@ -129,7 +131,7 @@ describe(AccessControlGuard.name, () => {
     return context;
   };
 
-  const guardFor = (actor?: AccessActor) => {
+  const guardFor = (actor?: Actor) => {
     const actorFor = vi.fn().mockResolvedValue(actor);
     const moduleRef = mock<ModuleRef>();
     moduleRef.resolve.mockImplementation(async (service) =>
@@ -273,7 +275,7 @@ describe(AccessControlGuard.name, () => {
 
     await guard.canActivate(context);
 
-    expect(requireAppContext(context).with(AccessCtx)).toEqual({
+    expect(requireAppContext(context).with(ActorCtx)).toEqual({
       kind: 'role',
       roles: ['clerk'],
     });
@@ -286,7 +288,7 @@ describe(AccessControlGuard.name, () => {
     await guard.canActivate(context);
 
     expect(() =>
-      requireAppContext(context).defineOverlay(AccessCtx, {
+      requireAppContext(context).defineOverlay(ActorCtx, {
         kind: 'role',
         roles: ['admin'],
       }),
@@ -368,5 +370,118 @@ describe(AccessControlGuard.name, () => {
     expect(
       ownerQuery.canAccess.mock.calls[0]?.[0].getRequest(),
     ).toBeUndefined();
+  });
+
+  describe('with an authority', () => {
+    const auditor: Actor = { kind: 'role', roles: ['auditor'] };
+
+    /** An authority allowing `<verb> <object>` keys, refusing the rest. */
+    const allowing = (...allowed: string[]): AuthorityInterface => ({
+      decide: async (_ctx, { action, object }) =>
+        allowed.includes(`${action} ${object}`)
+          ? { effect: 'allow' }
+          : { effect: 'refuse', gate: 'DEC-4' },
+    });
+
+    const governedGuard = (
+      authority: AuthorityInterface,
+      grants: AccessGrants = {},
+      actor: Actor = auditor,
+    ) =>
+      new AccessControlGuard(
+        new AccessControlService(
+          { actorFor: async () => actor },
+          new StaticAccessGrantsProvider(grants),
+          undefined,
+          authority,
+        ),
+        new Reflector(),
+        mock<ModuleRef>(),
+      );
+
+    it('lets a route through on the authority alone, as any', async () => {
+      const context = rpcContext(handlers.unchecked);
+
+      expect(
+        await governedGuard(allowing('read invoice')).canActivate(context),
+      ).toEqual(true);
+      expect(requireAppContext(context).with(AccessDecisionCtx).query).toEqual({
+        actor: auditor,
+        action: 'read',
+        possession: PossessionEnum.ANY,
+        resource: 'invoice',
+      });
+    });
+
+    it('refuses a route the authority refuses, naming the pending decision', async () => {
+      await expect(
+        governedGuard(allowing()).canActivate(rpcContext(handlers.unchecked)),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          context: expect.objectContaining({
+            subject: 'invoice',
+            reason: 'authority',
+            gate: 'DEC-4',
+          }),
+        }),
+      );
+    });
+
+    it('narrows to own with the actor’s rules, so ownership must be checked', async () => {
+      const grants: AccessGrants = {
+        'role:auditor': [
+          { action: 'read:any', subject: 'invoice', inverted: true },
+          { action: 'read:own', subject: 'invoice' },
+        ],
+      };
+
+      await expect(
+        governedGuard(allowing('read invoice'), grants).canActivate(
+          rpcContext(handlers.unchecked),
+        ),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          context: expect.objectContaining({ reason: 'own-unchecked' }),
+        }),
+      );
+      expect(
+        await governedGuard(allowing('read invoice'), grants).canActivate(
+          rpcContext(handlers.read),
+        ),
+      ).toEqual(true);
+    });
+
+    it('defines a copy of the actor whose roles nothing can change', async () => {
+      const roles = ['auditor'];
+      const context = rpcContext(handlers.unchecked);
+
+      await governedGuard(
+        allowing('read invoice'),
+        {},
+        {
+          kind: 'role',
+          roles,
+        },
+      ).canActivate(context);
+
+      const defined = requireAppContext(context).with(ActorCtx);
+      expect(defined).toEqual({ kind: 'role', roles: ['auditor'] });
+      if (defined.kind === 'role') {
+        expect(defined.roles).not.toBe(roles);
+        expect(Object.isFrozen(defined.roles)).toEqual(true);
+      }
+    });
+
+    it('records what the actor may read, for the response filter', async () => {
+      const context = rpcContext(handlers.unchecked);
+
+      await governedGuard(allowing('read invoice')).canActivate(context);
+
+      expect(
+        requireAppContext(context)
+          .with(AccessDecisionCtx)
+          .ability.can('read:any', 'invoice', 'total'),
+      ).toEqual(true);
+    });
   });
 });

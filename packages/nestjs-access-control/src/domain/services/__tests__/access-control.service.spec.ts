@@ -1,12 +1,13 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
+import { type Actor, type AuthorityInterface } from '@concepta/nestjs-core';
+
 import { StaticAccessGrantsProvider } from '../../../infrastructure/grants/static-access-grants.provider.js';
 import { PossessionEnum } from '../../enums/possession.enum.js';
 import { AccessControlException } from '../../exceptions/access-control.exception.js';
 import { AccessRefusedException } from '../../exceptions/access-refused.exception.js';
 import { AccessRulesInvalidException } from '../../exceptions/access-rules-invalid.exception.js';
 import { type AccessActorResolverInterface } from '../../interfaces/access-actor-resolver.interface.js';
-import { type AccessActor } from '../../interfaces/access-actor.type.js';
 import { type AccessDecisionSourceInterface } from '../../interfaces/access-decision-source.interface.js';
 import { type AccessGrantsProviderInterface } from '../../interfaces/access-grants-provider.interface.js';
 import { type AccessGrants } from '../../interfaces/access-grants.type.js';
@@ -15,17 +16,17 @@ import { createAccessAbility } from '../../utils/create-access-ability.util.js';
 import { AccessControlService } from '../access-control.service.js';
 
 describe(AccessControlService.name, () => {
-  const actingAs = (actor?: AccessActor): AccessActorResolverInterface => ({
+  const actingAs = (actor?: Actor): AccessActorResolverInterface => ({
     actorFor: async () => actor,
   });
 
-  const serviceFor = (actor: AccessActor | undefined, grants: AccessGrants) =>
+  const serviceFor = (actor: Actor | undefined, grants: AccessGrants) =>
     new AccessControlService(
       actingAs(actor),
       new StaticAccessGrantsProvider(grants),
     );
 
-  const clerk: AccessActor = { kind: 'role', roles: ['clerk'] };
+  const clerk: Actor = { kind: 'role', roles: ['clerk'] };
 
   describe('assert', () => {
     it('refuses when nobody is acting', async () => {
@@ -185,7 +186,7 @@ describe(AccessControlService.name, () => {
     });
 
     it('returns a copy, so changing it changes no later check', () => {
-      const actor: AccessActor = { kind: 'role', roles: ['clerk'] };
+      const actor: Actor = { kind: 'role', roles: ['clerk'] };
       const service = serviceDeciding({
         decisionFor: () => ({
           query: {
@@ -199,8 +200,9 @@ describe(AccessControlService.name, () => {
       });
       const decided = service.decision({});
 
+      // The type says readonly; a caller may still try.
       if (decided?.actor.kind === 'role') {
-        decided.actor.roles.push('admin');
+        Array.prototype.push.call(decided.actor.roles, 'admin');
       }
 
       expect(actor).toEqual({ kind: 'role', roles: ['clerk'] });
@@ -336,7 +338,7 @@ describe(AccessControlService.name, () => {
       rulesFor: async () => [...template, ...userRules],
     });
 
-    const user: AccessActor = { kind: 'role', roles: ['clerk'], userId: 'u1' };
+    const user: Actor = { kind: 'role', roles: ['clerk'], userId: 'u1' };
 
     it('lets a user rule remove what the template allows', async () => {
       const service = new AccessControlService(
@@ -400,6 +402,240 @@ describe(AccessControlService.name, () => {
 
     it('is empty when nobody is acting', async () => {
       expect(await serviceFor(undefined, {}).effectiveRules({})).toEqual([]);
+    });
+  });
+
+  describe('with an authority', () => {
+    /** Allows `<verb> <object>` keys, refusing the rest. */
+    const authorityAllowing = (
+      ...allowed: string[]
+    ): AuthorityInterface & { requests: unknown[] } => {
+      const requests: unknown[] = [];
+      return {
+        requests,
+        decide: async (_ctx, request) => {
+          requests.push(request);
+          if (allowed.includes(`${request.action} ${request.object}`)) {
+            return { effect: 'allow' };
+          }
+          return request.object === 'gated'
+            ? { effect: 'refuse', gate: 'DEC-4' }
+            : { effect: 'refuse' };
+        },
+      };
+    };
+
+    const governedService = (
+      authority: AuthorityInterface,
+      grants: AccessGrants = {},
+    ) =>
+      new AccessControlService(
+        actingAs(clerk),
+        new StaticAccessGrantsProvider(grants),
+        undefined,
+        authority,
+      );
+
+    it('lets the authority decide when the actor has no rule of their own', async () => {
+      const service = governedService(authorityAllowing('read invoice'));
+
+      expect(await service.can({}, 'read:any', 'invoice')).toEqual(true);
+      expect(await service.can({}, 'update:any', 'invoice')).toEqual(false);
+    });
+
+    it('asks the authority for the verb, on the resource as its object', async () => {
+      const authority = authorityAllowing('read invoice');
+      const ctx = {};
+
+      await governedService(authority).can(ctx, 'read:own', 'invoice');
+
+      expect(authority.requests).toEqual([
+        { actor: clerk, object: 'invoice', action: 'read', columns: [] },
+      ]);
+    });
+
+    it('refuses what the authority refuses, naming any pending decision', async () => {
+      const error = await governedService(authorityAllowing())
+        .assert({}, 'read:any', 'gated')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AccessRefusedException);
+      expect(error).toMatchObject({
+        context: { reason: 'authority', gate: 'DEC-4', subject: 'gated' },
+      });
+    });
+
+    it('never lets a rule of its own allow what the authority refuses', async () => {
+      const service = governedService(authorityAllowing('read invoice'), {
+        'role:clerk': [{ action: 'delete:any', subject: 'invoice' }],
+      });
+
+      expect(await service.can({}, 'delete:any', 'invoice')).toEqual(false);
+    });
+
+    it('narrows with a deny: a field the actor may not write', async () => {
+      const service = governedService(authorityAllowing('update invoice'), {
+        'role:clerk': [
+          {
+            action: 'update:any',
+            subject: 'invoice',
+            fields: ['amount'],
+            inverted: true,
+          },
+        ],
+      });
+
+      expect(
+        await service.can({}, 'update:any', 'invoice', { fields: ['notes'] }),
+      ).toEqual(true);
+      expect(
+        await service.can({}, 'update:any', 'invoice', { fields: ['amount'] }),
+      ).toEqual(false);
+    });
+
+    it('narrows to the actor’s own records: a deny of any beside an allow of own', async () => {
+      const service = governedService(authorityAllowing('update invoice'), {
+        'role:clerk': [
+          { action: 'update:any', subject: 'invoice', inverted: true },
+          { action: 'update:own', subject: 'invoice' },
+        ],
+      });
+
+      expect(await service.can({}, 'update:any', 'invoice')).toEqual(false);
+      expect(await service.can({}, 'update:own', 'invoice')).toEqual(true);
+    });
+
+    it('lets a write read what the authority lets the actor read', async () => {
+      const service = governedService(
+        authorityAllowing('update invoice', 'read invoice'),
+      );
+      const resolution = await service.resolve({});
+      if (!resolution) throw new Error('nobody acting');
+
+      const authorized = await service.authorize(
+        {},
+        resolution,
+        'update',
+        'invoice',
+      );
+
+      expect(authorized).toEqual({
+        allowed: true,
+        resolution: expect.objectContaining({
+          rules: [
+            { action: 'update:any', subject: 'invoice' },
+            { action: 'read:any', subject: 'invoice' },
+          ],
+        }),
+      });
+    });
+
+    it('does not let a write read what the authority does not let the actor read', async () => {
+      const service = governedService(authorityAllowing('update invoice'));
+      const resolution = await service.resolve({});
+      if (!resolution) throw new Error('nobody acting');
+
+      const authorized = await service.authorize(
+        {},
+        resolution,
+        'update',
+        'invoice',
+      );
+
+      expect(authorized).toEqual({
+        allowed: true,
+        resolution: expect.objectContaining({
+          rules: [{ action: 'update:any', subject: 'invoice' }],
+        }),
+      });
+    });
+
+    it('keeps none of the actor’s own allows for what the authority did not allow', async () => {
+      const service = governedService(authorityAllowing('update invoice'), {
+        'role:clerk': [
+          { action: 'read:any', subject: 'invoice' },
+          {
+            action: ['delete:any', 'update:own'],
+            subject: ['invoice', 'payment'],
+          },
+          { action: 'read:any', subject: 'payment' },
+        ],
+      });
+      const resolution = await service.resolve({});
+      if (!resolution) throw new Error('nobody acting');
+
+      const authorized = await service.authorize(
+        {},
+        resolution,
+        'update',
+        'invoice',
+      );
+      if (!authorized.allowed) throw new Error('refused');
+      const { ability } = authorized.resolution;
+
+      expect(ability.can('update:any', 'invoice')).toEqual(true);
+      expect(ability.can('update:own', 'invoice')).toEqual(true);
+      expect(ability.can('read:any', 'invoice')).toEqual(false);
+      expect(ability.can('delete:any', 'invoice')).toEqual(false);
+      expect(ability.can('update:own', 'payment')).toEqual(false);
+      expect(ability.can('read:any', 'payment')).toEqual(false);
+    });
+
+    it('keeps every one of the actor’s own denies', async () => {
+      const service = governedService(authorityAllowing('update invoice'), {
+        'role:clerk': [
+          { action: 'update:any', subject: 'invoice', inverted: true },
+        ],
+      });
+      const resolution = await service.resolve({});
+      if (!resolution) throw new Error('nobody acting');
+
+      const authorized = await service.authorize(
+        {},
+        resolution,
+        'update',
+        'invoice',
+      );
+      if (!authorized.allowed) throw new Error('refused');
+
+      expect(
+        authorized.resolution.ability.can('update:any', 'invoice'),
+      ).toEqual(false);
+    });
+
+    it('asks the authority about the same actor the repository does', async () => {
+      const authority = authorityAllowing('read invoice');
+      const service = new AccessControlService(
+        actingAs({
+          roles: ['clerk'],
+          kind: 'role',
+          userId: undefined,
+        }),
+        new StaticAccessGrantsProvider({}),
+        undefined,
+        authority,
+      );
+
+      await service.can({}, 'read:any', 'invoice');
+
+      expect(authority.requests).toStrictEqual([
+        {
+          actor: { kind: 'role', roles: ['clerk'] },
+          object: 'invoice',
+          action: 'read',
+          columns: [],
+        },
+      ]);
+    });
+
+    it('leaves a service with no authority deciding by its rules alone', async () => {
+      const service = serviceFor(clerk, {});
+      const resolution = await service.resolve({});
+      if (!resolution) throw new Error('nobody acting');
+
+      expect(
+        await service.authorize({}, resolution, 'read', 'invoice'),
+      ).toEqual({ allowed: true, resolution });
     });
   });
 

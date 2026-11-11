@@ -12,6 +12,7 @@ stays correct.
 | [Per-user grants from storage](./per-user-grants) | Role templates plus per-user rules an admin edits at runtime, a "my permissions" endpoint |
 | [System integrations](./system-integrations) | Partner systems calling with API keys, a queue consumer acting as a system |
 | [Multi-tenant access levels](./multi-tenant-levels) | Roles described as access levels, a different role in each tenant |
+| [Shared rules](./shared-rules) | One rule set deciding both routes and repository data, narrowed for one API |
 
 ## Running them
 
@@ -38,9 +39,11 @@ The examples keep everything outside access control as small as possible:
   header `Authorization: Bearer <user id>` signs that user in. Your
   authentication puts the verified user on the request instead; the actor
   resolvers read it the same way.
-- **Storage** is in memory. In an application on
-  `@concepta/nestjs-repository`, which rows a caller reaches (their own, their
-  tenant's) is row scope's job, so handlers don't filter rows themselves.
+- **Storage** is in memory, except in Shared rules, which runs
+  `@concepta/nestjs-repository` over an in-memory SQLite database. In an
+  application on the repository, which rows a caller reaches (their own,
+  their tenant's) is row scope's job, so handlers don't filter rows
+  themselves.
 - **Request validation** is left out; validate bodies as you normally would.
 
 The examples import `@concepta/nestjs-access-control` exactly as your

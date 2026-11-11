@@ -2,10 +2,9 @@ import { mock } from 'vitest-mock-extended';
 
 import { type ArgumentsHost, type ExecutionContext } from '@nestjs/common';
 
-import { getAppContext } from '@concepta/nestjs-core';
+import { ActorCtx, getAppContext } from '@concepta/nestjs-core';
 
 import { AccessContextOverlay } from '../access-context.overlay.js';
-import { AccessCtx } from '../interfaces/access-context.interface.js';
 
 type HttpArgumentsHost = ReturnType<ArgumentsHost['switchToHttp']>;
 
@@ -27,15 +26,15 @@ describe(AccessContextOverlay.name, () => {
     await new AccessContextOverlay({ actorFor }).attach(context);
 
     const ctx = getAppContext(request);
-    expect(ctx.with(AccessCtx)).toEqual({ kind: 'role', roles: ['a'] });
+    expect(ctx.with(ActorCtx)).toEqual({ kind: 'role', roles: ['a'] });
     expect(actorFor).toHaveBeenCalledWith(ctx, context);
-    expect(ctx.removeOverlay(AccessCtx)).toEqual(false);
+    expect(ctx.removeOverlay(ActorCtx)).toEqual(false);
   });
 
   it('leaves an actor already defined, without asking the resolver', async () => {
     const request = {};
     getAppContext(request).defineOverlay(
-      AccessCtx,
+      ActorCtx,
       { kind: 'system', name: 'agile' },
       { immutable: true },
     );
@@ -53,12 +52,12 @@ describe(AccessContextOverlay.name, () => {
       actorFor: async () => undefined,
     }).attach(httpContext(request));
 
-    expect(getAppContext(request).supports(AccessCtx)).toEqual(false);
+    expect(getAppContext(request).supports(ActorCtx)).toEqual(false);
   });
 
-  it('is a context overlay for AccessCtx', () => {
+  it('is a context overlay for ActorCtx', () => {
     expect(
       new AccessContextOverlay({ actorFor: async () => undefined }).ref,
-    ).toBe(AccessCtx);
+    ).toBe(ActorCtx);
   });
 });

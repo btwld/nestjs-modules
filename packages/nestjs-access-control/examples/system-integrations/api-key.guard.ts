@@ -1,7 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 
-import { AccessCtx } from '@concepta/nestjs-access-control';
-import { requireAppContext } from '@concepta/nestjs-core';
+import { ActorCtx, requireAppContext } from '@concepta/nestjs-core';
 
 import { type DemoRequestInterface } from '../shared/demo-request.interface.js';
 
@@ -28,7 +27,7 @@ export class ApiKeyGuard implements CanActivate {
 
     if (name) {
       requireAppContext(context).defineOverlay(
-        AccessCtx,
+        ActorCtx,
         { kind: 'system', name },
         { immutable: true },
       );

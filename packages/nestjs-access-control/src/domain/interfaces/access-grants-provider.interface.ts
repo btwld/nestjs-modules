@@ -1,6 +1,7 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type AccessActor } from './access-actor.type.js';
+import { type Actor } from '@concepta/nestjs-core';
+
 import { type AccessRuleInterface } from './access-rule.interface.js';
 
 /**
@@ -11,6 +12,6 @@ import { type AccessRuleInterface } from './access-rule.interface.js';
 export interface AccessGrantsProviderInterface {
   rulesFor(
     ctx: PlainLiteralObject,
-    actor: AccessActor,
+    actor: Actor,
   ): Promise<AccessRuleInterface[]>;
 }

@@ -123,6 +123,9 @@ importers:
       '@concepta/eslint-config':
         specifier: 2.0.0-alpha.4
         version: 2.0.0-alpha.4(@darraghor/eslint-plugin-nestjs-typed@6.18.0(@typescript-eslint/parser@8.70.0(eslint@9.39.5(jiti@2.6.1)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(class-validator@0.15.1)(eslint-import-resolver-node@0.3.10(supports-color@7.2.0))(eslint@9.39.5(jiti@2.6.1)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.6.1)(supports-color@7.2.0))(prettier@3.9.6)(supports-color@7.2.0)(typescript@5.9.3)
+      '@concepta/nestjs-repository':
+        specifier: workspace:*
+        version: link:packages/nestjs-repository
       '@concepta/nestjs-repository-typeorm':
         specifier: workspace:*
         version: link:packages/nestjs-repository-typeorm

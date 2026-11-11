@@ -5,8 +5,8 @@
  *   `update:own`.
  * - `subject` is the resource the action applies to.
  * - `fields`, when given, limits the rule to those field paths. A path
- *   covers everything beneath it (`address` covers `address.city`); `*`
- *   matches one level and `**` any depth.
+ *   covers everything beneath it (`address` covers `address.city`). Paths
+ *   are never patterns: a rule naming `*` is refused.
  * - `inverted: true` makes the rule a deny. A deny always wins over an allow,
  *   whichever role or rule source either comes from.
  *

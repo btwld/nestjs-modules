@@ -11,6 +11,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@concepta/eslint-config": "2.0.0-alpha.4",
+    "@concepta/nestjs-repository": "workspace:*",
     "@concepta/nestjs-repository-typeorm": "workspace:*",
     "@concepta/prettier-config": "2.0.0-alpha.4",
     "@darraghor/eslint-plugin-nestjs-typed": "^6.9.3",

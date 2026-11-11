@@ -11,8 +11,7 @@ export { ACCESS_CONTROL_MODULE_SETTINGS_TOKEN } from './access-control.constants
 // Gateways
 export { AccessControlGuard } from './gateways/http/access-control.guard.js';
 export { AccessControlFilter } from './gateways/http/access-control.filter.js';
-export { AccessCtx } from './gateways/interfaces/access-context.interface.js';
-export { AccessCtxActorResolver } from './gateways/access-ctx-actor.resolver.js';
+export { ActorCtxResolver } from './gateways/actor-ctx.resolver.js';
 export { AccessCtxDecisionSource } from './gateways/access-ctx-decision.source.js';
 export { AccessContextOverlay } from './gateways/access-context.overlay.js';
 
@@ -47,7 +46,6 @@ export {
   normalizeAccessFieldPath,
 } from './domain/utils/access-field-paths.util.js';
 export { AccessAbility } from './domain/interfaces/access-ability.type.js';
-export { AccessActor } from './domain/interfaces/access-actor.type.js';
 export { AccessActorResolverInterface } from './domain/interfaces/access-actor-resolver.interface.js';
 export { AccessCheckOptionsInterface } from './domain/interfaces/access-check-options.interface.js';
 export { AccessControlContextInterface } from './domain/interfaces/access-control-context.interface.js';
@@ -64,9 +62,8 @@ export {
 } from './domain/interfaces/access-refusal-reason.type.js';
 export { AccessRefusedDetailsInterface } from './domain/interfaces/access-refused-details.interface.js';
 export { AccessResolutionInterface } from './domain/interfaces/access-resolution.interface.js';
-export { AccessRoleActorInterface } from './domain/interfaces/access-role-actor.interface.js';
+export { AccessAuthorization } from './domain/interfaces/access-authorization.type.js';
 export { AccessRuleInterface } from './domain/interfaces/access-rule.interface.js';
-export { AccessSystemActorInterface } from './domain/interfaces/access-system-actor.interface.js';
 
 // Infrastructure
 export { StaticAccessGrantsProvider } from './infrastructure/grants/static-access-grants.provider.js';

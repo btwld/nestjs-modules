@@ -22,6 +22,7 @@ in your code or in your database.
 - [Examples](#examples)
 - [Writing Rules](#writing-rules)
 - [How Rules Combine](#how-rules-combine)
+- [Sharing Rules with the Repository](#sharing-rules-with-the-repository)
 - [Who Is Acting](#who-is-acting)
 - [Rules at Runtime](#rules-at-runtime)
 - [Protecting Routes](#protecting-routes)
@@ -104,6 +105,8 @@ against it:
   calling with API keys, and a queue consumer acting as a system.
 - [Multi-tenant access levels](./examples/multi-tenant-levels): roles
   described as access levels, with a different role in each tenant.
+- [Shared rules](./examples/shared-rules): one rule set deciding both the
+  routes and the repository's data, narrowed for one API.
 
 See [the examples' README](./examples) for how to run them.
 
@@ -174,6 +177,42 @@ A caller's rules are the rules of every role they hold, plus any rules a
 | an allow | allowed |
 | an allow and a deny, from any roles | refused |
 | allow `user`, deny `user.password` | allowed, without `password` |
+
+## Sharing Rules with the Repository
+
+When the data behind your routes lives in
+[`@concepta/nestjs-repository`](../nestjs-repository/README.md#object-authority)
+with an authority, hand access control the same authority, and you write
+your rules once:
+
+```ts
+AccessControlModule.forRootAsync({
+  imports: [AuthorityModule],
+  inject: [CaslAuthority],
+  useFactory: (authority: CaslAuthority) => ({ authority, actorResolver }),
+});
+```
+
+- **The authority decides each route first.** A route's resource is read
+  as the authority's object and its action as the verb, so
+  `@AccessControlDeleteOne('invoices')` asks whether the actor may `delete`
+  `invoices`. A refusal is a `403` with reason `authority`, before the
+  handler runs. Name a route's resource as the entity is keyed in
+  `RepositoryModule.forRoot()`; a route that is not about an entity gets
+  rules of its own in the same rule set.
+- **What it allows counts as `any`.** Which rows the caller reaches is row
+  scope's job; the repository then decides each read and write by the same
+  rules, columns included.
+- **Your own rules only narrow, by denying.** `settings.grants` and a grants
+  provider still apply, but can never allow what the authority refuses: on a
+  route, every deny counts, and an allow only for the route's resource and a
+  verb the authority allowed. Deny a field to hide it from one API's
+  responses or refuse it in `assertFields`; deny `update:any` beside an
+  allow of `update:own` to limit a role to its own records on these routes.
+- `can` and `assert` in handlers decide the same way.
+
+Without an authority, your rules decide alone, as everywhere else in this
+README. See the [Shared rules](./examples/shared-rules) example.
 
 ## Who Is Acting
 
@@ -254,31 +293,34 @@ The resolver decides who may act at all: refuse a user who is disabled
 verifies. On a refresh route, the user is whoever holds the refresh token;
 keep grants off routes that do anything but issue tokens.
 
-The module then defines the actor on the call's context as `AccessCtx`, on
-every HTTP call, so a route handler, or anything it calls, can check with
-the same actor. On a route without a grant, the actor is defined by a
-global interceptor, so your own guards and earlier interceptors don't see
-it yet there. The resolver runs once per request; cache in it if it reads a
-database.
-Don't define `AccessCtx` in an HTTP interceptor of your own: the guard has
+The module then defines the actor on the call's context as `ActorCtx`
+(from `@concepta/nestjs-core`), on every HTTP call, so a route handler, or
+anything it calls, checks with the same actor — repositories governed by an
+[authority](../nestjs-repository/README.md#object-authority) included. On a
+route without a grant, the actor is defined by a global interceptor, so your
+own guards and earlier interceptors don't see it yet there. The resolver
+runs once per request; cache in it if it reads a database.
+Don't define `ActorCtx` in an HTTP interceptor of your own: the guard has
 already defined it by then, so redefining it fails.
 
 The resolver is given a request only over HTTP: on other transports the
 "request" is the message payload, which the sender controls. There, define
-`AccessCtx` yourself. An integration consumer acting for another system
+`ActorCtx` yourself. An integration consumer acting for another system
 defines `{ kind: 'system', name: 'billing' }` on the context it opens for
 each message:
 
 ```ts
+import { ActorCtx, AppContextHost } from '@concepta/nestjs-core';
+
 const ctx = new AppContextHost();
 ctx.defineOverlay(
-  AccessCtx,
+  ActorCtx,
   { kind: 'system', name: 'billing' },
   { immutable: true },
 );
 ```
 
-A call carrying `AccessCtx` uses it; the resolver is asked only when it is
+A call carrying `ActorCtx` uses it; the resolver is asked only when it is
 absent. A system is checked against `system:billing` rules only, never
 against the roles of whatever account it runs under:
 
@@ -595,13 +637,18 @@ permissions(@Ctx() ctx: AppContextHost) {
 
 CASL's frontend packages read the result as is.
 
+With an [authority](#sharing-rules-with-the-repository), these are only the
+actor's own rules: what the authority allows is not among them. Show the
+authority's rules instead, from wherever your application keeps them.
+
 ## Options
 
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `settings.grants` | `{}` | Rules keyed `role:<name>` or `system:<name>`. Checked at startup. |
-| `actorResolver` | none | Works out who is acting when a call carries no `AccessCtx`. |
+| `actorResolver` | none | Works out who is acting when a call carries no `ActorCtx`. |
 | `grantsProvider` | `settings.grants` | Supplies an actor's rules on every check. |
+| `authority` | none | Decides each route first; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
 | `appFilter` | the response filter | Replace it, or `false` for none. |
 | `queryServices` | `[]` | Access query services to register. |
 
@@ -631,6 +678,7 @@ actor overlay of its own.
 | `field` | A field it touches is refused (also names the `field`) |
 | `access-query` | The route's access query service refused it |
 | `own-unchecked` | Only an `own` grant allows it, and nothing on the route checks ownership |
+| `authority` | The module's authority refuses it (also names any pending decision as `gate`) |
 
 `AccessRulesInvalidException` lists every problem found, so one fix pass
 covers them all.

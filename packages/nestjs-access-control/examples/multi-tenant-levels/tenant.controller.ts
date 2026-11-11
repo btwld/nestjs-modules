@@ -18,10 +18,9 @@ import {
   AccessControlReadOne,
   AccessControlService,
   AccessControlUpdateOne,
-  AccessCtx,
   PossessionEnum,
 } from '@concepta/nestjs-access-control';
-import { type AppContextHost, Ctx } from '@concepta/nestjs-core';
+import { ActorCtx, type AppContextHost, Ctx } from '@concepta/nestjs-core';
 
 import { OwnProjectQuery } from './own-project.query.js';
 import { type ProjectInterface } from './project.interface.js';
@@ -66,7 +65,7 @@ export class TenantController {
     @Body() { name }: Pick<ProjectInterface, 'name'>,
   ): ProjectInterface {
     // Whoever creates a project owns it, so `create:own` is enough.
-    const actor = ctx.with(AccessCtx);
+    const actor = ctx.with(ActorCtx);
 
     if (actor.kind !== 'role' || !actor.userId) {
       throw new ForbiddenException('Only a person can own a project');

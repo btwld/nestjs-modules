@@ -1,7 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 
-import { type AppContextHost, requireAppContext } from '@concepta/nestjs-core';
+import {
+  ActorCtx,
+  type AppContextHost,
+  requireAppContext,
+} from '@concepta/nestjs-core';
 
 import {
   ACCESS_CONTROL_MODULE_GRANT_METADATA,
@@ -15,9 +19,11 @@ import { AccessRefusedException } from '../../domain/exceptions/access-refused.e
 import { type AccessControlGrantOptionInterface } from '../../domain/interfaces/access-control-grant-option.interface.js';
 import { type AccessControlQueryOptionInterface } from '../../domain/interfaces/access-control-query-option.interface.js';
 import { type AccessQueryInterface } from '../../domain/interfaces/access-query.interface.js';
+import { type AccessRefusedDetailsInterface } from '../../domain/interfaces/access-refused-details.interface.js';
 import { type AccessResolutionInterface } from '../../domain/interfaces/access-resolution.interface.js';
 import { AccessControlService } from '../../domain/services/access-control.service.js';
-import { AccessCtx } from '../interfaces/access-context.interface.js';
+import { frozenActor } from '../../domain/utils/frozen-actor.util.js';
+import { type AccessAuthorizedGrantInterface } from '../interfaces/access-authorized-grant.interface.js';
 import { AccessDecisionCtx } from '../interfaces/access-decision-context.interface.js';
 
 const POSSESSIONS = [PossessionEnum.ANY, PossessionEnum.OWN];
@@ -44,7 +50,8 @@ const CHECKED = new WeakSet<AppContextHost>();
  * services or `@AccessControlOwnInHandler`; elsewhere it is refused with
  * `own-unchecked`. The route's access query services, if any, then decide:
  * the call proceeds when one of them allows it. The actor is then defined
- * on the call's context as `AccessCtx`, so checks in the handler reuse it,
+ * on the call's context as `ActorCtx`, so checks in the handler, and the
+ * repositories it calls, decide for the same actor,
  * and the grant the call got in on is recorded, immutably, for
  * `AccessControlService.assertFields` and the response filter.
  */
@@ -94,7 +101,7 @@ export class AccessControlGuard implements CanActivate {
 
     // Only an HTTP request is trusted to carry the actor: elsewhere the
     // request is the message payload, which the caller controls. Other
-    // transports define `AccessCtx` before the call.
+    // transports define `ActorCtx` before the call.
     const resolution = await this.accessControl.resolve(
       ctx,
       context.getType() === 'http' ? context : undefined,
@@ -124,45 +131,79 @@ export class AccessControlGuard implements CanActivate {
         ACCESS_CONTROL_MODULE_OWN_IN_HANDLER_METADATA,
         ownInHandlerTargets,
       ) === true;
-    const query = this.permittedQuery(
-      resolution,
-      grants,
+
+    // Each grant as the module's authority answers it; with no authority,
+    // the actor's rules alone.
+    const authorized: AccessAuthorizedGrantInterface[] = [];
+    let authorityRefusal: AccessRefusedDetailsInterface | undefined;
+    for (const grant of grants) {
+      const authorization = await this.accessControl.authorize(
+        ctx,
+        resolution,
+        grant.action,
+        grant.resource,
+      );
+
+      if (authorization.allowed) {
+        authorized.push({ grant, resolution: authorization.resolution });
+      } else {
+        authorityRefusal ??= authorization.refusal;
+      }
+    }
+
+    const [first] = authorized;
+    if (!first) {
+      throw new AccessRefusedException(
+        authorityRefusal ?? {
+          action: requestedAction,
+          subject: requested.resource,
+          actor: resolution.actor,
+          reason: 'authority',
+        },
+      );
+    }
+
+    const permitted = this.permittedQuery(
+      authorized,
       ownChecked ? POSSESSIONS : [PossessionEnum.ANY],
     );
 
-    if (!query) {
+    if (!permitted) {
       const ownOnly = ownChecked
         ? undefined
-        : this.permittedQuery(resolution, grants, [PossessionEnum.OWN]);
+        : this.permittedQuery(authorized, [PossessionEnum.OWN]);
 
       if (ownOnly) {
         throw new AccessRefusedException({
-          action: `${ownOnly.action}:${ownOnly.possession}`,
-          subject: ownOnly.resource,
+          action: `${ownOnly.query.action}:${ownOnly.query.possession}`,
+          subject: ownOnly.query.resource,
           actor: resolution.actor,
           reason: 'own-unchecked',
         });
       }
 
+      const firstAction = `${first.grant.action}:${PossessionEnum.ANY}`;
       throw new AccessRefusedException(
         this.accessControl.refusal(
-          resolution,
-          requestedAction,
-          requested.resource,
+          first.resolution,
+          firstAction,
+          first.grant.resource,
         ) ?? {
-          action: requestedAction,
-          subject: requested.resource,
+          action: firstAction,
+          subject: first.grant.resource,
           actor: resolution.actor,
           reason: 'no-grant',
         },
       );
     }
 
+    const { query } = permitted;
+
     if (
       !(await this.passesAccessQueries(
         context,
         ctx,
-        resolution,
+        permitted.resolution,
         query,
         queries,
       ))
@@ -175,14 +216,16 @@ export class AccessControlGuard implements CanActivate {
       });
     }
 
-    if (!ctx.supports(AccessCtx)) {
-      ctx.defineOverlay(AccessCtx, resolution.actor, { immutable: true });
+    if (!ctx.supports(ActorCtx)) {
+      ctx.defineOverlay(ActorCtx, frozenActor(resolution.actor), {
+        immutable: true,
+      });
     }
 
     // Immutable: `assertFields` and the response filter trust it.
     ctx.defineOverlay(
       AccessDecisionCtx,
-      { query, ability: resolution.ability },
+      { query, ability: permitted.resolution.ability },
       { immutable: true },
     );
     CHECKED.add(ctx);
@@ -190,21 +233,29 @@ export class AccessControlGuard implements CanActivate {
     return true;
   }
 
+  /**
+   * The first grant, `any` before `own`, the actor holds under what the
+   * authority allowed it, with the resolution it was checked against.
+   */
   private permittedQuery(
-    resolution: AccessResolutionInterface,
-    grants: AccessControlGrantOptionInterface[],
+    authorized: AccessAuthorizedGrantInterface[],
     possessions: PossessionEnum[],
-  ): AccessQueryInterface | undefined {
-    for (const grant of grants) {
+  ):
+    | { query: AccessQueryInterface; resolution: AccessResolutionInterface }
+    | undefined {
+    for (const { grant, resolution } of authorized) {
       for (const possession of possessions) {
         const action = `${grant.action}:${possession}`;
 
         if (!this.accessControl.refusal(resolution, action, grant.resource)) {
           return {
-            actor: resolution.actor,
-            action: grant.action,
-            possession,
-            resource: grant.resource,
+            query: {
+              actor: resolution.actor,
+              action: grant.action,
+              possession,
+              resource: grant.resource,
+            },
+            resolution,
           };
         }
       }

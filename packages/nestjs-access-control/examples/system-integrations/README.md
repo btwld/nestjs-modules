@@ -14,7 +14,7 @@ customers, never their card.
 
 - **Defining the system as the actor.** [`api-key.guard.ts`](./api-key.guard.ts)
   is a global guard: it maps the key to a system and defines
-  `{ kind: 'system', name }` as `AccessCtx`, immutably. Global guards run
+  `{ kind: 'system', name }` as `ActorCtx`, immutably. Global guards run
   before the route guard access control adds, so the check sees the system.
 - **Writing is not reading.** The payment provider may mark invoices paid
   but read none, so its update's response is empty: responses show what

@@ -22,6 +22,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 
 import {
+  ActorCtx,
   type AppContextHost,
   Ctx,
   requireAppContext,
@@ -42,7 +43,6 @@ import { AccessControlQuery } from '../../decorators/access-control-query.decora
 import { AccessControlReadMany } from '../../decorators/access-control-read-many.decorator.js';
 import { AccessControlReadOne } from '../../decorators/access-control-read-one.decorator.js';
 import { AccessControlUpdateOne } from '../../decorators/access-control-update-one.decorator.js';
-import { AccessCtx } from '../../interfaces/access-context.interface.js';
 
 import { headerActorResolverFixture } from './fixtures/header-actor.resolver.fixture.js';
 
@@ -208,7 +208,7 @@ class WholeControllerFixture {
 
   @Get('actor')
   actor(@Ctx() ctx: AppContextHost) {
-    return ctx.with(AccessCtx);
+    return ctx.with(ActorCtx);
   }
 
   @Get('profile')
@@ -272,7 +272,7 @@ class BillingSystemGuardFixture implements CanActivate {
 
     if (headers['x-billing']) {
       requireAppContext(context).defineOverlay(
-        AccessCtx,
+        ActorCtx,
         { kind: 'system', name: 'billing' },
         { immutable: true },
       );

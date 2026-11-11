@@ -5,6 +5,7 @@ export const ACCESS_REFUSAL_REASONS = [
   'field',
   'access-query',
   'own-unchecked',
+  'authority',
 ] as const;
 
 /**
@@ -17,6 +18,7 @@ export const ACCESS_REFUSAL_REASONS = [
  * - `access-query`: a route's access query service refused it;
  * - `own-unchecked`: only an `own` grant allows it, and the route neither
  *   checks ownership with an access query service nor declares that its
- *   handler does.
+ *   handler does;
+ * - `authority`: the module's authority refuses it.
  */
 export type AccessRefusalReason = (typeof ACCESS_REFUSAL_REASONS)[number];

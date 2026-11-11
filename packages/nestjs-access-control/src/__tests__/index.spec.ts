@@ -21,8 +21,7 @@ import {
   AccessControlReplaceOne,
   AccessControlService,
   AccessControlUpdateOne,
-  AccessCtx,
-  AccessCtxActorResolver,
+  ActorCtxResolver,
   AccessCtxDecisionSource,
   AccessRefusedException,
   AccessRulesInvalidException,
@@ -43,14 +42,13 @@ describe('Index', () => {
     expect(accessRuleProblems).toEqual(expect.any(Function));
     expect(accessGrantsProblems).toEqual(expect.any(Function));
     expect(createAccessAbility).toEqual(expect.any(Function));
-    expect(AccessCtxActorResolver).toEqual(expect.any(Function));
+    expect(ActorCtxResolver).toEqual(expect.any(Function));
     expect(AccessCtxDecisionSource).toEqual(expect.any(Function));
     expect(StaticAccessGrantsProvider).toEqual(expect.any(Function));
     expect(typeof ACCESS_CONTROL_MODULE_SETTINGS_TOKEN).toEqual('string');
   });
 
-  it('exports the actor overlay and field path helpers', () => {
-    expect(AccessCtx.name).toEqual('withAccess');
+  it('exports the field path helpers', () => {
     expect(accessFieldPaths).toEqual(expect.any(Function));
     expect(normalizeAccessFieldPath).toEqual(expect.any(Function));
   });
@@ -66,6 +64,7 @@ describe('Index', () => {
       'field',
       'access-query',
       'own-unchecked',
+      'authority',
     ]);
   });
 

@@ -1,15 +1,15 @@
 import { type ExecutionContext } from '@nestjs/common';
 
-import { ContextOverlayInterceptor } from '@concepta/nestjs-core';
+import { ActorCtx, ContextOverlayInterceptor } from '@concepta/nestjs-core';
 
 import { type AccessActorResolverInterface } from '../domain/interfaces/access-actor-resolver.interface.js';
-
-import { AccessCtx } from './interfaces/access-context.interface.js';
+import { frozenActor } from '../domain/utils/frozen-actor.util.js';
 
 /**
- * Defines `AccessCtx` on every HTTP call that does not carry it yet, using
+ * Defines `ActorCtx` on every HTTP call that does not carry it yet, using
  * the module's actor resolver, so handlers on routes without a grant can
- * check too. A checked route's guard has already defined it.
+ * check too, and every repository call the handler makes is decided for
+ * the same actor. A checked route's guard has already defined it.
  *
  * Registered by the module when it has an actor resolver. The resolver
  * reads the request, which authentication has prepared before any
@@ -17,7 +17,7 @@ import { AccessCtx } from './interfaces/access-context.interface.js';
  * matter.
  */
 export class AccessContextOverlay extends ContextOverlayInterceptor {
-  readonly ref = AccessCtx;
+  readonly ref = ActorCtx;
 
   constructor(private readonly actorResolver: AccessActorResolverInterface) {
     super();
@@ -26,14 +26,14 @@ export class AccessContextOverlay extends ContextOverlayInterceptor {
   async attach(context: ExecutionContext): Promise<void> {
     const ctx = this.appContext(context);
 
-    if (ctx.supports(AccessCtx)) {
+    if (ctx.supports(ActorCtx)) {
       return;
     }
 
     const actor = await this.actorResolver.actorFor(ctx, context);
 
     if (actor) {
-      ctx.defineOverlay(AccessCtx, actor, { immutable: true });
+      ctx.defineOverlay(ActorCtx, frozenActor(actor), { immutable: true });
     }
   }
 }

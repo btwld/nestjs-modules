@@ -1,6 +1,7 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type AccessActor } from '../../domain/interfaces/access-actor.type.js';
+import { type Actor, actorKeys } from '@concepta/nestjs-core';
+
 import { type AccessGrantsProviderInterface } from '../../domain/interfaces/access-grants-provider.interface.js';
 import { type AccessGrants } from '../../domain/interfaces/access-grants.type.js';
 import { type AccessRuleInterface } from '../../domain/interfaces/access-rule.interface.js';
@@ -15,13 +16,8 @@ export class StaticAccessGrantsProvider implements AccessGrantsProviderInterface
 
   async rulesFor(
     _ctx: PlainLiteralObject,
-    actor: AccessActor,
+    actor: Actor,
   ): Promise<AccessRuleInterface[]> {
-    const keys =
-      actor.kind === 'system'
-        ? [`system:${actor.name}`]
-        : actor.roles.map((role) => `role:${role}`);
-
-    return keys.flatMap((key) => this.grants[key] ?? []);
+    return actorKeys(actor).flatMap((key) => this.grants[key] ?? []);
   }
 }

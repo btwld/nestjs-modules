@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 import {
   AccessControlService,
-  AccessCtx,
   accessFieldPaths,
 } from '@concepta/nestjs-access-control';
-import { AppContextHost } from '@concepta/nestjs-core';
+import { ActorCtx, AppContextHost } from '@concepta/nestjs-core';
 
 import { BillingStore } from './billing.store.js';
 import { type InvoiceInterface } from './invoice.interface.js';
@@ -26,7 +25,7 @@ export class PaymentEventConsumer {
   async handle(event: PaymentEventInterface): Promise<InvoiceInterface> {
     const ctx = new AppContextHost();
     ctx.defineOverlay(
-      AccessCtx,
+      ActorCtx,
       { kind: 'system', name: 'billing' },
       { immutable: true },
     );

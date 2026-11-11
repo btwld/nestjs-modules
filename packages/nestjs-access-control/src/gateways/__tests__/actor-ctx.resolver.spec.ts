@@ -2,24 +2,21 @@ import { mock } from 'vitest-mock-extended';
 
 import { type ExecutionContext } from '@nestjs/common';
 
-import { AppContextHost } from '@concepta/nestjs-core';
+import { ActorCtx, AppContextHost } from '@concepta/nestjs-core';
 
-import { AccessCtxActorResolver } from '../access-ctx-actor.resolver.js';
-import { AccessCtx } from '../interfaces/access-context.interface.js';
+import { ActorCtxResolver } from '../actor-ctx.resolver.js';
 
-describe(AccessCtxActorResolver.name, () => {
-  it('returns the actor the AccessCtx overlay carries, before any fallback', async () => {
+describe(ActorCtxResolver.name, () => {
+  it('returns the actor the ActorCtx overlay carries, before any fallback', async () => {
     const actorFor = vi.fn();
     const ctx = new AppContextHost();
     ctx.defineOverlay(
-      AccessCtx,
+      ActorCtx,
       { kind: 'system', name: 'agile' },
       { immutable: true },
     );
 
-    expect(
-      await new AccessCtxActorResolver({ actorFor }).actorFor(ctx),
-    ).toEqual({
+    expect(await new ActorCtxResolver({ actorFor }).actorFor(ctx)).toEqual({
       kind: 'system',
       name: 'agile',
     });
@@ -32,12 +29,12 @@ describe(AccessCtxActorResolver.name, () => {
     const actorFor = vi.fn().mockResolvedValue({ kind: 'role', roles: ['a'] });
 
     expect(
-      await new AccessCtxActorResolver({ actorFor }).actorFor(ctx, context),
+      await new ActorCtxResolver({ actorFor }).actorFor(ctx, context),
     ).toEqual({ kind: 'role', roles: ['a'] });
     expect(actorFor).toHaveBeenCalledWith(ctx, context);
   });
 
   it('returns nobody without the overlay or a fallback', async () => {
-    expect(await new AccessCtxActorResolver().actorFor({})).toBeUndefined();
+    expect(await new ActorCtxResolver().actorFor({})).toBeUndefined();
   });
 });

@@ -1,7 +1,8 @@
 import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
+import { type Actor } from '@concepta/nestjs-core';
+
 import { type AccessAbility } from './access-ability.type.js';
-import { type AccessActor } from './access-actor.type.js';
 import { type AccessQueryInterface } from './access-query.interface.js';
 
 /**
@@ -11,7 +12,7 @@ export interface AccessControlContextInterface {
   /** The call's context, as handlers receive it. */
   getContext(): PlainLiteralObject;
   /** Who is acting. */
-  getActor(): AccessActor;
+  getActor(): Actor;
   /** The grant the route was let through on. */
   getQuery(): AccessQueryInterface;
   /** The actor's ability, for further checks. */

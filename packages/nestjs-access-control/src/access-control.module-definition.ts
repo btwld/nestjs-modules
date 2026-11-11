@@ -13,8 +13,8 @@ import { AccessRulesInvalidException } from './domain/exceptions/access-rules-in
 import { AccessControlService } from './domain/services/access-control.service.js';
 import { accessGrantsProblems } from './domain/utils/access-rule-problems.util.js';
 import { AccessContextOverlay } from './gateways/access-context.overlay.js';
-import { AccessCtxActorResolver } from './gateways/access-ctx-actor.resolver.js';
 import { AccessCtxDecisionSource } from './gateways/access-ctx-decision.source.js';
+import { ActorCtxResolver } from './gateways/actor-ctx.resolver.js';
 import { AccessControlFilter } from './gateways/http/access-control.filter.js';
 import { AccessControlGuard } from './gateways/http/access-control.guard.js';
 import { accessControlDefaultConfig } from './infrastructure/config/access-control-default.config.js';
@@ -133,9 +133,9 @@ export function createAccessControlSettingsProvider(
 }
 
 /**
- * Builds the service from the options' actor resolver and grants provider.
- * Without a grants provider, the settings' grants are used, and invalid
- * grants fail startup.
+ * Builds the service from the options' actor resolver, grants provider and
+ * authority. Without a grants provider, the settings' grants are used, and
+ * invalid grants fail startup.
  */
 export function createAccessControlServiceProvider(
   optionsOverrides?: AccessControlOptions,
@@ -147,20 +147,22 @@ export function createAccessControlServiceProvider(
       options: AccessControlOptionsInterface,
       settings: AccessControlSettingsInterface,
     ) => {
-      // A call's AccessCtx overlay wins; the options' resolver decides
+      // A call's ActorCtx overlay wins; the options' resolver decides
       // without one.
-      const actorResolver = new AccessCtxActorResolver(
+      const actorResolver = new ActorCtxResolver(
         optionsOverrides?.actorResolver ?? options.actorResolver,
       );
 
       const grantsProvider =
         optionsOverrides?.grantsProvider ?? options.grantsProvider;
+      const authority = optionsOverrides?.authority ?? options.authority;
 
       if (grantsProvider) {
         return new AccessControlService(
           actorResolver,
           grantsProvider,
           new AccessCtxDecisionSource(),
+          authority,
         );
       }
 
@@ -175,13 +177,14 @@ export function createAccessControlServiceProvider(
         actorResolver,
         new StaticAccessGrantsProvider(grants),
         new AccessCtxDecisionSource(),
+        authority,
       );
     },
   };
 }
 
 /**
- * With an actor resolver, registers the overlay that defines `AccessCtx` on
+ * With an actor resolver, registers the overlay that defines `ActorCtx` on
  * every HTTP call, so routes without a grant have an actor too.
  */
 export function createAccessControlContextOverlayProvider(

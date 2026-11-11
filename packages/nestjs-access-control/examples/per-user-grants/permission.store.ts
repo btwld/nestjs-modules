@@ -37,7 +37,7 @@ export class PermissionStore {
 
   private userRules = new Map<string, AccessRuleInterface[]>();
 
-  rulesFor(roles: string[], userId?: string): AccessRuleInterface[] {
+  rulesFor(roles: readonly string[], userId?: string): AccessRuleInterface[] {
     return [
       ...roles.flatMap((role) => this.roleRules[role] ?? []),
       ...((userId && this.userRules.get(userId)) || []),

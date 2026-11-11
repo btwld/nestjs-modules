@@ -1,10 +1,13 @@
 import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
+import { type Actor, type AuthorityInterface } from '@concepta/nestjs-core';
+
+import { PossessionEnum } from '../enums/possession.enum.js';
 import { AccessControlException } from '../exceptions/access-control.exception.js';
 import { AccessRefusedException } from '../exceptions/access-refused.exception.js';
 import { AccessRulesInvalidException } from '../exceptions/access-rules-invalid.exception.js';
 import { type AccessActorResolverInterface } from '../interfaces/access-actor-resolver.interface.js';
-import { type AccessActor } from '../interfaces/access-actor.type.js';
+import { type AccessAuthorization } from '../interfaces/access-authorization.type.js';
 import { type AccessCheckOptionsInterface } from '../interfaces/access-check-options.interface.js';
 import { type AccessDecisionSourceInterface } from '../interfaces/access-decision-source.interface.js';
 import { type AccessGrantsProviderInterface } from '../interfaces/access-grants-provider.interface.js';
@@ -16,7 +19,55 @@ import { normalizeAccessFieldPath } from '../utils/access-field-paths.util.js';
 import { accessRuleProblems } from '../utils/access-rule-problems.util.js';
 import { createAccessAbility } from '../utils/create-access-ability.util.js';
 
-function copyActor(actor: AccessActor): AccessActor {
+/** `update` of `update:own`. */
+function verbOf(action: string): string {
+  const [verb = action] = action.split(':');
+  return verb;
+}
+
+/** A value CASL takes as one string or a list, as a list. */
+function listOf(value: string | string[]): string[] {
+  return Array.isArray(value) ? value : [value];
+}
+
+/**
+ * The actor's rules that can only narrow what an authority allowed on
+ * `subject`: every deny, and of the allows only those for `subject` and a
+ * verb in `allowed` — what an `own` limit needs beside a deny of `any`.
+ * Every other allow is left out, since nothing the authority did not allow
+ * may be allowed here.
+ */
+function narrowingRules(
+  rules: readonly AccessRuleInterface[],
+  subject: string,
+  allowed: ReadonlySet<string>,
+): AccessRuleInterface[] {
+  return rules.flatMap((rule) => {
+    if (rule.inverted) return [rule];
+
+    const actions = listOf(rule.action).filter((action) =>
+      allowed.has(verbOf(action)),
+    );
+    if (!actions.length || !listOf(rule.subject).includes(subject)) return [];
+
+    return [{ ...rule, action: actions, subject }];
+  });
+}
+
+/** `actor` with exactly the properties its kind has, in a fixed order. */
+function normalizedActor(actor: Actor): Actor {
+  if (actor.kind === 'system') {
+    return { kind: 'system', name: actor.name };
+  }
+
+  return {
+    kind: 'role',
+    roles: [...actor.roles],
+    ...(actor.userId === undefined ? {} : { userId: actor.userId }),
+  };
+}
+
+function copyActor(actor: Actor): Actor {
   return actor.kind === 'role'
     ? { ...actor, roles: [...actor.roles] }
     : { ...actor };
@@ -38,7 +89,69 @@ export class AccessControlService {
     private readonly actorResolver: AccessActorResolverInterface,
     private readonly grantsProvider: AccessGrantsProviderInterface,
     private readonly decisions?: AccessDecisionSourceInterface,
+    private readonly authority?: AuthorityInterface,
   ) {}
+
+  /**
+   * What the module's authority answers for `verb` on `subject`, the
+   * resource read as the authority's object.
+   *
+   * Without an authority, `resolution` as it is: the actor's rules decide.
+   * With one, a refusal is final; an allow is added to the actor's rules as
+   * `<verb>:any` on `subject`, beside `read:any` when the authority lets the
+   * actor read it too, since a write's response shows what a read would.
+   * The actor's own rules then narrow it — by denying, since a deny always
+   * wins — and can never allow more.
+   */
+  async authorize(
+    ctx: PlainLiteralObject,
+    resolution: AccessResolutionInterface,
+    verb: string,
+    subject: string,
+  ): Promise<AccessAuthorization> {
+    const { authority } = this;
+    if (!authority) {
+      return { allowed: true, resolution };
+    }
+
+    // The shape a repository asks about, so both share one snapshot.
+    const actor = normalizedActor(resolution.actor);
+    const decide = (action: string) =>
+      authority.decide(ctx, { actor, object: subject, action, columns: [] });
+
+    const decision = await decide(verb);
+    if (decision.effect !== 'allow') {
+      return {
+        allowed: false,
+        refusal: {
+          action: `${verb}:${PossessionEnum.ANY}`,
+          subject,
+          actor,
+          reason: 'authority',
+          ...(decision.gate === undefined ? {} : { gate: decision.gate }),
+        },
+      };
+    }
+
+    const reads = verb !== 'read' && (await decide('read')).effect === 'allow';
+    const allowed = new Set(reads ? [verb, 'read'] : [verb]);
+    const rules: AccessRuleInterface[] = [
+      ...narrowingRules(resolution.rules, subject, allowed),
+      ...[...allowed].map((each) => ({
+        action: `${each}:${PossessionEnum.ANY}`,
+        subject,
+      })),
+    ];
+
+    return {
+      allowed: true,
+      resolution: {
+        actor: resolution.actor,
+        rules,
+        ability: createAccessAbility(rules),
+      },
+    };
+  }
 
   /**
    * The actor of a call with their validated rules and ability, or
@@ -123,8 +236,19 @@ export class AccessControlService {
     options?: AccessCheckOptionsInterface,
   ): Promise<boolean> {
     const resolution = await this.resolve(ctx);
+    if (!resolution) return false;
 
-    return !!resolution && !this.refusal(resolution, action, subject, options);
+    const authorized = await this.authorize(
+      ctx,
+      resolution,
+      verbOf(action),
+      subject,
+    );
+
+    return (
+      authorized.allowed &&
+      !this.refusal(authorized.resolution, action, subject, options)
+    );
   }
 
   /**
@@ -143,7 +267,22 @@ export class AccessControlService {
       throw new AccessRefusedException({ action, subject, reason: 'no-actor' });
     }
 
-    const refusal = this.refusal(resolution, action, subject, options);
+    const authorized = await this.authorize(
+      ctx,
+      resolution,
+      verbOf(action),
+      subject,
+    );
+    if (!authorized.allowed) {
+      throw new AccessRefusedException(authorized.refusal);
+    }
+
+    const refusal = this.refusal(
+      authorized.resolution,
+      action,
+      subject,
+      options,
+    );
 
     if (refusal) {
       throw new AccessRefusedException(refusal);

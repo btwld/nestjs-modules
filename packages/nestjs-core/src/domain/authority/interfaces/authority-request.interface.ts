@@ -1,5 +1,3 @@
-import { type ActionEnum } from '../../enums/action.enum.js';
-
 import { type Actor } from './actor.type.js';
 
 /**
@@ -11,7 +9,11 @@ export interface AuthorityRequestInterface {
    * The object's name, as the implementer catalogued it.
    */
   object: string;
-  action: ActionEnum;
+  /**
+   * `create`, `read`, `update` or `delete` (`ActionEnum`) from a repository;
+   * a route may ask for its own, such as `approve`.
+   */
+  action: string;
   /**
    * Every column of the object, so an answer can allow all of them but some.
    */
