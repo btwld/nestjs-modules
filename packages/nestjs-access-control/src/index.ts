@@ -25,6 +25,7 @@ export { AccessControlReadMany } from './gateways/decorators/access-control-read
 export { AccessControlReadOne } from './gateways/decorators/access-control-read-one.decorator.js';
 export { AccessControlRecoverOne } from './gateways/decorators/access-control-recover-one.decorator.js';
 export { AccessControlReplaceOne } from './gateways/decorators/access-control-replace-one.decorator.js';
+export { AccessControlSoftDeleteOne } from './gateways/decorators/access-control-soft-delete-one.decorator.js';
 export { AccessControlUpdateOne } from './gateways/decorators/access-control-update-one.decorator.js';
 
 // Domain

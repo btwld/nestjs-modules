@@ -395,6 +395,7 @@ that route:
 | `@AccessControlCreateOne(resource)`, `@AccessControlCreateMany(resource)` | `create` |
 | `@AccessControlUpdateOne(resource)`, `@AccessControlReplaceOne(resource)` | `update` |
 | `@AccessControlDeleteOne(resource)` | `delete` |
+| `@AccessControlSoftDeleteOne(resource)` | `softDelete` |
 | `@AccessControlRecoverOne(resource)` | `restore` |
 | `@AccessControlGrant({ resource, action }, ...)` | yours |
 
@@ -618,6 +619,11 @@ CrudModule.forRootAsync({
   extraDecorators: [AccessControlReadMany('invoice')],
 }
 ```
+
+Give each operation the decorator for the action its repository call takes:
+`AccessControlSoftDeleteOne` on `Operation.SoftDelete` and
+`AccessControlRecoverOne` on `Operation.Restore`, so a role allowed to soft
+delete but never to delete is let through the one route and not the other.
 
 Before each request runs, under the grant its route let the caller in on:
 

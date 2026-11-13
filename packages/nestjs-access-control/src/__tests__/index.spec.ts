@@ -17,6 +17,7 @@ import {
   AccessControlReadOne,
   AccessControlRecoverOne,
   AccessControlReplaceOne,
+  AccessControlSoftDeleteOne,
   AccessControlService,
   AccessControlUpdateOne,
   ActorCtxResolver,
@@ -78,5 +79,6 @@ describe('Index', () => {
     expect(AccessControlUpdateOne).toEqual(expect.any(Function));
     expect(AccessControlRecoverOne).toEqual(expect.any(Function));
     expect(AccessControlReplaceOne).toEqual(expect.any(Function));
+    expect(AccessControlSoftDeleteOne).toEqual(expect.any(Function));
   });
 });
