@@ -436,14 +436,15 @@ event context starts a fresh pair.
 `ActorCtx` carries who is acting on a call: a person through their roles, or
 a system acting on its own authority. Whatever established the caller defines
 it once, immutably, and every package that decides access reads it from the
-same place:
+same place. `frozenActor` copies the actor with its `roles` frozen too, so
+nothing holding the array can change who was decided:
 
 ```ts
-import { ActorCtx } from '@concepta/nestjs-core';
+import { ActorCtx, frozenActor } from '@concepta/nestjs-core';
 
 ctx.defineOverlay(
   ActorCtx,
-  { kind: 'role', roles: ['clerk'], userId: user.id },
+  frozenActor({ kind: 'role', roles: user.roles, userId: user.id }),
   { immutable: true },
 );
 ctx.defineOverlay(ActorCtx, { kind: 'system', name: 'billing-sync' }, { immutable: true });

@@ -1,9 +1,9 @@
-import { type Actor } from '@concepta/nestjs-core';
+import { type Actor } from '../interfaces/actor.type.js';
 
 /**
  * A copy of `actor` whose `roles` cannot change, for defining `ActorCtx`:
- * an immutable overlay freezes one level only, and every repository the
- * call reaches decides for this actor.
+ * an immutable overlay freezes one level only, and everything the call
+ * reaches decides for this actor.
  */
 export function frozenActor(actor: Actor): Actor {
   return actor.kind === 'role'

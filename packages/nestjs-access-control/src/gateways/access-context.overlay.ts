@@ -1,9 +1,12 @@
 import { type ExecutionContext } from '@nestjs/common';
 
-import { ActorCtx, ContextOverlayInterceptor } from '@concepta/nestjs-core';
+import {
+  ActorCtx,
+  ContextOverlayInterceptor,
+  frozenActor,
+} from '@concepta/nestjs-core';
 
 import { type AccessActorResolverInterface } from '../domain/interfaces/access-actor-resolver.interface.js';
-import { frozenActor } from '../domain/utils/frozen-actor.util.js';
 
 /**
  * Defines `ActorCtx` on every HTTP call that does not carry it yet, using

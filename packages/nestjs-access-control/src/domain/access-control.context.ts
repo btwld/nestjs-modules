@@ -1,12 +1,11 @@
 import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor } from '@concepta/nestjs-core';
+import { type Actor, frozenActor } from '@concepta/nestjs-core';
 
 import { type AccessAbility } from './interfaces/access-ability.type.js';
 import { type AccessControlContextArgsInterface } from './interfaces/access-control-context-args.interface.js';
 import { type AccessControlContextInterface } from './interfaces/access-control-context.interface.js';
 import { type AccessQueryInterface } from './interfaces/access-query.interface.js';
-import { frozenActor } from './utils/frozen-actor.util.js';
 
 export class AccessControlContext implements AccessControlContextInterface {
   constructor(private readonly ctxArgs: AccessControlContextArgsInterface) {}

@@ -4,6 +4,7 @@ import { ModuleRef, Reflector } from '@nestjs/core';
 import {
   ActorCtx,
   type AppContextHost,
+  frozenActor,
   requireAppContext,
 } from '@concepta/nestjs-core';
 
@@ -20,7 +21,6 @@ import { type AccessQueryInterface } from '../../domain/interfaces/access-query.
 import { type AccessRefusedDetailsInterface } from '../../domain/interfaces/access-refused-details.interface.js';
 import { type AccessResolutionInterface } from '../../domain/interfaces/access-resolution.interface.js';
 import { AccessControlService } from '../../domain/services/access-control.service.js';
-import { frozenActor } from '../../domain/utils/frozen-actor.util.js';
 import { type AccessAuthorizedGrantInterface } from '../interfaces/access-authorized-grant.interface.js';
 import { AccessDecisionCtx } from '../interfaces/access-decision-context.interface.js';
 
