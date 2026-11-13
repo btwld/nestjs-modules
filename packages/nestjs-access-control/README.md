@@ -629,7 +629,12 @@ Before each request runs, under the grant its route let the caller in on:
 
 - **Query input.** A `filter`, `or`, search or `sort` naming a field the
   caller may not read is refused, on every operation: matching or ordering
-  by `salary` tells its value without showing it.
+  by `salary` tells its value without showing it. Query fields reach the
+  repository unchanged, so they are stored names: when your response
+  schema sends `total_cents` as `total`, deny both. The deny on `total`
+  hides it from responses; the one on `total_cents` stops filtering and
+  sorting by it. A column refused in the repository's authority is refused
+  in every query, routes or not.
 - **Write bodies.** A create, an update and each item of a batch create may
   touch only fields the caller may write, as `assertFields` checks them.
 - **Replace.** A replace erases what its body leaves out, so it is refused
