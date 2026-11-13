@@ -194,7 +194,10 @@ your data rules once:
 AccessControlModule.forRootAsync({
   imports: [AuthorityModule],
   inject: [CaslAuthority],
-  useFactory: (authority: CaslAuthority) => ({ authority, actorResolver }),
+  useFactory: (authority: CaslAuthority) => ({
+    authority: { decider: authority, except: ['reports'] },
+    actorResolver,
+  }),
 });
 ```
 
@@ -203,12 +206,18 @@ AccessControlModule.forRootAsync({
   `@AccessControlDeleteOne('invoices')` asks whether the actor may `delete`
   `invoices`. A refusal is a `403` with reason `authority`, before the
   handler runs. Name a route's resource as the entity is keyed in
-  `RepositoryModule.forRoot()`; a route that is not about an entity gets
-  rules of its own in the same rule set. Which rows the caller reaches is
-  row scope's job; the repository then decides each read and write by the
-  same rules, columns included.
-- **Your own rules only narrow, by denying.** `settings.grants` and a grants
-  provider still apply, but can never allow what the authority refuses:
+  `RepositoryModule.forRoot()`: a misspelled one is refused by the
+  authority, so the mistake shows. Which rows the caller reaches is row
+  scope's job; the repository then decides each read and write by the same
+  rules, columns included.
+- **`except` names the routes that are yours alone.** A route on a resource
+  no entity stands behind, such as `@AccessControlGrant({ resource:
+  'reports', action: 'export' })`, is decided by your rules as if there
+  were no authority, once its resource is in `except`: nothing is allowed
+  without a rule allowing it. Until then, the authority refuses it.
+- **Elsewhere, your own rules only narrow, by denying.**
+  `settings.grants` and a grants provider still apply, but can never allow
+  what the authority refuses:
   their denies count, their allows don't. Deny a field to hide it from one
   API's responses, or to refuse it in `assertFields`.
 - `can` and `assert` in handlers decide the same way.
@@ -651,7 +660,7 @@ authority's rules instead, from wherever your application keeps them.
 | `settings.grants` | `{}` | Rules keyed `role:<name>` or `system:<name>`. Checked at startup. |
 | `actorResolver` | none | Works out who is acting when a call carries no `ActorCtx`. |
 | `grantsProvider` | `settings.grants` | Supplies an actor's rules on every check. |
-| `authority` | none | Decides each route first; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
+| `authority` | none | `{ decider, except? }`: decides each route first, except on resources in `except`; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
 | `appFilter` | the response filter | Replace it, or `false` for none. |
 | `queryServices` | `[]` | Access query services to register. |
 

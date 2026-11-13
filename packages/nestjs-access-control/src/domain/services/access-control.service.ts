@@ -2,7 +2,6 @@ import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
 import {
   type Actor,
-  type AuthorityInterface,
   type AuthorityRuleInterface,
   authorityRuleProblems,
 } from '@concepta/nestjs-core';
@@ -13,6 +12,7 @@ import { AccessRulesInvalidException } from '../exceptions/access-rules-invalid.
 import { type AccessActorResolverInterface } from '../interfaces/access-actor-resolver.interface.js';
 import { type AccessAuthorization } from '../interfaces/access-authorization.type.js';
 import { type AccessCheckOptionsInterface } from '../interfaces/access-check-options.interface.js';
+import { type AccessControlAuthorityInterface } from '../interfaces/access-control-authority.interface.js';
 import { type AccessDecisionSourceInterface } from '../interfaces/access-decision-source.interface.js';
 import { type AccessGrantsProviderInterface } from '../interfaces/access-grants-provider.interface.js';
 import { type AccessQueryInterface } from '../interfaces/access-query.interface.js';
@@ -64,19 +64,28 @@ function copyActor(actor: Actor): Actor {
  * the caller in on.
  */
 export class AccessControlService {
+  /**
+   * The resources the authority leaves to the actor's rules, copied, so a
+   * later change to the option's list changes no check.
+   */
+  private readonly authorityExcept: ReadonlySet<string>;
+
   constructor(
     private readonly actorResolver: AccessActorResolverInterface,
     private readonly grantsProvider: AccessGrantsProviderInterface,
     private readonly decisions?: AccessDecisionSourceInterface,
-    private readonly authority?: AuthorityInterface,
-  ) {}
+    private readonly authority?: AccessControlAuthorityInterface,
+  ) {
+    this.authorityExcept = new Set(authority?.except);
+  }
 
   /**
    * What the module's authority answers for `action` on `subject`, the
    * resource read as the authority's object.
    *
-   * Without an authority, `resolution` as it is: the actor's rules decide.
-   * With one, a refusal is final; an allow becomes the actor's allow of
+   * On a resource the authority leaves out (`except`), or with no
+   * authority, `resolution` as it is: the actor's rules decide. On any
+   * other, a refusal is final; an allow becomes the actor's allow of
    * `action` on `subject`, beside `read` when the authority lets the actor
    * read it too, since a write's response shows what a read would. The
    * actor's own rules then narrow it — by denying, since a deny always
@@ -88,10 +97,10 @@ export class AccessControlService {
     action: string,
     subject: string,
   ): Promise<AccessAuthorization> {
-    const { authority } = this;
-    if (!authority) {
+    if (!this.authority || this.authorityExcept.has(subject)) {
       return { allowed: true, resolution };
     }
+    const authority = this.authority.decider;
 
     // The shape a repository asks about, so both share one snapshot.
     const actor = normalizedActor(resolution.actor);

@@ -418,8 +418,32 @@ describe(AccessControlService.name, () => {
         actingAs(clerk),
         new StaticAccessGrantsProvider(grants),
         undefined,
-        authority,
+        { decider: authority, except: ['report'] },
       );
+
+    it('refuses a resource the authority has no rule for, unless it is left out', async () => {
+      const service = governedService(authorityAllowing('read invoice'), {
+        'role:clerk': [{ action: 'read', subject: 'invoices' }],
+      });
+
+      await expect(service.assert({}, 'read', 'invoices')).rejects.toThrow(
+        expect.objectContaining({
+          context: expect.objectContaining({ reason: 'authority' }),
+        }),
+      );
+    });
+
+    it('decides a resource the authority leaves out by the actor’s rules alone, never asking it', async () => {
+      const authority = authorityAllowing('read invoice');
+      const decide = vi.spyOn(authority, 'decide');
+      const service = governedService(authority, {
+        'role:clerk': [{ action: 'export', subject: 'report' }],
+      });
+
+      expect(await service.can({}, 'export', 'report')).toEqual(true);
+      expect(await service.can({}, 'delete', 'report')).toEqual(false);
+      expect(decide).not.toHaveBeenCalled();
+    });
 
     it('lets the authority decide when the actor has no rule of their own', async () => {
       const service = governedService(authorityAllowing('read invoice'));
@@ -582,7 +606,7 @@ describe(AccessControlService.name, () => {
         }),
         new StaticAccessGrantsProvider({}),
         undefined,
-        authority,
+        { decider: authority },
       );
 
       await service.can({}, 'read', 'invoice');

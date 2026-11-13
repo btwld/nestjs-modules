@@ -319,7 +319,7 @@ describe(AccessControlGuard.name, () => {
           { actorFor: async () => actor },
           new StaticAccessGrantsProvider(grants),
           undefined,
-          authority,
+          { decider: authority },
         ),
         new Reflector(),
         mock<ModuleRef>(),

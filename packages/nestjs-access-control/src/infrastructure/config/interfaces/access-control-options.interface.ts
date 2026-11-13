@@ -1,8 +1,7 @@
 import { type NestInterceptor } from '@nestjs/common';
 
-import { type AuthorityInterface } from '@concepta/nestjs-core';
-
 import { type AccessActorResolverInterface } from '../../../domain/interfaces/access-actor-resolver.interface.js';
+import { type AccessControlAuthorityInterface } from '../../../domain/interfaces/access-control-authority.interface.js';
 import { type AccessGrantsProviderInterface } from '../../../domain/interfaces/access-grants-provider.interface.js';
 
 import { type AccessControlSettingsInterface } from './access-control-settings.interface.js';
@@ -23,10 +22,11 @@ export interface AccessControlOptionsInterface {
   /**
    * Decides each route first, as a repository governed by the same
    * authority decides its data: a route's resource is the authority's
-   * object, its action the verb. The actor's rules then only narrow what
-   * it allows. Without one, the actor's rules decide alone.
+   * object, its action the verb. The actor's rules then only narrow what it
+   * allows. On a resource in `except`, and without one, the actor's rules
+   * decide alone.
    */
-  authority?: AuthorityInterface;
+  authority?: AccessControlAuthorityInterface;
   /**
    * Replaces the global response filter, or `false` to register none.
    */

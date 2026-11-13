@@ -43,6 +43,7 @@ export {
 export { AccessAbility } from './domain/interfaces/access-ability.type.js';
 export { AccessActorResolverInterface } from './domain/interfaces/access-actor-resolver.interface.js';
 export { AccessCheckOptionsInterface } from './domain/interfaces/access-check-options.interface.js';
+export { AccessControlAuthorityInterface } from './domain/interfaces/access-control-authority.interface.js';
 export { AccessControlContextInterface } from './domain/interfaces/access-control-context.interface.js';
 export { AccessControlGrantOptionInterface } from './domain/interfaces/access-control-grant-option.interface.js';
 export { AccessControlQueryOptionInterface } from './domain/interfaces/access-control-query-option.interface.js';
