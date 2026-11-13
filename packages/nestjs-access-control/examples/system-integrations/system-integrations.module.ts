@@ -18,23 +18,23 @@ const grants: AccessGrants = {
   // The payment provider marks invoices paid, and changes nothing else.
   'system:billing': [
     {
-      action: 'update:any',
+      action: 'update',
       subject: 'invoice',
       fields: ['status', 'paidAt'],
     },
   ],
   // The CRM reads customers, never their card.
   'system:crm': [
-    { action: 'read:any', subject: 'customer' },
+    { action: 'read', subject: 'customer' },
     {
-      action: 'read:any',
+      action: 'read',
       subject: 'customer',
       fields: ['cardNumber'],
       inverted: true,
     },
   ],
   // Staff read customers. No role is granted anything on invoices here.
-  'role:support': [{ action: 'read:any', subject: 'customer' }],
+  'role:support': [{ action: 'read', subject: 'customer' }],
 };
 
 const userRoles: Record<string, string[]> = {

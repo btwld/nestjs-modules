@@ -1,10 +1,13 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor, actorKeys } from '@concepta/nestjs-core';
+import {
+  type Actor,
+  actorKeys,
+  type AuthorityRuleInterface,
+} from '@concepta/nestjs-core';
 
 import { type AccessGrantsProviderInterface } from '../../domain/interfaces/access-grants-provider.interface.js';
 import { type AccessGrants } from '../../domain/interfaces/access-grants.type.js';
-import { type AccessRuleInterface } from '../../domain/interfaces/access-rule.interface.js';
 
 /**
  * The default grants provider: the rules in the module's settings, keyed
@@ -17,7 +20,7 @@ export class StaticAccessGrantsProvider implements AccessGrantsProviderInterface
   async rulesFor(
     _ctx: PlainLiteralObject,
     actor: Actor,
-  ): Promise<AccessRuleInterface[]> {
+  ): Promise<AuthorityRuleInterface<string>[]> {
     return actorKeys(actor).flatMap((key) => this.grants[key] ?? []);
   }
 }

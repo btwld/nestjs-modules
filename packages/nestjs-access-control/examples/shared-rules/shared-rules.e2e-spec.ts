@@ -56,7 +56,7 @@ describe('Shared rules', () => {
       .expect(403);
 
     expect(refused.body.message).toEqual(
-      'Access refused: delete:any on invoices (authority)',
+      'Access refused: delete on invoices (authority)',
     );
   });
 

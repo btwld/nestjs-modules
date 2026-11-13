@@ -11,6 +11,7 @@ import { ActivityWriteException } from '../activity/exceptions/activity-write.ex
 import { AuthorityBootException } from '../authority/exceptions/authority-boot.exception.js';
 import { AuthorityRefusedException } from '../authority/exceptions/authority-refused.exception.js';
 import { AuthorityUnboundException } from '../authority/exceptions/authority-unbound.exception.js';
+import { CaslAuthorityRulesInvalidException } from '../casl/exceptions/casl-authority-rules-invalid.exception.js';
 import { UnsupportedDurableDriverException } from '../durable/exceptions/unsupported-durable-driver.exception.js';
 import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
@@ -192,6 +193,11 @@ const CASES: {
     name: 'AuthorityRefusedException',
     build: () => new AuthorityRefusedException('Order', 'read'),
     fault: 'client',
+  },
+  {
+    name: 'CaslAuthorityRulesInvalidException',
+    build: () => new CaslAuthorityRulesInvalidException(['problem']),
+    fault: 'usage',
   },
   {
     name: 'RowScopeUnboundException',

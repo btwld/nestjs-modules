@@ -1,13 +1,16 @@
 import fc from 'fast-check';
 
-import { PossessionEnum } from '../domain/enums/possession.enum.js';
-import { type AccessRuleInterface } from '../domain/interfaces/access-rule.interface.js';
+import {
+  type AuthorityRuleInterface,
+  authorityRuleProblems,
+} from '@concepta/nestjs-core';
+
 import { AccessControlService } from '../domain/services/access-control.service.js';
 import {
   accessFieldPaths,
   normalizeAccessFieldPath,
 } from '../domain/utils/access-field-paths.util.js';
-import { accessRuleProblems } from '../domain/utils/access-rule-problems.util.js';
+import { accessGrantsProblems } from '../domain/utils/access-rule-problems.util.js';
 import { canReadAccessField } from '../domain/utils/can-read-access-field.util.js';
 import { createAccessAbility } from '../domain/utils/create-access-ability.util.js';
 import { projectAccessFields } from '../domain/utils/project-access-fields.util.js';
@@ -27,19 +30,20 @@ const RUNS = { numRuns: Number(process.env.AC_PROPERTY_RUNS ?? 500) };
 const RULE_SEGMENTS = ['a', 'b', 'id', 'secret', 'items', '__proto__'];
 const DATA_KEYS = [...RULE_SEGMENTS, '0', '12', 'constructor', 'toJSON'];
 const SUBJECTS = ['r', 's'];
+const ACTIONS = ['read', 'update', 'approve'];
 
 const fieldPath = fc
   .array(fc.constantFrom(...RULE_SEGMENTS), { minLength: 1, maxLength: 3 })
   .map((segments) => segments.join('.'));
 
-const rule: fc.Arbitrary<AccessRuleInterface> = fc
+const rule: fc.Arbitrary<AuthorityRuleInterface<string>> = fc
   .record({
     action: fc.oneof(
-      fc.constantFrom('read:any', 'read:own', 'update:any', 'update:own'),
-      fc.uniqueArray(
-        fc.constantFrom('read:any', 'read:own', 'update:any', 'update:own'),
-        { minLength: 1, maxLength: 2 },
-      ),
+      fc.constantFrom(...ACTIONS),
+      fc.uniqueArray(fc.constantFrom(...ACTIONS), {
+        minLength: 1,
+        maxLength: 2,
+      }),
     ),
     subject: fc.constantFrom(...SUBJECTS),
     fields: fc.option(
@@ -93,7 +97,7 @@ const covers = (field: string, path: string) =>
   path === field || path.startsWith(`${field}.`);
 
 const relevant = (
-  all: AccessRuleInterface[],
+  all: AuthorityRuleInterface<string>[],
   action: string,
   subject: string,
 ) =>
@@ -103,12 +107,12 @@ const relevant = (
       [candidate.subject].flat().includes(subject),
   );
 
-const reaches = (candidate: AccessRuleInterface, path: string) =>
+const reaches = (candidate: AuthorityRuleInterface<string>, path: string) =>
   !candidate.fields || candidate.fields.some((field) => covers(field, path));
 
 /** Whether the rules allow `action` on `path` of `subject`. */
 function oracleField(
-  all: AccessRuleInterface[],
+  all: AuthorityRuleInterface<string>[],
   action: string,
   subject: string,
   path: string,
@@ -126,7 +130,7 @@ function oracleField(
  * and only a deny naming no fields refuses it.
  */
 function oracleResource(
-  all: AccessRuleInterface[],
+  all: AuthorityRuleInterface<string>[],
   action: string,
   subject: string,
 ): boolean {
@@ -142,7 +146,7 @@ describe('access control properties', () => {
   it('generates only usable rules', () => {
     fc.assert(
       fc.property(rules, (generated) => {
-        expect(accessRuleProblems(generated, 'generated')).toEqual([]);
+        expect(authorityRuleProblems(generated, 'generated')).toEqual([]);
       }),
       RUNS,
     );
@@ -152,7 +156,7 @@ describe('access control properties', () => {
     fc.assert(
       fc.property(
         rules,
-        fc.constantFrom('read:any', 'update:own'),
+        fc.constantFrom(...ACTIONS),
         fc.constantFrom(...SUBJECTS),
         fieldPath,
         (generated, action, subject, path) => {
@@ -169,7 +173,7 @@ describe('access control properties', () => {
     fc.assert(
       fc.property(
         rules,
-        fc.constantFrom('read:any', 'update:own'),
+        fc.constantFrom(...ACTIONS),
         fc.constantFrom(...SUBJECTS),
         (generated, action, subject) => {
           const expected = oracleResource(generated, action, subject);
@@ -190,7 +194,7 @@ describe('access control properties', () => {
     fc.assert(
       fc.property(rules, dataRecord, (generated, data) => {
         const readable = (path: string) =>
-          oracleField(generated, 'read:any', 'r', path);
+          oracleField(generated, 'read', 'r', path);
         const wire: unknown = JSON.parse(
           JSON.stringify(projectAccessFields(data, readable) ?? null),
         );
@@ -229,16 +233,16 @@ describe('access control properties', () => {
     fc.assert(
       fc.property(rules, dataRecord, (generated, body) => {
         const fields = accessFieldPaths(body);
-        const denied = relevant(generated, 'update:any', 'r')
+        const denied = relevant(generated, 'update', 'r')
           .filter((c) => c.inverted)
           .flatMap((c) => c.fields ?? []);
         const expected =
-          oracleResource(generated, 'update:any', 'r') &&
+          oracleResource(generated, 'update', 'r') &&
           fields
             .map(normalizeAccessFieldPath)
             .every(
               (field) =>
-                oracleField(generated, 'update:any', 'r', field) &&
+                oracleField(generated, 'update', 'r', field) &&
                 !denied.some((d) => d.startsWith(`${field}.`)),
             );
 
@@ -247,7 +251,7 @@ describe('access control properties', () => {
             actor: { kind: 'role', roles: [] },
             ability: createAccessAbility(generated),
           },
-          'update:any',
+          'update',
           'r',
           { fields },
         );
@@ -265,24 +269,16 @@ describe('access control properties', () => {
     fc.assert(
       fc.property(
         rules,
-        fc.constantFrom(PossessionEnum.ANY, PossessionEnum.OWN),
+        fc.constantFrom(...SUBJECTS),
         fieldPath,
-        (generated, possession, path) => {
-          const ability = createAccessAbility(generated);
-          // A read route lets the caller in on `any` when they hold it, on
-          // `own` otherwise, and then shows what that grant allows.
-          const readsOn =
-            possession === PossessionEnum.OWN &&
-            !oracleResource(generated, 'read:any', 'r')
-              ? 'read:own'
-              : 'read:any';
-          const expected =
-            oracleResource(generated, readsOn, 'r') &&
-            oracleField(generated, readsOn, 'r', path);
-
+        (generated, resource, path) => {
           expect(
-            canReadAccessField(ability, { possession, resource: 'r' }, path),
-          ).toBe(expected);
+            canReadAccessField(
+              createAccessAbility(generated),
+              { resource },
+              path,
+            ),
+          ).toBe(oracleField(generated, 'read', resource, path));
         },
       ),
       RUNS,
@@ -314,11 +310,13 @@ describe('access control properties', () => {
   it('lists problems for any stored value without throwing', () => {
     fc.assert(
       fc.property(fc.jsonValue(), (value) => {
-        const stored: AccessRuleInterface[] = JSON.parse(
+        const stored: AuthorityRuleInterface<string>[] = JSON.parse(
           JSON.stringify([value]),
         );
 
-        expect(() => accessRuleProblems(stored, 'stored')).not.toThrow();
+        expect(() =>
+          accessGrantsProblems({ 'role:stored': stored }),
+        ).not.toThrow();
       }),
       RUNS,
     );
@@ -340,13 +338,13 @@ describe('access control properties', () => {
 
     fc.assert(
       fc.property(stored, (values) => {
-        const parsed: AccessRuleInterface[] = JSON.parse(
+        const parsed: AuthorityRuleInterface<string>[] = JSON.parse(
           JSON.stringify(values),
         );
 
-        if (accessRuleProblems(parsed, 'stored').length === 0) {
+        if (authorityRuleProblems(parsed, 'stored').length === 0) {
           expect(() =>
-            createAccessAbility(parsed).can('read:any', 'r', 'a'),
+            createAccessAbility(parsed).can('read', 'r', 'a'),
           ).not.toThrow();
         }
       }),

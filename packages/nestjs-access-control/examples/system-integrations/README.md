@@ -6,9 +6,9 @@ customers, never their card.
 
 | Actor | Rules |
 | --- | --- |
-| `system:billing` | `update:any` on invoices, only `status` and `paidAt` |
-| `system:crm` | `read:any` on customers, `cardNumber` denied |
-| `role:support` | `read:any` on customers |
+| `system:billing` | `update` on invoices, only `status` and `paidAt` |
+| `system:crm` | `read` on customers, `cardNumber` denied |
+| `role:support` | `read` on customers |
 
 ## What to look at
 

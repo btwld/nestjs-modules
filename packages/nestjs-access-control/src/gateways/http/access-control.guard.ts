@@ -9,11 +9,9 @@ import {
 
 import {
   ACCESS_CONTROL_MODULE_GRANT_METADATA,
-  ACCESS_CONTROL_MODULE_OWN_IN_HANDLER_METADATA,
   ACCESS_CONTROL_MODULE_QUERY_METADATA,
 } from '../../access-control.constants.js';
 import { AccessControlContext } from '../../domain/access-control.context.js';
-import { PossessionEnum } from '../../domain/enums/possession.enum.js';
 import { AccessControlException } from '../../domain/exceptions/access-control.exception.js';
 import { AccessRefusedException } from '../../domain/exceptions/access-refused.exception.js';
 import { type AccessControlGrantOptionInterface } from '../../domain/interfaces/access-control-grant-option.interface.js';
@@ -25,8 +23,6 @@ import { AccessControlService } from '../../domain/services/access-control.servi
 import { frozenActor } from '../../domain/utils/frozen-actor.util.js';
 import { type AccessAuthorizedGrantInterface } from '../interfaces/access-authorized-grant.interface.js';
 import { AccessDecisionCtx } from '../interfaces/access-decision-context.interface.js';
-
-const POSSESSIONS = [PossessionEnum.ANY, PossessionEnum.OWN];
 
 /**
  * The calls this guard has let through. Private to the guard, so nothing
@@ -45,14 +41,11 @@ const CHECKED = new WeakSet<AppContextHost>();
  * included, and before every interceptor, so nothing can answer a checked
  * route before it does.
  *
- * The first grant the actor holds lets the call through, checking `any`
- * before `own`. An `own` grant counts only on a route with access query
- * services or `@AccessControlOwnInHandler`; elsewhere it is refused with
- * `own-unchecked`. The route's access query services, if any, then decide:
- * the call proceeds when one of them allows it. The actor is then defined
- * on the call's context as `ActorCtx`, so checks in the handler, and the
- * repositories it calls, decide for the same actor,
- * and the grant the call got in on is recorded, immutably, for
+ * The first grant the actor holds lets the call through. The route's access
+ * query services, if any, then decide: the call proceeds when one of them
+ * allows it. The actor is then defined on the call's context as `ActorCtx`,
+ * so checks in the handler, and the repositories it calls, decide for the
+ * same actor, and the grant the call got in on is recorded, immutably, for
  * `AccessControlService.assertFields` and the response filter.
  */
 @Injectable()
@@ -106,31 +99,14 @@ export class AccessControlGuard implements CanActivate {
       ctx,
       context.getType() === 'http' ? context : undefined,
     );
-    const requestedAction = `${requested.action}:${PossessionEnum.ANY}`;
 
     if (!resolution) {
       throw new AccessRefusedException({
-        action: requestedAction,
+        action: requested.action,
         subject: requested.resource,
         reason: 'no-actor',
       });
     }
-
-    // An `own` grant counts only where something checks the records are
-    // the caller's: a query service, or a handler declared to. A route that
-    // declares its own grant is not covered by its controller's declaration.
-    const ownInHandlerTargets = this.reflector.get<unknown>(
-      ACCESS_CONTROL_MODULE_GRANT_METADATA,
-      context.getHandler(),
-    )
-      ? [context.getHandler()]
-      : targets;
-    const ownChecked =
-      queries.length > 0 ||
-      this.reflector.getAllAndOverride<boolean | undefined>(
-        ACCESS_CONTROL_MODULE_OWN_IN_HANDLER_METADATA,
-        ownInHandlerTargets,
-      ) === true;
 
     // Each grant as the module's authority answers it; with no authority,
     // the actor's rules alone.
@@ -155,7 +131,7 @@ export class AccessControlGuard implements CanActivate {
     if (!first) {
       throw new AccessRefusedException(
         authorityRefusal ?? {
-          action: requestedAction,
+          action: requested.action,
           subject: requested.resource,
           actor: resolution.actor,
           reason: 'authority',
@@ -163,33 +139,16 @@ export class AccessControlGuard implements CanActivate {
       );
     }
 
-    const permitted = this.permittedQuery(
-      authorized,
-      ownChecked ? POSSESSIONS : [PossessionEnum.ANY],
-    );
+    const permitted = this.permittedQuery(authorized);
 
     if (!permitted) {
-      const ownOnly = ownChecked
-        ? undefined
-        : this.permittedQuery(authorized, [PossessionEnum.OWN]);
-
-      if (ownOnly) {
-        throw new AccessRefusedException({
-          action: `${ownOnly.query.action}:${ownOnly.query.possession}`,
-          subject: ownOnly.query.resource,
-          actor: resolution.actor,
-          reason: 'own-unchecked',
-        });
-      }
-
-      const firstAction = `${first.grant.action}:${PossessionEnum.ANY}`;
       throw new AccessRefusedException(
         this.accessControl.refusal(
           first.resolution,
-          firstAction,
+          first.grant.action,
           first.grant.resource,
         ) ?? {
-          action: firstAction,
+          action: first.grant.action,
           subject: first.grant.resource,
           actor: resolution.actor,
           reason: 'no-grant',
@@ -209,7 +168,7 @@ export class AccessControlGuard implements CanActivate {
       ))
     ) {
       throw new AccessRefusedException({
-        action: `${query.action}:${query.possession}`,
+        action: query.action,
         subject: query.resource,
         actor: resolution.actor,
         reason: 'access-query',
@@ -234,30 +193,26 @@ export class AccessControlGuard implements CanActivate {
   }
 
   /**
-   * The first grant, `any` before `own`, the actor holds under what the
-   * authority allowed it, with the resolution it was checked against.
+   * The first grant the actor holds under what the authority allowed it,
+   * with the resolution it was checked against.
    */
   private permittedQuery(
     authorized: AccessAuthorizedGrantInterface[],
-    possessions: PossessionEnum[],
   ):
     | { query: AccessQueryInterface; resolution: AccessResolutionInterface }
     | undefined {
     for (const { grant, resolution } of authorized) {
-      for (const possession of possessions) {
-        const action = `${grant.action}:${possession}`;
-
-        if (!this.accessControl.refusal(resolution, action, grant.resource)) {
-          return {
-            query: {
-              actor: resolution.actor,
-              action: grant.action,
-              possession,
-              resource: grant.resource,
-            },
-            resolution,
-          };
-        }
+      if (
+        !this.accessControl.refusal(resolution, grant.action, grant.resource)
+      ) {
+        return {
+          query: {
+            actor: resolution.actor,
+            action: grant.action,
+            resource: grant.resource,
+          },
+          resolution,
+        };
       }
     }
 

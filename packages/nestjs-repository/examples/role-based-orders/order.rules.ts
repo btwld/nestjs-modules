@@ -1,10 +1,11 @@
 import { Injectable, type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor, actorKeys } from '@concepta/nestjs-core';
 import {
-  type CaslAuthorityRule,
-  type CaslAuthorityRulesInterface,
-} from '@concepta/nestjs-repository/optional/casl';
+  type Actor,
+  actorKeys,
+  type AuthorityRuleInterface,
+} from '@concepta/nestjs-core';
+import { type CaslAuthorityRulesInterface } from '@concepta/nestjs-repository/optional/casl';
 
 export const ORDERS = 'orders';
 
@@ -12,7 +13,7 @@ export const ORDERS = 'orders';
  * Who may do what with orders, by actor key. An application might keep these
  * in settings; the rules-from-storage example keeps them in a table.
  */
-export const ORDER_RULES: Record<string, CaslAuthorityRule[]> = {
+export const ORDER_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
     { action: ['create', 'read', 'update'], subject: ORDERS },
     // Clerks never see what an order costs the business...
@@ -30,7 +31,7 @@ export const ORDER_RULES: Record<string, CaslAuthorityRule[]> = {
 
 @Injectable()
 export class OrderRules implements CaslAuthorityRulesInterface {
-  rulesFor(_ctx: PlainLiteralObject, actor: Actor): CaslAuthorityRule[] {
+  rulesFor(_ctx: PlainLiteralObject, actor: Actor): AuthorityRuleInterface[] {
     return actorKeys(actor).flatMap((key) => ORDER_RULES[key] ?? []);
   }
 }

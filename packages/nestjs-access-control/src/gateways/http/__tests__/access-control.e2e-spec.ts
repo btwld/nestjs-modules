@@ -38,7 +38,6 @@ import { AccessControlService } from '../../../domain/services/access-control.se
 import { accessFieldPaths } from '../../../domain/utils/access-field-paths.util.js';
 import { AccessControlDeleteOne } from '../../decorators/access-control-delete-one.decorator.js';
 import { AccessControlGrant } from '../../decorators/access-control-grant.decorator.js';
-import { AccessControlOwnInHandler } from '../../decorators/access-control-own-in-handler.decorator.js';
 import { AccessControlQuery } from '../../decorators/access-control-query.decorator.js';
 import { AccessControlReadMany } from '../../decorators/access-control-read-many.decorator.js';
 import { AccessControlReadOne } from '../../decorators/access-control-read-one.decorator.js';
@@ -125,7 +124,6 @@ class UserControllerFixture {
 
   @Get()
   @AccessControlReadMany('user-list')
-  @AccessControlOwnInHandler()
   list() {
     return [USER_1, USER_2];
   }
@@ -139,14 +137,12 @@ class UserControllerFixture {
 
   @Get(':id')
   @AccessControlReadOne('user')
-  @AccessControlOwnInHandler()
   one() {
     return USER_1;
   }
 
   @Patch(':id')
   @AccessControlUpdateOne('user')
-  @AccessControlOwnInHandler()
   async update(
     @Ctx() ctx: AppContextHost,
     @Body() changes: Partial<typeof USER_1>,
@@ -333,7 +329,7 @@ describe('AccessControl (e2e)', () => {
   describe('checking', () => {
     it('refuses a checked route when nobody is acting', async () => {
       const api = await createApp({
-        grants: { 'role:clerk': [{ action: 'read:any', subject: 'user' }] },
+        grants: { 'role:clerk': [{ action: 'read', subject: 'user' }] },
       });
 
       const response = await api.get('/users/1').expect(403);
@@ -345,7 +341,7 @@ describe('AccessControl (e2e)', () => {
 
     it('refuses a route the actor holds no grant for', async () => {
       const api = await createApp({
-        grants: { 'role:clerk': [{ action: 'read:any', subject: 'user' }] },
+        grants: { 'role:clerk': [{ action: 'read', subject: 'user' }] },
       });
 
       await api.get('/users').set('x-roles', 'clerk').expect(403);
@@ -357,29 +353,11 @@ describe('AccessControl (e2e)', () => {
       await api.get('/users/open').expect(200).expect(USER_1);
     });
 
-    it('allows read any and read own', async () => {
-      const api = await createApp({
-        grants: {
-          'role:any': [{ action: 'read:any', subject: 'user' }],
-          'role:own': [{ action: 'read:own', subject: 'user' }],
-        },
-      });
-
-      await api.get('/users/1').set('x-roles', 'any').expect(200);
-      await api.get('/users/1').set('x-roles', 'own').expect(200);
-    });
-
     it('lets a deny on one role win over another role allowing it', async () => {
       const api = await createApp({
         grants: {
-          'role:a': [
-            {
-              action: ['delete:any', 'delete:own'],
-              subject: 'user',
-              inverted: true,
-            },
-          ],
-          'role:b': [{ action: 'delete:any', subject: 'user' }],
+          'role:a': [{ action: 'delete', subject: 'user', inverted: true }],
+          'role:b': [{ action: 'delete', subject: 'user' }],
         },
       });
 
@@ -390,8 +368,8 @@ describe('AccessControl (e2e)', () => {
     it('checks an action of your own, and a system as itself', async () => {
       const api = await createApp({
         grants: {
-          'system:agile': [{ action: 'approve:any', subject: 'contract' }],
-          'role:agile': [{ action: 'read:any', subject: 'user' }],
+          'system:agile': [{ action: 'approve', subject: 'contract' }],
+          'role:agile': [{ action: 'read', subject: 'user' }],
         },
       });
 
@@ -401,7 +379,7 @@ describe('AccessControl (e2e)', () => {
 
     it('lets an access query service decide, handing it the permitted grant', async () => {
       const api = await createApp({
-        grants: { 'role:clerk': [{ action: 'read:own', subject: 'user' }] },
+        grants: { 'role:clerk': [{ action: 'read', subject: 'user' }] },
       });
 
       await api
@@ -418,7 +396,6 @@ describe('AccessControl (e2e)', () => {
       expect(seen[0]?.getQuery()).toEqual({
         actor: { kind: 'role', roles: ['clerk'], userId: 'owner' },
         action: 'read',
-        possession: 'own',
         resource: 'user',
       });
     });
@@ -428,7 +405,7 @@ describe('AccessControl (e2e)', () => {
         grantsProvider: {
           rulesFor: async (_ctx, actor) =>
             actor.kind === 'role' && actor.userId === 'u1'
-              ? [{ action: 'read:any', subject: 'user' }]
+              ? [{ action: 'read', subject: 'user' }]
               : [],
         },
       });
@@ -449,7 +426,7 @@ describe('AccessControl (e2e)', () => {
       await expect(
         createApp({
           grants: {
-            'role:clerk': [{ action: 'read:any', subject: 'user', fields: [] }],
+            'role:clerk': [{ action: 'read', subject: 'user', fields: [] }],
           },
         }),
       ).rejects.toThrow(AccessRulesInvalidException);
@@ -460,7 +437,7 @@ describe('AccessControl (e2e)', () => {
     it('uses an actor already on the context instead of the resolver', async () => {
       const api = await createApp({
         grants: {
-          'system:billing': [{ action: 'read:any', subject: 'user' }],
+          'system:billing': [{ action: 'read', subject: 'user' }],
           'role:clerk': [],
         },
       });
@@ -477,7 +454,7 @@ describe('AccessControl (e2e)', () => {
     it('fails a checked route when the grants provider returns unusable rules', async () => {
       const api = await createApp({
         grantsProvider: {
-          rulesFor: async () => [{ action: 'manage:any', subject: 'all' }],
+          rulesFor: async () => [{ action: 'manage', subject: 'all' }],
         },
       });
 
@@ -495,9 +472,9 @@ describe('AccessControl (e2e)', () => {
       const api = await createApp({
         grants: {
           'role:clerk': [
-            { action: 'read:any', subject: 'user' },
+            { action: 'read', subject: 'user' },
             {
-              action: 'read:any',
+              action: 'read',
               subject: 'user',
               fields: ['phone'],
               inverted: true,
@@ -516,7 +493,7 @@ describe('AccessControl (e2e)', () => {
 
     it('checks every route of a controller declaring the grant', async () => {
       const api = await createApp({
-        grants: { 'role:clerk': [{ action: 'read:any', subject: 'user' }] },
+        grants: { 'role:clerk': [{ action: 'read', subject: 'user' }] },
       });
 
       await api.get('/whole').expect(403);
@@ -524,27 +501,10 @@ describe('AccessControl (e2e)', () => {
       await api.get('/whole').set('x-roles', 'clerk').expect(200);
     });
 
-    it('refuses an own grant on a route that never checks ownership', async () => {
-      const api = await createApp({
-        grants: { 'role:member': [{ action: 'read:own', subject: 'user' }] },
-      });
-
-      const response = await api
-        .get('/whole')
-        .set('x-roles', 'member')
-        .expect(403);
-
-      expect(response.body).toEqual(
-        expect.objectContaining({
-          message: 'Access refused: read:own on user (own-unchecked)',
-        }),
-      );
-    });
-
     it('lets a route grant override its controller grant, checking the call once', async () => {
       const rulesFor = vi
         .fn<AccessGrantsProviderInterface['rulesFor']>()
-        .mockResolvedValue([{ action: 'read:any', subject: 'profile' }]);
+        .mockResolvedValue([{ action: 'read', subject: 'profile' }]);
       const api = await createApp({ grantsProvider: { rulesFor } });
 
       await api
@@ -557,7 +517,7 @@ describe('AccessControl (e2e)', () => {
 
     it('defines the actor on the context for the handler', async () => {
       const api = await createApp({
-        grants: { 'role:clerk': [{ action: 'read:any', subject: 'user' }] },
+        grants: { 'role:clerk': [{ action: 'read', subject: 'user' }] },
       });
 
       await api
@@ -574,7 +534,7 @@ describe('AccessControl (e2e)', () => {
       'leaves a global class serializer able to recognise the instance, registered %s',
       async (serializer) => {
         const api = await createApp({
-          grants: { 'role:clerk': [{ action: 'read:any', subject: 'user' }] },
+          grants: { 'role:clerk': [{ action: 'read', subject: 'user' }] },
           serializer,
         });
 
@@ -590,11 +550,11 @@ describe('AccessControl (e2e)', () => {
       const api = await createApp({
         grants: {
           'role:role2': [
-            { action: 'read:any', subject: 'user-list', fields: ['phone'] },
+            { action: 'read', subject: 'user-list', fields: ['phone'] },
           ],
           'role:role1': [
             {
-              action: 'read:any',
+              action: 'read',
               subject: 'user-list',
               fields: ['firstName', 'lastName'],
             },
@@ -616,7 +576,7 @@ describe('AccessControl (e2e)', () => {
       const api = await createApp({
         grants: {
           'role:clerk': [
-            { action: 'read:any', subject: 'user-list', fields: ['firstName'] },
+            { action: 'read', subject: 'user-list', fields: ['firstName'] },
           ],
         },
       });
@@ -639,9 +599,9 @@ describe('AccessControl (e2e)', () => {
       const api = await createApp({
         grants: {
           'role:clerk': [
-            { action: 'read:any', subject: 'user-list' },
+            { action: 'read', subject: 'user-list' },
             {
-              action: 'read:any',
+              action: 'read',
               subject: 'user-list',
               fields: ['phone'],
               inverted: true,
@@ -661,63 +621,9 @@ describe('AccessControl (e2e)', () => {
       ]);
     });
 
-    it('filters by the any grant first, even when own allows more', async () => {
-      const api = await createApp({
-        grants: {
-          'role:manager': [
-            {
-              action: 'read:any',
-              subject: 'user',
-              fields: ['firstName', 'lastName'],
-            },
-          ],
-          'role:user': [
-            {
-              action: 'read:own',
-              subject: 'user',
-              fields: ['firstName', 'lastName', 'phone'],
-            },
-          ],
-        },
-      });
-
-      await api
-        .get('/users/1')
-        .set('x-roles', 'manager,user')
-        .expect(200)
-        .expect(pick(USER_1, 'firstName', 'lastName'));
-    });
-
-    it('combines own fields across roles', async () => {
-      const api = await createApp({
-        grants: {
-          'role:manager': [
-            {
-              action: 'read:own',
-              subject: 'user',
-              fields: ['firstName', 'lastName'],
-            },
-          ],
-          'role:user': [
-            {
-              action: 'read:own',
-              subject: 'user',
-              fields: ['firstName', 'phone'],
-            },
-          ],
-        },
-      });
-
-      await api
-        .get('/users/1')
-        .set('x-roles', 'manager,user')
-        .expect(200)
-        .expect(pick(USER_1, 'firstName', 'lastName', 'phone'));
-    });
-
     it('returns every field for a grant without fields', async () => {
       const api = await createApp({
-        grants: { 'role:manager': [{ action: 'read:any', subject: 'user' }] },
+        grants: { 'role:manager': [{ action: 'read', subject: 'user' }] },
       });
 
       await api
@@ -727,36 +633,11 @@ describe('AccessControl (e2e)', () => {
         .expect(USER_1);
     });
 
-    it('falls through to own, with its denied field hidden', async () => {
-      const api = await createApp({
-        grants: {
-          'role:role1': [
-            { action: 'read:own', subject: 'user-list' },
-            {
-              action: 'read:own',
-              subject: 'user-list',
-              fields: ['phone'],
-              inverted: true,
-            },
-          ],
-        },
-      });
-
-      await api
-        .get('/users')
-        .set('x-roles', 'role1')
-        .expect(200)
-        .expect([
-          pick(USER_1, 'firstName', 'lastName', 'dob'),
-          pick(USER_2, 'firstName', 'lastName', 'dob'),
-        ]);
-    });
-
     it('filters after the route serializer has seen the full response', async () => {
       const api = await createApp({
         grants: {
           'role:clerk': [
-            { action: 'read:any', subject: 'user', fields: ['firstName'] },
+            { action: 'read', subject: 'user', fields: ['firstName'] },
           ],
         },
       });
@@ -772,7 +653,7 @@ describe('AccessControl (e2e)', () => {
       const api = await createApp({
         grants: {
           'role:clerk': [
-            { action: 'read:any', subject: 'user', fields: ['firstName'] },
+            { action: 'read', subject: 'user', fields: ['firstName'] },
           ],
         },
       });
@@ -788,18 +669,18 @@ describe('AccessControl (e2e)', () => {
   describe('filtering a write response', () => {
     const grants: AccessGrants = {
       'role:editor': [
-        { action: ['update:any', 'read:any'], subject: 'user' },
+        { action: ['update', 'read'], subject: 'user' },
         {
-          action: 'read:any',
+          action: 'read',
           subject: 'user',
           fields: ['dob'],
           inverted: true,
         },
       ],
       'role:writer': [
-        { action: 'update:any', subject: 'user' },
+        { action: 'update', subject: 'user' },
         {
-          action: 'update:any',
+          action: 'update',
           subject: 'user',
           fields: ['dob'],
           inverted: true,
@@ -818,37 +699,6 @@ describe('AccessControl (e2e)', () => {
         .expect({ ...pick(USER_1, 'lastName', 'phone'), firstName: 'Jo' });
     });
 
-    it('hides from an update on own what a read of the record hides', async () => {
-      const api = await createApp({
-        grants: {
-          'role:support': [
-            { action: 'read:any', subject: 'user' },
-            {
-              action: 'read:any',
-              subject: 'user',
-              fields: ['phone'],
-              inverted: true,
-            },
-          ],
-          'role:member': [
-            { action: ['read:own', 'update:own'], subject: 'user' },
-          ],
-        },
-      });
-
-      await api
-        .get('/users/1')
-        .set('x-roles', 'support,member')
-        .expect(200)
-        .expect(pick(USER_1, 'firstName', 'lastName', 'dob'));
-      await api
-        .patch('/users/1')
-        .set('x-roles', 'support,member')
-        .send({ firstName: 'Jo' })
-        .expect(200)
-        .expect({ ...pick(USER_1, 'lastName', 'dob'), firstName: 'Jo' });
-    });
-
     it('shows nothing to a caller who may write but not read', async () => {
       const api = await createApp({ grants });
 
@@ -864,18 +714,18 @@ describe('AccessControl (e2e)', () => {
   describe('field checks in a handler', () => {
     const grants: AccessGrants = {
       'role:member': [
-        { action: 'update:own', subject: 'user' },
+        { action: 'update', subject: 'user' },
         {
-          action: 'update:own',
+          action: 'update',
           subject: 'user',
           fields: ['phone'],
           inverted: true,
         },
       ],
-      'role:admin': [{ action: 'update:any', subject: 'user' }],
+      'role:admin': [{ action: 'update', subject: 'user' }],
     };
 
-    it('checks the fields under the possession the route let the caller in on', async () => {
+    it('checks the fields a handler names under the grant the route let the caller in on', async () => {
       const api = await createApp({ grants });
 
       await api
@@ -892,7 +742,7 @@ describe('AccessControl (e2e)', () => {
 
       expect(response.body).toEqual(
         expect.objectContaining({
-          message: 'Access refused: update:own on user (field)',
+          message: 'Access refused: update on user (field)',
         }),
       );
 
@@ -908,10 +758,8 @@ describe('AccessControl (e2e)', () => {
     it('returns the actor rules, denies last, on a route without a grant', async () => {
       const api = await createApp({
         grants: {
-          'role:a': [
-            { action: 'void:any', subject: 'invoice', inverted: true },
-          ],
-          'role:b': [{ action: 'read:any', subject: 'invoice' }],
+          'role:a': [{ action: 'void', subject: 'invoice', inverted: true }],
+          'role:b': [{ action: 'read', subject: 'invoice' }],
         },
       });
 
@@ -920,8 +768,8 @@ describe('AccessControl (e2e)', () => {
         .set('x-roles', 'a,b')
         .expect(200)
         .expect([
-          { action: 'read:any', subject: 'invoice' },
-          { action: 'void:any', subject: 'invoice', inverted: true },
+          { action: 'read', subject: 'invoice' },
+          { action: 'void', subject: 'invoice', inverted: true },
         ]);
     });
   });

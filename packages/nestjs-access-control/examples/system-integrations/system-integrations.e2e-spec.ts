@@ -57,7 +57,7 @@ describe('Example: system integrations', () => {
         .set(apiKey('key-billing'))
         .send({ ...PAID, amount: 1 })
         .expect(403)
-        .expect(refused('update:any on invoice (field)')));
+        .expect(refused('update on invoice (field)')));
 
     it('shows the CRM a customer without their card', () =>
       api
@@ -72,14 +72,14 @@ describe('Example: system integrations', () => {
         .set(apiKey('key-crm'))
         .send(PAID)
         .expect(403)
-        .expect(refused('update:any on invoice (no-grant)')));
+        .expect(refused('update on invoice (no-grant)')));
 
     it('refuses an unknown key as nobody acting', () =>
       api
         .get('/customers/cus-1')
         .set(apiKey('key-stolen'))
         .expect(403)
-        .expect(refused('read:any on customer (no-actor)')));
+        .expect(refused('read on customer (no-actor)')));
 
     it('gives a person whose role is named billing none of the system’s grants', () =>
       api
@@ -87,7 +87,7 @@ describe('Example: system integrations', () => {
         .set(bearer('bill'))
         .send(PAID)
         .expect(403)
-        .expect(refused('update:any on invoice (no-grant)')));
+        .expect(refused('update on invoice (no-grant)')));
 
     it('serves staff and systems from the same routes', () =>
       api.get('/customers/cus-1').set(bearer('sam')).expect(200).expect({

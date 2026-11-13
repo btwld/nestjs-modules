@@ -1,17 +1,35 @@
+import { type AccessGrants } from '@concepta/nestjs-access-control';
 import {
-  type AccessGrants,
-  type AccessRuleInterface,
-} from '@concepta/nestjs-access-control';
+  type Actor,
+  type AuthorityRuleInterface,
+  type ActionEnum,
+} from '@concepta/nestjs-core';
 
 import { type AccessLevel } from './access-level.type.js';
 
-const ACTIONS_BY_LEVEL: Record<AccessLevel, string[]> = {
+type Verb = `${ActionEnum}`;
+
+const VERBS_BY_LEVEL: Record<AccessLevel, Verb[]> = {
   none: [],
-  'view-own': ['read:own'],
-  view: ['read:any'],
-  'edit-own': ['read:any', 'create:own', 'update:own'],
-  edit: ['read:any', 'create:any', 'update:any'],
-  full: ['read:any', 'create:any', 'update:any', 'delete:any'],
+  'view-own': ['read'],
+  view: ['read'],
+  'edit-own': ['read', 'create', 'update'],
+  edit: ['read', 'create', 'update'],
+  full: ['read', 'create', 'update', 'delete'],
+};
+
+/**
+ * The verbs a level holds only on the caller's own records. The
+ * application's own data: grants carry the verbs, this says whose records
+ * they reach.
+ */
+const OWN_ONLY_BY_LEVEL: Record<AccessLevel, Verb[]> = {
+  none: [],
+  'view-own': ['read'],
+  view: [],
+  'edit-own': ['create', 'update'],
+  edit: [],
+  full: [],
 };
 
 /**
@@ -20,8 +38,8 @@ const ACTIONS_BY_LEVEL: Record<AccessLevel, string[]> = {
 export function levelRules(
   subject: string,
   level: AccessLevel,
-): AccessRuleInterface[] {
-  const action = ACTIONS_BY_LEVEL[level];
+): AuthorityRuleInterface[] {
+  const action = VERBS_BY_LEVEL[level];
 
   return action.length ? [{ action, subject }] : [];
 }
@@ -41,4 +59,36 @@ export function levelGrants(
       ),
     ]),
   );
+}
+
+/**
+ * Whether the level holds the action only on the caller's own records.
+ */
+function levelOwnOnly(level: AccessLevel, action: string): boolean {
+  return OWN_ONLY_BY_LEVEL[level].some((verb) => verb === action);
+}
+
+/**
+ * Whether the actor may take the action only on their own records of the
+ * subject: a person is limited unless one of their roles holds the action
+ * on everyone's records, and anyone who is not a person is limited too.
+ */
+export function ownRecordsOnly(
+  roles: Record<string, Record<string, AccessLevel>>,
+  actor: Actor,
+  subject: string,
+  action: string,
+): boolean {
+  if (actor.kind !== 'role') {
+    return true;
+  }
+
+  return !actor.roles.some((role) => {
+    const level = roles[role]?.[subject] ?? 'none';
+
+    return (
+      VERBS_BY_LEVEL[level].some((verb) => verb === action) &&
+      !levelOwnOnly(level, action)
+    );
+  });
 }

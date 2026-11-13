@@ -23,6 +23,13 @@ export type CascadeSync = 'merge' | 'replace';
 /** The lifecycle operations that pass on to related rows. */
 export type CascadeRemoval = 'delete' | 'softDelete' | 'restore';
 
+/** The action each removal takes on the related rows it passes on to. */
+const REMOVAL_ACTIONS: Record<CascadeRemoval, ActionEnum> = {
+  delete: ActionEnum.DELETE,
+  softDelete: ActionEnum.SOFT_DELETE,
+  restore: ActionEnum.RESTORE,
+};
+
 /**
  * Writes an entity's cascade relations through each related entity's own
  * repository, so its hooks, row scope and checks run on every related row.
@@ -57,8 +64,8 @@ export class CascadeWriter {
    *
    * `create` creates; `merge` updates and creates, and deletes a to-one set
    * to `null`; `replace` also deletes. Which of them a write takes depends
-   * on what is stored, so each one it could take is decided. Each related
-   * repository decides again, and checks columns, when it is written.
+   * on what is stored, so each one it could take is decided. The columns
+   * each related row writes, and its own related rows, are decided too.
    */
   async authorize(
     children: CascadeChildren,
@@ -79,7 +86,15 @@ export class CascadeWriter {
                 ? [ActionEnum.DELETE]
                 : []),
             ];
-      await target.authorizeReach(actions, ctx);
+      await target.authorizeCascade(
+        actions,
+        this.listOf(relation, children.get(name)),
+        mode,
+        ctx,
+        [relation.on.to],
+        // A to-one payload always names the one row there is.
+        relation.cardinality === 'many',
+      );
     }
   }
 
@@ -98,7 +113,7 @@ export class CascadeWriter {
         rows.push(
           await target.create(
             this.linked(relation, child, row),
-            this.linkedOptions(relation, ctx),
+            this.linkedOptions(relation, target, ctx),
           ),
         );
       }
@@ -131,7 +146,10 @@ export class CascadeWriter {
       const existing = new Map(
         (
           await target.find(
-            internalCall({ where: this.childrenOf(relation, row), ctx }),
+            internalCall(
+              { where: this.childrenOf(relation, row), ctx },
+              target,
+            ),
           )
         )
           .map((stored) => [this.keyOf(target, stored), stored] as const)
@@ -168,17 +186,20 @@ export class CascadeWriter {
               ? await target.replace(
                   stored,
                   data,
-                  this.linkedOptions(relation, ctx),
+                  this.linkedOptions(relation, target, ctx),
                 )
               : await target.update(
                   stored,
                   data,
-                  this.linkedOptions(relation, ctx),
+                  this.linkedOptions(relation, target, ctx),
                 ),
           );
         } else {
           rows.push(
-            await target.create(data, this.linkedOptions(relation, ctx)),
+            await target.create(
+              data,
+              this.linkedOptions(relation, target, ctx),
+            ),
           );
         }
       }
@@ -219,7 +240,10 @@ export class CascadeWriter {
       for (const { relation, target } of this.relations.values()) {
         const where = this.childrenOf(relation, row);
         const found = await target.find(
-          internalCall({ where, withDeleted: operation !== 'softDelete', ctx }),
+          internalCall(
+            { where, withDeleted: operation !== 'softDelete', ctx },
+            target,
+          ),
         );
         const deleteDate = target.metadata.columns.find(
           (column) => column.isRemoveDate,
@@ -235,8 +259,7 @@ export class CascadeWriter {
       }
     }
 
-    const action =
-      operation === 'restore' ? ActionEnum.UPDATE : ActionEnum.DELETE;
+    const action = REMOVAL_ACTIONS[operation];
     for (const target of new Set(removals.map(({ target }) => target))) {
       await target.authorizeReach([action], ctx);
     }
@@ -294,9 +317,10 @@ export class CascadeWriter {
    */
   private linkedOptions(
     relation: RepositoryRelationMetadataInterface,
+    target: CascadeRelation['target'],
     ctx: PlainLiteralObject | undefined,
   ): { ctx: PlainLiteralObject | undefined } {
-    return linkedCall({ ctx }, [relation.on.to]);
+    return linkedCall({ ctx }, target, [relation.on.to]);
   }
 
   private childrenOf(

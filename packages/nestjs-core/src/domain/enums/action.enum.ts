@@ -3,4 +3,6 @@ export enum ActionEnum {
   READ = 'read',
   UPDATE = 'update',
   DELETE = 'delete',
+  SOFT_DELETE = 'softDelete',
+  RESTORE = 'restore',
 }

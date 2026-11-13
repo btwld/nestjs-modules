@@ -28,7 +28,7 @@ const CASES: {
     name: 'AccessRefusedException',
     build: () =>
       new AccessRefusedException({
-        action: 'read:any',
+        action: 'read',
         subject: 'user',
         reason: 'no-grant',
       }),
@@ -63,7 +63,7 @@ describe('exception fault classification', () => {
     [
       'ACCESS_REFUSED_ERROR',
       new AccessRefusedException({
-        action: 'read:any',
+        action: 'read',
         subject: 'user',
         reason: 'denied',
       }),
@@ -79,7 +79,7 @@ describe('exception fault classification', () => {
   it('refuses with 403', () => {
     expect(
       new AccessRefusedException({
-        action: 'read:any',
+        action: 'read',
         subject: 'user',
         reason: 'denied',
       }).getStatus(),

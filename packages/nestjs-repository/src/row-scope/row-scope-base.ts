@@ -280,12 +280,15 @@ export abstract class RowScopeBase<
     // Not decided by the entity's authority: the write it guards was, and
     // needs no read permission of its own.
     const found = await repository.findOne(
-      internalCall({
-        where:
-          conditions.length === 1 ? conditions[0] : Where.and(...conditions),
-        withDeleted: true,
-        ctx,
-      }),
+      internalCall(
+        {
+          where:
+            conditions.length === 1 ? conditions[0] : Where.and(...conditions),
+          withDeleted: true,
+          ctx,
+        },
+        repository,
+      ),
     );
 
     if (!found) {

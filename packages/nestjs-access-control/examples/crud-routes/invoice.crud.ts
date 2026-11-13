@@ -25,25 +25,22 @@ export const INVOICES = 'invoice';
  */
 export const INVOICE_GRANTS: AccessGrants = {
   'role:clerk': [
-    { action: ['create:any', 'read:any', 'update:any'], subject: INVOICES },
+    { action: ['create', 'read', 'update'], subject: INVOICES },
     {
-      action: 'read:any',
+      action: 'read',
       subject: INVOICES,
       fields: ['notes'],
       inverted: true,
     },
     {
-      action: 'update:any',
+      action: 'update',
       subject: INVOICES,
       fields: ['amount'],
       inverted: true,
     },
   ],
   'role:manager': [
-    {
-      action: ['create:any', 'read:any', 'update:any', 'delete:any'],
-      subject: INVOICES,
-    },
+    { action: ['create', 'read', 'update', 'delete'], subject: INVOICES },
   ],
 };
 

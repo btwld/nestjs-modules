@@ -8,7 +8,7 @@ stays correct.
 | Example | Shows |
 | --- | --- |
 | [Role-based API](./role-based-api) | Grants per role, a field hidden from one role, a field one role may not write |
-| [Ownership](./ownership) | `own` grants, an access query service that checks the owner, lists of your own records |
+| [Ownership](./ownership) | Roles limited to their own records, an access query service that checks the owner, a field only some roles may write, lists of your own records |
 | [Per-user grants from storage](./per-user-grants) | Role templates plus per-user rules an admin edits at runtime, a "my permissions" endpoint |
 | [System integrations](./system-integrations) | Partner systems calling with API keys, a queue consumer acting as a system |
 | [Multi-tenant access levels](./multi-tenant-levels) | Roles described as access levels, a different role in each tenant |

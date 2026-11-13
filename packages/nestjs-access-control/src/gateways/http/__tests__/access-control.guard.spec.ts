@@ -17,10 +17,8 @@ import {
 
 import {
   ACCESS_CONTROL_MODULE_GRANT_METADATA,
-  ACCESS_CONTROL_MODULE_OWN_IN_HANDLER_METADATA,
   ACCESS_CONTROL_MODULE_QUERY_METADATA,
 } from '../../../access-control.constants.js';
-import { PossessionEnum } from '../../../domain/enums/possession.enum.js';
 import { AccessControlException } from '../../../domain/exceptions/access-control.exception.js';
 import { type AccessControlContextInterface } from '../../../domain/interfaces/access-control-context.interface.js';
 import { type AccessGrantsProviderInterface } from '../../../domain/interfaces/access-grants-provider.interface.js';
@@ -36,7 +34,7 @@ type RpcArgumentsHost = ReturnType<ArgumentsHost['switchToRpc']>;
 type HttpArgumentsHost = ReturnType<ArgumentsHost['switchToHttp']>;
 
 describe(AccessControlGuard.name, () => {
-  class OwnerQuery implements CanAccess {
+  class AllowingQuery implements CanAccess {
     canAccess = vi.fn(async (_context: AccessControlContextInterface) => true);
   }
 
@@ -54,7 +52,6 @@ describe(AccessControlGuard.name, () => {
     @SetMetadata(ACCESS_CONTROL_MODULE_GRANT_METADATA, [
       { resource: 'invoice', action: 'read' },
     ])
-    @SetMetadata(ACCESS_CONTROL_MODULE_OWN_IN_HANDLER_METADATA, true)
     read() {
       return null;
     }
@@ -62,29 +59,24 @@ describe(AccessControlGuard.name, () => {
     @SetMetadata(ACCESS_CONTROL_MODULE_GRANT_METADATA, [
       { resource: 'invoice', action: 'read' },
     ])
-    unchecked() {
-      return null;
-    }
-
-    @SetMetadata(ACCESS_CONTROL_MODULE_GRANT_METADATA, [
-      { resource: 'invoice', action: 'read' },
-    ])
     @SetMetadata(ACCESS_CONTROL_MODULE_QUERY_METADATA, [
-      { service: OwnerQuery },
+      { service: AllowingQuery },
     ])
-    owned() {
+    queried() {
       return null;
     }
 
     @SetMetadata(ACCESS_CONTROL_MODULE_QUERY_METADATA, [
-      { service: OwnerQuery },
+      { service: AllowingQuery },
     ])
     queryOnly() {
       return null;
     }
   }
 
-  @SetMetadata(ACCESS_CONTROL_MODULE_QUERY_METADATA, [{ service: OwnerQuery }])
+  @SetMetadata(ACCESS_CONTROL_MODULE_QUERY_METADATA, [
+    { service: AllowingQuery },
+  ])
   class QueriedHandlers {
     @SetMetadata(ACCESS_CONTROL_MODULE_GRANT_METADATA, [
       { resource: 'invoice', action: 'read' },
@@ -97,25 +89,8 @@ describe(AccessControlGuard.name, () => {
     }
   }
 
-  @SetMetadata(ACCESS_CONTROL_MODULE_GRANT_METADATA, [
-    { resource: 'invoice', action: 'read' },
-  ])
-  @SetMetadata(ACCESS_CONTROL_MODULE_OWN_IN_HANDLER_METADATA, true)
-  class OptedInHandlers {
-    inherited() {
-      return null;
-    }
-
-    @SetMetadata(ACCESS_CONTROL_MODULE_GRANT_METADATA, [
-      { resource: 'invoice', action: 'read' },
-    ])
-    ownGrant() {
-      return null;
-    }
-  }
-
   const handlers = new Handlers();
-  const ownerQuery = new OwnerQuery();
+  const allowingQuery = new AllowingQuery();
 
   const rpcContext = (
     handler: () => null,
@@ -135,7 +110,7 @@ describe(AccessControlGuard.name, () => {
     const actorFor = vi.fn().mockResolvedValue(actor);
     const moduleRef = mock<ModuleRef>();
     moduleRef.resolve.mockImplementation(async (service) =>
-      service === RefusingQuery ? new RefusingQuery() : ownerQuery,
+      service === RefusingQuery ? new RefusingQuery() : allowingQuery,
     );
 
     return {
@@ -144,7 +119,7 @@ describe(AccessControlGuard.name, () => {
         new AccessControlService(
           { actorFor },
           new StaticAccessGrantsProvider({
-            'role:clerk': [{ action: 'read:own', subject: 'invoice' }],
+            'role:clerk': [{ action: 'read', subject: 'invoice' }],
           }),
         ),
         new Reflector(),
@@ -158,52 +133,6 @@ describe(AccessControlGuard.name, () => {
 
     expect(await guard.canActivate(rpcContext(handlers.open))).toEqual(true);
     expect(actorFor).not.toHaveBeenCalled();
-  });
-
-  describe('own', () => {
-    it('refuses a call let in on own when nothing checks the record is theirs', async () => {
-      const { guard } = guardFor({ kind: 'role', roles: ['clerk'] });
-
-      await expect(
-        guard.canActivate(rpcContext(handlers.unchecked)),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          context: expect.objectContaining({
-            action: 'read:own',
-            subject: 'invoice',
-            reason: 'own-unchecked',
-          }),
-        }),
-      );
-    });
-
-    it('lets it through when the route checks ownership with a query service', async () => {
-      const { guard } = guardFor({ kind: 'role', roles: ['clerk'] });
-
-      expect(await guard.canActivate(rpcContext(handlers.owned))).toEqual(true);
-    });
-
-    it('lets it through when the route decides ownership in its handler', async () => {
-      const { guard } = guardFor({ kind: 'role', roles: ['clerk'] });
-
-      expect(await guard.canActivate(rpcContext(handlers.read))).toEqual(true);
-    });
-
-    it('applies a controller’s declaration only to routes using its grant', async () => {
-      const { guard } = guardFor({ kind: 'role', roles: ['clerk'] });
-      const opted = new OptedInHandlers();
-
-      expect(
-        await guard.canActivate(rpcContext(opted.inherited, OptedInHandlers)),
-      ).toEqual(true);
-      await expect(
-        guard.canActivate(rpcContext(opted.ownGrant, OptedInHandlers)),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          context: expect.objectContaining({ reason: 'own-unchecked' }),
-        }),
-      );
-    });
   });
 
   it('fails a route with access query services but no grant, rather than skip them', async () => {
@@ -233,13 +162,13 @@ describe(AccessControlGuard.name, () => {
     );
   });
 
-  it('names the requested action with its possession when nobody is acting', async () => {
+  it('names the requested action when nobody is acting', async () => {
     const { guard } = guardFor();
 
     await expect(guard.canActivate(rpcContext(handlers.read))).rejects.toThrow(
       expect.objectContaining({
         context: expect.objectContaining({
-          action: 'read:any',
+          action: 'read',
           subject: 'invoice',
           reason: 'no-actor',
         }),
@@ -306,12 +235,9 @@ describe(AccessControlGuard.name, () => {
         query: {
           actor: { kind: 'role', roles: ['admin'] },
           action: 'read',
-          possession: PossessionEnum.ANY,
           resource: 'invoice',
         },
-        ability: createAccessAbility([
-          { action: 'read:any', subject: 'invoice' },
-        ]),
+        ability: createAccessAbility([{ action: 'read', subject: 'invoice' }]),
       }),
     ).toThrow(OverlayImmutableException);
   });
@@ -319,7 +245,7 @@ describe(AccessControlGuard.name, () => {
   it('checks a call once when a controller and its route both apply it', async () => {
     const rulesFor = vi
       .fn<AccessGrantsProviderInterface['rulesFor']>()
-      .mockResolvedValue([{ action: 'read:own', subject: 'invoice' }]);
+      .mockResolvedValue([{ action: 'read', subject: 'invoice' }]);
     const guard = new AccessControlGuard(
       new AccessControlService(
         { actorFor: async () => ({ kind: 'role', roles: ['clerk'] }) },
@@ -344,7 +270,7 @@ describe(AccessControlGuard.name, () => {
         { actorFor },
         new StaticAccessGrantsProvider({
           'role:clerk': [
-            { action: 'read:any', subject: 'invoice', inverted: true },
+            { action: 'read', subject: 'invoice', inverted: true },
           ],
         }),
       ),
@@ -355,7 +281,7 @@ describe(AccessControlGuard.name, () => {
     await expect(guard.canActivate(rpcContext(handlers.read))).rejects.toThrow(
       expect.objectContaining({
         context: expect.objectContaining({
-          action: 'read:any',
+          action: 'read',
           subject: 'invoice',
           reason: 'denied',
         }),
@@ -366,9 +292,9 @@ describe(AccessControlGuard.name, () => {
   it('hands access query services no request outside HTTP', async () => {
     const { guard } = guardFor({ kind: 'role', roles: ['clerk'] });
 
-    expect(await guard.canActivate(rpcContext(handlers.owned))).toEqual(true);
+    expect(await guard.canActivate(rpcContext(handlers.queried))).toEqual(true);
     expect(
-      ownerQuery.canAccess.mock.calls[0]?.[0].getRequest(),
+      allowingQuery.canAccess.mock.calls[0]?.[0].getRequest(),
     ).toBeUndefined();
   });
 
@@ -399,8 +325,8 @@ describe(AccessControlGuard.name, () => {
         mock<ModuleRef>(),
       );
 
-    it('lets a route through on the authority alone, as any', async () => {
-      const context = rpcContext(handlers.unchecked);
+    it('lets a route through on the authority alone', async () => {
+      const context = rpcContext(handlers.read);
 
       expect(
         await governedGuard(allowing('read invoice')).canActivate(context),
@@ -408,14 +334,13 @@ describe(AccessControlGuard.name, () => {
       expect(requireAppContext(context).with(AccessDecisionCtx).query).toEqual({
         actor: auditor,
         action: 'read',
-        possession: PossessionEnum.ANY,
         resource: 'invoice',
       });
     });
 
     it('refuses a route the authority refuses, naming the pending decision', async () => {
       await expect(
-        governedGuard(allowing()).canActivate(rpcContext(handlers.unchecked)),
+        governedGuard(allowing()).canActivate(rpcContext(handlers.read)),
       ).rejects.toThrow(
         expect.objectContaining({
           context: expect.objectContaining({
@@ -427,33 +352,9 @@ describe(AccessControlGuard.name, () => {
       );
     });
 
-    it('narrows to own with the actor’s rules, so ownership must be checked', async () => {
-      const grants: AccessGrants = {
-        'role:auditor': [
-          { action: 'read:any', subject: 'invoice', inverted: true },
-          { action: 'read:own', subject: 'invoice' },
-        ],
-      };
-
-      await expect(
-        governedGuard(allowing('read invoice'), grants).canActivate(
-          rpcContext(handlers.unchecked),
-        ),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          context: expect.objectContaining({ reason: 'own-unchecked' }),
-        }),
-      );
-      expect(
-        await governedGuard(allowing('read invoice'), grants).canActivate(
-          rpcContext(handlers.read),
-        ),
-      ).toEqual(true);
-    });
-
     it('defines a copy of the actor whose roles nothing can change', async () => {
       const roles = ['auditor'];
-      const context = rpcContext(handlers.unchecked);
+      const context = rpcContext(handlers.read);
 
       await governedGuard(
         allowing('read invoice'),
@@ -473,14 +374,14 @@ describe(AccessControlGuard.name, () => {
     });
 
     it('records what the actor may read, for the response filter', async () => {
-      const context = rpcContext(handlers.unchecked);
+      const context = rpcContext(handlers.read);
 
       await governedGuard(allowing('read invoice')).canActivate(context);
 
       expect(
         requireAppContext(context)
           .with(AccessDecisionCtx)
-          .ability.can('read:any', 'invoice', 'total'),
+          .ability.can('read', 'invoice', 'total'),
       ).toEqual(true);
     });
   });

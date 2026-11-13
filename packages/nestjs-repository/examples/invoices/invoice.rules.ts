@@ -1,17 +1,18 @@
 import { Injectable, type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor, actorKeys } from '@concepta/nestjs-core';
-import { RowScopeBase } from '@concepta/nestjs-repository';
 import {
-  type CaslAuthorityRule,
-  type CaslAuthorityRulesInterface,
-} from '@concepta/nestjs-repository/optional/casl';
+  type Actor,
+  actorKeys,
+  type AuthorityRuleInterface,
+} from '@concepta/nestjs-core';
+import { RowScopeBase } from '@concepta/nestjs-repository';
+import { type CaslAuthorityRulesInterface } from '@concepta/nestjs-repository/optional/casl';
 
 export const CUSTOMERS = 'customers';
 export const INVOICES = 'invoices';
 export const INVOICE_LINES = 'invoice-lines';
 
-export const INVOICE_RULES: Record<string, CaslAuthorityRule[]> = {
+export const INVOICE_RULES: Record<string, AuthorityRuleInterface[]> = {
   // Clerks keep invoices, and see customers without their credit limit.
   'role:clerk': [
     {
@@ -37,7 +38,7 @@ export const INVOICE_RULES: Record<string, CaslAuthorityRule[]> = {
 
 @Injectable()
 export class InvoiceRules implements CaslAuthorityRulesInterface {
-  rulesFor(_ctx: PlainLiteralObject, actor: Actor): CaslAuthorityRule[] {
+  rulesFor(_ctx: PlainLiteralObject, actor: Actor): AuthorityRuleInterface[] {
     return actorKeys(actor).flatMap((key) => INVOICE_RULES[key] ?? []);
   }
 }

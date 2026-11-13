@@ -7,7 +7,6 @@ import {
   type CrudRequestPolicyInterface,
 } from '@concepta/nestjs-crud';
 
-import { PossessionEnum } from '../../domain/enums/possession.enum.js';
 import { AccessRefusedException } from '../../domain/exceptions/access-refused.exception.js';
 import { type AccessDecisionSourceInterface } from '../../domain/interfaces/access-decision-source.interface.js';
 import { type AccessDecisionInterface } from '../../domain/interfaces/access-decision.interface.js';
@@ -20,9 +19,6 @@ import {
 } from '../../domain/utils/access-field-paths.util.js';
 import { canReadAccessField } from '../../domain/utils/can-read-access-field.util.js';
 import { AccessCtxDecisionSource } from '../access-ctx-decision.source.js';
-
-const READ_ANY = `read:${PossessionEnum.ANY}`;
-const READ_OWN = `read:${PossessionEnum.OWN}`;
 
 /**
  * Checks a CRUD request against the grant its route let the call in on,
@@ -97,7 +93,7 @@ function refused(
   field?: string,
 ): AccessRefusedException {
   return new AccessRefusedException({
-    action: `${query.action}:${query.possession}`,
+    action: query.action,
     subject: query.resource,
     actor: query.actor,
     reason: 'field',
@@ -117,10 +113,9 @@ function canQueryField(
   const field = normalizeAccessFieldPath(path);
   if (!canReadAccessField(ability, query, field)) return false;
 
-  const read = ability.can(READ_ANY, query.resource) ? READ_ANY : READ_OWN;
   // `possibleRulesFor`, not `rulesFor`: the latter leaves out field denies.
   return !ability
-    .possibleRulesFor(read, query.resource)
+    .possibleRulesFor('read', query.resource)
     .some(
       (rule) =>
         rule.inverted &&
@@ -135,10 +130,7 @@ function canQueryField(
  */
 function assertReplaceable(decision: AccessDecisionInterface): void {
   const { query, ability } = decision;
-  const rules = ability.possibleRulesFor(
-    `${query.action}:${query.possession}`,
-    query.resource,
-  );
+  const rules = ability.possibleRulesFor(query.action, query.resource);
 
   const denied = rules
     .filter((rule) => rule.inverted)

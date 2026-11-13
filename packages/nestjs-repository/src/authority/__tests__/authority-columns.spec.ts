@@ -290,6 +290,64 @@ describe('authority over columns', () => {
       expect(orders.stored).toEqual([ORDER]);
     });
 
+    it.each<{
+      name: string;
+      write: (
+        orders: MemoryRepositoryFixture<OrderFixture>,
+        ctx: AppContextHost,
+      ) => Promise<unknown>;
+      actions: string[];
+    }>([
+      {
+        name: 'an update',
+        actions: ['update'],
+        write: (orders, ctx) =>
+          orders.update(ORDER, { dateDeleted: new Date() }, { ctx }),
+      },
+      {
+        name: 'an upsert',
+        actions: ['create', 'update'],
+        write: (orders, ctx) =>
+          orders.upsert({ ...ORDER, dateDeleted: new Date() }, { ctx }),
+      },
+      {
+        name: 'a create',
+        actions: ['create'],
+        write: (orders, ctx) =>
+          orders.create(
+            { id: 'order-2', tenantId: 'acme', dateDeleted: new Date() },
+            { ctx },
+          ),
+      },
+    ])(
+      'should refuse $name soft deleting a row the actor may not soft delete',
+      async ({ write, actions }) => {
+        const orders = await ordersWith(
+          allow('role:clerk', ORDER_TOKEN, actions),
+        );
+
+        const error = await refusal(write(orders, ctxOf(CLERK)));
+
+        expect(error).toMatchObject({ context: { action: 'softDelete' } });
+        expect(orders.stored).toEqual([ORDER]);
+      },
+    );
+
+    it('should let an actor who may soft delete write the delete date', async () => {
+      const orders = await ordersWith(
+        allow('role:clerk', ORDER_TOKEN, ['update', 'softDelete']),
+      );
+      const deleted = new Date();
+
+      await orders.update(
+        ORDER,
+        { dateDeleted: deleted },
+        { ctx: ctxOf(CLERK) },
+      );
+
+      expect(orders.stored).toEqual([{ ...ORDER, dateDeleted: deleted }]);
+    });
+
     it('should update the writable columns', async () => {
       const orders = await ordersWith({
         ...only('role:clerk', 'update', ['description']),

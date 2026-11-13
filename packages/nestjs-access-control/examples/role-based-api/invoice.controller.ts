@@ -60,7 +60,7 @@ export class InvoiceController {
     @Body() changes: Partial<InvoiceInterface>,
   ): Promise<InvoiceInterface> {
     // The route guard checked the resource; a write also checks each field
-    // it touches, under the grant the guard let the caller in on.
+    // it touches, against the caller's rules for the route's action.
     await this.accessControl.assertFields(ctx, accessFieldPaths(changes));
 
     return this.invoices.update(id, changes);

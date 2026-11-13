@@ -8,6 +8,9 @@ export interface AccessRefusedDetailsInterface {
   reason: AccessRefusalReason;
   actor?: Actor;
   field?: string;
-  /** The decision still pending, when the authority refused for one. */
+  /**
+   * The decision still pending, when the refusal is one: the authority
+   * refused for one, or every deny that refused carries a `reason`.
+   */
   gate?: string;
 }

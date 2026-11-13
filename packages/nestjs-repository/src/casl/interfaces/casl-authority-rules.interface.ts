@@ -1,8 +1,6 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor } from '@concepta/nestjs-core';
-
-import { type CaslAuthorityRule } from './casl-authority-rule.type.js';
+import { type Actor, type AuthorityRuleInterface } from '@concepta/nestjs-core';
 
 /**
  * Where an application keeps its rules: in settings, a table, or another
@@ -13,5 +11,7 @@ export interface CaslAuthorityRulesInterface {
   rulesFor(
     ctx: PlainLiteralObject,
     actor: Actor,
-  ): readonly CaslAuthorityRule[] | Promise<readonly CaslAuthorityRule[]>;
+  ):
+    | readonly AuthorityRuleInterface<string>[]
+    | Promise<readonly AuthorityRuleInterface<string>[]>;
 }

@@ -8,28 +8,28 @@ import {
   type AuthorityDecision,
   type AuthorityInterface,
   type AuthorityRequestInterface,
+  authorityRuleProblems,
 } from '@concepta/nestjs-core';
 
-import { type CaslAuthorityRule } from './interfaces/casl-authority-rule.type.js';
+import { CaslAuthorityRulesInvalidException } from './exceptions/casl-authority-rules-invalid.exception.js';
 import { type CaslAuthorityRulesInterface } from './interfaces/casl-authority-rules.interface.js';
 
 type CaslAuthorityAbility = Ability<[string, string]>;
 
 /**
- * An authority answering from CASL rules, which `rules` supplies for each
- * actor.
+ * An authority answering from rules (`AuthorityRuleInterface`), which
+ * `rules` supplies for each actor, decided by CASL.
  *
  * - A deny always wins, whatever order the rules come in.
  * - A rule naming `fields` covers those columns only, by exact name; one
  *   naming none covers every column.
- * - A rule with `conditions` is refused: which rows a caller reaches is row
- *   scope's to decide.
+ * - Rules are checked before use (`authorityRuleProblems`): one with
+ *   `conditions`, an unknown property, or CASL's wildcards `manage` and
+ *   `all` refuses the call, as does every other call on the same ctx.
  * - A deny's `reason` is reported as the decision still pending (`gate`)
  *   when the deny refuses the object outright and every other deny that
  *   applies has one too. A deny naming `fields` narrows the columns instead,
  *   and its `reason` is not reported.
- * - CASL's `manage` (every action) and `all` (every object) apply, so no
- *   entity should be keyed `all`.
  */
 export class CaslAuthority implements AuthorityInterface {
   /**
@@ -116,10 +116,11 @@ export class CaslAuthority implements AuthorityInterface {
     ctx: PlainLiteralObject,
     actor: Actor,
   ): Promise<CaslAuthorityAbility> {
-    const rules: readonly CaslAuthorityRule[] = await this.rules.rulesFor(
-      ctx,
-      actor,
-    );
+    const rules = await this.rules.rulesFor(ctx, actor);
+    const problems = authorityRuleProblems(rules, 'rules');
+    if (problems.length > 0) {
+      throw new CaslAuthorityRulesInvalidException(problems);
+    }
 
     // CASL lets the last matching rule decide, so every deny goes last.
     return new Ability<[string, string]>(

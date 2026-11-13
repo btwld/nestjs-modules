@@ -8,7 +8,9 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
+  type AuthorityDecision,
   type AuthorityInterface,
+  type AuthorityRequestInterface,
   CoreModule,
   RuntimeException,
 } from '@concepta/nestjs-core';
@@ -34,7 +36,7 @@ import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-to
 import { AuthorityBootException } from '../exceptions/authority-boot.exception.js';
 import { AuthorityRefusedException } from '../exceptions/authority-refused.exception.js';
 
-const ALL = ['create', 'read', 'update', 'delete'];
+const ALL = ['create', 'read', 'update', 'delete', 'softDelete', 'restore'];
 
 const ADMIN = actorCtx({ kind: 'role', roles: ['admin'] });
 const CLERK = actorCtx({ kind: 'role', roles: ['clerk'] });
@@ -157,12 +159,12 @@ const OPERATIONS: {
   },
   {
     name: 'softDelete',
-    actions: ['delete'],
+    actions: ['softDelete'],
     run: (o, ctx) => o.softDelete(ORDER, { ctx }),
   },
   {
     name: 'restore',
-    actions: ['update'],
+    actions: ['restore'],
     run: (o, ctx) => o.restore(ORDER, { ctx }),
   },
 ];
@@ -302,6 +304,61 @@ describe('authority binding', () => {
       );
 
       await expect(orders.find({ ctx: CLERK })).resolves.toEqual([]);
+    });
+
+    it('should accept an authority typed to its entity’s columns', async () => {
+      @Injectable()
+      class OrderColumnsAuthority implements AuthorityInterface<
+        keyof OrderFixture & string
+      > {
+        decide(
+          _ctx: PlainLiteralObject,
+          { columns }: AuthorityRequestInterface<keyof OrderFixture & string>,
+        ): AuthorityDecision<keyof OrderFixture & string> {
+          return {
+            effect: 'allow',
+            columns: columns.filter((column) => column !== 'tenantId'),
+          };
+        }
+      }
+      @Module({
+        providers: [OrderColumnsAuthority],
+        exports: [OrderColumnsAuthority],
+      })
+      class OrderColumnsModule {}
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          CoreModule.forRoot({}),
+          RepositoryModule.forRoot({
+            imports: [OrderColumnsModule],
+            drivers: [
+              {
+                driver: MemoryRepositoryModuleFixture,
+                entities: [
+                  {
+                    ...GOVERNED,
+                    authority: {
+                      access: 'governed',
+                      authority: OrderColumnsAuthority,
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      }).compile();
+      const orders = moduleRef.get<MemoryRepositoryFixture<OrderFixture>>(
+        getDynamicRepositoryToken(ORDER_TOKEN),
+      );
+      await orders.create(
+        { id: ORDER.id, description: ORDER.description },
+        { ctx: CLERK },
+      );
+
+      await expect(orders.find({ ctx: CLERK })).resolves.toEqual([
+        { id: ORDER.id, description: ORDER.description, dateDeleted: null },
+      ]);
     });
   });
 

@@ -5,16 +5,14 @@ import {
   ActorCtx,
   actorKeys,
   AppContextHost,
+  type AuthorityRuleInterface,
 } from '@concepta/nestjs-core';
 import {
   InjectDynamicRepository,
   type RepositoryInterface,
   Where,
 } from '@concepta/nestjs-repository';
-import {
-  type CaslAuthorityRule,
-  type CaslAuthorityRulesInterface,
-} from '@concepta/nestjs-repository/optional/casl';
+import { type CaslAuthorityRulesInterface } from '@concepta/nestjs-repository/optional/casl';
 
 import { type StoredRuleEntity } from './stored-rule.entity.js';
 
@@ -25,7 +23,7 @@ export const RULES = 'rules';
  * Rules that cannot live in the table they govern: who may edit the rules,
  * and the system that reads them.
  */
-const FIXED_RULES: Record<string, CaslAuthorityRule[]> = {
+const FIXED_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:admin': [{ action: ['create', 'read', 'delete'], subject: RULES }],
   'system:authority': [{ action: 'read', subject: RULES }],
 };
@@ -47,7 +45,7 @@ export class StoredRules implements CaslAuthorityRulesInterface {
   async rulesFor(
     _ctx: PlainLiteralObject,
     actor: Actor,
-  ): Promise<CaslAuthorityRule[]> {
+  ): Promise<AuthorityRuleInterface<string>[]> {
     const keys = actorKeys(actor);
     const fixed = keys.flatMap((key) => FIXED_RULES[key] ?? []);
     if (actor.kind === 'system' && actor.name === 'authority') return fixed;

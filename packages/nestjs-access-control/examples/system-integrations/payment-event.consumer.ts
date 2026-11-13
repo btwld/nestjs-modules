@@ -30,7 +30,7 @@ export class PaymentEventConsumer {
       { immutable: true },
     );
 
-    await this.accessControl.assert(ctx, 'update:any', 'invoice', {
+    await this.accessControl.assert(ctx, 'update', 'invoice', {
       fields: accessFieldPaths(event.changes),
     });
 

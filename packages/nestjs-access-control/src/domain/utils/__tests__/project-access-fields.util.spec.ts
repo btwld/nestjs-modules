@@ -1,4 +1,3 @@
-import { PossessionEnum } from '../../enums/possession.enum.js';
 import { canReadAccessField } from '../can-read-access-field.util.js';
 import { createAccessAbility } from '../create-access-ability.util.js';
 import { projectAccessFields } from '../project-access-fields.util.js';
@@ -183,16 +182,12 @@ describe(projectAccessFields.name, () => {
   // With the filter's own check, where CASL reads an empty path as none.
   it('hides a numeric top-level key from a caller limited to named fields', () => {
     const ability = createAccessAbility([
-      { action: 'read:any', subject: 'user', fields: ['id'] },
+      { action: 'read', subject: 'user', fields: ['id'] },
     ]);
 
     expect(
       projectAccessFields({ id: 1, '0': 'secret' }, (path) =>
-        canReadAccessField(
-          ability,
-          { possession: PossessionEnum.ANY, resource: 'user' },
-          path,
-        ),
+        canReadAccessField(ability, { resource: 'user' }, path),
       ),
     ).toStrictEqual({ id: 1 });
   });

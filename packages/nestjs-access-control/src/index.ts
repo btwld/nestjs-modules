@@ -18,7 +18,6 @@ export { AccessContextOverlay } from './gateways/access-context.overlay.js';
 // Decorators
 export { AccessControlGrant } from './gateways/decorators/access-control-grant.decorator.js';
 export { AccessControlQuery } from './gateways/decorators/access-control-query.decorator.js';
-export { AccessControlOwnInHandler } from './gateways/decorators/access-control-own-in-handler.decorator.js';
 export { AccessControlCreateMany } from './gateways/decorators/access-control-create-many.decorator.js';
 export { AccessControlCreateOne } from './gateways/decorators/access-control-create-one.decorator.js';
 export { AccessControlDeleteOne } from './gateways/decorators/access-control-delete-one.decorator.js';
@@ -30,12 +29,8 @@ export { AccessControlUpdateOne } from './gateways/decorators/access-control-upd
 
 // Domain
 export { AccessControlContext } from './domain/access-control.context.js';
-export { PossessionEnum } from './domain/enums/possession.enum.js';
 export { CanAccess } from './domain/interfaces/can-access.interface.js';
-export {
-  accessGrantsProblems,
-  accessRuleProblems,
-} from './domain/utils/access-rule-problems.util.js';
+export { accessGrantsProblems } from './domain/utils/access-rule-problems.util.js';
 export { createAccessAbility } from './domain/utils/create-access-ability.util.js';
 export { AccessControlService } from './domain/services/access-control.service.js';
 export { AccessControlException } from './domain/exceptions/access-control.exception.js';
@@ -63,7 +58,6 @@ export {
 export { AccessRefusedDetailsInterface } from './domain/interfaces/access-refused-details.interface.js';
 export { AccessResolutionInterface } from './domain/interfaces/access-resolution.interface.js';
 export { AccessAuthorization } from './domain/interfaces/access-authorization.type.js';
-export { AccessRuleInterface } from './domain/interfaces/access-rule.interface.js';
 
 // Infrastructure
 export { StaticAccessGrantsProvider } from './infrastructure/grants/static-access-grants.provider.js';

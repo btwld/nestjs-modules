@@ -13,27 +13,31 @@ import { DocumentController } from './document.controller.js';
 import { DocumentStore } from './document.store.js';
 import { OwnDocumentQuery } from './own-document.query.js';
 
+// Grants give verbs; on whose documents a role holds each one is
+// `EVERYONES_DOCUMENTS`, checked by `OwnDocumentQuery`.
 const grants: AccessGrants = {
-  // Members read and edit their own documents, but cannot give one away.
+  // Members read and edit (their own) documents, but cannot give one away.
   'role:member': [
-    { action: ['read:own', 'update:own'], subject: 'document' },
+    { action: ['read', 'update'], subject: 'document' },
     {
-      action: 'update:own',
+      action: 'update',
       subject: 'document',
       fields: ['ownerId'],
       inverted: true,
     },
   ],
   // Managers read everyone's, and change none.
-  'role:manager': [{ action: 'read:any', subject: 'document' }],
+  'role:manager': [{ action: 'read', subject: 'document' }],
   // Admins read and edit everyone's, owner included.
-  'role:admin': [{ action: ['read:any', 'update:any'], subject: 'document' }],
+  'role:admin': [{ action: ['read', 'update'], subject: 'document' }],
 };
 
 const userRoles: Record<string, string[]> = {
   maya: ['member'],
   max: ['member'],
   mia: ['manager'],
+  // A member who also manages: reads everyone's, edits only her own.
+  mel: ['member', 'manager'],
   ola: ['admin'],
 };
 

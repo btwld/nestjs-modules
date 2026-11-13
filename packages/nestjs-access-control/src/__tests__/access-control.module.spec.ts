@@ -19,7 +19,7 @@ import { type AccessControlSettingsInterface } from '../infrastructure/config/in
 
 describe('AccessControlModule', () => {
   const grants: AccessGrants = {
-    'role:clerk': [{ action: 'read:any', subject: 'user' }],
+    'role:clerk': [{ action: 'read', subject: 'user' }],
   };
 
   let settings: AccessControlSettingsInterface;
@@ -113,7 +113,7 @@ describe('AccessControlModule', () => {
 
   describe(AccessControlModule.forFeature, () => {
     const featureGrants: AccessGrants = {
-      'system:agile': [{ action: 'approve:any', subject: 'contract' }],
+      'system:agile': [{ action: 'approve', subject: 'contract' }],
     };
     const actorResolver: AccessActorResolverInterface = {
       actorFor: async () => ({ kind: 'system', name: 'agile' }),
@@ -148,7 +148,7 @@ describe('AccessControlModule', () => {
     });
 
     it('uses the feature actor resolver and grants', async () => {
-      expect(await service.can({}, 'approve:any', 'contract')).toEqual(true);
+      expect(await service.can({}, 'approve', 'contract')).toEqual(true);
     });
   });
 
@@ -288,7 +288,7 @@ describe('AccessControlModule', () => {
         imports: [
           AccessControlModule.register({
             settings: {
-              grants: { clerk: [{ action: 'read:any', subject: 'user' }] },
+              grants: { clerk: [{ action: 'read', subject: 'user' }] },
             },
           }),
         ],

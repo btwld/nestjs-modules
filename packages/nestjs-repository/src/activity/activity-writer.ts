@@ -67,7 +67,10 @@ export class ActivityWriter {
     });
 
     try {
-      await this.binding.store.createMany(records, internalCall({ ctx }));
+      await this.binding.store.createMany(
+        records,
+        internalCall({ ctx }, this.binding.store),
+      );
     } catch (error) {
       // A store refusal keeps its status and fault, so a scope the caller
       // lacks reads as the refusal it is, not as a server failure.

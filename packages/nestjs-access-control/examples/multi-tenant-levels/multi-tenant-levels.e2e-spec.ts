@@ -3,15 +3,13 @@ import supertest from 'supertest';
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
-import {
-  accessGrantsProblems,
-  accessRuleProblems,
-} from '@concepta/nestjs-access-control';
+import { accessGrantsProblems } from '@concepta/nestjs-access-control';
+import { type Actor, authorityRuleProblems } from '@concepta/nestjs-core';
 
 import { bearer, refused } from '../shared/demo-e2e.util.js';
 
 import { ACCESS_LEVELS } from './access-level.type.js';
-import { levelGrants, levelRules } from './level-rules.util.js';
+import { levelGrants, levelRules, ownRecordsOnly } from './level-rules.util.js';
 import { MultiTenantLevelsModule } from './multi-tenant-levels.module.js';
 import { ROLE_LEVELS } from './tenant-directory.js';
 
@@ -39,27 +37,31 @@ describe('Example: multi-tenant access levels', () => {
     it('stand for rules', () => {
       expect(levelRules('project', 'none')).toEqual([]);
       expect(levelRules('project', 'edit-own')).toEqual([
-        {
-          action: ['read:any', 'create:own', 'update:own'],
-          subject: 'project',
-        },
+        { action: ['read', 'create', 'update'], subject: 'project' },
       ]);
       expect(levelRules('project', 'full')).toEqual([
-        {
-          action: ['read:any', 'create:any', 'update:any', 'delete:any'],
-          subject: 'project',
-        },
+        { action: ['read', 'create', 'update', 'delete'], subject: 'project' },
       ]);
     });
 
     it.each(ACCESS_LEVELS)(
       '%s stands for rules the module accepts',
       (level) => {
-        expect(accessRuleProblems(levelRules('project', level), level)).toEqual(
-          [],
-        );
+        expect(
+          authorityRuleProblems(levelRules('project', level), level),
+        ).toEqual([]);
       },
     );
+
+    it('limit edit-own to the caller’s own records for edits, not reads', () => {
+      const member: Actor = { kind: 'role', roles: ['member'] };
+
+      expect(
+        ['read', 'create', 'update'].map((action) =>
+          ownRecordsOnly(ROLE_LEVELS, member, 'project', action),
+        ),
+      ).toEqual([false, true, true]);
+    });
 
     it('make grants the module accepts', () => {
       expect(accessGrantsProblems(levelGrants(ROLE_LEVELS))).toEqual([]);
@@ -108,7 +110,7 @@ describe('Example: multi-tenant access levels', () => {
         .delete('/tenants/globex/projects/p-3')
         .set(bearer('alice'))
         .expect(403)
-        .expect(refused('delete:any on project (no-grant)'));
+        .expect(refused('delete on project (no-grant)'));
     });
 
     it('shows a contractor on view-own only their own projects', () =>
@@ -131,7 +133,7 @@ describe('Example: multi-tenant access levels', () => {
         .set(bearer('bob'))
         .send({ name: 'Mine now' })
         .expect(403)
-        .expect(refused('update:own on project (access-query)'));
+        .expect(refused('update on project (access-query)'));
     });
 
     it('makes a member the owner of what they create', async () => {
@@ -154,7 +156,7 @@ describe('Example: multi-tenant access levels', () => {
         .get('/tenants/acme/budget')
         .set(bearer('bob'))
         .expect(403)
-        .expect(refused('read:any on budget (no-grant)'));
+        .expect(refused('read on budget (no-grant)'));
 
       await api
         .get('/tenants/acme/budget')
@@ -168,6 +170,6 @@ describe('Example: multi-tenant access levels', () => {
         .get('/tenants/globex/projects')
         .set(bearer('bob'))
         .expect(403)
-        .expect(refused('read:any on project (no-grant)')));
+        .expect(refused('read on project (no-grant)')));
   });
 });

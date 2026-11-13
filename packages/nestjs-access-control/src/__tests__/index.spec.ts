@@ -11,9 +11,7 @@ import {
   AccessControlGuard,
   AccessControlModule,
   accessGrantsProblems,
-  accessRuleProblems,
   createAccessAbility,
-  AccessControlOwnInHandler,
   AccessControlQuery,
   AccessControlReadMany,
   AccessControlReadOne,
@@ -28,7 +26,6 @@ import {
   accessFieldPaths,
   AccessContextOverlay,
   normalizeAccessFieldPath,
-  PossessionEnum,
   StaticAccessGrantsProvider,
 } from '../index.js';
 
@@ -39,7 +36,6 @@ describe('Index', () => {
     expect(AccessControlFilter).toEqual(expect.any(Function));
     expect(AccessControlContext).toEqual(expect.any(Function));
     expect(AccessControlService).toEqual(expect.any(Function));
-    expect(accessRuleProblems).toEqual(expect.any(Function));
     expect(accessGrantsProblems).toEqual(expect.any(Function));
     expect(createAccessAbility).toEqual(expect.any(Function));
     expect(ActorCtxResolver).toEqual(expect.any(Function));
@@ -63,7 +59,6 @@ describe('Index', () => {
       'denied',
       'field',
       'access-query',
-      'own-unchecked',
       'authority',
     ]);
   });
@@ -75,7 +70,6 @@ describe('Index', () => {
   it('exports all grant decorators', () => {
     expect(AccessControlGrant).toEqual(expect.any(Function));
     expect(AccessControlQuery).toEqual(expect.any(Function));
-    expect(AccessControlOwnInHandler).toEqual(expect.any(Function));
     expect(AccessControlCreateMany).toEqual(expect.any(Function));
     expect(AccessControlCreateOne).toEqual(expect.any(Function));
     expect(AccessControlDeleteOne).toEqual(expect.any(Function));
@@ -84,9 +78,5 @@ describe('Index', () => {
     expect(AccessControlUpdateOne).toEqual(expect.any(Function));
     expect(AccessControlRecoverOne).toEqual(expect.any(Function));
     expect(AccessControlReplaceOne).toEqual(expect.any(Function));
-  });
-
-  it('exports the possession enum', () => {
-    expect(PossessionEnum).toEqual(expect.any(Object));
   });
 });

@@ -5,9 +5,9 @@ import {
 } from '@nestjs/common';
 
 import {
-  type AccessRuleInterface,
-  accessRuleProblems,
-} from '@concepta/nestjs-access-control';
+  type AuthorityRuleInterface,
+  authorityRuleProblems,
+} from '@concepta/nestjs-core';
 
 const RULES_SUBJECT = 'user-rules';
 
@@ -18,33 +18,37 @@ const RULES_SUBJECT = 'user-rules';
  */
 @Injectable()
 export class PermissionStore {
-  private readonly roleRules: Record<string, AccessRuleInterface[]> = {
-    analyst: [
-      { action: 'read:any', subject: 'report' },
-      {
-        action: 'read:any',
-        subject: 'report',
-        fields: ['payroll'],
-        inverted: true,
-        reason: 'payroll is for HR',
-      },
-    ],
-    admin: [
-      { action: 'read:any', subject: 'report' },
-      { action: ['read:any', 'update:any'], subject: RULES_SUBJECT },
-    ],
-  };
+  private readonly roleRules: Record<string, AuthorityRuleInterface<string>[]> =
+    {
+      analyst: [
+        { action: 'read', subject: 'report' },
+        {
+          action: 'read',
+          subject: 'report',
+          fields: ['payroll'],
+          inverted: true,
+          reason: 'payroll is for HR',
+        },
+      ],
+      admin: [
+        { action: 'read', subject: 'report' },
+        { action: ['read', 'update'], subject: RULES_SUBJECT },
+      ],
+    };
 
-  private userRules = new Map<string, AccessRuleInterface[]>();
+  private userRules = new Map<string, AuthorityRuleInterface<string>[]>();
 
-  rulesFor(roles: readonly string[], userId?: string): AccessRuleInterface[] {
+  rulesFor(
+    roles: readonly string[],
+    userId?: string,
+  ): AuthorityRuleInterface<string>[] {
     return [
       ...roles.flatMap((role) => this.roleRules[role] ?? []),
       ...((userId && this.userRules.get(userId)) || []),
     ];
   }
 
-  userRulesOf(userId: string): AccessRuleInterface[] {
+  userRulesOf(userId: string): AuthorityRuleInterface<string>[] {
     return this.userRules.get(userId) ?? [];
   }
 
@@ -60,13 +64,13 @@ export class PermissionStore {
   setUserRules(
     editorId: string,
     userId: string,
-    rules: AccessRuleInterface[],
+    rules: AuthorityRuleInterface<string>[],
   ): void {
     if (editorId === userId) {
       throw new ForbiddenException('Nobody edits their own rules');
     }
 
-    const problems = accessRuleProblems(rules, `user ${userId}`);
+    const problems = authorityRuleProblems(rules, `user ${userId}`);
 
     if (problems.length) {
       throw new BadRequestException(problems);

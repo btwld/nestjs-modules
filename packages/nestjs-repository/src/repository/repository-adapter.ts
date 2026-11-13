@@ -26,9 +26,13 @@ import {
   isAuthorityGoverned,
 } from '../authority/interfaces/authority-registration.interface.js';
 import { type AuthorizedCallInterface } from '../authority/interfaces/authorized-call.interface.js';
-import { isInternalCall, linkedColumns } from '../authority/internal-call.js';
+import {
+  isInternalCall,
+  linkedCall,
+  linkedColumns,
+} from '../authority/internal-call.js';
 import { type CascadeRelation } from '../cascade/cascade-relation.interface.js';
-import { CascadeWriter } from '../cascade/cascade-writer.js';
+import { type CascadeSync, CascadeWriter } from '../cascade/cascade-writer.js';
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { EntityNotFoundException } from '../exceptions/entity-not-found.exception.js';
@@ -216,13 +220,6 @@ export abstract class RepositoryAdapter<
    * `scopeColumns` — checked per entity, since one resolver may serve many.
    */
   setRowScopeResolver(rowScope: RowScopeInterface): void {
-    const binding = this._binding;
-    if (!isRowScopeScoped(binding?.rowScope)) {
-      throw new RowScopeBootException([
-        `"${this.entityKey}" is not bound as scoped, so it takes no row ` +
-          'scope resolver.',
-      ]);
-    }
     if (this._rowScope) {
       throw new RowScopeBootException([
         `"${this.entityKey}" already has a row scope resolver bound. ` +
@@ -230,7 +227,7 @@ export abstract class RepositoryAdapter<
       ]);
     }
 
-    const resolver = binding.rowScope.resolver.name;
+    const resolver = rowScope.constructor.name;
     const columns = new Set(this.metadata.columns.map(({ name }) => name));
     const failures = [
       ...(this.metadata.columns.some(({ isPrimary }) => isPrimary)
@@ -265,12 +262,6 @@ export abstract class RepositoryAdapter<
    * operation rather than run undecided. Attaches once.
    */
   setAuthority(authority: AuthorityInterface): void {
-    if (!isAuthorityGoverned(this._binding?.authority)) {
-      throw new AuthorityBootException([
-        `"${this.entityKey}" is not bound as governed, so it takes no ` +
-          'authority.',
-      ]);
-    }
     if (this._authority) {
       throw new AuthorityBootException([
         `"${this.entityKey}" already has an authority attached. ` +
@@ -368,6 +359,77 @@ export abstract class RepositoryAdapter<
   ): Promise<AuthorizedCallInterface | undefined> {
     this.requireBinding();
     return this.authorize(actions, { ctx });
+  }
+
+  /**
+   * Decide a cascade's write of `values` to this entity's rows, before the
+   * row they belong to is written: `actions` as `authorizeReach` does; the
+   * own columns each value names, against what create allows, and update
+   * too when the value may name a stored row; on `replace`, every column but
+   * the primary key against update for such a value, since a replaced row is
+   * written whole; and in turn each value's own cascade relations.
+   *
+   * With `byKey`, a value names a stored row only by its primary key, so one
+   * without it can only be created; otherwise any value may name one.
+   * `linked` is the foreign key the cascade sets, which is not counted.
+   * Hooks have not run on `values` yet, so anything but own columns is left
+   * to the write, and each row is checked again when it is written.
+   */
+  async authorizeCascade(
+    actions: ActionEnum[],
+    values: readonly DeepPartial<Entity>[],
+    mode: 'create' | CascadeSync,
+    ctx: PlainLiteralObject | undefined,
+    linked: readonly string[],
+    byKey: boolean,
+  ): Promise<void> {
+    this.requireBinding();
+    const call = await this.authorize(
+      actions,
+      linkedCall({ ctx }, this, linked),
+    );
+    const only = (kept: ActionEnum[]) =>
+      call && {
+        ...call,
+        actions: new Map(
+          [...call.actions].filter(([action]) => kept.includes(action)),
+        ),
+      };
+
+    const columns = new Set(this.metadata.columns.map(({ name }) => name));
+    const primaryColumn = this.getPrimaryColumn();
+    for (const value of values) {
+      const { own, children } = this.cascade.peel(value);
+      const named: PlainLiteralObject = Object.fromEntries(
+        Object.entries(own).filter(
+          ([key, column]) => columns.has(key) && column !== undefined,
+        ),
+      );
+      const mayBeStored =
+        !byKey ||
+        primaryColumn === undefined ||
+        named[primaryColumn] !== undefined;
+
+      await this.authorizeDeleteDate(
+        call,
+        [named],
+        linkedCall({ ctx }, this, linked),
+      );
+
+      if (!mayBeStored) {
+        this.assertWritable(only([ActionEnum.CREATE]), [named]);
+        await this.cascade.authorize(children, 'create', ctx);
+        continue;
+      }
+
+      this.assertWritable(only([ActionEnum.CREATE, ActionEnum.UPDATE]), [
+        named,
+      ]);
+      if (mode === 'replace') {
+        this.assertReplaceable(only([ActionEnum.UPDATE]));
+      }
+      await this.cascade.authorize(children, mode, ctx);
+    }
   }
 
   /**
@@ -533,7 +595,7 @@ export abstract class RepositoryAdapter<
     options: PlainLiteralObject | undefined,
   ): Promise<AuthorizedCallInterface | undefined> {
     const authority = this.requireAuthority();
-    if (!authority || isInternalCall(options)) return undefined;
+    if (!authority || isInternalCall(options, this)) return undefined;
 
     const ctx: PlainLiteralObject | undefined = options?.ctx;
     const actor = this.resolveActor(ctx);
@@ -561,7 +623,7 @@ export abstract class RepositoryAdapter<
       allowed.set(action, decision.columns && new Set(decision.columns));
     }
 
-    const linked = new Set(linkedColumns(options));
+    const linked = new Set(linkedColumns(options, this));
     if (allowed.has(ActionEnum.READ)) {
       return {
         actions: allowed,
@@ -748,6 +810,24 @@ export abstract class RepositoryAdapter<
           columns: refused,
         });
       }
+    }
+  }
+
+  /**
+   * Refuse `values` setting the delete date unless the actor may also soft
+   * delete: a write that sets it soft deletes the row, whatever the write is
+   * called. Decided as the call's own actions are, from `options`.
+   */
+  private async authorizeDeleteDate(
+    call: AuthorizedCallInterface | undefined,
+    values: PlainLiteralObject[],
+    options: PlainLiteralObject | undefined,
+  ): Promise<void> {
+    const column = this.getDeleteDateColumn();
+    if (!call || column === undefined) return;
+
+    if (values.some((value) => value[column] != null)) {
+      await this.authorize([ActionEnum.SOFT_DELETE], options);
     }
   }
 
@@ -1642,6 +1722,7 @@ export abstract class RepositoryAdapter<
         const { own, children } = this.cascade.peel(scoped);
         const values = this.toOwnColumns(own);
         this.assertWritable(call, [values]);
+        await this.authorizeDeleteDate(call, [values], options);
         await this.cascade.authorize(children, 'create', options?.ctx);
         const value = this.toOwnColumns(
           await this.applyWriteScope(
@@ -1678,6 +1759,7 @@ export abstract class RepositoryAdapter<
         const peeled = scoped.map((entity) => this.cascade.peel(entity));
         const owned = peeled.map(({ own }) => this.toOwnColumns(own));
         this.assertWritable(call, owned);
+        await this.authorizeDeleteDate(call, owned, options);
         for (const { children } of peeled) {
           await this.cascade.authorize(children, 'create', options?.ctx);
         }
@@ -1740,6 +1822,7 @@ export abstract class RepositoryAdapter<
         const values = this.toOwnColumns(own);
         this.assertKeyUnchanged(stored, values);
         this.assertWritable(call, [values]);
+        await this.authorizeDeleteDate(call, [values], options);
         await this.cascade.authorize(children, 'merge', options?.ctx);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
@@ -1790,6 +1873,7 @@ export abstract class RepositoryAdapter<
         const { own, children } = this.cascade.peel(scoped);
         const reduced = this.toOwnColumns(own);
         this.assertWritable(call, [reduced]);
+        await this.authorizeDeleteDate(call, [reduced], options);
         await this.cascade.authorize(children, 'replace', options?.ctx);
         // After hooks, so the row found is the row the payload now names.
         const stored = await this.findByKey(reduced, options?.ctx);
@@ -1842,6 +1926,7 @@ export abstract class RepositoryAdapter<
         const { own, children } = this.cascade.peel(scoped);
         const values = this.toOwnColumns(own);
         this.assertKeyUnchanged(stored, values);
+        await this.authorizeDeleteDate(call, [values], options);
         await this.cascade.authorize(children, 'replace', options?.ctx);
         const written = this.toOwnColumns(
           await this.applyWriteScope(
@@ -1961,8 +2046,8 @@ export abstract class RepositoryAdapter<
     this.assertAppendable('softDelete');
     const deleteDateColumn = this.requireDeleteDateColumn('softDelete');
     // Ahead of the no-op for a row already deleted, so that answer is given
-    // only to a caller allowed to delete.
-    const call = await this.authorize([ActionEnum.DELETE], options);
+    // only to a caller allowed to soft delete.
+    const call = await this.authorize([ActionEnum.SOFT_DELETE], options);
     // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
     // below, so a stale precondition against a row someone else already
     // deleted conflicts instead of quietly succeeding.
@@ -2023,7 +2108,7 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('restore');
     this.requireDeleteDateColumn('restore');
-    const call = await this.authorize([ActionEnum.UPDATE], options);
+    const call = await this.authorize([ActionEnum.RESTORE], options);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,

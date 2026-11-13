@@ -5,15 +5,12 @@ import { type AccessGrants } from '@concepta/nestjs-access-control';
  */
 export const invoiceGrants: AccessGrants = {
   'role:admin': [
-    {
-      action: ['create:any', 'read:any', 'update:any', 'delete:any'],
-      subject: 'invoice',
-    },
+    { action: ['create', 'read', 'update', 'delete'], subject: 'invoice' },
   ],
   'role:accountant': [
-    { action: ['create:any', 'read:any', 'update:any'], subject: 'invoice' },
+    { action: ['create', 'read', 'update'], subject: 'invoice' },
     {
-      action: 'update:any',
+      action: 'update',
       subject: 'invoice',
       fields: ['amount'],
       inverted: true,
@@ -21,9 +18,9 @@ export const invoiceGrants: AccessGrants = {
     },
   ],
   'role:viewer': [
-    { action: 'read:any', subject: 'invoice' },
+    { action: 'read', subject: 'invoice' },
     {
-      action: 'read:any',
+      action: 'read',
       subject: 'invoice',
       fields: ['internalNotes'],
       inverted: true,

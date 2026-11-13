@@ -5,7 +5,6 @@ import { type ExecutionContext } from '@nestjs/common';
 import { AppContextHost } from '@concepta/nestjs-core';
 
 import { AccessControlContext } from '../access-control.context.js';
-import { PossessionEnum } from '../enums/possession.enum.js';
 import { type AccessQueryInterface } from '../interfaces/access-query.interface.js';
 import { createAccessAbility } from '../utils/create-access-ability.util.js';
 
@@ -14,12 +13,11 @@ describe(AccessControlContext.name, () => {
     const ctx = new AppContextHost();
     const executionContext = mock<ExecutionContext>();
     const ability = createAccessAbility([
-      { action: 'read:own', subject: 'invoice' },
+      { action: 'read', subject: 'invoice' },
     ]);
     const query: AccessQueryInterface = {
       actor: { kind: 'role', roles: ['clerk'], userId: 'u1' },
       action: 'read',
-      possession: PossessionEnum.OWN,
       resource: 'invoice',
     };
 
@@ -47,7 +45,6 @@ describe(AccessControlContext.name, () => {
       query: {
         actor: { kind: 'system', name: 'agile' },
         action: 'read',
-        possession: PossessionEnum.ANY,
         resource: 'invoice',
       },
       ability: createAccessAbility([]),

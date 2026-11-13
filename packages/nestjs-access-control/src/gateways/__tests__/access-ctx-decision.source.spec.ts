@@ -1,6 +1,5 @@
 import { AppContextHost } from '@concepta/nestjs-core';
 
-import { PossessionEnum } from '../../domain/enums/possession.enum.js';
 import { type AccessDecisionInterface } from '../../domain/interfaces/access-decision.interface.js';
 import { createAccessAbility } from '../../domain/utils/create-access-ability.util.js';
 import { AccessCtxDecisionSource } from '../access-ctx-decision.source.js';
@@ -12,7 +11,6 @@ describe(AccessCtxDecisionSource.name, () => {
       query: {
         actor: { kind: 'role', roles: ['clerk'] },
         action: 'update',
-        possession: PossessionEnum.OWN,
         resource: 'document',
       },
       ability: createAccessAbility([]),

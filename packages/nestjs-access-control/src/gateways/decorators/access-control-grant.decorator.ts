@@ -7,7 +7,7 @@ import { AccessControlGuard } from '../http/access-control.guard.js';
 
 /**
  * The grants a route requires; the first the actor holds lets the call
- * through, checking `any` before `own`. On a controller, every route in it
+ * through. On a controller, every route in it
  * requires them, unless a route declares its own.
  *
  * Applies `AccessControlGuard`, which runs after every global guard and

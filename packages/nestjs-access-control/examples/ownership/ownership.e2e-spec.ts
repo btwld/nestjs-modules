@@ -39,14 +39,14 @@ describe('Example: ownership', () => {
         .get('/documents/doc-2')
         .set(bearer('maya'))
         .expect(403)
-        .expect(refused('read:own on document (access-query)')));
+        .expect(refused('read on document (access-query)')));
 
     it('refuses a member a document that does not exist, like someone else’s', () =>
       api
         .get('/documents/doc-404')
         .set(bearer('maya'))
         .expect(403)
-        .expect(refused('read:own on document (access-query)')));
+        .expect(refused('read on document (access-query)')));
 
     it('lets a manager read anyone’s document', () =>
       api.get('/documents/doc-2').set(bearer('mia')).expect(200).expect(MAXS));
@@ -85,7 +85,7 @@ describe('Example: ownership', () => {
         .set(bearer('maya'))
         .send({ title: 'Mine now' })
         .expect(403)
-        .expect(refused('update:own on document (access-query)'));
+        .expect(refused('update on document (access-query)'));
 
       expect(await documentAsAdmin('doc-1')).toEqual({
         ...MAYAS,
@@ -99,12 +99,12 @@ describe('Example: ownership', () => {
         .set(bearer('maya'))
         .send({ ownerId: 'max' })
         .expect(403)
-        .expect(refused('update:own on document (field)'));
+        .expect(refused('update on document (field)'));
 
       expect(await documentAsAdmin('doc-1')).toEqual(MAYAS);
     });
 
-    it('lets an admin, on update:any, change the owner', async () => {
+    it('lets an admin change the owner', async () => {
       await api
         .patch('/documents/doc-1')
         .set(bearer('ola'))
@@ -117,12 +117,25 @@ describe('Example: ownership', () => {
       });
     });
 
+    it('limits each verb on its own: a member who manages reads anyone’s document, edits only her own', async () => {
+      await api.get('/documents/doc-2').set(bearer('mel')).expect(200, MAXS);
+
+      await api
+        .patch('/documents/doc-2')
+        .set(bearer('mel'))
+        .send({ title: 'Mine now' })
+        .expect(403)
+        .expect(refused('update on document (access-query)'));
+
+      expect(await documentAsAdmin('doc-2')).toEqual(MAXS);
+    });
+
     it('refuses a manager editing, since reading is all they hold', () =>
       api
         .patch('/documents/doc-2')
         .set(bearer('mia'))
         .send({ title: 'Edited' })
         .expect(403)
-        .expect(refused('update:any on document (no-grant)')));
+        .expect(refused('update on document (no-grant)')));
   });
 });

@@ -4,7 +4,7 @@
 export const bearer = (user: string) => ({ Authorization: `Bearer ${user}` });
 
 /**
- * The body of a refused call, such as `refused('read:any on invoice (no-grant)')`.
+ * The body of a refused call, such as `refused('read on invoice (no-grant)')`.
  */
 export const refused = (detail: string) => ({
   statusCode: 403,

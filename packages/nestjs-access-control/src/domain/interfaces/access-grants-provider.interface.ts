@@ -1,8 +1,6 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor } from '@concepta/nestjs-core';
-
-import { type AccessRuleInterface } from './access-rule.interface.js';
+import { type Actor, type AuthorityRuleInterface } from '@concepta/nestjs-core';
 
 /**
  * Supplies an actor's rules for a call. Called on every check, so rules
@@ -13,5 +11,5 @@ export interface AccessGrantsProviderInterface {
   rulesFor(
     ctx: PlainLiteralObject,
     actor: Actor,
-  ): Promise<AccessRuleInterface[]>;
+  ): Promise<AuthorityRuleInterface<string>[]>;
 }

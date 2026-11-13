@@ -1,4 +1,4 @@
-import { Module, type PlainLiteralObject } from '@nestjs/common';
+import { Module, type PlainLiteralObject, type Type } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
@@ -44,6 +44,10 @@ import {
   type EmployeeFixture,
 } from '../../__fixtures__/relation/employee.fixture.js';
 import { RecordingRepositoryFixture } from '../../__fixtures__/relation/recording-repository.fixture.js';
+import {
+  BeforeCreate,
+  RepoHook,
+} from '../../hooks/repository-hook.decorators.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
 import { type RepositoryColumnMetadataInterface } from '../../repository/interfaces/repository-column-metadata.interface.js';
 import { type RepositoryMetadataInterface } from '../../repository/interfaces/repository-metadata.interface.js';
@@ -56,7 +60,7 @@ import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-to
 import { AuthorityBootException } from '../exceptions/authority-boot.exception.js';
 import { AuthorityRefusedException } from '../exceptions/authority-refused.exception.js';
 
-const ALL = ['create', 'read', 'update', 'delete'];
+const ALL = ['create', 'read', 'update', 'delete', 'softDelete', 'restore'];
 const ADMIN: Actor = { kind: 'role', roles: ['admin'] };
 const CLERK: Actor = { kind: 'role', roles: ['clerk'] };
 
@@ -404,21 +408,24 @@ describe('authority over related rows', () => {
       dateDeleted: null,
     };
 
-    async function start(table: AuthorityTableFixture) {
+    async function start(table: AuthorityTableFixture, lineHooks: Type[] = []) {
       const authority = new AuthorityFixture({
         ...allow('role:admin', INVOICE_TOKEN, ALL),
         ...allow('role:admin', INVOICE_LINE_TOKEN, ALL),
         ...allow('role:admin', RECEIPT_TOKEN, ALL),
         ...table,
       });
+      const entities = ENTITIES.map((entity) =>
+        entity.key === INVOICE_LINE_TOKEN && lineHooks.length > 0
+          ? { ...entity, hooks: lineHooks }
+          : entity,
+      );
       const moduleRef: TestingModule = await Test.createTestingModule({
         imports: [
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
-            imports: [deciders(authority)],
-            drivers: [
-              { driver: MemoryRepositoryModuleFixture, entities: ENTITIES },
-            ],
+            imports: [deciders(authority, lineHooks)],
+            drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
           }),
         ],
       }).compile();
@@ -532,6 +539,39 @@ describe('authority over related rows', () => {
       expect(receipts.stored).toEqual([]);
     });
 
+    it('should soft delete no related row unless the actor may soft delete it, whatever they may delete', async () => {
+      const { invoices, lines, receipts } = await seeded({
+        ...allow('role:clerk', INVOICE_TOKEN, ['softDelete']),
+        ...allow('role:clerk', INVOICE_LINE_TOKEN, ['softDelete', 'delete']),
+        ...allow('role:clerk', RECEIPT_TOKEN, ['delete']),
+      });
+
+      await expect(
+        invoices.softDelete(INVOICE, { ctx: actorCtx(CLERK) }),
+      ).rejects.toThrow(AuthorityRefusedException);
+      expect(invoices.stored).toEqual([INVOICE]);
+      expect(lines.stored).toEqual([LINE]);
+      expect(receipts.stored).toEqual([RECEIPT]);
+    });
+
+    it('should restore related rows as restores, not updates', async () => {
+      const { invoices, lines, receipts } = await seeded({
+        ...allow('role:clerk', INVOICE_TOKEN, ['restore']),
+        ...allow('role:clerk', INVOICE_LINE_TOKEN, ['restore']),
+        ...allow('role:clerk', RECEIPT_TOKEN, ['restore']),
+      });
+      await invoices.softDelete(INVOICE, { ctx: actorCtx(ADMIN) });
+
+      await invoices.restore(
+        { ...INVOICE, dateDeleted: invoices.stored[0]?.dateDeleted ?? null },
+        { ctx: actorCtx(CLERK) },
+      );
+
+      expect(invoices.stored).toEqual([INVOICE]);
+      expect(lines.stored).toEqual([LINE]);
+      expect(receipts.stored).toEqual([RECEIPT]);
+    });
+
     it('should not decide a related entity with no rows to remove', async () => {
       const { invoices } = await start({
         ...allow('role:admin', INVOICE_TOKEN, ALL),
@@ -565,6 +605,155 @@ describe('authority over related rows', () => {
       expect(invoices.stored).toEqual([INVOICE, OTHER]);
       expect(lines.stored).toEqual([LINE]);
       expect(receipts.stored).toEqual([{ ...RECEIPT, invoiceId: OTHER.id }]);
+    });
+
+    describe('the columns of related rows', () => {
+      const WITHOUT_SKU: AuthorityDecision = {
+        effect: 'allow',
+        columns: ['tenantId', 'dateDeleted'],
+      };
+
+      it('should create nothing when a related row writes a column the actor may not create', async () => {
+        const { invoices, lines } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['create']),
+          [`role:clerk ${INVOICE_LINE_TOKEN} create`]: WITHOUT_SKU,
+        });
+
+        const error = await invoices
+          .create({ ...INVOICE, lines: [LINE] }, { ctx: actorCtx(CLERK) })
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(AuthorityRefusedException);
+        expect(error).toMatchObject({ context: { columns: ['sku'] } });
+        expect(invoices.stored).toEqual([]);
+        expect(lines.stored).toEqual([]);
+      });
+
+      it('should update nothing when a related row writes a column the actor may not update', async () => {
+        const { invoices, lines } = await seeded({
+          ...allow('role:clerk', INVOICE_TOKEN, ['update']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['create']),
+          [`role:clerk ${INVOICE_LINE_TOKEN} update`]: WITHOUT_SKU,
+        });
+
+        await expect(
+          invoices.update(
+            INVOICE,
+            { number: '2', lines: [{ ...LINE, sku: 'b' }] },
+            { ctx: actorCtx(CLERK) },
+          ),
+        ).rejects.toThrow(AuthorityRefusedException);
+        expect(invoices.stored).toEqual([INVOICE]);
+        expect(lines.stored).toEqual([LINE]);
+      });
+
+      it('should replace nothing when the actor may not replace a related row whole', async () => {
+        const { invoices, lines } = await seeded({
+          ...allow('role:clerk', INVOICE_TOKEN, ['update']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['create', 'delete']),
+          [`role:clerk ${INVOICE_LINE_TOKEN} update`]: WITHOUT_SKU,
+        });
+
+        await expect(
+          invoices.replace(
+            INVOICE,
+            {
+              tenantId: INVOICE.tenantId,
+              number: '2',
+              dateDeleted: null,
+              lines: [{ id: LINE.id, tenantId: LINE.tenantId }],
+            },
+            { ctx: actorCtx(CLERK) },
+          ),
+        ).rejects.toThrow(AuthorityRefusedException);
+        expect(invoices.stored).toEqual([INVOICE]);
+        expect(lines.stored).toEqual([LINE]);
+      });
+
+      it('should hold a new related row a replace creates to what create allows', async () => {
+        const { invoices, lines } = await seeded({
+          ...allow('role:clerk', INVOICE_TOKEN, ['update']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['create', 'delete']),
+          [`role:clerk ${INVOICE_LINE_TOKEN} update`]: WITHOUT_SKU,
+        });
+
+        await invoices.replace(
+          INVOICE,
+          {
+            tenantId: INVOICE.tenantId,
+            number: '2',
+            dateDeleted: null,
+            lines: [{ tenantId: LINE.tenantId, sku: 'b' }],
+          },
+          { ctx: actorCtx(CLERK) },
+        );
+
+        expect(lines.stored.map(({ sku }) => sku)).toEqual(['b']);
+      });
+
+      it('should leave a related row’s other properties to its write, after its hooks', async () => {
+        @RepoHook()
+        class SkuFromCodeHook {
+          @BeforeCreate({ replace: true })
+          beforeCreate({ code, ...line }: PlainLiteralObject) {
+            return { ...line, sku: code };
+          }
+        }
+        const { invoices, lines } = await start(
+          {
+            ...allow('role:clerk', INVOICE_TOKEN, ['create']),
+            ...allow('role:clerk', INVOICE_LINE_TOKEN, ['create']),
+          },
+          [SkuFromCodeHook],
+        );
+
+        // Not a column of the line: the line's hook makes it one.
+        const coded = { id: LINE.id, tenantId: LINE.tenantId, code: 'a' };
+        await invoices.create(
+          { ...INVOICE, lines: [coded] },
+          { ctx: actorCtx(CLERK) },
+        );
+
+        expect(lines.stored).toEqual([LINE]);
+      });
+
+      it('should create nothing when a related row sets its delete date and the actor may not soft delete it', async () => {
+        const { invoices, lines } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['create']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['create']),
+        });
+
+        const error = await invoices
+          .create(
+            { ...INVOICE, lines: [{ ...LINE, dateDeleted: new Date() }] },
+            { ctx: actorCtx(CLERK) },
+          )
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(AuthorityRefusedException);
+        expect(error).toMatchObject({ context: { action: 'softDelete' } });
+        expect(invoices.stored).toEqual([]);
+        expect(lines.stored).toEqual([]);
+      });
+
+      it('should not count a delete’s columns against the rows a write sets', async () => {
+        const { invoices, receipts } = await seeded({
+          ...allow('role:clerk', INVOICE_TOKEN, ['update']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['create', 'update']),
+          [`role:clerk ${RECEIPT_TOKEN} delete`]: {
+            effect: 'allow',
+            columns: [],
+          },
+        });
+
+        await invoices.update(
+          INVOICE,
+          { receipt: { ...RECEIPT, total: 20 } },
+          { ctx: actorCtx(CLERK) },
+        );
+
+        expect(receipts.stored).toEqual([{ ...RECEIPT, total: 20 }]);
+      });
     });
 
     describe('the foreign key a cascade links a related row by', () => {
@@ -670,10 +859,10 @@ describe('authority over related rows', () => {
   });
 });
 
-function deciders(authority: AuthorityFixture) {
+function deciders(authority: AuthorityFixture, hooks: Type[] = []) {
   @Module({
-    providers: [{ provide: AuthorityFixture, useValue: authority }],
-    exports: [AuthorityFixture],
+    providers: [{ provide: AuthorityFixture, useValue: authority }, ...hooks],
+    exports: [AuthorityFixture, ...hooks],
   })
   class DecidersModule {}
   return DecidersModule;

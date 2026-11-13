@@ -7,12 +7,16 @@ import { type AuthorityRequestInterface } from './authority-request.interface.js
  * Decides which actions an actor may take on which objects, and on which of
  * their columns.
  *
+ * `Column` narrows the column names, for an authority written for one
+ * entity (`AuthorityInterface<keyof Order & string>`); one serving many
+ * entities keeps `string`.
+ *
  * Every check in one call should agree: an implementation that can change at
  * runtime answers a call from one snapshot, kept on `ctx`.
  */
-export interface AuthorityInterface {
+export interface AuthorityInterface<Column extends string = string> {
   decide(
     ctx: PlainLiteralObject,
-    request: AuthorityRequestInterface,
-  ): AuthorityDecision | Promise<AuthorityDecision>;
+    request: AuthorityRequestInterface<Column>,
+  ): AuthorityDecision<Column> | Promise<AuthorityDecision<Column>>;
 }

@@ -4,8 +4,9 @@ Decide who may do what to which resource, by role and by external system.
 You write rules, say who is acting, and mark the routes that need a grant;
 the module refuses everything else, filters responses down to the fields the
 caller may see, and answers the same question inside your command handlers.
-Rules are [CASL](https://casl.js.org) rules in plain JSON, so they can live
-in your code or in your database.
+Rules are plain JSON, decided by [CASL](https://casl.js.org), so they can
+live in your code or in your database, and they are written the same way as
+the rules of `@concepta/nestjs-repository`'s authority.
 
 ## Project
 
@@ -27,7 +28,7 @@ in your code or in your database.
 - [Rules at Runtime](#rules-at-runtime)
 - [Protecting Routes](#protecting-routes)
 - [Response Filtering](#response-filtering)
-- [Ownership Checks](#ownership-checks)
+- [Record Checks](#record-checks)
 - [Checking in Handlers](#checking-in-handlers)
 - [CRUD Routes](#crud-routes)
 - [Showing Permissions in a UI](#showing-permissions-in-a-ui)
@@ -56,10 +57,10 @@ import { AccessControlModule } from '@concepta/nestjs-access-control';
     AccessControlModule.forRoot({
       settings: {
         grants: {
-          'role:admin': [
-            { action: ['read:any', 'update:any'], subject: 'user' },
+          'role:admin': [{ action: ['read', 'update'], subject: 'user' }],
+          'role:member': [
+            { action: 'read', subject: 'user', fields: ['id', 'name'] },
           ],
-          'role:member': [{ action: 'read:own', subject: 'user' }],
         },
       },
     }),
@@ -84,10 +85,9 @@ export class UserController {
 }
 ```
 
-An admin reads any user. A member holds only `read:own`, which counts once
-the route checks the user is theirs (see [Ownership Checks](#ownership-checks));
-until then they get a `403`, as does anyone else, or a call with nobody
-acting.
+An admin reads any user. A member reads them too, but the response holds
+only `id` and `name`. Anyone else, or a call with nobody acting, gets a
+`403`.
 
 ## Examples
 
@@ -96,8 +96,8 @@ against it:
 
 - [Role-based API](./examples/role-based-api): grants per role, hiding a
   field from one role, refusing a field on write.
-- [Ownership](./examples/ownership): `own` grants and an access query
-  service that checks the owner.
+- [Ownership](./examples/ownership): members limited to their own
+  records, checked by an access query service.
 - [Per-user grants from storage](./examples/per-user-grants): role
   templates plus per-user rules an admin edits at runtime, and a "my
   permissions" endpoint.
@@ -117,24 +117,26 @@ See [the examples' README](./examples) for how to run them.
 A rule names an action, a resource, and optionally the fields it covers:
 
 ```ts
-{ action: 'update:any', subject: 'invoice', fields: ['notes', 'dueDate'] }
+{ action: 'update', subject: 'invoice', fields: ['notes', 'dueDate'] }
 ```
 
-- **`action`** is `<action>:<possession>`. The action is `create`, `read`,
-  `update`, `delete`, or one of your own, such as `approve`. The possession
-  is `any` (every record) or `own` (the caller's own records). `any` never
-  covers `own`, and `own` never covers `any`.
+- **`action`** is a verb: `create`, `read`, `update`, `delete`, `restore`,
+  or one of your own, such as `approve`.
 - **`subject`** is the resource, matching what your routes declare.
 - **`fields`** limits the rule to those field paths. A path covers
   everything beneath it (`address` covers `address.city`), and positions in
   arrays are ignored (`items.amount` covers every item). Leave it out to
   cover every field.
-- **`inverted: true`** makes the rule a deny. Add a `reason` to say why.
+- **`inverted: true`** makes the rule a deny. Its `reason` is reported as a
+  decision still pending (`gate`) when it refuses a call.
 
-Actions and subjects can be lists. A rule set is refused, at startup or when
-it is loaded, if any rule:
+Rules are `AuthorityRuleInterface` from `@concepta/nestjs-core`, the shape
+`@concepta/nestjs-repository`'s authority reads too. Its type accepts only
+the verbs above, so a typo fails to compile; widen it for verbs of your own,
+`AuthorityRuleInterface<'read' | 'approve'>`. Actions and subjects can be
+lists. A rule set is refused, at startup or when it is loaded, if any rule:
 
-- has an action without `:any` or `:own`;
+- has an action that is not a verb, such as `read all`;
 - uses `manage` or `all`, which CASL treats as "everything";
 - has `conditions`. Which records a caller reaches is row scope's job (see
   `@concepta/nestjs-repository`), not a grant's;
@@ -146,21 +148,22 @@ it is loaded, if any rule:
 - has a property other than `action`, `subject`, `fields`, `inverted` and
   `reason`.
 
-`accessRuleProblems(rules, source)` lists every problem with a rule set, so
-a screen that edits rules can check them before saving.
+`authorityRuleProblems(rules, source)` from `@concepta/nestjs-core` lists
+every problem with a rule set, so a screen that edits rules can check them
+before saving.
 
 To hide a field, allow the resource and deny the field:
 
 ```ts
 'role:support': [
-  { action: 'read:any', subject: 'user' },
-  { action: 'read:any', subject: 'user', fields: ['password'], inverted: true },
+  { action: 'read', subject: 'user' },
+  { action: 'read', subject: 'user', fields: ['password'], inverted: true },
 ],
 ```
 
 A denied field is also protected from writes to its parents: with
-`profile.ssn` denied on `update:any`, a write to `profile` as a whole, such
-as `{ profile: null }`, is refused too.
+`profile.ssn` denied on `update`, a write to `profile` as a whole, such as
+`{ profile: null }`, is refused too.
 
 ## How Rules Combine
 
@@ -185,7 +188,7 @@ A caller's rules are the rules of every role they hold, plus any rules a
 When the data behind your routes lives in
 [`@concepta/nestjs-repository`](../nestjs-repository/README.md#object-authority)
 with an authority, hand access control the same authority, and you write
-your rules once:
+your data rules once:
 
 ```ts
 AccessControlModule.forRootAsync({
@@ -201,17 +204,26 @@ AccessControlModule.forRootAsync({
   `invoices`. A refusal is a `403` with reason `authority`, before the
   handler runs. Name a route's resource as the entity is keyed in
   `RepositoryModule.forRoot()`; a route that is not about an entity gets
-  rules of its own in the same rule set.
-- **What it allows counts as `any`.** Which rows the caller reaches is row
-  scope's job; the repository then decides each read and write by the same
-  rules, columns included.
+  rules of its own in the same rule set. Which rows the caller reaches is
+  row scope's job; the repository then decides each read and write by the
+  same rules, columns included.
 - **Your own rules only narrow, by denying.** `settings.grants` and a grants
-  provider still apply, but can never allow what the authority refuses: on a
-  route, every deny counts, and an allow only for the route's resource and a
-  verb the authority allowed. Deny a field to hide it from one API's
-  responses or refuse it in `assertFields`; deny `update:any` beside an
-  allow of `update:own` to limit a role to its own records on these routes.
+  provider still apply, but can never allow what the authority refuses:
+  their denies count, their allows don't. Deny a field to hide it from one
+  API's responses, or to refuse it in `assertFields`.
 - `can` and `assert` in handlers decide the same way.
+
+The two rule sets are written the same way but name different things. The
+authority's rules name your storage: an entity and its columns, exactly as
+stored. Access control's rules name your API: a route's resource and the
+fields of its request and response bodies, which a mapper may rename or
+nest (`total_cents` stored, `pricing.total` sent). So:
+
+- **data rules go in the authority**, once: who may read or write which
+  entity and which columns. They hold for every caller of the repository,
+  routes or not;
+- **access control's field rules are for the API alone**: a computed field,
+  a response that is not an entity, a nested shape the storage doesn't have.
 
 Without an authority, your rules decide alone, as everywhere else in this
 README. See the [Shared rules](./examples/shared-rules) example.
@@ -328,7 +340,7 @@ against the roles of whatever account it runs under:
 
 ```ts
 grants: {
-  'system:billing': [{ action: 'update:any', subject: 'invoice' }],
+  'system:billing': [{ action: 'update', subject: 'invoice' }],
 }
 ```
 
@@ -372,8 +384,9 @@ that route:
 | --- | --- |
 | `@AccessControlReadOne(resource)`, `@AccessControlReadMany(resource)` | `read` |
 | `@AccessControlCreateOne(resource)`, `@AccessControlCreateMany(resource)` | `create` |
-| `@AccessControlUpdateOne(resource)`, `@AccessControlReplaceOne(resource)`, `@AccessControlRecoverOne(resource)` | `update` |
+| `@AccessControlUpdateOne(resource)`, `@AccessControlReplaceOne(resource)` | `update` |
 | `@AccessControlDeleteOne(resource)` | `delete` |
+| `@AccessControlRecoverOne(resource)` | `restore` |
 | `@AccessControlGrant({ resource, action }, ...)` | yours |
 
 ```ts
@@ -384,8 +397,8 @@ approve(@Param('id') id: string) {
 }
 ```
 
-The caller gets through on `any` first, then `own`. With several grants,
-the first one the caller holds lets them through. On a controller, a
+With several grants, the first one the caller holds lets them through. On a
+controller, a
 decorator applies to every route in it, unless a route declares its own.
 A route with neither is not checked.
 
@@ -397,15 +410,8 @@ through a checked route without it.
 
 A checked route's response is filtered down to the fields the caller may
 read, under their `read` rules, whatever the route does: an update's
-response shows what the caller may read, not what they may write, and a
-caller who may write but not read gets an empty response.
-
-A response shows what a read of the same record would: a caller holding
-`read:any` sees the fields their `read:any` rules allow, even if
-`read:own` would show more; otherwise, on a call let through on `own`, the
-fields their `read:own` rules allow. A caller let through on `any` who
-holds only `read:own` gets an empty response, even for their own record:
-an `any` grant never established that the record is theirs.
+response shows what a read of the same record would, not what the caller
+may write, and a caller who may write but not read gets an empty response.
 
 - each item of an array is filtered, and so is each item of a paginated
   response's `data`; the page's counters are kept, and its other fields
@@ -430,8 +436,8 @@ record, can be granted just that field:
 
 ```ts
 'system:billing': [
-  { action: 'create:any', subject: 'invoice' },
-  { action: 'read:any', subject: 'invoice', fields: ['id'] },
+  { action: 'create', subject: 'invoice' },
+  { action: 'read', subject: 'invoice', fields: ['id'] },
 ],
 ```
 
@@ -459,94 +465,69 @@ module imported earlier runs before the filter. A cache with an entry per
 caller must drop a caller's entries when their rules change, or a field
 taken away stays visible until the entry expires.
 
-## Ownership Checks
+## Record Checks
 
-Only you know which records are a caller's, so a grant on `own` counts only
-on a route that checks: a caller holding only `own` is refused, with reason
-`own-unchecked`, on a route that doesn't. Add an access query service to
-decide:
+A grant says what a caller may do to a resource, not which of its records.
+Which records a caller reaches, their own or their tenant's, is a question
+about the data:
+
+- **On data in `@concepta/nestjs-repository`, it is row scope's.** A row
+  scope resolver limits every read and write, through any route or none: a
+  clerk to `{ ownerId: actor.userId }`, a manager to their tenant. See
+  [Row Scope](../nestjs-repository/README.md#row-scope).
+- **On any other route, add an access query service.** It runs after a grant
+  lets the call in, and decides from the call's context:
 
 ```ts
 import {
   type AccessControlContextInterface,
   AccessControlQuery,
   type CanAccess,
-  PossessionEnum,
 } from '@concepta/nestjs-access-control';
 
 @Injectable()
-export class OwnUserQuery implements CanAccess {
+export class OwnProfileQuery implements CanAccess {
   async canAccess(context: AccessControlContextInterface): Promise<boolean> {
-    const { possession } = context.getQuery();
     const actor = context.getActor();
     const params = context.getRequest('params');
 
     return (
-      possession === PossessionEnum.ANY ||
-      (actor.kind === 'role' &&
-        typeof params === 'object' &&
-        params !== null &&
-        Reflect.get(params, 'id') === actor.userId)
+      actor.kind === 'role' &&
+      typeof params === 'object' &&
+      params !== null &&
+      Reflect.get(params, 'id') === actor.userId
     );
   }
 }
 
 @Get(':id')
-@AccessControlReadOne('user')
-@AccessControlQuery({ service: OwnUserQuery })
+@AccessControlReadOne('profile')
+@AccessControlQuery({ service: OwnProfileQuery })
 getOne(@Param('id') id: string) {
   // ...
 }
 ```
 
 Register the service with the module's `queryServices`, or, when it injects
-your own providers (such as the repository that knows who owns a record),
-in your own module: the check finds it in any module. A route with access
-query services proceeds when one of them allows it. On a controller,
-`@AccessControlQuery` applies to every route, unless a route declares its
-own, which replace the controller's. Access query services run only after a
-grant: on a route without one, the call fails rather than skip them. Each
-one receives:
+your own providers (such as the store that knows who owns a record), in
+your own module: the check finds it in any module. A route with access
+query services proceeds when one of them allows it, and is refused with
+reason `access-query` otherwise. On a controller, `@AccessControlQuery`
+applies to every route, unless a route declares its own, which replace the
+controller's. Access query services run only after a grant: on a route
+without one, the call fails rather than skip them. Each one receives:
 
 | Method | Returns |
 | --- | --- |
-| `getQuery()` | the grant the call got through on: actor, action, possession, resource |
+| `getQuery()` | the grant the call got through on: actor, action, resource |
 | `getActor()` | who is acting |
 | `getContext()` | the call's context, as handlers receive it |
 | `getAbility()` | the caller's CASL ability, for further checks |
 | `getRequest(property?)` | the request, or one of its properties; `undefined` outside HTTP |
 
-For lists, which rows a caller sees belongs in row scope, not here. A
-handler that serves both, returning every record to a caller let in on
-`any` and their own to one on `own`, declares that it decides ownership
-itself with `@AccessControlOwnInHandler()`, and reads the grant from
-`AccessControlService.decision(ctx)`:
-
-```ts
-@Get()
-@AccessControlReadMany('document')
-@AccessControlOwnInHandler()
-list(@Ctx() ctx: AppContextHost) {
-  const decision = this.accessControl.decision(ctx);
-
-  if (decision?.possession === PossessionEnum.ANY) {
-    return this.documents.all();
-  }
-
-  return decision?.actor.kind === 'role' && decision.actor.userId
-    ? this.documents.ownedBy(decision.actor.userId)
-    : [];
-}
-```
-
-It returns who is acting and the action, possession and resource the call
-was let through on, or `undefined` on a call no route checked.
-
-Put `@AccessControlOwnInHandler()` on each route that decides ownership.
-On a controller, it covers the routes using the controller's grant, but
-not a route that declares its own, so a route added later doesn't inherit
-it by accident. A query service you declare is the route's ownership check
-in the same way: it must decide `own` calls, not only `any` ones.
+In a handler, `AccessControlService.decision(ctx)` returns the same grant:
+who is acting and the action and resource the call was let through on, or
+`undefined` on a call no route checked.
 
 ## Checking in Handlers
 
@@ -566,12 +547,11 @@ async update(
 }
 ```
 
-It checks each field under the grant the route let the caller in on: a
-caller on `update:own` against their `update:own` rules, one on
-`update:any` against `update:any`. On a route with several grants, that is
-the one that let them in, so write field denies for each action the route
-grants. It reuses the route's decision, so the rules are not resolved
-again. Called anywhere else, it throws `AccessControlException`.
+It checks each field under the grant the route let the caller in on. On a
+route with several grants, that is the one that let them in, so write field
+denies for each action the route grants. It reuses the route's decision, so
+the rules are not resolved again. Called anywhere else, it throws
+`AccessControlException`.
 
 `accessFieldPaths` lists the fields a body sets, which is what a merging
 update touches. A handler that replaces a nested object whole, such as a
@@ -593,7 +573,7 @@ export class UpdateInvoiceHandler {
   constructor(private readonly accessControl: AccessControlService) {}
 
   async execute({ ctx, id, changes }: UpdateInvoiceCommand) {
-    await this.accessControl.assert(ctx, 'update:any', 'invoice', {
+    await this.accessControl.assert(ctx, 'update', 'invoice', {
       fields: accessFieldPaths(changes),
     });
     // ...
@@ -641,12 +621,9 @@ Before each request runs, under the grant its route let the caller in on:
   whenever a field is denied to the caller for the action.
 
 What a request selects is not narrowed: the response filter leaves out what
-the caller may not read. An `own` grant is refused on a generated route
-(`own-unchecked`): nothing in the route checks that the records are the
-caller's. When something below it does — row scope limiting the entity to
-the caller's rows — declare it with `AccessControlOwnInHandler()` among the
-route's `extraDecorators`. See the [CRUD routes](./examples/crud-routes)
-example.
+the caller may not read. Which rows a generated route reaches is row
+scope's job, on the entity's repository. See the
+[CRUD routes](./examples/crud-routes) example.
 
 ## Showing Permissions in a UI
 
@@ -700,10 +677,9 @@ actor overlay of its own.
 | --- | --- |
 | `no-actor` | Nobody is acting |
 | `no-grant` | No rule allows it |
-| `denied` | A deny refuses it |
+| `denied` | A deny refuses it (also names a pending decision as `gate` when every deny that refused has a `reason`) |
 | `field` | A field it touches is refused (also names the `field`) |
 | `access-query` | The route's access query service refused it |
-| `own-unchecked` | Only an `own` grant allows it, and nothing on the route checks ownership |
 | `authority` | The module's authority refuses it (also names any pending decision as `gate`) |
 
 `AccessRulesInvalidException` lists every problem found, so one fix pass

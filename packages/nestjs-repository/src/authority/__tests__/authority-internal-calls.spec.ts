@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, type PlainLiteralObject } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
 import {
@@ -29,7 +29,12 @@ import {
   OrderEntityFixture,
   type OrderFixture,
 } from '../../__fixtures__/memory/order.fixture.js';
+import {
+  BeforeRead,
+  RepoHook,
+} from '../../hooks/repository-hook.decorators.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
+import { type RepositoryFindOneOptions } from '../../repository/interfaces/repository-options.interface.js';
 import { Where } from '../../repository/where.helpers.js';
 import { RepositoryModule } from '../../repository.module.js';
 import { RowScopeCtx } from '../../row-scope/interfaces/row-scope-context.interface.js';
@@ -47,6 +52,18 @@ const CLERK: Actor = { kind: 'role', roles: ['clerk'] };
 const WIDGET_COLUMNS = ['id', 'name', 'color', 'secret', 'dateDeleted'];
 const ORDER_COLUMNS = ['id', 'tenantId', 'description', 'dateDeleted'];
 
+/** Keeps every read options object its entity's hooks are handed. */
+@RepoHook()
+class KeepsReadOptionsHook {
+  readonly seen: RepositoryFindOneOptions<PlainLiteralObject>[] = [];
+
+  @BeforeRead()
+  beforeRead(options: RepositoryFindOneOptions<PlainLiteralObject>) {
+    this.seen.push(options);
+    return options;
+  }
+}
+
 async function compile(
   entities: RepositoryProviderOptions[],
   authority: AuthorityFixture,
@@ -55,8 +72,9 @@ async function compile(
     providers: [
       { provide: AuthorityFixture, useValue: authority },
       OrderRowScopeFixture,
+      KeepsReadOptionsHook,
     ],
-    exports: [AuthorityFixture, OrderRowScopeFixture],
+    exports: [AuthorityFixture, OrderRowScopeFixture, KeepsReadOptionsHook],
   })
   class DecidersModule {}
 
@@ -260,6 +278,54 @@ describe('calls the repository makes itself', () => {
           ctx: scopedCtx(CLERK, 'acme'),
         }),
       ).rejects.toThrow(AuthorityRefusedException);
+    });
+
+    it('should decide another repository handed the check’s options by a hook', async () => {
+      const authority = new AuthorityFixture({
+        ...allow('role:admin', ORDER_TOKEN, ['create']),
+        ...allow('role:clerk', ORDER_TOKEN, ['update']),
+      });
+      const moduleRef = await compile(
+        [
+          {
+            key: ORDER_TOKEN,
+            entity: OrderEntityFixture,
+            authority: GOVERNED,
+            rowScope: { access: 'scoped', resolver: OrderRowScopeFixture },
+            hooks: [KeepsReadOptionsHook],
+          },
+          {
+            key: WIDGET_TOKEN,
+            entity: WidgetEntityFixture,
+            authority: GOVERNED,
+          },
+        ],
+        authority,
+      );
+      await moduleRef.init();
+      const orders = moduleRef.get<MemoryRepositoryFixture<OrderFixture>>(
+        getDynamicRepositoryToken(ORDER_TOKEN),
+      );
+      const widgets = moduleRef.get<
+        MemoryRepositoryFixture<PlainLiteralObject>
+      >(getDynamicRepositoryToken(WIDGET_TOKEN));
+      const hook = moduleRef.get(KeepsReadOptionsHook, { strict: false });
+      await orders.create(ORDER, { ctx: scopedCtx(ADMIN, 'acme') });
+
+      await orders.update(
+        ORDER,
+        { description: 'changed' },
+        { ctx: scopedCtx(CLERK, 'acme') },
+      );
+      const [checkOptions] = hook.seen;
+
+      expect(checkOptions).toBeDefined();
+      await expect(widgets.findOne({ ...checkOptions })).rejects.toThrow(
+        AuthorityRefusedException,
+      );
+      await expect(widgets.findOne(checkOptions ?? {})).rejects.toThrow(
+        AuthorityRefusedException,
+      );
     });
   });
 });

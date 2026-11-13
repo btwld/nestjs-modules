@@ -1,7 +1,6 @@
-import { type Actor } from '@concepta/nestjs-core';
+import { type Actor, type AuthorityRuleInterface } from '@concepta/nestjs-core';
 
 import { type AccessAbility } from './access-ability.type.js';
-import { type AccessRuleInterface } from './access-rule.interface.js';
 
 /**
  * Who is acting for a call, their validated rules, and the ability built
@@ -9,6 +8,6 @@ import { type AccessRuleInterface } from './access-rule.interface.js';
  */
 export interface AccessResolutionInterface {
   actor: Actor;
-  rules: AccessRuleInterface[];
+  rules: AuthorityRuleInterface<string>[];
   ability: AccessAbility;
 }

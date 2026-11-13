@@ -146,6 +146,8 @@ export { AuthorityRequestInterface } from './domain/authority/interfaces/authori
 export { AuthorityDecision } from './domain/authority/interfaces/authority-decision.type.js';
 export { AuthorityAllowInterface } from './domain/authority/interfaces/authority-allow.interface.js';
 export { AuthorityRefuseInterface } from './domain/authority/interfaces/authority-refuse.interface.js';
+export { AuthorityRuleInterface } from './domain/authority/interfaces/authority-rule.interface.js';
+export { authorityRuleProblems } from './domain/authority/utils/authority-rule-problems.util.js';
 
 // Event context
 export { EventContextHost } from './domain/events/causal-context/event-context.host.js';

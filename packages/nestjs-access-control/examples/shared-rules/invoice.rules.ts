@@ -1,10 +1,13 @@
 import { Injectable, Module, type PlainLiteralObject } from '@nestjs/common';
 
 import { type AccessGrants } from '@concepta/nestjs-access-control';
-import { type Actor, actorKeys } from '@concepta/nestjs-core';
+import {
+  type Actor,
+  actorKeys,
+  type AuthorityRuleInterface,
+} from '@concepta/nestjs-core';
 import {
   CaslAuthority,
-  type CaslAuthorityRule,
   type CaslAuthorityRulesInterface,
 } from '@concepta/nestjs-repository/optional/casl';
 
@@ -15,7 +18,7 @@ export const INVOICES = 'invoices';
  * columns. Access control decides each route by it, and the repository each
  * read and write.
  */
-export const INVOICE_RULES: Record<string, CaslAuthorityRule[]> = {
+export const INVOICE_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
     { action: ['create', 'read', 'update'], subject: INVOICES },
     {
@@ -37,7 +40,7 @@ export const INVOICE_RULES: Record<string, CaslAuthorityRule[]> = {
 export const ROUTE_GRANTS: AccessGrants = {
   'role:clerk': [
     {
-      action: 'update:any',
+      action: 'update',
       subject: INVOICES,
       fields: ['amount'],
       inverted: true,
@@ -53,7 +56,7 @@ export const USER_ROLES: Record<string, string[]> = {
 
 @Injectable()
 export class InvoiceRules implements CaslAuthorityRulesInterface {
-  rulesFor(_ctx: PlainLiteralObject, actor: Actor): CaslAuthorityRule[] {
+  rulesFor(_ctx: PlainLiteralObject, actor: Actor): AuthorityRuleInterface[] {
     return actorKeys(actor).flatMap((key) => INVOICE_RULES[key] ?? []);
   }
 }

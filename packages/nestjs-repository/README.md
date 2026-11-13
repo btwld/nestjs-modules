@@ -2458,7 +2458,8 @@ See its [adapter sections](../nestjs-repository-typeorm/README.md#choose-your-ad
 ## Object Authority
 
 Object authority decides what a caller may *do* with an entity: which of
-create, read, update and delete, and on which columns. Row scope decides which
+create, read, update, delete, soft delete and restore, and on which columns.
+Row scope decides which
 rows; authority decides which actions and which columns, so the two combine.
 Like row scope, it holds for every repository call, not only for calls that
 come through a controller: a queue consumer, a job or another module's service
@@ -2531,20 +2532,23 @@ hands on another `ctx` cannot change who is decided.
 ### Rules with CASL
 
 `@concepta/nestjs-repository/optional/casl` ships an authority that answers
-from [CASL](https://casl.js.org) rules. You supply the rules for each actor,
-from settings, a table, or another service:
+from rules, decided by [CASL](https://casl.js.org). You supply the rules for
+each actor, from settings, a table, or another service:
 
 ```ts
 import { Injectable, Module, type PlainLiteralObject } from '@nestjs/common';
 
-import { type Actor, actorKeys } from '@concepta/nestjs-core';
+import {
+  type Actor,
+  actorKeys,
+  type AuthorityRuleInterface,
+} from '@concepta/nestjs-core';
 import {
   CaslAuthority,
-  type CaslAuthorityRule,
   type CaslAuthorityRulesInterface,
 } from '@concepta/nestjs-repository/optional/casl';
 
-const RULES: Record<string, CaslAuthorityRule[]> = {
+const RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
     { action: ['create', 'read', 'update'], subject: 'orders' },
     // Clerks never change a total, whatever else allows it
@@ -2558,7 +2562,7 @@ const RULES: Record<string, CaslAuthorityRule[]> = {
 
 @Injectable()
 class OrderRules implements CaslAuthorityRulesInterface {
-  rulesFor(_ctx: PlainLiteralObject, actor: Actor): CaslAuthorityRule[] {
+  rulesFor(_ctx: PlainLiteralObject, actor: Actor): AuthorityRuleInterface[] {
     return actorKeys(actor).flatMap((key) => RULES[key] ?? []);
   }
 }
@@ -2578,7 +2582,7 @@ export class AuthorityModule {}
 ```
 
 - **`subject`** is the entity's `forRoot()` key; **`action`** is `create`,
-  `read`, `update` or `delete`.
+  `read`, `update`, `delete`, `softDelete` or `restore`.
 - **`fields`** limits a rule to those columns, by exact name. A rule naming no
   fields covers every column.
 - **A deny (`inverted`) always wins**, whatever order the rules come in, and
@@ -2587,15 +2591,26 @@ export class AuthorityModule {}
   permission nobody has approved yet — in the refusal's context, for logs.
   Only a deny of the whole entity reports one, and only when every deny that
   applies has a reason: a deny without one is final.
-- **`manage` and `all`** are CASL's words for every action and every entity,
-  so don't key an entity `all`.
-- **No `conditions`.** Which rows a caller reaches is row scope's to decide; a
-  rule with conditions throws rather than being ignored.
+- **Rules are checked before use.** A rule with `conditions` (which rows a
+  caller reaches is row scope's to decide), an unknown property, a field
+  pattern, or CASL's wildcards `manage` and `all` refuses the call with
+  `CaslAuthorityRulesInvalidException`, listing every problem.
+  `authorityRuleProblems` from `@concepta/nestjs-core` runs the same check,
+  for an admin screen to call before saving rules.
+- **Typos fail to compile.** `AuthorityRuleInterface` accepts only the
+  actions above; narrow the rest too, such as
+  `AuthorityRuleInterface<'read' | 'update', 'orders', keyof Order & string>`.
 - `actorKeys` keys a person by each role (`role:<name>`) and a system by its
   name (`system:<name>`). Rules for one person alone are yours to look up, for
   example by `actor.userId`.
 - Rules are asked for once per `ctx`, so every check in one call reads the
   same rules even when they are stored and edited at runtime.
+
+Access control's route grants are written in the same shape. They name your
+API, not your storage: a grant's `subject` is a route's resource and its
+`fields` are paths in request and response bodies, which a mapper may rename.
+Data rules belong here, written once; see access control's README for how the
+two combine.
 
 Any other engine plugs in the same way: implement `AuthorityInterface` from
 `@concepta/nestjs-core`. Its `decide(ctx, request)` is given the actor, the
@@ -2614,8 +2629,10 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
 | --- | --- |
 | `find`, `findOne`, `count`, `findAndCount` | read |
 | `create`, `createMany` | create |
-| `update`, `replace`, `restore` | update |
-| `delete`, `deleteMany`, `softDelete` | delete |
+| `update`, `replace` | update |
+| `delete`, `deleteMany` | delete |
+| `softDelete` | softDelete |
+| `restore` | restore |
 | `upsert` | create **and** update — it does either, depending on what is stored, and deciding both never reveals which |
 
 **Columns:**
@@ -2626,7 +2643,8 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
 - **Writes.** Every column a write sets must be writable; the primary key is
   not checked, since it names the row. A `replace` erases what it leaves out,
   so it needs every column writable. Columns row scope stamps (a tenant id)
-  are not counted against the actor.
+  are not counted against the actor. A write that sets the delete date soft
+  deletes the row, so it also needs `softDelete`.
 - **Write results** hold the columns the actor may read, and the primary key.
   A write needs no read permission of its own: an actor who may only create
   gets back the new row's key.
@@ -2642,19 +2660,25 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   repository opens no transaction: a create needs create on each related
   entity it writes; an update needs update and create (and delete, for a
   to-one set to `null`); a `replace` or `upsert` also needs delete. A delete,
-  soft delete or restore finds every related row first, then decides each
-  related entity it touches before writing any. The foreign key a cascade
-  links a related row by is not counted against the actor. A related row's
-  other columns are checked when it is written, after its parent.
+  soft delete or restore finds every related row first, then decides the same
+  action on each related entity it touches before writing any. Each related
+  row's columns, and its own related rows, are checked before the parent is
+  written too: a new row (one without a primary key, in a to-many relation)
+  against create; any other against create and update, and on a `replace` or
+  `upsert` against update on every column, since it may replace a stored row
+  whole.
+  The foreign key a cascade links a related row by is not counted against
+  the actor.
 
 ### What is not decided
 
 The repository's own calls: the activity record of a write already decided,
 the read `RowScopeBase` makes to check a row is the caller's before writing
 it, and a cascade's reads finding the related rows to write. They are marked
-inside the package, and nothing outside it can mark a call. Everything else is
-decided as its caller — hooks calling other repositories, and cascade writes,
-included.
+inside the package, for the one repository they call, and nothing outside it
+can mark a call. Everything else is decided as its caller — hooks calling
+other repositories, even with the options object they were handed, and
+cascade writes, included.
 
 As with row scope, an ORM's own repository used directly, or SQL that
 bypasses the repository, is outside it.
@@ -3287,6 +3311,6 @@ also exported for manual provider wiring.
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
 | `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
-| `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityRule`, `CaslAuthorityRulesInterface`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
+| `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityRulesInterface`, `CaslAuthorityRulesInvalidException`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

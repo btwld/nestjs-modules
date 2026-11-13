@@ -2,37 +2,35 @@ import { createAccessAbility } from '../create-access-ability.util.js';
 
 describe(createAccessAbility.name, () => {
   it('allows nothing without rules', () => {
-    expect(createAccessAbility([]).can('read:any', 'user')).toEqual(false);
+    expect(createAccessAbility([]).can('read', 'user')).toEqual(false);
   });
 
   it('lets a deny win over an allow that comes after it', () => {
     const ability = createAccessAbility([
-      { action: 'delete:own', subject: 'user', inverted: true },
-      { action: 'delete:own', subject: 'user' },
+      { action: 'delete', subject: 'user', inverted: true },
+      { action: 'delete', subject: 'user' },
     ]);
 
-    expect(ability.can('delete:own', 'user')).toEqual(false);
-    expect(ability.relevantRuleFor('delete:own', 'user')?.inverted).toEqual(
-      true,
-    );
+    expect(ability.can('delete', 'user')).toEqual(false);
+    expect(ability.relevantRuleFor('delete', 'user')?.inverted).toEqual(true);
   });
 
   it('matches a field and everything beneath it', () => {
     const ability = createAccessAbility([
-      { action: 'read:any', subject: 'user', fields: ['address'] },
+      { action: 'read', subject: 'user', fields: ['address'] },
     ]);
 
-    expect(ability.can('read:any', 'user', 'address')).toEqual(true);
-    expect(ability.can('read:any', 'user', 'address.city')).toEqual(true);
-    expect(ability.can('read:any', 'user', 'addressBook')).toEqual(false);
-    expect(ability.can('read:any', 'user', 'name')).toEqual(false);
+    expect(ability.can('read', 'user', 'address')).toEqual(true);
+    expect(ability.can('read', 'user', 'address.city')).toEqual(true);
+    expect(ability.can('read', 'user', 'addressBook')).toEqual(false);
+    expect(ability.can('read', 'user', 'name')).toEqual(false);
   });
 
   it('never treats a field as a pattern', () => {
     const ability = createAccessAbility([
-      { action: 'read:any', subject: 'user', fields: ['tags.*'] },
+      { action: 'read', subject: 'user', fields: ['tags.*'] },
     ]);
 
-    expect(ability.can('read:any', 'user', 'tags.first')).toEqual(false);
+    expect(ability.can('read', 'user', 'tags.first')).toEqual(false);
   });
 });

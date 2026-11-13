@@ -456,7 +456,26 @@ Core ships no implementation; `@concepta/nestjs-repository` enforces one on
 every repository call and ships a CASL-backed one — see its
 [Object Authority](../nestjs-repository/README.md#object-authority).
 `actorKeys(actor)` gives the keys an actor's permissions are usually stored
-under: `role:<name>` for each role, `system:<name>` for a system.
+under: `role:<name>` for each role, `system:<name>` for a system. A one-entity
+authority can narrow its column names, `AuthorityInterface<keyof Order & string>`.
+
+Rules are written in one shape wherever they are used, the repository's
+authority and access control's grants alike: `AuthorityRuleInterface`, plain
+JSON naming an `action` (a verb), a `subject`, optional `fields`, and
+`inverted: true` with a `reason` for a deny. Its type accepts only
+`ActionEnum`'s verbs unless you widen it, so a typo fails to compile.
+`authorityRuleProblems(rules, source)` checks rules read from storage,
+listing every problem: conditions, unknown properties, field patterns, and
+CASL's wildcards `manage` and `all` are refused.
+
+```ts
+import { type AuthorityRuleInterface } from '@concepta/nestjs-core';
+
+const clerk: AuthorityRuleInterface[] = [
+  { action: ['create', 'read', 'update'], subject: 'orders' },
+  { action: 'update', subject: 'orders', fields: ['total'], inverted: true },
+];
+```
 
 ### RPC (preview)
 

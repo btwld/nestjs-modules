@@ -4,6 +4,7 @@ import {
   ActionEnum,
   type Actor,
   AppContextHost,
+  type AuthorityRuleInterface,
   Operation,
 } from '@concepta/nestjs-core';
 import {
@@ -13,9 +14,7 @@ import {
 } from '@concepta/nestjs-crud';
 import { WhereOperator } from '@concepta/nestjs-repository';
 
-import { PossessionEnum } from '../../../domain/enums/possession.enum.js';
 import { AccessRefusedException } from '../../../domain/exceptions/access-refused.exception.js';
-import { type AccessRuleInterface } from '../../../domain/interfaces/access-rule.interface.js';
 import { AccessControlService } from '../../../domain/services/access-control.service.js';
 import { createAccessAbility } from '../../../domain/utils/create-access-ability.util.js';
 import { StaticAccessGrantsProvider } from '../../../infrastructure/grants/static-access-grants.provider.js';
@@ -26,16 +25,16 @@ import { AccessControlCrudPolicy } from '../access-control-crud.policy.js';
 const CLERK: Actor = { kind: 'role', roles: ['clerk'] };
 
 /** What the clerk was let in on: invoices, without `secret`, never `amount`. */
-const RULES: AccessRuleInterface[] = [
-  { action: ['read:any', 'create:any', 'update:any'], subject: 'invoice' },
+const RULES: AuthorityRuleInterface<string>[] = [
+  { action: ['read', 'create', 'update'], subject: 'invoice' },
   {
-    action: 'read:any',
+    action: 'read',
     subject: 'invoice',
     fields: ['secret'],
     inverted: true,
   },
   {
-    action: ['create:any', 'update:any'],
+    action: ['create', 'update'],
     subject: 'invoice',
     fields: ['amount'],
     inverted: true,
@@ -55,7 +54,7 @@ const NO_QUERY: CrudParsedQueryInterface<PlainLiteralObject> = {
   includeDeleted: undefined,
 };
 
-/** The CRUD context of a call the route guard let in on `action:any`. */
+/** The CRUD context of a call the route guard let in on `action`. */
 function crudCtx(
   operation: Operation,
   action: string,
@@ -64,7 +63,10 @@ function crudCtx(
   {
     rules = RULES,
     params = {},
-  }: { rules?: AccessRuleInterface[]; params?: Record<string, unknown> } = {},
+  }: {
+    rules?: AuthorityRuleInterface<string>[];
+    params?: Record<string, unknown>;
+  } = {},
 ): CrudContextInterface {
   const host = new AppContextHost();
   if (decided) {
@@ -74,7 +76,6 @@ function crudCtx(
         query: {
           actor: CLERK,
           action,
-          possession: PossessionEnum.ANY,
           resource: 'invoice',
         },
         ability: createAccessAbility(rules),
@@ -176,9 +177,9 @@ describe(AccessControlCrudPolicy.name, () => {
             true,
             {
               rules: [
-                { action: 'read:any', subject: 'invoice' },
+                { action: 'read', subject: 'invoice' },
                 {
-                  action: 'read:any',
+                  action: 'read',
                   subject: 'invoice',
                   fields: ['profile.ssn'],
                   inverted: true,
@@ -270,9 +271,9 @@ describe(AccessControlCrudPolicy.name, () => {
         policy.check({
           ctx: crudCtx(Operation.Replace, 'update', {}, true, {
             rules: [
-              { action: 'read:any', subject: 'invoice' },
+              { action: 'read', subject: 'invoice' },
               {
-                action: 'update:any',
+                action: 'update',
                 subject: 'invoice',
                 fields: ['customer'],
               },
@@ -289,7 +290,7 @@ describe(AccessControlCrudPolicy.name, () => {
       await expect(
         policy.check({
           ctx: crudCtx(Operation.Replace, 'update', {}, true, {
-            rules: [{ action: ['read:any', 'update:any'], subject: 'invoice' }],
+            rules: [{ action: ['read', 'update'], subject: 'invoice' }],
           }),
           body: { customer: 'Initech' },
         }),

@@ -19,7 +19,7 @@ describe('@AccessControlRecoverOne', () => {
   const controller = new TestController();
 
   describe('enhance controller method with access control', () => {
-    it('should have update grants metadata, as CRUD restore is an update', () => {
+    it('should have restore grants metadata', () => {
       const grants = Reflect.getMetadata(
         ACCESS_CONTROL_MODULE_GRANT_METADATA,
         controller.recoverOne,
@@ -28,7 +28,7 @@ describe('@AccessControlRecoverOne', () => {
       expect(grants).toEqual([
         {
           resource: resource,
-          action: ActionEnum.UPDATE,
+          action: ActionEnum.RESTORE,
         },
       ]);
     });
