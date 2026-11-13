@@ -2638,8 +2638,11 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
 **Columns:**
 
 - **Reads.** A read that selects, filters or sorts on a column the actor may
-  not read is refused. A read selecting nothing returns only the columns the
-  actor may read. An actor who may read no column at all is refused.
+  not read is refused. A column that doesn't exist is refused with the same
+  `403` for an actor limited to some columns, so the refusal never tells
+  them which hidden columns there are. A read selecting
+  nothing returns only the columns the actor may read. An actor who may read
+  no column at all is refused.
 - **Writes.** Every column a write sets must be writable; the primary key is
   not checked, since it names the row. A `replace` erases what it leaves out,
   so it needs every column writable. Columns row scope stamps (a tenant id)
