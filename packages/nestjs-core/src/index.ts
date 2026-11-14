@@ -188,3 +188,14 @@ export { HooksCtx } from './infrastructure/hook/hook.context.overlay.js';
 export { normalizeHookOption } from './infrastructure/hook/utils/normalize-hook-option.js';
 export { HookNotDecoratedException } from './infrastructure/hook/exceptions/hook-not-decorated.exception.js';
 export { HookProviderNotFoundException } from './infrastructure/hook/exceptions/hook-provider-not-found.exception.js';
+
+// Route audit feature
+export { AuditedRouteInterface } from './infrastructure/route-audit/interfaces/audited-route.interface.js';
+export { RouteAuditRuleInterface } from './infrastructure/route-audit/interfaces/route-audit-rule.interface.js';
+export { RouteAuditSettingsInterface } from './infrastructure/route-audit/interfaces/route-audit-settings.interface.js';
+export { RouteAuditSubjectInterface } from './infrastructure/route-audit/interfaces/route-audit-subject.interface.js';
+export { RouteAuditViolationInterface } from './infrastructure/route-audit/interfaces/route-audit-violation.interface.js';
+export { RouteAuditRuleProvider } from './infrastructure/route-audit/decorators/route-audit-rule-provider.decorator.js';
+export { PublicRoute } from './infrastructure/route-audit/decorators/public-route.decorator.js';
+export { isPublicRoute } from './infrastructure/route-audit/utils/is-public-route.util.js';
+export { RouteAuditFailedException } from './infrastructure/route-audit/exceptions/route-audit-failed.exception.js';

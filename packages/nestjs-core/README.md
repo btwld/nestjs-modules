@@ -27,6 +27,7 @@ utilities**.
   - [Consuming Hooks](#consuming-hooks)
 - [Context System](#context-system)
   - [RPC (preview)](#rpc-preview)
+- [Route Audit](#route-audit)
 - [Exceptions](#exceptions)
 - [Schemas & OpenAPI](#schemas--openapi)
 - [Event Context](#event-context)
@@ -528,6 +529,90 @@ WebSocket gateways and gRPC call-stream handlers aren't supported yet. There,
 `@Ctx()` and `@Transactional()` throw `AppContextUnavailableException` and
 route hooks don't apply. Create a context with `new AppContextHost()` and pass
 it on yourself.
+
+## Route Audit
+
+A new route that forgets its sign-in or its access-control grant ships open,
+and nothing tells you. Turn on the route audit and the application refuses to
+start instead, naming each route:
+
+```ts
+CoreModule.forRoot({
+  routeAudit: {
+    allow: { requireAcl: ['GET /health'] },
+  },
+});
+```
+
+```text
+The route audit found 1 violation(s):
+  - [requireAcl] POST /invoices: No access-control grant on this route, ...
+```
+
+Each module you import adds its rule, and every rule runs on every controller
+route:
+
+| Rule | Added by | Passes when |
+| --- | --- | --- |
+| `requireAuth` | `@concepta/nestjs-authentication` | an authentication guard runs on the route, or it is `@AuthPublic()` |
+| `requireAcl` | `@concepta/nestjs-access-control` | the route has a grant decorator, or it is `@AuthPublic()` |
+
+The audit only looks for routes left open. A mistake that refuses calls, such
+as a guard order that leaves access control without an actor, shows up on the
+first request instead.
+
+- **`allow`** exempts a route from one rule: rule name, then route ids. A
+  route id is `METHOD /path` before any global prefix, with the path
+  `RouterModule` mounts the module at (`GET /admin/invoices/:id`); a declared
+  version adds `v2` and a host adds `@` and the host. An entry that
+  exempts nothing, because the route is gone or now passes, fails startup too,
+  so the list can't go stale.
+- **`mode: 'report'`** logs each violation as a warning and starts anyway, for
+  a first look at an existing application. The default is `'throw'`.
+- **`@PublicRoute()`** marks a route as open on purpose, so rules skip it.
+  `@AuthPublic()` sets it for you; apply it yourself on routes your own guard
+  lets through.
+
+Only controller routes are audited: not message handlers (RPC), and not paths
+served outside a controller, such as middleware or Swagger UI.
+
+A rule that can't run, because it or something it injects is request-scoped,
+fails startup too, rather than being skipped.
+
+### Writing a rule
+
+A rule is a provider with `@RouteAuditRuleProvider()`. It gets every route,
+with its guards and whether it is public, plus the global guards, and returns
+what it finds:
+
+```ts
+import { Injectable } from '@nestjs/common';
+import {
+  RouteAuditRuleProvider,
+  type RouteAuditRuleInterface,
+  type RouteAuditSubjectInterface,
+} from '@concepta/nestjs-core';
+
+@Injectable()
+@RouteAuditRuleProvider()
+export class RequireTenantRule implements RouteAuditRuleInterface {
+  readonly name = 'requireTenant';
+
+  audit({ routes, globalGuards }: RouteAuditSubjectInterface) {
+    if (globalGuards.includes(TenantGuard)) {
+      return [];
+    }
+
+    return routes
+      .filter((route) => !route.guards.includes(TenantGuard))
+      .map((route) => ({ route: route.id, message: 'No TenantGuard runs here.' }));
+  }
+}
+```
+
+Read a route's own metadata with a `Reflector` over `route.handler` and
+`route.controller`. Leave `route` out of a violation that belongs to the whole
+application; `allow` can't exempt it.
 
 ## Exceptions
 
@@ -1081,7 +1166,7 @@ exercise correlation behavior directly.
 
 | Export | Description |
 | --- | --- |
-| `CoreModule` | The root module. Registers a global `APP_INTERCEPTOR` for hook context and exports `HookResolverService`. |
+| `CoreModule` | The root module. Registers a global `APP_INTERCEPTOR` for hook context, exports `HookResolverService`, and runs the [route audit](#route-audit) when `routeAudit` is set. |
 
 ### Hook Decorators
 
@@ -1151,6 +1236,20 @@ exercise correlation behavior directly.
 | `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
 | `AuthorityRequestInterface` | `{ actor, object, action, columns }`. |
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns? }` or `{ effect: 'refuse', gate? }`. |
+
+### Route Audit Exports
+
+| Export | Description |
+| --- | --- |
+| `RouteAuditSettingsInterface` | The `routeAudit` option of `CoreModule`: `mode` and `allow`. |
+| `@RouteAuditRuleProvider()` | Registers a provider as a route audit rule. |
+| `RouteAuditRuleInterface` | A rule: its `name` and `audit(subject)`. |
+| `RouteAuditSubjectInterface` | What a rule checks: `routes` and `globalGuards`. |
+| `AuditedRouteInterface` | One route: `id`, `controller`, `handler`, `guards`, `public`. |
+| `RouteAuditViolationInterface` | One finding: `route` (left out for the whole application) and `message`. |
+| `@PublicRoute()` | Marks a route or controller as open on purpose. Opens nothing by itself. |
+| `isPublicRoute(...targets)` | Whether a handler or controller carries `@PublicRoute()`. |
+| `RouteAuditFailedException` | Thrown at startup with every violation (`fault: 'usage'`). |
 
 ### Exceptions Exports
 

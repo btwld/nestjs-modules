@@ -24,6 +24,7 @@ import { AuthUserCtx } from '../gateways/auth-user-context.overlay.js';
 import { AuthGuardCtr, AuthGuardOptions } from './auth.guard.types.js';
 import { AuthPublicMetadata } from './decorators/auth-public.decorator.js';
 import { AuthUserConflictException } from './exceptions/auth-user-conflict.exception.js';
+import { markAuthenticationGuard } from './utils/authentication-guard.util.js';
 
 /**
  * A Guard to use passport for express or fastify
@@ -150,6 +151,8 @@ export const AuthGuard = (
       return activated;
     }
   }
+
+  markAuthenticationGuard(AuthGuard);
 
   return AuthGuard;
 };

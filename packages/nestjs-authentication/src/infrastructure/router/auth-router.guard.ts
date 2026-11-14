@@ -9,6 +9,8 @@ import {
   Inject,
 } from '@nestjs/common';
 
+import { markAuthenticationGuard } from '../utils/authentication-guard.util.js';
+
 import { AuthRouterGuards } from './auth-router.constants.js';
 import { AuthRouterGuardsRecord } from './auth-router.types.js';
 import { AuthRouterAuthenticationFailedException } from './exceptions/auth-router-authentication-failed.exception.js';
@@ -150,3 +152,5 @@ export class AuthRouterGuard implements CanActivate {
     return guardInstance;
   }
 }
+
+markAuthenticationGuard(AuthRouterGuard);

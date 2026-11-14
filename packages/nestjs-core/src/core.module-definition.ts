@@ -3,7 +3,9 @@ import {
   type DynamicModule,
   type Provider,
 } from '@nestjs/common';
+import { DiscoveryModule } from '@nestjs/core';
 
+import { CORE_MODULE_RAW_OPTIONS_TOKEN } from './core.constants.js';
 import {
   createCorrelationFeatureExports,
   createCorrelationFeatureProviders,
@@ -12,13 +14,15 @@ import {
   createHookFeatureExports,
   createHookFeatureProviders,
 } from './infrastructure/hook/utils/create-hook-feature-providers.js';
-
-const CORE_MODULE_RAW_OPTIONS_TOKEN = Symbol(
-  '__CORE_MODULE_RAW_OPTIONS_TOKEN__',
-);
+import { type RouteAuditSettingsInterface } from './infrastructure/route-audit/interfaces/route-audit-settings.interface.js';
+import { createRouteAuditFeatureProviders } from './infrastructure/route-audit/utils/create-route-audit-feature-providers.js';
 
 export interface CoreOptionsInterface {
-  // Reserved for future feature options
+  /**
+   * Turns on the route audit, which checks every HTTP route against the
+   * registered rules at startup. Off when left out.
+   */
+  routeAudit?: RouteAuditSettingsInterface;
 }
 
 export interface CoreOptionsExtrasInterface {
@@ -43,12 +47,13 @@ function definitionTransform(
   definition: DynamicModule,
   extras: CoreOptionsExtrasInterface,
 ): DynamicModule {
-  const { providers = [] } = definition;
+  const { imports = [], providers = [] } = definition;
   const { global = true } = extras;
 
   return {
     ...definition,
     global,
+    imports: [...imports, DiscoveryModule],
     providers: createCoreProviders({ providers }),
     exports: [CORE_MODULE_RAW_OPTIONS_TOKEN, ...createCoreExports()],
   };
@@ -63,6 +68,8 @@ export function createCoreProviders(options: {
     ...createHookFeatureProviders(),
     // Correlation feature
     ...createCorrelationFeatureProviders(),
+    // Route audit feature
+    ...createRouteAuditFeatureProviders(),
   ];
 }
 

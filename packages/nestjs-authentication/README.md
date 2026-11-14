@@ -593,6 +593,34 @@ import { isAuthPublic } from '@concepta/nestjs-authentication';
 isAuthPublic(context.getHandler(), context.getClass()); // boolean
 ```
 
+**Catching unauthenticated routes at startup:**
+
+Turn on core's [route audit](../nestjs-core/README.md#route-audit) and this
+module adds the `requireAuth` rule: startup fails for a route that no
+authentication guard runs on and that isn't `@AuthPublic()`. The global JWT
+guard, a guard given as `appGuard` (a class instance), and any guard built
+with `AuthGuard()` count, subclasses included. A subclass that lets anonymous
+callers through still counts, so mark its routes
+`@AuthPublic({ optional: true })` to keep them visible. Turning guards off
+with `settings.guards.enable: false` fails it for the whole application. A
+`settings.guards.disable` callback decides per call, so the audit can't see
+what it lets through.
+
+A guard of your own that authenticates, without `AuthGuard()`, counts once
+you declare it:
+
+```typescript
+import { AuthenticationGuard } from '@concepta/nestjs-authentication';
+
+@Injectable()
+@AuthenticationGuard()
+export class ApiKeyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    // ...
+  }
+}
+```
+
 **Guards exported:**
 
 - `JwtGuard` — `AuthGuard('jwt')` subclass with `canDisable` support.
@@ -1455,6 +1483,7 @@ gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 | `@AuthPublic(options?)` | Exempts a route (or, with `{ classLevel: true }`, a controller) from the global guard |
 | `AuthPublicOptions` / `AuthPublicMetadata` | Decorator option/metadata types |
 | `@AuthUser()` | Injects the authenticated user into a route parameter |
+| `@AuthenticationGuard()` | Declares a guard of your own as authentication for the `requireAuth` route audit rule |
 
 ### Schemas
 

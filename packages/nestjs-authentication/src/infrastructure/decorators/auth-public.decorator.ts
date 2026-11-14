@@ -1,5 +1,7 @@
 import { applyDecorators, SetMetadata } from '@nestjs/common';
 
+import { PublicRoute } from '@concepta/nestjs-core';
+
 import {
   AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
   AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
@@ -52,6 +54,8 @@ export const AuthPublic = (
   options?: AuthPublicOptions,
 ): ReturnType<typeof applyDecorators> =>
   applyDecorators(
+    // Tells route audit rules the route is open on purpose.
+    PublicRoute(),
     SetMetadata<string, AuthPublicMetadata>(
       AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
       options?.classLevel ? 'classLevel' : true,

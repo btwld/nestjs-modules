@@ -410,7 +410,10 @@ approve(@Param('id') id: string) {
 With several grants, the first one the caller holds lets them through. On a
 controller, a
 decorator applies to every route in it, unless a route declares its own.
-A route with neither is not checked.
+A route with neither is not checked. To catch one at startup, turn on core's
+[route audit](../nestjs-core/README.md#route-audit): this module adds the
+`requireAcl` rule, which fails startup for a route that has no grant and isn't
+`@AuthPublic()`.
 
 The check is a route guard: it runs after every global guard and before
 every interceptor, so nothing, such as a cached response, can let a caller

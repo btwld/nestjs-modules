@@ -13,6 +13,7 @@ import { OverlayImmutableException } from '../infrastructure/context/exceptions/
 import { OverlayNotDefinedException } from '../infrastructure/context/exceptions/overlay-not-defined.exception.js';
 import { HookNotDecoratedException } from '../infrastructure/hook/exceptions/hook-not-decorated.exception.js';
 import { HookProviderNotFoundException } from '../infrastructure/hook/exceptions/hook-provider-not-found.exception.js';
+import { RouteAuditFailedException } from '../infrastructure/route-audit/exceptions/route-audit-failed.exception.js';
 import { collectRuntimeExceptionClassNames } from '../testing/collect-runtime-exception-class-names.js';
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
@@ -61,6 +62,11 @@ const CASES: {
   {
     name: 'HookProviderNotFoundException',
     build: () => new HookProviderNotFoundException('SomeHook'),
+    fault: 'usage',
+  },
+  {
+    name: 'RouteAuditFailedException',
+    build: () => new RouteAuditFailedException(['[rule] GET /x: wrong']),
     fault: 'usage',
   },
   {

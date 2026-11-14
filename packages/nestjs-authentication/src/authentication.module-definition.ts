@@ -22,7 +22,10 @@ import { VerifyRefreshTokenHandler } from './application/queries/handlers/verify
 import { LocalService } from './application/services/local/local.service.js';
 import { RecoveryService } from './application/services/recovery/recovery.service.js';
 import { VerifyService } from './application/services/verify/verify.service.js';
-import { AUTHENTICATION_JWT_PORT_TOKEN } from './authentication.constants.js';
+import {
+  AUTHENTICATION_APP_GUARD_TOKEN,
+  AUTHENTICATION_JWT_PORT_TOKEN,
+} from './authentication.constants.js';
 import { GuardsPolicy } from './domain/policies/guards.policy.js';
 import { JwtPolicy } from './domain/policies/jwt.policy.js';
 import { AuthUserContextOverlay } from './gateways/auth-user-context.overlay.js';
@@ -31,6 +34,7 @@ import { type AuthenticationOptionsExtrasInterface } from './infrastructure/conf
 import { type AuthenticationOptionsInterface } from './infrastructure/config/interfaces/authentication-options.interface.js';
 import { NestJwtModule } from './infrastructure/jwt/jwt.externals.js';
 import { JwtService } from './infrastructure/jwt/jwt.service.js';
+import { RequireAuthRouteAuditRule } from './infrastructure/route-audit/require-auth-route-audit.rule.js';
 import { AuthRouterGuards } from './infrastructure/router/auth-router.constants.js';
 import { JwtGuard } from './infrastructure/strategies/jwt/jwt.guard.js';
 import { JwtStrategy } from './infrastructure/strategies/jwt/jwt.strategy.js';
@@ -190,6 +194,12 @@ export function createAuthenticationProviders(options: {
       : []),
     // Context overlays
     { provide: APP_INTERCEPTOR, useClass: AuthUserContextOverlay },
+    // Route audit
+    {
+      provide: AUTHENTICATION_APP_GUARD_TOKEN,
+      useValue: options.extras?.appGuard ?? false,
+    },
+    RequireAuthRouteAuditRule,
   ];
 }
 

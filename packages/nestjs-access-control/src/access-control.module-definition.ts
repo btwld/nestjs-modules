@@ -17,6 +17,7 @@ import { AccessCtxDecisionSource } from './gateways/access-ctx-decision.source.j
 import { ActorCtxResolver } from './gateways/actor-ctx.resolver.js';
 import { AccessControlFilter } from './gateways/http/access-control.filter.js';
 import { AccessControlGuard } from './gateways/http/access-control.guard.js';
+import { RequireAclRouteAuditRule } from './gateways/http/require-acl-route-audit.rule.js';
 import { accessControlDefaultConfig } from './infrastructure/config/access-control-default.config.js';
 import { type AccessControlOptionsExtrasInterface } from './infrastructure/config/interfaces/access-control-options-extras.interface.js';
 import { type AccessControlOptionsInterface } from './infrastructure/config/interfaces/access-control-options.interface.js';
@@ -115,6 +116,7 @@ export function createAccessControlProviders(options: {
       : []),
     AccessControlFilter,
     AccessControlGuard,
+    RequireAclRouteAuditRule,
   ];
 }
 

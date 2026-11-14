@@ -38,6 +38,7 @@ export {
   AuthPublicOptions,
 } from './infrastructure/decorators/auth-public.decorator.js';
 export { isAuthPublic } from './infrastructure/decorators/is-auth-public.util.js';
+export { AuthenticationGuard } from './infrastructure/decorators/authentication-guard.decorator.js';
 
 export { AuthenticationOptionsInterface } from './infrastructure/config/interfaces/authentication-options.interface.js';
 export { AuthenticationOptionsExtrasInterface } from './infrastructure/config/interfaces/authentication-options-extras.interface.js';
