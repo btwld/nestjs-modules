@@ -1135,7 +1135,7 @@ Presence of a strategy key activates that Passport strategy:
 ```typescript
 settings: {
   strategies: {
-    jwt?: JwtStrategyPolicySettingsInterface;     // { jwtFromRequest? }
+    jwt?: JwtStrategyPolicySettingsInterface;     // { jwtFromRequest?, requireUserValidation? }
     local?: LocalStrategyPolicySettingsInterface; // { usernameField?, passwordField?, loginSchema? }
     refresh?: RefreshStrategyPolicySettingsInterface; // { jwtFromRequest? }
   },
@@ -1144,6 +1144,13 @@ settings: {
 
 Omitting a strategy key entirely disables that strategy.
 `loginSchema` is any `StandardSchemaV1` (default: `localLoginSchema`).
+
+`requireUserValidation` only matters when no `ports.user` is configured, as
+when you verify tokens another service issues. Token validation through
+`TokenPort` then accepts the token without looking anyone up (the default),
+or, set to `true`, refuses with `AuthenticationUserPortRequiredException`.
+With a `UserPort`, the user is always looked up, and a missing or inactive one
+is refused.
 
 ### MFA Settings
 
