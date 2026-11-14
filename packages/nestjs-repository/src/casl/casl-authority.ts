@@ -123,6 +123,8 @@ export class CaslAuthority implements AuthorityInterface {
     }
 
     // CASL lets the last matching rule decide, so every deny goes last.
+    // CASL needs a field matcher for rules that name columns, although
+    // columns are only ever read from the rules, never matched.
     return new Ability<[string, string]>(
       [
         ...rules.filter((rule) => !rule.inverted),

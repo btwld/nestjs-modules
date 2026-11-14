@@ -200,6 +200,20 @@ describe(AccessControlService.name, () => {
       expect(actor).toEqual({ kind: 'role', roles: ['clerk'] });
     });
 
+    it('returns a copy of a system actor too', () => {
+      const actor: Actor = { kind: 'system', name: 'billing' };
+      const service = serviceDeciding({
+        decisionFor: () => ({
+          query: { actor, action: 'update', resource: 'document' },
+          ability: createAccessAbility(decisionRules),
+        }),
+      });
+      const decided = service.decision({});
+
+      expect(decided?.actor).toEqual(actor);
+      expect(decided?.actor).not.toBe(actor);
+    });
+
     it('is undefined for a call that passed no route check', () => {
       expect(
         serviceDeciding({ decisionFor: () => undefined }).decision({}),
@@ -462,6 +476,40 @@ describe(AccessControlService.name, () => {
         { actor: clerk, object: 'invoice', action: 'read', columns: [] },
       ]);
     });
+
+    // A resolver may hand over an actor carrying more than its kind has.
+    const withExtra = (actor: Actor): Actor =>
+      Object.assign({ note: 'extra' }, actor);
+
+    it.each<{ kind: string; actor: Actor; asked: Actor }>([
+      {
+        kind: 'a system',
+        actor: withExtra({ kind: 'system', name: 'billing' }),
+        asked: { kind: 'system', name: 'billing' },
+      },
+      {
+        kind: 'a signed-in',
+        actor: withExtra({ kind: 'role', roles: ['clerk'], userId: 'user-7' }),
+        asked: { kind: 'role', roles: ['clerk'], userId: 'user-7' },
+      },
+    ])(
+      'asks about $kind actor in the shape a repository asks about',
+      async ({ actor, asked }) => {
+        const authority = authorityAllowing('read invoice');
+        const service = new AccessControlService(
+          { actorFor: async () => actor },
+          new StaticAccessGrantsProvider({}),
+          undefined,
+          { decider: authority },
+        );
+
+        await service.can({}, 'read', 'invoice');
+
+        expect(authority.requests).toEqual([
+          { actor: asked, object: 'invoice', action: 'read', columns: [] },
+        ]);
+      },
+    );
 
     it('refuses what the authority refuses, naming any pending decision', async () => {
       const error = await governedService(authorityAllowing())

@@ -147,6 +147,22 @@ describe('authority over columns', () => {
       expect(orders.queries.map(({ select }) => select)).toEqual([undefined]);
     });
 
+    it('should read every column when the actor may read each one by name', async () => {
+      const orders = await ordersWith(
+        only('role:clerk', 'read', [
+          'id',
+          'tenantId',
+          'description',
+          'dateDeleted',
+        ]),
+      );
+
+      await expect(orders.find({ ctx: ctxOf(CLERK) })).resolves.toEqual([
+        ORDER,
+      ]);
+      expect(orders.queries.map(({ select }) => select)).toEqual([undefined]);
+    });
+
     it('should read an empty select as no select, which every driver reads as all', async () => {
       const orders = await ordersWith(READS);
 

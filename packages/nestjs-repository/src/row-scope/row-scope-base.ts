@@ -282,8 +282,9 @@ export abstract class RowScopeBase<
     const found = await repository.findOne(
       internalCall(
         {
-          where:
-            conditions.length === 1 ? conditions[0] : Where.and(...conditions),
+          // A write with no scope columns was refused before this read, so
+          // there is always the key and at least one scope column.
+          where: Where.and(...conditions),
           withDeleted: true,
           ctx,
         },

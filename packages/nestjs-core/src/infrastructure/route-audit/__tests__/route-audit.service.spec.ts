@@ -13,6 +13,7 @@ import {
   type Type,
   UseGuards,
   Version,
+  VERSION_NEUTRAL,
 } from '@nestjs/common';
 import { APP_GUARD, RouterModule } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -142,6 +143,43 @@ describe('RouteAuditService', () => {
     await boot();
 
     expect(runs).toBe(0);
+  });
+
+  it('names a version-neutral route, and a route on a host, apart', async () => {
+    @Controller({ path: 'status', host: 'admin.example.com' })
+    class AdminStatusController {
+      @Get()
+      @Version(VERSION_NEUTRAL)
+      show(): void {}
+
+      @Get('all')
+      @Version(['1', VERSION_NEUTRAL])
+      all(): void {}
+    }
+
+    await boot({}, { controllers: [AdminStatusController] });
+
+    expect(seen?.routes.map((route) => route.id)).toEqual([
+      'GET /status neutral @admin.example.com',
+      'GET /status/all v1,neutral @admin.example.com',
+    ]);
+  });
+
+  it('leaves out a request-scoped global guard built by a factory', async () => {
+    await boot(
+      {},
+      {
+        providers: [
+          {
+            provide: APP_GUARD,
+            scope: Scope.REQUEST,
+            useFactory: () => new GlobalGuard(),
+          },
+        ],
+      },
+    );
+
+    expect(seen?.globalGuards).toEqual([]);
   });
 
   it('gives each rule every HTTP route and the global guards', async () => {

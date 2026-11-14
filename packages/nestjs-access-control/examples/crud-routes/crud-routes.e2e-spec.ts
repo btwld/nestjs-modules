@@ -57,6 +57,35 @@ describe('CRUD routes', () => {
     },
   );
 
+  it('a clerk enters a batch of invoices, and reads them back without the notes', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/invoices/bulk')
+      .set(as('ada'))
+      .send({
+        bulk: [INVOICE, { customer: 'Initrode', amount: 80, notes: 'new' }],
+      })
+      .expect(201);
+
+    expect(created.body).toEqual([
+      { id: expect.any(String), customer: 'Initech', amount: 1200 },
+      { id: expect.any(String), customer: 'Initrode', amount: 80 },
+    ]);
+  });
+
+  it('a user with no role may not enter a batch', async () => {
+    await request(app.getHttpServer())
+      .post('/invoices/bulk')
+      .set(as('eve'))
+      .send({ bulk: [INVOICE] })
+      .expect(403);
+
+    const listed = await request(app.getHttpServer())
+      .get('/invoices')
+      .set(as('grace'))
+      .expect(200);
+    expect(listed.body.data).toHaveLength(1);
+  });
+
   it('a manager may filter on the notes', async () => {
     const listed = await request(app.getHttpServer())
       .get('/invoices?filter=notes||$starts||slow')

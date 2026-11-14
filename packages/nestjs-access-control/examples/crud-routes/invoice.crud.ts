@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  AccessControlCreateMany,
   AccessControlCreateOne,
   AccessControlDeleteOne,
   AccessControlReadMany,
@@ -12,6 +13,7 @@ import {
 import { Operation } from '@concepta/nestjs-core';
 import {
   ConfigurableCrudBuilder,
+  createBatchSchema,
   paginatedSchema,
 } from '@concepta/nestjs-crud';
 
@@ -87,6 +89,12 @@ export const { controllers, providers } =
       {
         operation: Operation.Create,
         extraDecorators: [AccessControlCreateOne(INVOICES)],
+      },
+      {
+        operation: Operation.CreateBatch,
+        request: { bodyBatch: createBatchSchema(invoiceWriteSchema) },
+        response: { serialization: { resource: z.array(invoiceSchema) } },
+        extraDecorators: [AccessControlCreateMany(INVOICES)],
       },
       {
         operation: Operation.Update,

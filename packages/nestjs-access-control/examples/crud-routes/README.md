@@ -20,6 +20,9 @@ operation declares the grant it needs through `extraDecorators`.
 - **Write fields on generated routes.** No handler of yours runs, so the
   request policy checks the body: the clerk's change to `amount` is
   refused, their change to `customer` goes through.
+- **Batches are checked item by item.** A clerk's `POST /invoices/bulk`
+  checks every item's fields, and what comes back leaves out `notes` on
+  every row.
 - **Replace writes everything.** A `PUT` erases what it leaves out, so a
   clerk, who may not write `amount`, may not replace an invoice at all.
 

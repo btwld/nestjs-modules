@@ -1,3 +1,4 @@
+import { of } from 'rxjs';
 import { mock } from 'vitest-mock-extended';
 
 import {
@@ -172,6 +173,74 @@ describe(AuthGuard.name, () => {
           return true;
         }).canActivate(context),
       ).rejects.toThrow(AuthUserConflictException);
+    });
+
+    it('refuses a call its authentication declines, defining no user', async () => {
+      const request = {};
+
+      expect(
+        await guardAuthenticating(() => false).canActivate(
+          httpContext(routes.guarded, request),
+        ),
+      ).toBe(false);
+      expect(getAppContext(request).supports(AuthUserCtx)).toBe(false);
+    });
+
+    it('defines no user when authentication lets a call through without one', async () => {
+      const request = {};
+
+      expect(
+        await guardAuthenticating(() => true).canActivate(
+          httpContext(routes.guarded, request),
+        ),
+      ).toBe(true);
+      expect(getAppContext(request).supports(AuthUserCtx)).toBe(false);
+    });
+
+    it('accepts an authentication that answers with an observable', async () => {
+      const Guard = AuthGuard('jwt', { canDisable: true });
+      Reflect.set(Object.getPrototypeOf(Guard.prototype), 'canActivate', () =>
+        of(true),
+      );
+      const guard = new Guard(
+        new GuardsPolicy({ enable: true }),
+        new Reflector(),
+      );
+
+      expect(await guard.canActivate(httpContext(routes.guarded, {}))).toBe(
+        true,
+      );
+    });
+
+    it('defines no user outside HTTP, where the request is the caller’s payload', async () => {
+      const Guard = AuthGuard('jwt', { canDisable: true });
+      Reflect.set(
+        Object.getPrototypeOf(Guard.prototype),
+        'canActivate',
+        async () => true,
+      );
+      const guard = new Guard(
+        new GuardsPolicy({ enable: true }),
+        new Reflector(),
+      );
+      const context = mock<ExecutionContext>();
+      context.getType.mockReturnValue('rpc');
+      context.getHandler.mockReturnValue(routes.guarded);
+      context.getClass.mockReturnValue(Routes);
+
+      expect(await guard.canActivate(context)).toBe(true);
+      expect(context.switchToHttp).not.toHaveBeenCalled();
+    });
+
+    it('leaves an optional route anonymous when authentication declines without refusing', async () => {
+      const request = {};
+
+      expect(
+        await guardAuthenticating(() => false).canActivate(
+          httpContext(routes.optional, request),
+        ),
+      ).toBe(true);
+      expect(getAppContext(request).supports(AuthUserCtx)).toBe(false);
     });
 
     it('leaves an optional route anonymous when authentication refuses', async () => {

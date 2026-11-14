@@ -260,6 +260,33 @@ describe('authority over related rows', () => {
       ).resolves.toEqual([{ ...OWN, department: { id: 'dep-1' } }]);
     });
 
+    it('should leave a missing joined row missing while narrowing the others', async () => {
+      const { employees } = start(readsOnly('departments', ['id']));
+      employees.rows = [EMPLOYEE, { ...OWN, id: 'emp-2', department: null }];
+
+      await expect(
+        employees.find({
+          join: [{ relation: 'department' }],
+          ctx: actorCtx(CLERK),
+        }),
+      ).resolves.toEqual([
+        { ...OWN, department: { id: 'dep-1' } },
+        { ...OWN, id: 'emp-2', department: null },
+      ]);
+    });
+
+    it('should find no row through a narrowed join', async () => {
+      const { employees } = start(readsOnly('departments', ['id']));
+
+      await expect(
+        employees.findOne({
+          where: Where.eq('id', 'emp-9'),
+          join: [{ relation: 'department' }],
+          ctx: actorCtx(CLERK),
+        }),
+      ).resolves.toBeNull();
+    });
+
     it.each([
       {
         name: 'filter',

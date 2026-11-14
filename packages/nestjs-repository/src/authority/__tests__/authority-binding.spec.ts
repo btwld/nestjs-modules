@@ -21,9 +21,10 @@ import {
   AuthorityFixture,
   type AuthorityTableFixture,
 } from '../../__fixtures__/memory/authority.fixture.js';
-import { type MemoryRepositoryFixture } from '../../__fixtures__/memory/memory-repository.fixture.js';
+import { MemoryRepositoryFixture } from '../../__fixtures__/memory/memory-repository.fixture.js';
 import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-repository.module.fixture.js';
 import {
+  ORDER_METADATA,
   ORDER_TOKEN,
   OrderEntityFixture,
   type OrderFixture,
@@ -35,6 +36,7 @@ import { RepositoryModule } from '../../repository.module.js';
 import { getDynamicRepositoryToken } from '../../utils/get-dynamic-repository-token.js';
 import { AuthorityBootException } from '../exceptions/authority-boot.exception.js';
 import { AuthorityRefusedException } from '../exceptions/authority-refused.exception.js';
+import { AuthorityUnboundException } from '../exceptions/authority-unbound.exception.js';
 
 const ALL = ['create', 'read', 'update', 'delete', 'softDelete', 'restore'];
 
@@ -246,6 +248,20 @@ describe('authority binding', () => {
       ).rejects.toThrow(AuthorityRefusedException);
     });
 
+    it('should pass the authority a signed-in actor’s user id', async () => {
+      const { orders, authority } = await ordersWith(
+        allow('role:clerk', ORDER_TOKEN, ['read']),
+      );
+
+      await orders.find({
+        ctx: actorCtx({ kind: 'role', roles: ['clerk'], userId: 'user-7' }),
+      });
+
+      expect(authority.requests.map(({ actor }) => actor)).toEqual([
+        { kind: 'role', roles: ['clerk'], userId: 'user-7' },
+      ]);
+    });
+
     it('should decide a system actor by its own key', async () => {
       const { orders } = await ordersWith(
         allow('system:billing', ORDER_TOKEN, ['read']),
@@ -393,6 +409,32 @@ describe('authority binding', () => {
   });
 
   describe('startup', () => {
+    it('should refuse replacing an attached authority', async () => {
+      const { orders } = await ordersWith({});
+
+      expect(() => orders.setAuthority(new AuthorityFixture())).toThrow(
+        AuthorityBootException,
+      );
+      // The attached one still decides.
+      await expect(orders.find({ ctx: ADMIN })).resolves.toEqual([ORDER]);
+    });
+
+    it('should refuse every call before its authority is attached', async () => {
+      const orders = new MemoryRepositoryFixture<OrderFixture>(
+        ORDER_TOKEN,
+        ORDER_METADATA,
+      );
+      orders.bind({ authority: GOVERNED.authority });
+
+      await expect(orders.find({ ctx: ADMIN })).rejects.toThrow(
+        AuthorityUnboundException,
+      );
+      await expect(orders.create(ORDER, { ctx: ADMIN })).rejects.toThrow(
+        AuthorityUnboundException,
+      );
+      expect(orders.stored).toEqual([]);
+    });
+
     it('should refuse an undeclared entity when declarations are required', async () => {
       await expect(
         compile(
