@@ -2344,7 +2344,7 @@ entity columns.
 
 `params.scope` is the authority on **who the caller is**. It is the
 `RowScopeCtx` overlay, resolved from the caller's context *before hooks run*
-so nothing downstream can change which principal you enforce against. What you
+so nothing downstream can change which caller you enforce against. What you
 receive is a fresh copy of the overlay's values each call, so mutating it
 affects nothing.
 
@@ -2354,7 +2354,7 @@ the caller's transaction. Building a fresh context instead silently drops it.
 
 **Never decide scope from `params.ctx`.** A hook can replace it, and a
 resolver reading its tenant from there lets a `beforeRead` hook choose which
-principal is enforced.
+caller is enforced.
 
 Attach the overlay from a `ContextOverlayInterceptor`, before the handler
 runs — which is the answer to "the tenant arrives in a request header":
@@ -2375,7 +2375,7 @@ export class TenantScopeOverlay extends ContextOverlayInterceptor {
 }
 ```
 
-Derive the scope from the authenticated principal. A client-supplied header is
+Derive the scope from the authenticated user. A client-supplied header is
 a tenant-spoof unless a trusted gateway sets it.
 
 Register it — without this the overlay is never attached, no scope reaches any
@@ -2504,9 +2504,11 @@ to defend later. Undeclared is allowed unless the deployment sets
 ### The actor
 
 An authority decides for an actor: a person acting through their roles, or a
-system acting on its own authority. Whatever established the caller —
-authentication, a queue consumer, a scheduled job — defines it once on the
-call's `ctx`, immutably:
+system acting on its own authority. Whatever established the caller defines
+it once on the call's `ctx`, immutably: on HTTP, access control's
+`actorResolver` turning the signed-in user into an actor, or a guard of your
+own; elsewhere, a queue consumer or a scheduled job. Authentication alone
+signs the user in but defines no actor:
 
 ```ts
 import { ActorCtx } from '@concepta/nestjs-core';
@@ -2597,9 +2599,10 @@ export class AuthorityModule {}
   `CaslAuthorityRulesInvalidException`, listing every problem.
   `authorityRuleProblems` from `@concepta/nestjs-core` runs the same check,
   for an admin screen to call before saving rules.
-- **Typos fail to compile.** `AuthorityRuleInterface` accepts only the
-  actions above; narrow the rest too, such as
-  `AuthorityRuleInterface<'read' | 'update', 'orders', keyof Order & string>`.
+- **Type your rules to catch typos.** `rulesFor` takes rules of any verb.
+  Type the rules you write as `AuthorityRuleInterface`, which accepts only
+  the actions above, and a typo fails to compile; narrow the rest too, such
+  as `AuthorityRuleInterface<'read' | 'update', 'orders', keyof Order & string>`.
 - `actorKeys` keys a person by each role (`role:<name>`) and a system by its
   name (`system:<name>`). Rules for one person alone are yours to look up, for
   example by `actor.userId`.
@@ -2609,8 +2612,9 @@ export class AuthorityModule {}
 Access control's route grants are written in the same shape. They name your
 API, not your storage: a grant's `subject` is a route's resource and its
 `fields` are paths in request and response bodies, which a mapper may rename.
-Data rules belong here, written once; see access control's README for how the
-two combine.
+The exception is a generated CRUD route's query (`filter`, `sort`), which
+reaches this repository unchanged and so names columns. Data rules belong
+here, written once; see access control's README for how the two combine.
 
 Any other engine plugs in the same way: implement `AuthorityInterface` from
 `@concepta/nestjs-core`. Its `decide(ctx, request)` is given the actor, the
@@ -2903,7 +2907,10 @@ export class ActivityActorHook {
     records: DeepPartial<Activity>[],
     ctx?: PlainLiteralObject,
   ): Promise<DeepPartial<Activity>[]> {
-    const actorId = principalOf(ctx)?.id ?? null; // null: a job or seeder
+    const host = AppContextHost.from(ctx);
+    const actor = host.supports(ActorCtx) ? host.with(ActorCtx) : undefined;
+    // null: a system, a job or a seeder
+    const actorId = actor?.kind === 'role' ? (actor.userId ?? null) : null;
     return records.map((record) => ({ ...record, actorId }));
   }
 }

@@ -1241,11 +1241,11 @@ current `CrudContextInterface`.
 | Method | Description |
 | --- | --- |
 | `CrudSpec.operation(op)` | Match a specific operation |
-| `CrudSpec.action(action)` | Match an action category |
-| `CrudSpec.isCreate()` | CREATE action |
-| `CrudSpec.isRead()` | READ action |
-| `CrudSpec.isUpdate()` | UPDATE action |
-| `CrudSpec.isDelete()` | DELETE action |
+| `CrudSpec.action(action)` | Match a category: CREATE, READ, UPDATE or DELETE |
+| `CrudSpec.isCreate()` | CREATE category |
+| `CrudSpec.isRead()` | READ category |
+| `CrudSpec.isUpdate()` | UPDATE category, restore included |
+| `CrudSpec.isDelete()` | DELETE category, soft delete included |
 | `CrudSpec.isQuery()` | List + Read operations |
 | `CrudSpec.isWrite()` | Create + CreateBatch + Update + Replace |
 | `CrudSpec.isMutation()` | All state-changing operations |
@@ -1254,6 +1254,11 @@ current `CrudContextInterface`.
 | `CrudSpec.not(spec)` | Negate a specification |
 | `CrudSpec.always()` | Always matches (default) |
 | `CrudSpec.never()` | Never matches |
+
+The categories group operations for hooks (`ctx.action`, typed
+`CrudActionCategory`). They are not what an authority decides: soft delete
+and restore are actions of their own there. Match `operation` to tell them
+apart, and never authorize by the category.
 
 ### Defining a Hook
 

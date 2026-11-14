@@ -119,6 +119,7 @@ export { Operation } from '@concepta/nestjs-core';
 
 // specifications
 export { CrudSpecContextInterface } from './infrastructure/specifications/interfaces/crud-spec-context.interface.js';
+export { CrudActionCategory } from './infrastructure/specifications/interfaces/crud-action-category.type.js';
 export { CrudSpec } from './infrastructure/specifications/crud-spec.factory.js';
 export { OperationSpecification } from './infrastructure/specifications/operation.specification.js';
 export { ActionSpecification } from './infrastructure/specifications/action.specification.js';

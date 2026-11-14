@@ -11,7 +11,7 @@ import { OperationSpecification } from '../infrastructure/specifications/operati
 
 function createContext(
   operation: Operation,
-  action: ActionEnum,
+  action: CrudSpecContextInterface['action'],
 ): CrudSpecContextInterface {
   return { operation, action };
 }
@@ -121,6 +121,21 @@ describe('CrudSpec factory', () => {
       const spec = CrudSpec.action(ActionEnum.CREATE);
 
       expect(spec).toBeInstanceOf(ActionSpecification);
+    });
+
+    it('should not take an authority action no category is', () => {
+      // Soft delete and restore are categorized as DELETE and UPDATE, so
+      // matching them as actions would never match: it fails to compile.
+      // @ts-expect-error soft delete is not a category
+      CrudSpec.action(ActionEnum.SOFT_DELETE);
+      // @ts-expect-error restore is not a category
+      CrudSpec.action(ActionEnum.RESTORE);
+
+      expect(
+        CrudSpec.isDelete().isSatisfiedBy(
+          createContext(Operation.SoftDelete, ActionEnum.DELETE),
+        ),
+      ).toBe(true);
     });
   });
 

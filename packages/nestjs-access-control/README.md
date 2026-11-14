@@ -120,8 +120,8 @@ A rule names an action, a resource, and optionally the fields it covers:
 { action: 'update', subject: 'invoice', fields: ['notes', 'dueDate'] }
 ```
 
-- **`action`** is a verb: `create`, `read`, `update`, `delete`, `restore`,
-  or one of your own, such as `approve`.
+- **`action`** is a verb: `create`, `read`, `update`, `delete`,
+  `softDelete`, `restore`, or one of your own, such as `approve`.
 - **`subject`** is the resource, matching what your routes declare.
 - **`fields`** limits the rule to those field paths. A path covers
   everything beneath it (`address` covers `address.city`), and positions in
@@ -131,8 +131,11 @@ A rule names an action, a resource, and optionally the fields it covers:
   decision still pending (`gate`) when it refuses a call.
 
 Rules are `AuthorityRuleInterface` from `@concepta/nestjs-core`, the shape
-`@concepta/nestjs-repository`'s authority reads too. Its type accepts only
-the verbs above, so a typo fails to compile; widen it for verbs of your own,
+`@concepta/nestjs-repository`'s authority reads too. `settings.grants`
+accepts any verb, since your routes may declare their own, so a typo there
+grants nothing rather than failing to compile. Type your rules as
+`AuthorityRuleInterface`, which accepts only the verbs above, and a typo
+fails to compile; widen it for verbs of your own,
 `AuthorityRuleInterface<'read' | 'approve'>`. Actions and subjects can be
 lists. A rule set is refused, at startup or when it is loaded, if any rule:
 
@@ -233,6 +236,9 @@ nest (`total_cents` stored, `pricing.total` sent). So:
   routes or not;
 - **access control's field rules are for the API alone**: a computed field,
   a response that is not an entity, a nested shape the storage doesn't have.
+  One exception: on generated CRUD routes, query fields (`filter`, `sort`,
+  `s`) reach the repository unchanged, so they are stored names (see
+  [CRUD Routes](#crud-routes)).
 
 Without an authority, your rules decide alone, as everywhere else in this
 README. See the [Shared rules](./examples/shared-rules) example.
@@ -311,14 +317,16 @@ A route marked `@AuthPublic()` never authenticates, so a grant on it
 refuses everyone. For a public route that still recognises signed-in
 callers, use `@AuthPublic({ optional: true })`.
 
-The resolver decides who may act at all: refuse a user who is disabled
-(`active: false`), since a token issued before they were disabled still
-verifies. On a refresh route, the user is whoever holds the refresh token;
-keep grants off routes that do anything but issue tokens.
+The resolver decides who may act at all. `@concepta/nestjs-authentication`
+already refuses a user turned off (`active: false`) on every call; refuse
+anyone else your application shuts out. On a refresh route, the user is
+whoever holds the refresh token; keep grants off routes that do anything but
+issue tokens.
 
-The module then defines the actor on the call's context as `ActorCtx`
-(from `@concepta/nestjs-core`), on every HTTP call, so a route handler, or
-anything it calls, checks with the same actor — repositories governed by an
+With a resolver, the module then defines the actor on the call's context as
+`ActorCtx` (from `@concepta/nestjs-core`), on every HTTP call, so a route
+handler, or anything it calls, checks with the same actor — repositories
+governed by an
 [authority](../nestjs-repository/README.md#object-authority) included. On a
 route without a grant, the actor is defined by a global interceptor, so your
 own guards and earlier interceptors don't see it yet there. The resolver

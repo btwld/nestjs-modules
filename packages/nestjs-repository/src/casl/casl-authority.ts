@@ -117,7 +117,7 @@ export class CaslAuthority implements AuthorityInterface {
     actor: Actor,
   ): Promise<CaslAuthorityAbility> {
     const rules = await this.rules.rulesFor(ctx, actor);
-    const problems = authorityRuleProblems(rules, 'rules');
+    const problems = authorityRuleProblems(rules, 'rules source');
     if (problems.length > 0) {
       throw new CaslAuthorityRulesInvalidException(problems);
     }

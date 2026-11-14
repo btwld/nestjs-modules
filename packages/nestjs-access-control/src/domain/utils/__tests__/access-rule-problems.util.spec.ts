@@ -1,3 +1,5 @@
+import { actorKeys } from '@concepta/nestjs-core';
+
 import { accessGrantsProblems } from '../access-rule-problems.util.js';
 
 describe(accessGrantsProblems.name, () => {
@@ -26,15 +28,25 @@ describe(accessGrantsProblems.name, () => {
     ]);
   });
 
-  it('refuses a key with anything before the actor kind or a space in the name', () => {
+  it('refuses a key with anything before the actor kind, or a name a space starts or ends', () => {
     expect(
       accessGrantsProblems({
         'xrole:clerk': [],
-        'role:head clerk': [],
+        'role: clerk': [],
+        'role:clerk ': [],
       }),
     ).toEqual([
       'grants key "xrole:clerk": must be role:<name> or system:<name>',
-      'grants key "role:head clerk": must be role:<name> or system:<name>',
+      'grants key "role: clerk": must be role:<name> or system:<name>',
+      'grants key "role:clerk ": must be role:<name> or system:<name>',
     ]);
+  });
+
+  it('accepts a role named with a space, as actorKeys keys it', () => {
+    expect(
+      accessGrantsProblems({
+        [actorKeys({ kind: 'role', roles: ['head clerk'] })[0] ?? '']: [],
+      }),
+    ).toEqual([]);
   });
 });

@@ -15,6 +15,7 @@ import { type CrudAdapter } from '../adapters/crud.adapter.js';
 import { type CrudAdapterProvider } from '../adapters/interfaces/crud-adapter.types.js';
 import { CrudDecoratorException } from '../exceptions/crud-decorator.exception.js';
 import { type CrudControllerEntityInterface } from '../interfaces/crud-controller-entity.interface.js';
+import { type CrudActionCategory } from '../specifications/interfaces/crud-action-category.type.js';
 
 /**
  * Gets the dynamic adapter token for a given name.
@@ -78,12 +79,14 @@ export function queryFilterIsArray(
 }
 
 /**
- * Maps a CRUD operation to its corresponding action category.
+ * Maps a CRUD operation to its category for hooks. Soft delete counts as
+ * DELETE and restore as UPDATE; an authority decides those as actions of
+ * their own.
  *
  * @param operation - The CRUD operation (List, Read, Create, etc.)
  * @returns The action category (CREATE, READ, UPDATE, DELETE)
  */
-export function operationToAction(operation: Operation): ActionEnum {
+export function operationToAction(operation: Operation): CrudActionCategory {
   switch (operation) {
     case Operation.Create:
     case Operation.CreateBatch:

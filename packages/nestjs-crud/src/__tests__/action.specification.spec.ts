@@ -5,7 +5,7 @@ import { type CrudSpecContextInterface } from '../infrastructure/specifications/
 
 function createContext(
   operation: Operation,
-  action: ActionEnum,
+  action: CrudSpecContextInterface['action'],
 ): CrudSpecContextInterface {
   return { operation, action };
 }

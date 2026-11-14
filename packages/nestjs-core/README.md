@@ -436,9 +436,10 @@ event context starts a fresh pair.
 
 `ActorCtx` carries who is acting on a call: a person through their roles, or
 a system acting on its own authority. Whatever established the caller defines
-it once, immutably, and every package that decides access reads it from the
-same place. `frozenActor` copies the actor with its `roles` frozen too, so
-nothing holding the array can change who was decided:
+it once, immutably (on HTTP, access control's `actorResolver`, which turns
+the signed-in user into an actor), and every package that decides access
+reads it from the same place. `frozenActor` copies the actor with its `roles`
+frozen too, so nothing holding the array can change who was decided:
 
 ```ts
 import { ActorCtx, frozenActor } from '@concepta/nestjs-core';
@@ -465,7 +466,9 @@ Rules are written in one shape wherever they are used, the repository's
 authority and access control's grants alike: `AuthorityRuleInterface`, plain
 JSON naming an `action` (a verb), a `subject`, optional `fields`, and
 `inverted: true` with a `reason` for a deny. Its type accepts only
-`ActionEnum`'s verbs unless you widen it, so a typo fails to compile.
+`ActionEnum`'s verbs unless you widen it, so a typo in rules you type with it
+fails to compile. Where rules are handed over (`settings.grants`, a rules
+source) any verb is accepted, since a route may name one of its own.
 `authorityRuleProblems(rules, source)` checks rules read from storage,
 listing every problem: conditions, unknown properties, field patterns, and
 CASL's wildcards `manage` and `all` are refused.
@@ -1312,7 +1315,7 @@ exercise correlation behavior directly.
 
 | Export | Description |
 | --- | --- |
-| `ActionEnum` | Enum of CRUD action names (`CREATE`, `READ`, `UPDATE`, `DELETE`). |
+| `ActionEnum` | Enum of the actions an authority decides (`CREATE`, `READ`, `UPDATE`, `DELETE`, `SOFT_DELETE`, `RESTORE`). |
 | `Operation` | String enum of the nine operations: `List`, `Read`, `Create`, `CreateBatch`, `Update`, `Replace`, `Delete`, `SoftDelete`, `Restore`. |
 | `ReadOperations` | Read-only tuple `[List, Read]`. |
 | `WriteOperations` | Read-only tuple `[Create, CreateBatch, Update, Replace]`. |

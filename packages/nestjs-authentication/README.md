@@ -1422,6 +1422,27 @@ This is exactly how the `@AuthUser()` decorator resolves the user, and it is
 useful in command/query handlers that need access to the authenticated user
 without taking it as a parameter.
 
+The signed-in user is not yet an actor: repositories governed by an
+authority, and access control, decide by core's `ActorCtx`. Access
+control's `actorResolver` turns this user into one, with the roles your
+application gives them:
+
+```typescript
+AccessControlModule.forRoot({
+  actorResolver: {
+    actorFor: async (ctx) => {
+      const host = AppContextHost.from(ctx);
+      const user = host.supports(AuthUserCtx)
+        ? host.with(AuthUserCtx).user
+        : undefined;
+      return user
+        ? { kind: 'role', roles: await rolesOf(user.id), userId: user.id }
+        : undefined;
+    },
+  },
+});
+```
+
 The guard that authenticates a call defines it, immutably, so guards that run
 after it, such as an authorization guard, can read it, and nothing later in
 the call can change who the user is. A second guard on the same call that
