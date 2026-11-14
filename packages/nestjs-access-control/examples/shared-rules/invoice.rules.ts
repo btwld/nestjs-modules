@@ -11,7 +11,7 @@ import {
   type CaslAuthorityRulesInterface,
 } from '@concepta/nestjs-repository/optional/casl';
 
-export const INVOICES = 'invoices';
+export const INVOICE = 'invoice';
 
 /**
  * The one rule set: what each role may do with invoices, and with which
@@ -20,16 +20,16 @@ export const INVOICES = 'invoices';
  */
 export const INVOICE_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
-    { action: ['create', 'read', 'update'], subject: INVOICES },
+    { action: ['create', 'read', 'update'], subject: INVOICE },
     {
       action: 'read',
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['internalNotes'],
       inverted: true,
     },
   ],
   'role:manager': [
-    { action: ['create', 'read', 'update', 'delete'], subject: INVOICES },
+    { action: ['create', 'read', 'update', 'delete'], subject: INVOICE },
   ],
 };
 
@@ -41,7 +41,7 @@ export const ROUTE_GRANTS: AccessGrants = {
   'role:clerk': [
     {
       action: 'update',
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['amount'],
       inverted: true,
     },

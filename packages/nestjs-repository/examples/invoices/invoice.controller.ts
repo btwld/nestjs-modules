@@ -7,12 +7,12 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type InvoiceEntity } from './invoice.entities.js';
-import { INVOICES } from './invoice.rules.js';
+import { INVOICE } from './invoice.rules.js';
 
 @Controller('invoices')
 export class InvoiceController {
   constructor(
-    @InjectDynamicRepository(INVOICES)
+    @InjectDynamicRepository(INVOICE)
     private readonly invoices: RepositoryInterface<InvoiceEntity>,
   ) {}
 

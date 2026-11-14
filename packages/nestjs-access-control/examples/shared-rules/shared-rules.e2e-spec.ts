@@ -56,7 +56,7 @@ describe('Shared rules', () => {
       .delete(`/invoices/${invoiceId}`)
       .set(as('ada'))
       .expect(403)
-      .expect(refused('delete', 'invoices', 'authority'));
+      .expect(refused('delete', 'invoice', 'authority'));
   });
 
   it('a manager deletes', async () => {

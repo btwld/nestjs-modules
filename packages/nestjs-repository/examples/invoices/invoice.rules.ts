@@ -8,32 +8,32 @@ import {
 import { RowScopeBase } from '@concepta/nestjs-repository';
 import { type CaslAuthorityRulesInterface } from '@concepta/nestjs-repository/optional/casl';
 
-export const CUSTOMERS = 'customers';
-export const INVOICES = 'invoices';
-export const INVOICE_LINES = 'invoice-lines';
+export const CUSTOMER = 'customer';
+export const INVOICE = 'invoice';
+export const INVOICE_LINE = 'invoice-line';
 
 export const INVOICE_RULES: Record<string, AuthorityRuleInterface[]> = {
   // Clerks keep invoices, and see customers without their credit limit.
   'role:clerk': [
     {
       action: ['create', 'read', 'update'],
-      subject: [INVOICES, INVOICE_LINES],
+      subject: [INVOICE, INVOICE_LINE],
     },
-    { action: 'read', subject: CUSTOMERS },
+    { action: 'read', subject: CUSTOMER },
     {
       action: 'read',
-      subject: CUSTOMERS,
+      subject: CUSTOMER,
       fields: ['creditLimit'],
       inverted: true,
     },
   ],
   // Intake enters invoices from the mail, and reads nothing back.
-  'role:intake': [{ action: 'create', subject: [INVOICES, INVOICE_LINES] }],
+  'role:intake': [{ action: 'create', subject: [INVOICE, INVOICE_LINE] }],
   // A junior may raise an invoice, but not its lines.
-  'role:junior': [{ action: 'create', subject: INVOICES }],
+  'role:junior': [{ action: 'create', subject: INVOICE }],
   // Collections see invoices and every customer column, lines aside.
-  'role:collector': [{ action: 'read', subject: [INVOICES, CUSTOMERS] }],
-  'system:seeder': [{ action: 'create', subject: CUSTOMERS }],
+  'role:collector': [{ action: 'read', subject: [INVOICE, CUSTOMER] }],
+  'system:seeder': [{ action: 'create', subject: CUSTOMER }],
 };
 
 @Injectable()

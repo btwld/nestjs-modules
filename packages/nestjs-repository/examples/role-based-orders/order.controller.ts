@@ -19,7 +19,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type OrderEntity } from './order.entity.js';
-import { ORDERS } from './order.rules.js';
+import { ORDER } from './order.rules.js';
 
 /**
  * A plain controller: it passes the request's `ctx` to every repository call
@@ -29,7 +29,7 @@ import { ORDERS } from './order.rules.js';
 @Controller('orders')
 export class OrderController {
   constructor(
-    @InjectDynamicRepository(ORDERS)
+    @InjectDynamicRepository(ORDER)
     private readonly orders: RepositoryInterface<OrderEntity>,
   ) {}
 

@@ -8,7 +8,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type OrderEntity } from './order.entity.js';
-import { ORDERS } from './order.rules.js';
+import { ORDER } from './order.rules.js';
 
 /**
  * A job the billing integration triggers, outside any HTTP request. It acts
@@ -18,7 +18,7 @@ import { ORDERS } from './order.rules.js';
 @Injectable()
 export class BillingSyncJob {
   constructor(
-    @InjectDynamicRepository(ORDERS)
+    @InjectDynamicRepository(ORDER)
     private readonly orders: RepositoryInterface<OrderEntity>,
   ) {}
 

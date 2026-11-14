@@ -4,7 +4,7 @@ A documents API whose rules live in a table an admin edits at runtime. Nobody
 may read documents until the admin adds a rule saying so.
 
 [`stored-rules.ts`](./stored-rules.ts) answers `CaslAuthority` from the
-`rules` table. The table is governed too: only an `admin` may edit it, by
+`stored_rule` table. The table is governed too: only an `admin` may edit it, by
 rules fixed in code, since the rules that protect the table cannot live in
 it. The table is read as the `authority` system, on a `ctx` of its own, so a
 caller who may not read the rules is still decided by them.

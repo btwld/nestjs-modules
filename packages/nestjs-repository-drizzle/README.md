@@ -218,7 +218,7 @@ export class Book {
           driver: DrizzlePostgresRepositoryModule,
           entities: [
             {
-              key: 'books',
+              key: 'book',
               entity: Book,
               table: books,
               removeDate: 'removedAt',
@@ -234,8 +234,8 @@ export class AppModule {}
 ```
 
 Each key gets a repository from your adapter (`DrizzlePostgresRepository`,
-…). Import `RepositoryModule.forFeature(['books'])` in a module to inject it
-there with `@InjectDynamicRepository('books')`. Rows come back as instances
+…). Import `RepositoryModule.forFeature(['book'])` in a module to inject it
+there with `@InjectDynamicRepository('book')`. Rows come back as instances
 of `entity`, holding the table's columns.
 
 ### Provider Options
@@ -287,7 +287,7 @@ import { InjectDynamicRepository, type RepositoryInterface } from '@concepta/nes
 @Injectable()
 export class BookService {
   constructor(
-    @InjectDynamicRepository('books')
+    @InjectDynamicRepository('book')
     private readonly bookRepo: RepositoryInterface<Book>,
   ) {}
 
@@ -390,7 +390,7 @@ import { TransactionScope } from '@concepta/nestjs-repository';
 export class BookService {
   constructor(
     private readonly txScope: TransactionScope,
-    @InjectDynamicRepository('books')
+    @InjectDynamicRepository('book')
     private readonly bookRepo: RepositoryInterface<Book>,
   ) {}
 
@@ -432,7 +432,7 @@ RepositoryModule.forRoot({
   drivers: [
     {
       driver: DrizzlePostgresRepositoryModule,
-      entities: [{ key: 'orders', entity: Order, table: orders }],
+      entities: [{ key: 'order', entity: Order, table: orders }],
       options: {
         transactionSettings: (ctx) => ({
           'app.tenant_id': ctx.supports(RowScopeCtx)

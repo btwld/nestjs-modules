@@ -481,8 +481,8 @@ CASL's wildcards `manage` and `all` are refused.
 import { type AuthorityRuleInterface } from '@concepta/nestjs-core';
 
 const clerk: AuthorityRuleInterface[] = [
-  { action: ['create', 'read', 'update'], subject: 'orders' },
-  { action: 'update', subject: 'orders', fields: ['total'], inverted: true },
+  { action: ['create', 'read', 'update'], subject: 'order' },
+  { action: 'update', subject: 'order', fields: ['total'], inverted: true },
 ];
 ```
 

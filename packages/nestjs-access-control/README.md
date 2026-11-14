@@ -198,7 +198,7 @@ AccessControlModule.forRootAsync({
   imports: [AuthorityModule],
   inject: [CaslAuthority],
   useFactory: (authority: CaslAuthority) => ({
-    authority: { authority, except: ['reports'] },
+    authority: { authority, except: ['report'] },
     actorResolver,
   }),
 });
@@ -206,8 +206,8 @@ AccessControlModule.forRootAsync({
 
 - **The authority decides each route first.** A route's resource is read
   as the authority's subject and its action as the verb, so
-  `@AccessControlDeleteOne('invoices')` asks whether the actor may `delete`
-  `invoices`. A refusal is a `403` with refusal `authority`, before the
+  `@AccessControlDeleteOne('invoice')` asks whether the actor may `delete`
+  an `invoice`. A refusal is a `403` with refusal `authority`, before the
   handler runs. Name a route's resource as the entity is keyed in
   `RepositoryModule.forRoot()`: a misspelled one is refused by the
   authority, so the mistake shows. Which rows the caller reaches is row
@@ -215,7 +215,7 @@ AccessControlModule.forRootAsync({
   rules, columns included.
 - **`except` names the routes that are yours alone.** A route on a resource
   no entity stands behind, such as `@AccessControlGrant({ resource:
-  'reports', action: 'export' })`, is decided by your rules as if there
+  'report', action: 'export' })`, is decided by your rules as if there
   were no authority, once its resource is in `except`: nothing is allowed
   without a rule allowing it. Until then, the authority refuses it.
 - **Elsewhere, your own rules only narrow, by denying.**
@@ -553,6 +553,12 @@ In a handler, `AccessControlService.decision(ctx)` returns the same grant:
 who is acting and the action and resource the call was let through on, or
 `undefined` on a call no route checked.
 
+The two answer a caller differently. A record an access query service
+refuses is a `403`, which tells the caller the record exists. Row scope
+leaves a row outside the caller's reach out of every read, so the route
+answers as it would for a missing record, a `404`. Where even a record's
+existence is private, use row scope.
+
 ## Checking in Handlers
 
 The route guard checks the resource, not the body. In a checked route's
@@ -706,7 +712,7 @@ actor overlay of its own.
 | `AccessRulesInvalidException` | 500 | `usage` | A rule set cannot be used |
 
 `AccessRefusedException`'s message names only the action and the resource,
-such as `Not allowed to delete invoices`. Its context names the `action`,
+such as `Not allowed to delete invoice`. Its context names the `action`,
 the `resource`, the `actor` (who they are only: their kind, and their roles
 and user id or their name), and a `refusal`:
 

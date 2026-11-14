@@ -13,15 +13,15 @@ import {
 
 import { type AccessGrants } from '../../domain/interfaces/access-grants.type.js';
 
-export const CUSTOMERS = 'customers';
-export const INVOICES = 'invoices';
-export const INVOICE_LINES = 'invoice-lines';
+export const CUSTOMER = 'customer';
+export const INVOICE = 'invoice';
+export const INVOICE_LINE = 'invoice-line';
 
 /** A resource no entity stands behind, left to access control's rules. */
-export const REPORTS = 'reports';
+export const REPORT = 'report';
 
 /** A resource nobody listed in `except`, and no entity stands behind. */
-export const LEDGERS = 'ledgers';
+export const LEDGER = 'ledger';
 
 /**
  * The one data rule set: what each role may do with which entity and which
@@ -34,18 +34,18 @@ export const AUTHORITY_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
     {
       action: ['create', 'read', 'update'],
-      subject: [INVOICES, INVOICE_LINES],
+      subject: [INVOICE, INVOICE_LINE],
     },
     {
       action: ['read', 'create', 'update'],
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['internalNotes'],
       inverted: true,
     },
-    { action: 'read', subject: CUSTOMERS },
+    { action: 'read', subject: CUSTOMER },
     {
       action: 'read',
-      subject: CUSTOMERS,
+      subject: CUSTOMER,
       fields: ['creditLimit'],
       inverted: true,
     },
@@ -54,29 +54,29 @@ export const AUTHORITY_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:manager': [
     {
       action: ['create', 'read', 'update', 'delete', 'softDelete', 'restore'],
-      subject: [INVOICES, INVOICE_LINES],
+      subject: [INVOICE, INVOICE_LINE],
     },
-    { action: 'read', subject: CUSTOMERS },
+    { action: 'read', subject: CUSTOMER },
   ],
   // Supervisors read and soft delete, but never delete for good or restore.
   'role:supervisor': [
-    { action: ['read', 'softDelete'], subject: [INVOICES, INVOICE_LINES] },
+    { action: ['read', 'softDelete'], subject: [INVOICE, INVOICE_LINE] },
   ],
   // A junior may raise an invoice, but not its lines.
   'role:junior': [
-    { action: ['create', 'read'], subject: INVOICES },
+    { action: ['create', 'read'], subject: INVOICE },
     {
       action: ['read', 'create'],
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['internalNotes'],
       inverted: true,
     },
   ],
   // Intake enters invoices from the mail, and reads nothing back.
-  'role:intake': [{ action: 'create', subject: [INVOICES, INVOICE_LINES] }],
+  'role:intake': [{ action: 'create', subject: [INVOICE, INVOICE_LINE] }],
   // Collections read invoices and every customer column.
-  'role:collector': [{ action: 'read', subject: [INVOICES, CUSTOMERS] }],
-  'system:seeder': [{ action: 'create', subject: CUSTOMERS }],
+  'role:collector': [{ action: 'read', subject: [INVOICE, CUSTOMER] }],
+  'system:seeder': [{ action: 'create', subject: CUSTOMER }],
 };
 
 /**
@@ -87,14 +87,14 @@ export const ROUTE_GRANTS: AccessGrants = {
   'role:clerk': [
     {
       action: 'update',
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['amount'],
       inverted: true,
     },
   ],
   'role:manager': [
-    { action: 'read', subject: REPORTS },
-    { action: 'read', subject: LEDGERS },
+    { action: 'read', subject: REPORT },
+    { action: 'read', subject: LEDGER },
   ],
 };
 

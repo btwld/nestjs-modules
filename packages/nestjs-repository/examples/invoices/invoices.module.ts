@@ -16,9 +16,9 @@ import {
   InvoiceLineEntity,
 } from './invoice.entities.js';
 import {
-  CUSTOMERS,
-  INVOICE_LINES,
-  INVOICES,
+  CUSTOMER,
+  INVOICE,
+  INVOICE_LINE,
   InvoiceRules,
   TenantRowScope,
 } from './invoice.rules.js';
@@ -55,16 +55,16 @@ export class InvoiceAuthorityModule {}
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [
-            { key: CUSTOMERS, entity: CustomerEntity, authority: GOVERNED },
+            { key: CUSTOMER, entity: CustomerEntity, authority: GOVERNED },
             {
-              key: INVOICES,
+              key: INVOICE,
               entity: InvoiceEntity,
               authority: GOVERNED,
               rowScope: TENANT,
               relations: { lines: { cascade: true } },
             },
             {
-              key: INVOICE_LINES,
+              key: INVOICE_LINE,
               entity: InvoiceLineEntity,
               authority: GOVERNED,
               rowScope: TENANT,
@@ -73,7 +73,7 @@ export class InvoiceAuthorityModule {}
         },
       ],
     }),
-    RepositoryModule.forFeature([CUSTOMERS, INVOICES]),
+    RepositoryModule.forFeature([CUSTOMER, INVOICE]),
   ],
   controllers: [InvoiceController],
   providers: [{ provide: APP_GUARD, useClass: DemoActorGuard }],

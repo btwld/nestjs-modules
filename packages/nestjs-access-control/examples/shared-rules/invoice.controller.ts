@@ -25,7 +25,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type InvoiceEntity } from './invoice.entity.js';
-import { INVOICES } from './invoice.rules.js';
+import { INVOICE } from './invoice.rules.js';
 
 /**
  * Each route declares the action it takes; access control decides it by
@@ -35,25 +35,25 @@ import { INVOICES } from './invoice.rules.js';
 @Controller('invoices')
 export class InvoiceController {
   constructor(
-    @InjectDynamicRepository(INVOICES)
+    @InjectDynamicRepository(INVOICE)
     private readonly invoices: RepositoryInterface<InvoiceEntity>,
     private readonly accessControl: AccessControlService,
   ) {}
 
   @Get()
-  @AccessControlReadMany(INVOICES)
+  @AccessControlReadMany(INVOICE)
   list(@Ctx() ctx: AppContextHost) {
     return this.invoices.find({ ctx });
   }
 
   @Post()
-  @AccessControlCreateOne(INVOICES)
+  @AccessControlCreateOne(INVOICE)
   create(@Ctx() ctx: AppContextHost, @Body() body: Partial<InvoiceEntity>) {
     return this.invoices.create(body, { ctx });
   }
 
   @Patch(':id')
-  @AccessControlUpdateOne(INVOICES)
+  @AccessControlUpdateOne(INVOICE)
   async update(
     @Ctx() ctx: AppContextHost,
     @Param('id') id: string,
@@ -64,7 +64,7 @@ export class InvoiceController {
   }
 
   @Delete(':id')
-  @AccessControlDeleteOne(INVOICES)
+  @AccessControlDeleteOne(INVOICE)
   async delete(@Ctx() ctx: AppContextHost, @Param('id') id: string) {
     return this.invoices.delete(await this.find(ctx, id), { ctx });
   }

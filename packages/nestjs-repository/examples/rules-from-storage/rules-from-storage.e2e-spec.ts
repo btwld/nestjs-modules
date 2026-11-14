@@ -12,7 +12,7 @@ import {
 
 import { type DocumentEntity } from './document.entity.js';
 import { RulesFromStorageModule } from './rules-from-storage.module.js';
-import { DOCUMENTS } from './stored-rules.js';
+import { DOCUMENT } from './stored-rules.js';
 
 describe('Rules from storage', () => {
   let app: INestApplication;
@@ -33,7 +33,7 @@ describe('Rules from storage', () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    documents = app.get(getDynamicRepositoryToken(DOCUMENTS));
+    documents = app.get(getDynamicRepositoryToken(DOCUMENT));
     const seeder = new AppContextHost();
     seeder.defineOverlay(
       ActorCtx,
@@ -45,7 +45,7 @@ describe('Rules from storage', () => {
     await grant({
       actorKey: 'system:seeder',
       action: 'create',
-      subject: DOCUMENTS,
+      subject: DOCUMENT,
     });
     await documents.create(
       { title: 'Handbook', body: 'Be kind.' },
@@ -63,7 +63,7 @@ describe('Rules from storage', () => {
   });
 
   it('a rule an admin adds decides the very next request', async () => {
-    await grant({ actorKey: 'role:clerk', action: 'read', subject: DOCUMENTS });
+    await grant({ actorKey: 'role:clerk', action: 'read', subject: DOCUMENT });
 
     const listed = await request(app.getHttpServer())
       .get('/documents')
@@ -79,7 +79,7 @@ describe('Rules from storage', () => {
     await grant({
       actorKey: 'role:intern',
       action: 'read',
-      subject: DOCUMENTS,
+      subject: DOCUMENT,
       fields: ['id', 'title'],
     });
 
@@ -97,7 +97,7 @@ describe('Rules from storage', () => {
     const rule = await grant({
       actorKey: 'role:clerk',
       action: 'read',
-      subject: DOCUMENTS,
+      subject: DOCUMENT,
     });
 
     await request(app.getHttpServer())
@@ -112,11 +112,11 @@ describe('Rules from storage', () => {
   });
 
   it('a deny waiting on a decision refuses, and names the decision in its context', async () => {
-    await grant({ actorKey: 'role:clerk', action: 'read', subject: DOCUMENTS });
+    await grant({ actorKey: 'role:clerk', action: 'read', subject: DOCUMENT });
     await grant({
       actorKey: 'role:clerk',
       action: 'read',
-      subject: DOCUMENTS,
+      subject: DOCUMENT,
       inverted: true,
       reason: 'DEC-7: documents await legal review',
     });
@@ -150,7 +150,7 @@ describe('Rules from storage', () => {
     await request(app.getHttpServer())
       .post('/rules')
       .set(as('clerk'))
-      .send({ actorKey: 'role:clerk', action: 'read', subject: DOCUMENTS })
+      .send({ actorKey: 'role:clerk', action: 'read', subject: DOCUMENT })
       .expect(403);
   });
 });

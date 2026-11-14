@@ -15,7 +15,7 @@ import { InvoiceController } from './invoice.controller.js';
 import { InvoiceEntity } from './invoice.entity.js';
 import {
   InvoiceAuthorityModule,
-  INVOICES,
+  INVOICE,
   ROUTE_GRANTS,
   USER_ROLES,
 } from './invoice.rules.js';
@@ -37,7 +37,7 @@ import {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [
             {
-              key: INVOICES,
+              key: INVOICE,
               entity: InvoiceEntity,
               authority: { access: 'governed', authority: CaslAuthority },
             },
@@ -45,7 +45,7 @@ import {
         },
       ],
     }),
-    RepositoryModule.forFeature([INVOICES]),
+    RepositoryModule.forFeature([INVOICE]),
     // The routes: decided by the same authority, narrowed by ROUTE_GRANTS.
     AccessControlModule.forRootAsync({
       imports: [InvoiceAuthorityModule],

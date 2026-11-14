@@ -7,7 +7,7 @@ import {
 } from '@concepta/nestjs-core';
 import { type CaslAuthorityRulesInterface } from '@concepta/nestjs-repository/optional/casl';
 
-export const ORDERS = 'orders';
+export const ORDER = 'order';
 
 /**
  * Who may do what with orders, by actor key. An application might keep these
@@ -15,17 +15,17 @@ export const ORDERS = 'orders';
  */
 export const ORDER_RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
-    { action: ['create', 'read', 'update'], subject: ORDERS },
+    { action: ['create', 'read', 'update'], subject: ORDER },
     // Clerks never see what an order costs the business...
-    { action: 'read', subject: ORDERS, fields: ['cost'], inverted: true },
+    { action: 'read', subject: ORDER, fields: ['cost'], inverted: true },
     // ...and never change what the customer pays.
-    { action: 'update', subject: ORDERS, fields: ['total'], inverted: true },
+    { action: 'update', subject: ORDER, fields: ['total'], inverted: true },
   ],
-  'role:manager': [{ action: ['read', 'update', 'delete'], subject: ORDERS }],
+  'role:manager': [{ action: ['read', 'update', 'delete'], subject: ORDER }],
   // The billing integration reads orders and settles them, nothing else.
   'system:billing-sync': [
-    { action: 'read', subject: ORDERS },
-    { action: 'update', subject: ORDERS, fields: ['total', 'status'] },
+    { action: 'read', subject: ORDER },
+    { action: 'update', subject: ORDER, fields: ['total', 'status'] },
   ],
 };
 

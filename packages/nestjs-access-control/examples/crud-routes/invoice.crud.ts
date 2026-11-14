@@ -19,7 +19,7 @@ import {
 
 import { type InvoiceEntity } from './invoice.entity.js';
 
-export const INVOICES = 'invoice';
+export const INVOICE = 'invoice';
 
 /**
  * Clerks enter and correct invoices, but never see the notes, and never
@@ -27,22 +27,22 @@ export const INVOICES = 'invoice';
  */
 export const INVOICE_GRANTS: AccessGrants = {
   'role:clerk': [
-    { action: ['create', 'read', 'update'], subject: INVOICES },
+    { action: ['create', 'read', 'update'], subject: INVOICE },
     {
       action: 'read',
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['notes'],
       inverted: true,
     },
     {
       action: 'update',
-      subject: INVOICES,
+      subject: INVOICE,
       fields: ['amount'],
       inverted: true,
     },
   ],
   'role:manager': [
-    { action: ['create', 'read', 'update', 'delete'], subject: INVOICES },
+    { action: ['create', 'read', 'update', 'delete'], subject: INVOICE },
   ],
 };
 
@@ -70,7 +70,7 @@ export const { controllers, providers } =
   new ConfigurableCrudBuilder<InvoiceEntity>({
     controller: {
       path: 'invoices',
-      entity: INVOICES,
+      entity: INVOICE,
       request: { body: invoiceWriteSchema },
       response: {
         resource: invoiceSchema,
@@ -80,34 +80,34 @@ export const { controllers, providers } =
     operations: [
       {
         operation: Operation.List,
-        extraDecorators: [AccessControlReadMany(INVOICES)],
+        extraDecorators: [AccessControlReadMany(INVOICE)],
       },
       {
         operation: Operation.Read,
-        extraDecorators: [AccessControlReadOne(INVOICES)],
+        extraDecorators: [AccessControlReadOne(INVOICE)],
       },
       {
         operation: Operation.Create,
-        extraDecorators: [AccessControlCreateOne(INVOICES)],
+        extraDecorators: [AccessControlCreateOne(INVOICE)],
       },
       {
         operation: Operation.CreateBatch,
         request: { bodyBatch: createBatchSchema(invoiceWriteSchema) },
         response: { serialization: { resource: z.array(invoiceSchema) } },
-        extraDecorators: [AccessControlCreateMany(INVOICES)],
+        extraDecorators: [AccessControlCreateMany(INVOICE)],
       },
       {
         operation: Operation.Update,
         request: { body: invoiceUpdateSchema },
-        extraDecorators: [AccessControlUpdateOne(INVOICES)],
+        extraDecorators: [AccessControlUpdateOne(INVOICE)],
       },
       {
         operation: Operation.Replace,
-        extraDecorators: [AccessControlReplaceOne(INVOICES)],
+        extraDecorators: [AccessControlReplaceOne(INVOICE)],
       },
       {
         operation: Operation.Delete,
-        extraDecorators: [AccessControlDeleteOne(INVOICES)],
+        extraDecorators: [AccessControlDeleteOne(INVOICE)],
       },
     ],
   }).build();

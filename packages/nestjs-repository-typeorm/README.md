@@ -222,8 +222,8 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
         {
           driver: TypeOrmPostgresRepositoryModule,
           entities: [
-            { key: 'orders', entity: OrderEntity },
-            { key: 'customers', entity: CustomerEntity, dataSource: 'secondary' },
+            { key: 'order', entity: OrderEntity },
+            { key: 'customer', entity: CustomerEntity, dataSource: 'secondary' },
             { key: 'audit', entity: AuditLog, factory: createAuditRepository },
           ],
         },
@@ -236,8 +236,8 @@ export class AppModule {}
 
 Each entity key gets a repository from your adapter
 (`TypeOrmPostgresRepository`, …); inject it typed as `TypeOrmRepository`.
-Import `RepositoryModule.forFeature(['orders'])` in a module to inject it
-there with `@InjectDynamicRepository('orders')`.
+Import `RepositoryModule.forFeature(['order'])` in a module to inject it
+there with `@InjectDynamicRepository('order')`.
 
 ### Provider Options
 
@@ -284,7 +284,7 @@ import { TypeOrmRepository } from '@concepta/nestjs-repository-typeorm';
 @Injectable()
 export class OrderService {
   constructor(
-    @InjectDynamicRepository('orders')
+    @InjectDynamicRepository('order')
     private readonly orderRepo: TypeOrmRepository<OrderEntity>,
   ) {}
 
@@ -596,7 +596,7 @@ import { TransactionScope } from '@concepta/nestjs-repository';
 export class OrderService {
   constructor(
     private readonly txScope: TransactionScope,
-    @InjectDynamicRepository('orders')
+    @InjectDynamicRepository('order')
     private readonly orderRepo: TypeOrmRepository<OrderEntity>,
   ) {}
 
@@ -631,7 +631,7 @@ RepositoryModule.forRoot({
   drivers: [
     {
       driver: TypeOrmPostgresRepositoryModule,
-      entities: [{ key: 'orders', entity: Order }],
+      entities: [{ key: 'order', entity: Order }],
       options: {
         transactionSettings: (ctx) => ({
           'app.tenant_id': ctx.supports(RowScopeCtx)
@@ -747,7 +747,7 @@ RepositoryModule.forRoot({
   drivers: [
     {
       driver: TypeOrmOracleRepositoryModule,
-      entities: [{ key: 'orders', entity: Order }],
+      entities: [{ key: 'order', entity: Order }],
       options: {
         applicationContext: {
           procedure: 'app_owner.app_ctx_pkg.set_value',
@@ -872,7 +872,7 @@ RepositoryModule.forRoot({
   drivers: [
     {
       driver: TypeOrmSqlServerRepositoryModule,
-      entities: [{ key: 'orders', entity: Order }],
+      entities: [{ key: 'order', entity: Order }],
       options: {
         sessionContext: (ctx) => ({
           tenant_id: ctx.supports(RowScopeCtx)
@@ -1129,12 +1129,12 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
       drivers: [
         {
           driver: TypeOrmPostgresRepositoryModule,
-          entities: [{ key: 'orders', entity: OrderEntity }],
+          entities: [{ key: 'order', entity: OrderEntity }],
         },
       ],
     }),
     DurableMessagingModule.forRoot({
-      key: 'orders',
+      key: 'order',
       driver: TypeOrmDurable,
       outbox: { retry: 10 },
     }),

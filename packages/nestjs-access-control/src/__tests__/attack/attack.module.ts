@@ -37,10 +37,10 @@ import {
 import {
   AttackAuthorityModule,
   AttackTenantRowScope,
-  CUSTOMERS,
-  INVOICE_LINES,
-  INVOICES,
-  REPORTS,
+  CUSTOMER,
+  INVOICE,
+  INVOICE_LINE,
+  REPORT,
   ROUTE_GRANTS,
 } from './attack.rules.js';
 
@@ -58,7 +58,7 @@ const ATTACK_JWT_REFRESH_SECRET = 'attack-refresh-secret-at-least-32-chars';
 export class AttackUserModule {}
 
 @Module({
-  imports: [RepositoryModule.forFeature([INVOICES])],
+  imports: [RepositoryModule.forFeature([INVOICE])],
   controllers: [
     ...Object.values(controllers),
     AttackDeskController,
@@ -123,19 +123,19 @@ const TENANT = { access: 'scoped', resolver: AttackTenantRowScope } as const;
           driver: TypeOrmSqliteRepositoryModule,
           entities: [
             {
-              key: CUSTOMERS,
+              key: CUSTOMER,
               entity: AttackCustomerEntity,
               authority: GOVERNED,
             },
             {
-              key: INVOICES,
+              key: INVOICE,
               entity: AttackInvoiceEntity,
               authority: GOVERNED,
               rowScope: TENANT,
               relations: { lines: { cascade: true } },
             },
             {
-              key: INVOICE_LINES,
+              key: INVOICE_LINE,
               entity: AttackInvoiceLineEntity,
               authority: GOVERNED,
               rowScope: TENANT,
@@ -151,7 +151,7 @@ const TENANT = { access: 'scoped', resolver: AttackTenantRowScope } as const;
         authority: CaslAuthority,
         actorResolver: AttackActorResolver,
       ) => ({
-        authority: { authority, except: [REPORTS] },
+        authority: { authority, except: [REPORT] },
         settings: { grants: ROUTE_GRANTS },
         actorResolver,
       }),

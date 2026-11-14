@@ -18,7 +18,7 @@ import { AccessControlSoftDeleteOne } from '../../gateways/decorators/access-con
 import { AccessControlUpdateOne } from '../../gateways/decorators/access-control-update-one.decorator.js';
 
 import { type AttackInvoiceEntity } from './attack.entities.js';
-import { INVOICES } from './attack.rules.js';
+import { INVOICE } from './attack.rules.js';
 
 const dateSchema = z.union([z.date(), z.string()]).nullable();
 
@@ -78,7 +78,7 @@ export const { controllers, providers } =
   new ConfigurableCrudBuilder<AttackInvoiceEntity>({
     controller: {
       path: 'invoices',
-      entity: INVOICES,
+      entity: INVOICE,
       // A cascade refused halfway leaves nothing behind.
       transactional: true,
       request: { body: invoiceWriteSchema },
@@ -90,43 +90,43 @@ export const { controllers, providers } =
     operations: [
       {
         operation: Operation.List,
-        extraDecorators: [AccessControlReadMany(INVOICES)],
+        extraDecorators: [AccessControlReadMany(INVOICE)],
       },
       {
         operation: Operation.Read,
-        extraDecorators: [AccessControlReadOne(INVOICES)],
+        extraDecorators: [AccessControlReadOne(INVOICE)],
       },
       {
         operation: Operation.Create,
-        extraDecorators: [AccessControlCreateOne(INVOICES)],
+        extraDecorators: [AccessControlCreateOne(INVOICE)],
       },
       {
         operation: Operation.CreateBatch,
         request: { bodyBatch: createBatchSchema(invoiceWriteSchema) },
         response: { serialization: { resource: z.array(invoiceSchema) } },
-        extraDecorators: [AccessControlCreateMany(INVOICES)],
+        extraDecorators: [AccessControlCreateMany(INVOICE)],
       },
       {
         operation: Operation.Update,
         request: { body: invoiceUpdateSchema },
-        extraDecorators: [AccessControlUpdateOne(INVOICES)],
+        extraDecorators: [AccessControlUpdateOne(INVOICE)],
       },
       {
         operation: Operation.Replace,
-        extraDecorators: [AccessControlReplaceOne(INVOICES)],
+        extraDecorators: [AccessControlReplaceOne(INVOICE)],
       },
       {
         operation: Operation.Delete,
-        extraDecorators: [AccessControlDeleteOne(INVOICES)],
+        extraDecorators: [AccessControlDeleteOne(INVOICE)],
       },
       {
         operation: Operation.SoftDelete,
         path: 'soft/:id',
-        extraDecorators: [AccessControlSoftDeleteOne(INVOICES)],
+        extraDecorators: [AccessControlSoftDeleteOne(INVOICE)],
       },
       {
         operation: Operation.Restore,
-        extraDecorators: [AccessControlRestoreOne(INVOICES)],
+        extraDecorators: [AccessControlRestoreOne(INVOICE)],
       },
     ],
   }).build();

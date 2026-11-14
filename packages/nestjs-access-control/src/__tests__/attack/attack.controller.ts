@@ -19,7 +19,7 @@ import {
   type AttackCustomerEntity,
   type AttackInvoiceEntity,
 } from './attack.entities.js';
-import { INVOICES, LEDGERS, REPORTS } from './attack.rules.js';
+import { INVOICE, LEDGER, REPORT } from './attack.rules.js';
 
 /** Open to anyone: a load balancer's probe. */
 @Controller('health')
@@ -35,21 +35,21 @@ export class AttackHealthController {
 @Controller('desk')
 export class AttackDeskController {
   constructor(
-    @InjectDynamicRepository(INVOICES)
+    @InjectDynamicRepository(INVOICE)
     private readonly invoices: RepositoryInterface<AttackInvoiceEntity>,
     private readonly accessControl: AccessControlService,
   ) {}
 
   /** Each invoice with its customer. */
   @Get('invoices')
-  @AccessControlReadMany(INVOICES)
+  @AccessControlReadMany(INVOICE)
   list(@Ctx() ctx: AppContextHost) {
     return this.invoices.find({ join: [{ relation: 'customer' }], ctx });
   }
 
   /** Invoices of customers allowed to owe a lot: filters a joined column. */
   @Get('invoices/large-credit')
-  @AccessControlReadMany(INVOICES)
+  @AccessControlReadMany(INVOICE)
   largeCredit(@Ctx() ctx: AppContextHost) {
     return this.invoices.find({
       join: [{ relation: 'customer' }],
@@ -63,7 +63,7 @@ export class AttackDeskController {
 
   /** Creates an invoice and its lines in one call, all or nothing. */
   @Post('invoices')
-  @AccessControlCreateOne(INVOICES)
+  @AccessControlCreateOne(INVOICE)
   @Transactional()
   async create(
     @Ctx() ctx: AppContextHost,
@@ -78,21 +78,21 @@ export class AttackDeskController {
    * so nobody is acting on it. It must be refused, never run unrestricted.
    */
   @Get('invoices/detached')
-  @AccessControlReadMany(INVOICES)
+  @AccessControlReadMany(INVOICE)
   detached() {
     return this.invoices.find({ ctx: new AppContextHost() });
   }
 
   /** A report no entity stands behind, left to access control's rules. */
   @Get('reports/aging')
-  @AccessControlGrant({ resource: REPORTS, action: 'read' })
+  @AccessControlGrant({ resource: REPORT, action: 'read' })
   aging() {
     return { buckets: [] };
   }
 
   /** A resource the authority doesn't know, and nobody exempted. */
   @Get('ledgers')
-  @AccessControlGrant({ resource: LEDGERS, action: 'read' })
+  @AccessControlGrant({ resource: LEDGER, action: 'read' })
   ledgers() {
     return { entries: [] };
   }

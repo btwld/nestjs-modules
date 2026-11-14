@@ -10,7 +10,7 @@ import {
 } from '@concepta/nestjs-repository';
 
 import { type CustomerEntity } from './invoice.entities.js';
-import { CUSTOMERS } from './invoice.rules.js';
+import { CUSTOMER } from './invoice.rules.js';
 import { InvoicesModule } from './invoices.module.js';
 
 describe('Invoices with lines and customers', () => {
@@ -46,7 +46,7 @@ describe('Invoices with lines and customers', () => {
       },
     );
     const customers: RepositoryInterface<CustomerEntity> = app.get(
-      getDynamicRepositoryToken(CUSTOMERS),
+      getDynamicRepositoryToken(CUSTOMER),
     );
     customer = await customers.create(
       { name: 'Initech', creditLimit: 50000 },

@@ -16,20 +16,20 @@ import { type CaslAuthorityRulesInterface } from '@concepta/nestjs-repository/op
 
 import { type StoredRuleEntity } from './stored-rule.entity.js';
 
-export const DOCUMENTS = 'documents';
-export const RULES = 'rules';
+export const DOCUMENT = 'document';
+export const RULE = 'rule';
 
 /**
  * Rules that cannot live in the table they govern: who may edit the rules,
  * and the system that reads them.
  */
 const FIXED_RULES: Record<string, AuthorityRuleInterface[]> = {
-  'role:admin': [{ action: ['create', 'read', 'delete'], subject: RULES }],
-  'system:authority': [{ action: 'read', subject: RULES }],
+  'role:admin': [{ action: ['create', 'read', 'delete'], subject: RULE }],
+  'system:authority': [{ action: 'read', subject: RULE }],
 };
 
 /**
- * Every actor's rules, from the `rules` table, plus the fixed ones.
+ * Every actor's rules, from the `stored_rule` table, plus the fixed ones.
  *
  * The table is governed too, so it is read as the `authority` system — on a
  * ctx of its own, whose rules are fixed — rather than as the caller, who may
@@ -38,7 +38,7 @@ const FIXED_RULES: Record<string, AuthorityRuleInterface[]> = {
 @Injectable()
 export class StoredRules implements CaslAuthorityRulesInterface {
   constructor(
-    @InjectDynamicRepository(RULES)
+    @InjectDynamicRepository(RULE)
     private readonly rules: RepositoryInterface<StoredRuleEntity>,
   ) {}
 

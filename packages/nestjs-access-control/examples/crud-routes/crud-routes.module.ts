@@ -17,15 +17,15 @@ import { demoRequestOf } from '../shared/demo-request.util.js';
 
 import {
   controllers,
+  INVOICE,
   INVOICE_GRANTS,
-  INVOICES,
   providers,
   USER_ROLES,
 } from './invoice.crud.js';
 import { InvoiceEntity } from './invoice.entity.js';
 
 @Module({
-  imports: [RepositoryModule.forFeature([INVOICES])],
+  imports: [RepositoryModule.forFeature([INVOICE])],
   controllers: Object.values(controllers),
   providers,
 })
@@ -44,7 +44,7 @@ class InvoiceCrudModule {}
       drivers: [
         {
           driver: TypeOrmSqliteRepositoryModule,
-          entities: [{ key: INVOICES, entity: InvoiceEntity }],
+          entities: [{ key: INVOICE, entity: InvoiceEntity }],
         },
       ],
     }),

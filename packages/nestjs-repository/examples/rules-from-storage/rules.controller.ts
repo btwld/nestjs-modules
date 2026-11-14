@@ -17,13 +17,13 @@ import {
 
 import { type DocumentEntity } from './document.entity.js';
 import { type StoredRuleEntity } from './stored-rule.entity.js';
-import { DOCUMENTS, RULES } from './stored-rules.js';
+import { DOCUMENT, RULE } from './stored-rules.js';
 
 /** An admin edits the rules; the next request is decided by them. */
 @Controller('rules')
 export class RulesController {
   constructor(
-    @InjectDynamicRepository(RULES)
+    @InjectDynamicRepository(RULE)
     private readonly rules: RepositoryInterface<StoredRuleEntity>,
   ) {}
 
@@ -43,7 +43,7 @@ export class RulesController {
 @Controller('documents')
 export class DocumentController {
   constructor(
-    @InjectDynamicRepository(DOCUMENTS)
+    @InjectDynamicRepository(DOCUMENT)
     private readonly documents: RepositoryInterface<DocumentEntity>,
   ) {}
 

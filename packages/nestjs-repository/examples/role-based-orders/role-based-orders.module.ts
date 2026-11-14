@@ -12,7 +12,7 @@ import { DemoActorGuard } from '../shared/demo-actor.guard.js';
 import { BillingSyncJob } from './billing-sync.job.js';
 import { OrderController } from './order.controller.js';
 import { OrderEntity } from './order.entity.js';
-import { ORDERS, OrderRules } from './order.rules.js';
+import { ORDER, OrderRules } from './order.rules.js';
 
 /** The authority, built from the application's rules. */
 @Module({
@@ -44,7 +44,7 @@ export class OrderAuthorityModule {}
           driver: TypeOrmSqliteRepositoryModule,
           entities: [
             {
-              key: ORDERS,
+              key: ORDER,
               entity: OrderEntity,
               authority: { access: 'governed', authority: CaslAuthority },
             },
@@ -52,7 +52,7 @@ export class OrderAuthorityModule {}
         },
       ],
     }),
-    RepositoryModule.forFeature([ORDERS]),
+    RepositoryModule.forFeature([ORDER]),
   ],
   controllers: [OrderController],
   providers: [BillingSyncJob, { provide: APP_GUARD, useClass: DemoActorGuard }],

@@ -12,13 +12,13 @@ import { DemoActorGuard } from '../shared/demo-actor.guard.js';
 import { DocumentEntity } from './document.entity.js';
 import { DocumentController, RulesController } from './rules.controller.js';
 import { StoredRuleEntity } from './stored-rule.entity.js';
-import { DOCUMENTS, RULES, StoredRules } from './stored-rules.js';
+import { DOCUMENT, RULE, StoredRules } from './stored-rules.js';
 
 const GOVERNED = { access: 'governed', authority: CaslAuthority } as const;
 
-/** The authority, reading its rules from the `rules` table. */
+/** The authority, reading its rules from the `stored_rule` table. */
 @Module({
-  imports: [RepositoryModule.forFeature([RULES])],
+  imports: [RepositoryModule.forFeature([RULE])],
   providers: [
     StoredRules,
     {
@@ -46,13 +46,13 @@ export class StoredAuthorityModule {}
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [
-            { key: DOCUMENTS, entity: DocumentEntity, authority: GOVERNED },
-            { key: RULES, entity: StoredRuleEntity, authority: GOVERNED },
+            { key: DOCUMENT, entity: DocumentEntity, authority: GOVERNED },
+            { key: RULE, entity: StoredRuleEntity, authority: GOVERNED },
           ],
         },
       ],
     }),
-    RepositoryModule.forFeature([DOCUMENTS, RULES]),
+    RepositoryModule.forFeature([DOCUMENT, RULE]),
   ],
   controllers: [DocumentController, RulesController],
   providers: [{ provide: APP_GUARD, useClass: DemoActorGuard }],

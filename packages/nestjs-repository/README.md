@@ -90,8 +90,8 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
         {
           driver: YourDriverModule,
           entities: [
-            { key: 'orders', entity: Order },
-            { key: 'customers', entity: Customer },
+            { key: 'order', entity: Order },
+            { key: 'customer', entity: Customer },
           ],
         },
       ],
@@ -129,7 +129,7 @@ RepositoryModule.forRoot({
       driver: YourDriverModule,
       entities: [
         {
-          key: 'orders',
+          key: 'order',
           entity: Order,
           rowScope: { access: 'scoped', resolver: OrdersRowScope },
         },
@@ -150,7 +150,7 @@ Entities stay static; only the settings come from the factory.
       drivers: [
         {
           driver: YourDriverModule,
-          entities: [{ key: 'orders', entity: Order }],
+          entities: [{ key: 'order', entity: Order }],
         },
       ],
       imports: [ConfigModule],
@@ -177,13 +177,13 @@ module that imports it, by key:
 @Injectable()
 export class OrdersService {
   constructor(
-    @InjectDynamicRepository('orders')
+    @InjectDynamicRepository('order')
     private readonly orders: RepositoryInterface<Order>,
   ) {}
 }
 
 @Module({
-  imports: [RepositoryModule.forFeature(['orders', 'customers'])],
+  imports: [RepositoryModule.forFeature(['order', 'customer'])],
   providers: [OrdersService],
 })
 export class OrdersModule {}
@@ -701,7 +701,7 @@ RepositoryModule.forRoot({
     {
       driver: YourDriverModule,
       entities: [{
-        key: 'users',
+        key: 'user',
         entity: UserEntity,
         relations: {
           posts: { federated: true }, // read through its own repository
@@ -768,11 +768,11 @@ Mark a relation `cascade: true`, and its rows are written with the entity:
 ```ts
 entities: [
   {
-    key: 'invoices',
+    key: 'invoice',
     entity: InvoiceEntity,
     relations: { lines: { cascade: true } },
   },
-  { key: 'invoice-lines', entity: InvoiceLineEntity },
+  { key: 'invoice-line', entity: InvoiceLineEntity },
 ],
 ```
 
@@ -927,7 +927,7 @@ RepositoryModule.forRoot({
     {
       driver: YourDriverModule,
       entities: [
-        { key: 'comments', entity: CommentEntity, allowEagerRelations: true },
+        { key: 'comment', entity: CommentEntity, allowEagerRelations: true },
       ],
     },
   ],
@@ -1738,7 +1738,7 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
         {
           driver: YourDriverModule,
           entities: [
-            { key: 'orders', entity: Order, hooks: [OrderDefaultsHook] },
+            { key: 'order', entity: Order, hooks: [OrderDefaultsHook] },
           ],
         },
       ],
@@ -2036,12 +2036,12 @@ Register it for every tenant-owned entity:
 ```ts
 entities: [
   {
-    key: 'orders',
+    key: 'order',
     entity: Order,
     rowScope: { access: 'scoped', resolver: TenantRowScope },
   },
   {
-    key: 'order-lines',
+    key: 'order-line',
     entity: OrderLine,
     rowScope: { access: 'scoped', resolver: TenantRowScope },
   },
@@ -2165,14 +2165,14 @@ A foreign key that must point inside the caller's scope is the common case:
 nothing about a scoped read on the child says which parent a child points at.
 Give the child its own resolver, override `scopeWrite` (call `super` first), and
 inject the repository to read. Its module imports that repository with
-`RepositoryModule.forFeature(['orders'])` — not a circular dependency, since a
+`RepositoryModule.forFeature(['order'])` — not a circular dependency, since a
 repository never depends on its resolver:
 
 ```ts
 @Injectable()
 export class OrderLinesRowScope extends RowScopeBase<TenantScope> {
   constructor(
-    @InjectDynamicRepository('orders')
+    @InjectDynamicRepository('order')
     private readonly orders: RepositoryInterface<Order>,
   ) {
     super({ scope: ['tenantId'], joinable: true });
@@ -2481,12 +2481,12 @@ RepositoryModule.forRoot({
       driver: MyDriverModule,
       entities: [
         {
-          key: 'orders',
+          key: 'order',
           entity: OrderEntity,
           authority: { access: 'governed', authority: CaslAuthority },
         },
         {
-          key: 'countries',
+          key: 'country',
           entity: CountryEntity,
           authority: { access: 'open', reason: 'public reference data' },
         },
@@ -2552,13 +2552,13 @@ import {
 
 const RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
-    { action: ['create', 'read', 'update'], subject: 'orders' },
+    { action: ['create', 'read', 'update'], subject: 'order' },
     // Clerks never change a total, whatever else allows it
-    { action: 'update', subject: 'orders', fields: ['total'], inverted: true },
+    { action: 'update', subject: 'order', fields: ['total'], inverted: true },
   ],
-  'role:auditor': [{ action: 'read', subject: 'orders' }],
+  'role:auditor': [{ action: 'read', subject: 'order' }],
   'system:billing-sync': [
-    { action: 'update', subject: 'orders', fields: ['total', 'status'] },
+    { action: 'update', subject: 'order', fields: ['total', 'status'] },
   ],
 };
 
@@ -2602,7 +2602,7 @@ export class AuthorityModule {}
 - **Type your rules to catch typos.** `rulesFor` takes rules of any verb.
   Type the rules you write as `AuthorityRuleInterface`, which accepts only
   the actions above, and a typo fails to compile; narrow the rest too, such
-  as `AuthorityRuleInterface<'read' | 'update', 'orders', keyof Order & string>`.
+  as `AuthorityRuleInterface<'read' | 'update', 'order', keyof Order & string>`.
 - `actorKeys` keys a person by each role (`role:<name>`) and a system by its
   name (`system:<name>`). Rules for one person alone are yours to look up, for
   example by `actor.userId`.
@@ -2711,7 +2711,7 @@ bypasses the repository, is outside it.
 ### Refusals
 
 `AuthorityRefusedException` is a `403`. Its message names only the action and
-the entity's key (`Not allowed to read orders`). Its `context`, for logs and
+the entity's key (`Not allowed to read order`). Its `context`, for logs and
 never in the response, holds the `entityKey` and `action`, why it was refused
 (`refusal`: `no-actor` when the call names no actor, `authority` otherwise),
 who asked (`actor`, as the authority was asked about them), and the columns
@@ -2740,7 +2740,7 @@ RepositoryModule.forRoot({
       driver: YourDriverModule,
       entities: [
         {
-          key: 'statement-items',
+          key: 'statement-item',
           entity: StatementItem,
           writePolicy: { access: 'append-only', reason: 'financial lineage is retained' },
         },
@@ -2844,9 +2844,9 @@ RepositoryModule.forRoot({
     {
       driver: YourDriverModule,
       entities: [
-        { key: 'invoices', entity: Invoice, activity: { store: 'activity' } },
+        { key: 'invoice', entity: Invoice, activity: { store: 'activity' } },
         {
-          key: 'users',
+          key: 'user',
           entity: User,
           activity: { store: 'activity', values: true, omit: ['passwordHash'] },
         },
@@ -2955,7 +2955,7 @@ entity's datasource.
 ```ts
 const history = await activity.find({
   where: Where.and(
-    Where.eq('entityKey', 'invoices'),
+    Where.eq('entityKey', 'invoice'),
     Where.eq('recordId', invoice.id),
   ),
   ...OrderBy.order(OrderBy.asc<Activity>('occurredAt')),
@@ -3007,9 +3007,9 @@ import { DurableMessagingModule } from '@concepta/nestjs-repository/optional/out
 
 @Module({
   imports: [
-    RepositoryModule.forRoot({ /* ... the 'orders' registration ... */ }),
+    RepositoryModule.forRoot({ /* ... the 'order' registration ... */ }),
     DurableMessagingModule.forRoot({
-      key: 'orders',              // the registration whose datasource holds the outbox
+      key: 'order',               // the registration whose datasource holds the outbox
       driver: YourDriverDurable,  // from your driver's optional/outbox
       outbox: { retry: 10 },      // passed to OutboxModule.forRoot()
     }),
@@ -3026,7 +3026,7 @@ export class OrdersService {
   constructor(
     private readonly txScope: TransactionScope,
     private readonly durable: DurableMessaging,
-    @InjectDynamicRepository('orders')
+    @InjectDynamicRepository('order')
     private readonly orders: RepositoryInterface<Order>,
   ) {}
 
@@ -3090,7 +3090,7 @@ type instead, set `retryIf` and the number of attempts:
 
 ```ts
 DurableMessagingModule.forRoot({
-  key: 'orders',
+  key: 'order',
   driver: YourDriverDurable,
   outbox: {
     retry: {
@@ -3137,13 +3137,13 @@ RepositoryModule.forRoot({
     {
       driver: YourDriverModule,
       entities: [
-        { key: 'users', entity: UserEntity },
-        { key: 'users', entity: AdminEntity }, // duplicate key!
+        { key: 'user', entity: UserEntity },
+        { key: 'user', entity: AdminEntity }, // duplicate key!
       ],
     },
   ],
 });
-// Throws: Duplicate repository keys: "users" (registered for UserEntity, attempted for AdminEntity)
+// Throws: Duplicate repository keys: "user" (registered for UserEntity, attempted for AdminEntity)
 ```
 
 `forRoot()` is imported once. Importing it a second time fails at startup.
@@ -3161,12 +3161,12 @@ RepositoryModule.forRoot({
     {
       driver: YourDriverModule,
       entities: [
-        { key: 'users', entity: UserEntity, relations: { posts: { federated: true } } },
+        { key: 'user', entity: UserEntity, relations: { posts: { federated: true } } },
       ],
     },
     {
       driver: YourOtherDriverModule, // posts live in another database
-      entities: [{ key: 'posts', entity: PostEntity }],
+      entities: [{ key: 'post', entity: PostEntity }],
     },
   ],
 });
@@ -3283,7 +3283,7 @@ import { InjectDynamicRepository } from '@concepta/nestjs-repository';
 @Injectable()
 export class OrderService {
   constructor(
-    @InjectDynamicRepository('orders')
+    @InjectDynamicRepository('order')
     private readonly orderRepo: RepositoryInterface<Order>,
   ) {}
 

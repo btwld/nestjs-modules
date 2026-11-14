@@ -35,7 +35,7 @@ import {
   type AttackInvoiceLineEntity,
 } from './attack.entities.js';
 import { AttackModule } from './attack.module.js';
-import { CUSTOMERS, INVOICE_LINES } from './attack.rules.js';
+import { CUSTOMER, INVOICE_LINE } from './attack.rules.js';
 
 /** A context acting as `actor` in `tenantId`, for checking what is stored. */
 function storedAs(actor: Actor, tenantId?: string): AppContextHost {
@@ -112,7 +112,7 @@ describe('Attack round: one application, every layer', () => {
   const globexLines = (): Promise<AttackInvoiceLineEntity[]> =>
     app
       .get<RepositoryInterface<AttackInvoiceLineEntity>>(
-        getDynamicRepositoryToken(INVOICE_LINES),
+        getDynamicRepositoryToken(INVOICE_LINE),
       )
       .find({
         ctx: storedAs(
@@ -147,7 +147,7 @@ describe('Attack round: one application, every layer', () => {
 
     customer = await app
       .get<RepositoryInterface<AttackCustomerEntity>>(
-        getDynamicRepositoryToken(CUSTOMERS),
+        getDynamicRepositoryToken(CUSTOMER),
       )
       .create(
         { name: 'Initech', creditLimit: 50000 },
@@ -246,7 +246,7 @@ describe('Attack round: one application, every layer', () => {
         .set(as('alice'))
         .expect(403);
 
-      expect(refused.body.message).toEqual('Not allowed to delete invoices');
+      expect(refused.body.message).toEqual('Not allowed to delete invoice');
       expect(lastRefusal()).toEqual('authority');
       expect(await managerRead()).toEqual({
         ...clerkView(),
@@ -298,7 +298,7 @@ describe('Attack round: one application, every layer', () => {
         .set(as('grace'))
         .expect(403);
 
-      expect(refused.body.message).toEqual('Not allowed to read ledgers');
+      expect(refused.body.message).toEqual('Not allowed to read ledger');
       expect(lastRefusal()).toEqual('authority');
     });
 
@@ -312,7 +312,7 @@ describe('Attack round: one application, every layer', () => {
         .get('/desk/reports/aging')
         .set(as('alice'))
         .expect(403);
-      expect(refused.body.message).toEqual('Not allowed to read reports');
+      expect(refused.body.message).toEqual('Not allowed to read report');
       expect(lastRefusal()).toEqual('no-grant');
     });
   });
@@ -881,7 +881,7 @@ describe('Attack round: one application, every layer', () => {
         .expect(200, [
           {
             action: 'update',
-            subject: 'invoices',
+            subject: 'invoice',
             fields: ['amount'],
             inverted: true,
           },
@@ -925,7 +925,7 @@ describe('Attack round: one application, every layer', () => {
       expect(
         await app
           .get<RepositoryInterface<AttackInvoiceLineEntity>>(
-            getDynamicRepositoryToken(INVOICE_LINES),
+            getDynamicRepositoryToken(INVOICE_LINE),
           )
           .find({
             where: Where.eq('id', globexLineId),
