@@ -1,3 +1,4 @@
+/** Every {@link AccessRefusal}, for code that checks or lists them. */
 export const ACCESS_REFUSALS = [
   'no-actor',
   'no-grant',

@@ -1,3 +1,4 @@
+/** What `AccessControlService`'s `can` and `assert` check besides the action. */
 export interface AccessCheckOptionsInterface {
   /**
    * Field paths the action touches, such as the keys of a write body. Each

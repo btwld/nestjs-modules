@@ -32,15 +32,11 @@ export { AccessControlUpdateOne } from './gateways/decorators/access-control-upd
 export { AccessControlContext } from './domain/access-control.context.js';
 export { CanAccess } from './domain/interfaces/can-access.interface.js';
 export { accessGrantsProblems } from './domain/utils/access-rule-problems.util.js';
-export { createAccessAbility } from './domain/utils/create-access-ability.util.js';
 export { AccessControlService } from './domain/services/access-control.service.js';
 export { AccessControlException } from './domain/exceptions/access-control.exception.js';
 export { AccessRefusedException } from './domain/exceptions/access-refused.exception.js';
 export { AccessRulesInvalidException } from './domain/exceptions/access-rules-invalid.exception.js';
-export {
-  accessFieldPaths,
-  normalizeAccessFieldPath,
-} from './domain/utils/access-field-paths.util.js';
+export { accessFieldPaths } from './domain/utils/access-field-paths.util.js';
 export { AccessAbility } from './domain/interfaces/access-ability.type.js';
 export { AccessActorResolverInterface } from './domain/interfaces/access-actor-resolver.interface.js';
 export { AccessCheckOptionsInterface } from './domain/interfaces/access-check-options.interface.js';

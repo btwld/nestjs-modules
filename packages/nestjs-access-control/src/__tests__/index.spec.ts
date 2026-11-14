@@ -11,7 +11,6 @@ import {
   AccessControlGuard,
   AccessControlModule,
   accessGrantsProblems,
-  createAccessAbility,
   AccessControlQuery,
   AccessControlReadMany,
   AccessControlReadOne,
@@ -26,9 +25,9 @@ import {
   AccessRulesInvalidException,
   accessFieldPaths,
   AccessContextOverlay,
-  normalizeAccessFieldPath,
   StaticAccessGrantsProvider,
 } from '../index.js';
+import * as index from '../index.js';
 
 describe('Index', () => {
   it('exports module and runtime classes', () => {
@@ -38,16 +37,16 @@ describe('Index', () => {
     expect(AccessControlContext).toEqual(expect.any(Function));
     expect(AccessControlService).toEqual(expect.any(Function));
     expect(accessGrantsProblems).toEqual(expect.any(Function));
-    expect(createAccessAbility).toEqual(expect.any(Function));
     expect(ActorCtxResolver).toEqual(expect.any(Function));
     expect(AccessCtxDecisionSource).toEqual(expect.any(Function));
     expect(StaticAccessGrantsProvider).toEqual(expect.any(Function));
     expect(typeof ACCESS_CONTROL_MODULE_SETTINGS_TOKEN).toEqual('string');
   });
 
-  it('exports the field path helpers', () => {
+  it('exports the field path helper, and keeps its own internals private', () => {
     expect(accessFieldPaths).toEqual(expect.any(Function));
-    expect(normalizeAccessFieldPath).toEqual(expect.any(Function));
+    expect(index).not.toHaveProperty('normalizeAccessFieldPath');
+    expect(index).not.toHaveProperty('createAccessAbility');
   });
 
   it('exports the exceptions and refusals', () => {
