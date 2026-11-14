@@ -19,7 +19,7 @@ export class CaslAuthorityRulesInvalidException extends RuntimeException {
       ...options,
     });
 
-    this.errorCode = 'CASL_AUTHORITY_RULES_INVALID';
+    this.errorCode = 'CASL_AUTHORITY_RULES_INVALID_ERROR';
     this.context = { ...this.context, problems };
   }
 }

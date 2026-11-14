@@ -36,6 +36,15 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
+  4. **errorCodes without the `_ERROR` suffix** (S, wire-visible) — the convention is
+      that every `errorCode` ends in `_ERROR` (user, 2026-11-14). About 55 v8 codes
+      don't: core 13 (`HOOK_NOT_DECORATED`, `OVERLAY_*`, `CURRENCY_*`, `MONEY_*`,
+      `APP_CONTEXT_UNAVAILABLE`, `RUNTIME_EXCEPTION`), repository 29 (`ENTITY_NOT_FOUND`,
+      `ROW_SCOPE_*`, `TRANSACTION_*`, `*_BOOT_CHECK_FAILED`, ...), TypeORM driver 4,
+      Drizzle driver 2, user 3, otp 1, cache 1, crud 1. Rename in one sweep, with the
+      tests and READMEs that name them; list them with
+      `grep -rhoE "errorCode = '[A-Z_]+'" packages/*/src | grep -v "_ERROR'"`.
+
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.

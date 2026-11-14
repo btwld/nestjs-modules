@@ -13,6 +13,6 @@ export class RouteAuditFailedException extends RuntimeException {
       ...options,
     });
 
-    this.errorCode = 'ROUTE_AUDIT_FAILED';
+    this.errorCode = 'ROUTE_AUDIT_FAILED_ERROR';
   }
 }

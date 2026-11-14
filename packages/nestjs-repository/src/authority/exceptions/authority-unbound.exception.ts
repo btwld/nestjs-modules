@@ -28,6 +28,6 @@ export class AuthorityUnboundException extends RuntimeException {
     });
 
     this.context = { ...this.context, entityKey };
-    this.errorCode = 'AUTHORITY_UNBOUND';
+    this.errorCode = 'AUTHORITY_UNBOUND_ERROR';
   }
 }

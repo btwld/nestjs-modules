@@ -48,6 +48,6 @@ export class AuthorityRefusedException extends RuntimeException {
       ...(details.gate === undefined ? {} : { gate: details.gate }),
       ...(details.columns === undefined ? {} : { columns: details.columns }),
     };
-    this.errorCode = 'AUTHORITY_REFUSED';
+    this.errorCode = 'AUTHORITY_REFUSED_ERROR';
   }
 }

@@ -21,6 +21,6 @@ export class AuthorityBootException extends RuntimeException {
     });
 
     this.context = { ...this.context, failures };
-    this.errorCode = 'AUTHORITY_BOOT_CHECK_FAILED';
+    this.errorCode = 'AUTHORITY_BOOT_CHECK_FAILED_ERROR';
   }
 }
