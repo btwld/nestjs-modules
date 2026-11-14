@@ -402,6 +402,10 @@ guarantees: row scope, write policy and hooks never see what it does.
   dropped from a create or update without an error. An `update` or `replace`
   whose `data` names nothing else fails with `RepositoryQueryException`, since
   TypeORM is left with nothing to set.
+- **`@Column({ select: false })`** leaves the column out of a read only when
+  the read selects nothing; a read that names its columns gets it. Whether it
+  does depends on the read, so it hides nothing: to keep a column from
+  callers, deny it in the entity's authority or exclude it from the route.
 - **A column `transformer`** runs on the values `eq`, `in` and the range
   operators compare, but not on a text operator's pattern: `contains`,
   `starts` and `ends` match the value as stored.

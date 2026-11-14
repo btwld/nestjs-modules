@@ -23,6 +23,8 @@ import {
   OrderEntityFixture,
   type OrderFixture,
 } from '../../__fixtures__/memory/order.fixture.js';
+import { RepositoryQueryException } from '../../exceptions/repository-query.exception.js';
+import { UnknownColumnException } from '../../exceptions/unknown-column.exception.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
 import { SortOrder } from '../../repository/repository.types.js';
 import { Where } from '../../repository/where.helpers.js';
@@ -180,6 +182,75 @@ describe('authority over columns', () => {
       await refusal(orders.find({ ctx: ctxOf(CLERK) }));
       await refusal(orders.find({ select: [], ctx: ctxOf(CLERK) }));
       expect(orders.queries).toEqual([]);
+    });
+
+    describe('within', () => {
+      it('should read the columns within it the actor may read, leaving out the rest', async () => {
+        const orders = await ordersWith(READS);
+
+        await expect(
+          orders.find({
+            within: ['id', 'tenantId', 'description'],
+            ctx: ctxOf(CLERK),
+          }),
+        ).resolves.toEqual([{ id: ORDER.id, description: ORDER.description }]);
+        expect(orders.queries).toEqual([
+          expect.objectContaining({ select: ['id', 'description'] }),
+        ]);
+        expect(orders.queries[0]).not.toHaveProperty('within');
+      });
+
+      it('should read only the columns within it when the actor may read all', async () => {
+        const orders = await ordersWith({});
+
+        await expect(
+          orders.findOne({
+            where: Where.eq('id', ORDER.id),
+            within: ['id', 'description'],
+            ctx: ctxOf(ADMIN),
+          }),
+        ).resolves.toEqual({ id: ORDER.id, description: ORDER.description });
+      });
+
+      it('should leave it out of a read that selects, which stays strict', async () => {
+        const orders = await ordersWith(READS);
+
+        await refusal(
+          orders.find({
+            select: ['tenantId'],
+            within: ['id', 'tenantId'],
+            ctx: ctxOf(CLERK),
+          }),
+        );
+      });
+
+      it('should refuse a read when the actor may read no column within it', async () => {
+        const orders = await ordersWith(READS);
+
+        await refusal(orders.find({ within: ['tenantId'], ctx: ctxOf(CLERK) }));
+        expect(orders.queries).toEqual([]);
+      });
+
+      it('should refuse one naming no column of the entity', async () => {
+        const orders = await ordersWith({});
+        // The types allow only columns; a caller building names at runtime
+        // can still send another.
+        const options = { ctx: ctxOf(ADMIN) };
+        Reflect.set(options, 'within', ['id', 'nope']);
+
+        await expect(orders.find(options)).rejects.toThrow(
+          UnknownColumnException,
+        );
+      });
+
+      it('should refuse an empty one, rather than read every column', async () => {
+        const orders = await ordersWith({});
+
+        await expect(
+          orders.find({ within: [], ctx: ctxOf(ADMIN) }),
+        ).rejects.toThrow(RepositoryQueryException);
+        expect(orders.queries).toEqual([]);
+      });
     });
 
     it('should read the readable columns a caller selects', async () => {

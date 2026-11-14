@@ -485,6 +485,10 @@ export const userSchema = withNamedComponent(
 selected, `version` included — use `persist` in the route's query options
 if a narrowing client still needs it.
 
+When the repository limits which columns a caller may read (its object
+authority), a list without `?select=` returns the route's columns less the
+caller's hidden ones. A `?select=` naming a hidden column is refused (`403`).
+
 ## Controller Build Modes
 
 `ConfigurableCrudBuilder` supports three controller build paths.

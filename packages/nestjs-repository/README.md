@@ -2643,6 +2643,20 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   them which hidden columns there are. A read selecting
   nothing returns only the columns the actor may read. An actor who may read
   no column at all is refused.
+- **A default of your own.** `select` is for columns the caller asked for.
+  To shape what a read returns by default, such as the columns one endpoint
+  shows, pass `within` instead: the read returns those columns less any the
+  actor may not read, without refusing.
+
+  ```ts
+  // An actor who may not read `notes` gets id and total.
+  orders.find({ within: ['id', 'total', 'notes'], ctx });
+  ```
+
+  Generated CRUD routes pass their columns this way, so one actor's hidden
+  column never fails another's list. A hook sees the default in `within`;
+  narrow it there. `RepositoryAdapter` applies `within`, so a repository of
+  your own that doesn't extend it must too.
 - **Writes.** Every column a write sets must be writable; the primary key is
   not checked, since it names the row. A `replace` erases what it leaves out,
   so it needs every column writable. Columns row scope stamps (a tenant id)

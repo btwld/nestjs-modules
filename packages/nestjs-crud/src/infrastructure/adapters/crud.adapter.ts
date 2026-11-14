@@ -490,8 +490,12 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     const where = this.buildWhere(context);
     this.validateWhereFields(where);
 
-    // Get select fields (without alias prefix)
-    const select = this.getSelectFields(query, queryOptions);
+    // The columns the caller asked for are a select, refused when they name
+    // one the caller may not read. Without any, the route's columns are only
+    // the most each row holds: the repository leaves out what the caller may
+    // not read rather than refusing the list.
+    const columns = this.getSelectFields(query, queryOptions);
+    const asked = Boolean(query.fields?.length);
 
     // Build order clause
     const order =
@@ -510,7 +514,8 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
       ctx: context,
       where,
       join: context.options?.query?.join,
-      select: select.length > 0 ? select : undefined,
+      select: asked && columns.length > 0 ? columns : undefined,
+      within: !asked && columns.length > 0 ? columns : undefined,
       order: order.length > 0 ? order : undefined,
       take: take || undefined,
       skip: skip || undefined,

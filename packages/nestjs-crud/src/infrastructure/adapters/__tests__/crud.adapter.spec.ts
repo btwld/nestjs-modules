@@ -289,6 +289,40 @@ describe('CrudAdapter', () => {
     });
   });
 
+  describe('buildFindOptions', () => {
+    const optionsFor = (
+      fields: (keyof TestEntity)[],
+      query: CrudContextOptionsInterface<PlainLiteralObject>['query'] = {},
+    ) =>
+      adapter.exposedBuildFindOptions(
+        mockCrudContext<TestEntity>({
+          query: { ...mockCrudParsedQuery(), fields },
+          options: { query },
+        }),
+      );
+
+    it('should leave the route’s columns to the repository to narrow when the caller selects none', () => {
+      const options = optionsFor([]);
+
+      expect(options.select).toBeUndefined();
+      expect(options.within).toEqual(['id', 'name', 'age']);
+    });
+
+    it('should keep the route’s own narrowing in what the repository narrows within', () => {
+      const options = optionsFor([], { exclude: ['age'] });
+
+      expect(options.select).toBeUndefined();
+      expect(options.within).toEqual(['id', 'name']);
+    });
+
+    it('should select what the caller asks for, which the repository checks strictly', () => {
+      const options = optionsFor(['name']);
+
+      expect(options.select).toEqual(['name', 'id']);
+      expect(options.within).toBeUndefined();
+    });
+  });
+
   describe('checkFilterIsArray', () => {
     it('should return true for non-empty array value', () => {
       const cond = {

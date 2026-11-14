@@ -652,7 +652,8 @@ export abstract class RepositoryAdapter<
   /**
    * Refuse a read naming a column the actor may not read, in what it selects,
    * filters or sorts on; and when it selects nothing, select only what the
-   * actor may read.
+   * actor may read, within `within` when given. `within` becomes that select
+   * here, so nothing after this, row scope or the driver, sees it.
    *
    * Checked on the query as the caller and its hooks shaped it, before row
    * scope adds its own columns, so the actor needs no rights on those.
@@ -661,9 +662,57 @@ export abstract class RepositoryAdapter<
     call: AuthorizedCallInterface | undefined,
     options: Options,
   ): Options {
-    const readable = call?.readable;
-    if (!readable) return options;
+    const { within } = options;
+    const query = { ...options };
+    Reflect.deleteProperty(query, 'within');
 
+    const columns = this.metadata.columns.map((column) => column.name);
+    const ceiling = within?.map(String);
+    const unknown = (ceiling ?? []).filter(
+      (column) => !columns.includes(column),
+    );
+    if (unknown.length > 0) {
+      throw new UnknownColumnException(this.metadata.name, unknown, {
+        message: 'Cannot read %s — not a column of this entity: %s',
+        messageParams: [this.metadata.name, unknown.join(', ')],
+      });
+    }
+
+    const readable = call?.readable;
+    if (readable) this.assertReadableColumns(readable, query);
+
+    // An empty select reads every column, in every driver, so it selects
+    // nothing here either.
+    if (query.select?.length) return query;
+
+    const select = columns.filter(
+      (column) =>
+        (!ceiling || ceiling.includes(column)) &&
+        (!readable || readable.has(column)),
+    );
+    if (select.length === 0) {
+      if (readable) {
+        throw new AuthorityRefusedException(
+          this.metadata.name,
+          ActionEnum.READ,
+        );
+      }
+      // An empty select would read every column, past the ceiling.
+      throw new RepositoryQueryException(this.metadata.name, {
+        message: 'Cannot read %s within no column: `within` names none',
+        messageParams: [this.metadata.name],
+        fault: 'usage',
+      });
+    }
+
+    return select.length === columns.length ? query : { ...query, select };
+  }
+
+  /** Refuse a read naming a column the actor may not read. */
+  private assertReadableColumns(
+    readable: ReadonlySet<string>,
+    options: RepositoryFindOneOptions<Entity>,
+  ): void {
     const leaves = options.where ? this.whereConditions(options.where) : [];
     const named = [
       ...(options.select ?? []).map(String),
@@ -684,20 +733,6 @@ export abstract class RepositoryAdapter<
         columns: refused,
       });
     }
-
-    // An empty select reads every column, in every driver, so it selects
-    // nothing here either.
-    if (options.select?.length) return options;
-
-    const columns = this.metadata.columns.map((column) => column.name);
-    if (columns.every((column) => readable.has(column))) return options;
-
-    const select = columns.filter((column) => readable.has(column));
-    if (select.length === 0) {
-      throw new AuthorityRefusedException(this.metadata.name, ActionEnum.READ);
-    }
-
-    return { ...options, select };
   }
 
   /**

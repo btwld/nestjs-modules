@@ -643,9 +643,10 @@ Before each request runs, under the grant its route let the caller in on:
 - **Replace.** A replace erases what its body leaves out, so it is refused
   whenever a field is denied to the caller for the action.
 
-What a request selects is not narrowed: the response filter leaves out what
-the caller may not read. Which rows a generated route reaches is row
-scope's job, on the entity's repository. See the
+What a request selects is not narrowed by these rules: the response filter
+leaves out what the caller may not read. With a shared authority, the
+repository also leaves the caller's hidden columns out of a list. Which rows a
+generated route reaches is row scope's job, on the entity's repository. See the
 [CRUD routes](./examples/crud-routes) example.
 
 ## Showing Permissions in a UI
