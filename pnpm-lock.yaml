@@ -262,12 +262,18 @@ importers:
         specifier: ^7.8.1
         version: 7.8.2
     devDependencies:
+      '@concepta/nestjs-authentication':
+        specifier: workspace:*
+        version: link:../nestjs-authentication
       '@concepta/nestjs-crud':
         specifier: workspace:*
         version: link:../nestjs-crud
       '@concepta/nestjs-repository':
         specifier: workspace:*
         version: link:../nestjs-repository
+      '@concepta/nestjs-repository-typeorm':
+        specifier: workspace:*
+        version: link:../nestjs-repository-typeorm
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -277,9 +283,15 @@ importers:
       '@nestjs/core':
         specifier: ^12.0.1
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/cqrs':
+        specifier: ^12.0.0
+        version: 12.0.0(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/testing':
         specifier: ^12.0.1
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(@nestjs/microservices@12.0.4)(@nestjs/platform-express@12.0.1)
+      '@nestjs/typeorm':
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.2(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0))
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
@@ -289,9 +301,15 @@ importers:
       supertest:
         specifier: ^7.3.1
         version: 7.3.1(supports-color@7.2.0)
+      typeorm:
+        specifier: ^1.1.0
+        version: 1.1.2(better-sqlite3@12.11.1)(mssql@12.7.13(supports-color@7.2.0))(mysql2@3.24.6(@types/node@20.19.43))(oracledb@6.10.0)(pg@8.23.1)(supports-color@7.2.0)
       vitest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)(vitest@4.1.11)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/nestjs-auth-apple:
     dependencies:
