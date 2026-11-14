@@ -54,5 +54,17 @@ describe(JwtStrategy, () => {
       };
       await expect(t).rejects.toThrow(JwtUnauthorizedException);
     });
+
+    it('refuses an inactive user like a missing one', async () => {
+      void userPort.getBySubject;
+      vi.spyOn(userPort, 'getBySubject').mockResolvedValueOnce({
+        ...user,
+        active: false,
+      });
+
+      await expect(
+        jwtStrategy.validate(authorizationPayload, {}),
+      ).rejects.toThrow(JwtUnauthorizedException);
+    });
   });
 });

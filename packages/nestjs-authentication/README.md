@@ -1429,11 +1429,10 @@ redefining it fails.
 A guard that runs *before* authentication sees neither `request.user` nor
 `AuthUserCtx`: keep authentication global, or list its guard first.
 
-The JWT and refresh strategies accept a user `UserPort.getBySubject`
-returns, without checking `active`: only local login refuses an inactive
-user. Until they do, a disabled user keeps access until their token
-expires; refuse inactive users in `getBySubject`, or keep access tokens
-short.
+Every sign-in refuses a user whose `active` isn't `true`, the same way as a
+user `UserPort` can't find: local login, the JWT and refresh guards, and
+token validation through `TokenPort`. Turning a user off takes effect on
+their next call, with no need to wait for their tokens to expire.
 
 The overlay reads `request.user`, so it attaches on HTTP only. In RPC message
 handlers, define `AuthUserCtx` from your own overlay that reads the user from

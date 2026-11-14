@@ -33,7 +33,8 @@ export class ValidateAndVerifyRefreshTokenHandler implements IQueryHandler<
     if (this.userPort) {
       const { sub } = payload;
       const user = await this.userPort.getBySubject(ctx, sub);
-      if (!user) {
+      // An inactive user is refused like a missing one.
+      if (user?.active !== true) {
         throw new AuthenticationRefreshTokenException();
       }
     }

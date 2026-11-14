@@ -6,19 +6,7 @@ Effort tags: S/M/L. Completed items are removed from this list rather than marke
 done — see git history for what shipped. Reference notes that are not work live under
 "Parked" at the end.
 
-  1. **JWT and refresh authentication ignore `active: false`** (S, security) —
-      `JwtStrategy.validate` and `RefreshStrategy.validate` in
-      `nestjs-authentication` return whatever `UserPort.getBySubject` returns,
-      so a disabled user keeps full access until their token expires (1h access,
-      7d refresh, and refresh keeps minting new ones). Only local login checks
-      `active`. `JwtStrategyPolicy.requireUserValidation` is read only by
-      `ValidateTokenHandler`, not on the guard path. Fix: refuse a user whose
-      `active !== true` in both strategies with the same 401 as "not found",
-      and decide what `requireUserValidation` means. Found by the
-      access-control integration review (2026-11-09); access control can't
-      compensate, since the user on the request looks normal.
-
-  2. **Row scope cannot see the tables a view reads** (S) — row scope compares
+  1. **Row scope cannot see the tables a view reads** (S) — row scope compares
       URNs, and a view entity's URN names the view, not the tables it selects
       from. `@ViewEntity({ name: 'open_orders', expression: 'SELECT … FROM
       orders …' })` is `urn:typeorm:shop:open_orders` while a scoped `Order` is
@@ -30,7 +18,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       would need the driver to know which tables a view expression reads, and
       to resolve SQLite paths.
 
-  3. **`@Transactional` e2e specs may still fail under full-suite parallel load** (M) —
+  2. **`@Transactional` e2e specs may still fail under full-suite parallel load** (M) —
       the 401/404 sightings were requests reaching another process on a shared port, fixed
       by supertest 7.3.1. Not yet explained: a `SQLITE_CONSTRAINT: UNIQUE` on a fixture row
       and `TransactionScopeFailedException` after a timeout, seen in `nestjs-cache`,
@@ -39,7 +27,7 @@ done — see git history for what shipped. Reference notes that are not work liv
       failing spec to a single worker. Drop this item if neither recurs. Leaving it trains
       everyone to re-run a red suite rather than look.
 
-  4. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
+  3. **Investigate zod 4.5.x's OpenAPI `$ref`/`$defs` hoisting change** — all packages
       that depend on zod are pinned to `~4.4.3` (both the published range and a
       `pnpm-workspace.yaml` override) because 4.5.0 changes `z.toJSONSchema()`'s `$ref`
       hoisting in a way that breaks nestjs-crud's OpenAPI tests

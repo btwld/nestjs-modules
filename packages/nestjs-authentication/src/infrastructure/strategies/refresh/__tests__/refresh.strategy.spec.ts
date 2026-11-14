@@ -62,5 +62,16 @@ describe(RefreshStrategy, () => {
         refreshStrategy.validate(authorizationPayloadInterface, {});
       await expect(t).rejects.toThrow(RefreshUnauthorizedException);
     });
+
+    it('refuses an inactive user like a missing one', async () => {
+      vi.spyOn(userPort, 'getBySubject').mockResolvedValue({
+        ...user,
+        active: false,
+      });
+
+      await expect(
+        refreshStrategy.validate(authorizationPayloadInterface, {}),
+      ).rejects.toThrow(RefreshUnauthorizedException);
+    });
   });
 });

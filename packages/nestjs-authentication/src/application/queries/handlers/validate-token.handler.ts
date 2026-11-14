@@ -33,6 +33,7 @@ export class ValidateTokenHandler implements IQueryHandler<
       typeof sub === 'string'
         ? await this.userPort.getBySubject(ctx, sub)
         : null;
-    return !!user;
+    // An inactive user is refused like a missing one.
+    return user?.active === true;
   }
 }
