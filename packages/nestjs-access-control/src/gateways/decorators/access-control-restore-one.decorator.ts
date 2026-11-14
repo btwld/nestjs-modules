@@ -5,12 +5,12 @@ import { ActionEnum } from '@concepta/nestjs-core';
 import { AccessControlGrant } from './access-control-grant.decorator.js';
 
 /**
- * Recover one resource grant shortcut: the `restore` action, as CRUD's
+ * Restore one resource grant shortcut: the `restore` action, as CRUD's
  * restore route and the repository's `restore` take.
  *
  * @param resource - The grant resource.
  */
-export const AccessControlRecoverOne = (
+export const AccessControlRestoreOne = (
   resource: string,
 ): ReturnType<typeof applyDecorators> =>
   AccessControlGrant({ resource, action: ActionEnum.RESTORE });

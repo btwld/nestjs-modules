@@ -12,8 +12,8 @@ import { AccessControlCreateOne } from '../../gateways/decorators/access-control
 import { AccessControlDeleteOne } from '../../gateways/decorators/access-control-delete-one.decorator.js';
 import { AccessControlReadMany } from '../../gateways/decorators/access-control-read-many.decorator.js';
 import { AccessControlReadOne } from '../../gateways/decorators/access-control-read-one.decorator.js';
-import { AccessControlRecoverOne } from '../../gateways/decorators/access-control-recover-one.decorator.js';
 import { AccessControlReplaceOne } from '../../gateways/decorators/access-control-replace-one.decorator.js';
+import { AccessControlRestoreOne } from '../../gateways/decorators/access-control-restore-one.decorator.js';
 import { AccessControlSoftDeleteOne } from '../../gateways/decorators/access-control-soft-delete-one.decorator.js';
 import { AccessControlUpdateOne } from '../../gateways/decorators/access-control-update-one.decorator.js';
 
@@ -126,7 +126,7 @@ export const { controllers, providers } =
       },
       {
         operation: Operation.Restore,
-        extraDecorators: [AccessControlRecoverOne(INVOICES)],
+        extraDecorators: [AccessControlRestoreOne(INVOICES)],
       },
     ],
   }).build();

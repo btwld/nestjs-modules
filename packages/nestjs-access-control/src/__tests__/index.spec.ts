@@ -15,7 +15,7 @@ import {
   AccessControlQuery,
   AccessControlReadMany,
   AccessControlReadOne,
-  AccessControlRecoverOne,
+  AccessControlRestoreOne,
   AccessControlReplaceOne,
   AccessControlSoftDeleteOne,
   AccessControlService,
@@ -77,7 +77,7 @@ describe('Index', () => {
     expect(AccessControlReadMany).toEqual(expect.any(Function));
     expect(AccessControlReadOne).toEqual(expect.any(Function));
     expect(AccessControlUpdateOne).toEqual(expect.any(Function));
-    expect(AccessControlRecoverOne).toEqual(expect.any(Function));
+    expect(AccessControlRestoreOne).toEqual(expect.any(Function));
     expect(AccessControlReplaceOne).toEqual(expect.any(Function));
     expect(AccessControlSoftDeleteOne).toEqual(expect.any(Function));
   });

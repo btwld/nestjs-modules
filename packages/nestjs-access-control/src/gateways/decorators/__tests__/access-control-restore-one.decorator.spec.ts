@@ -3,15 +3,15 @@ import { Controller } from '@nestjs/common';
 import { ActionEnum } from '@concepta/nestjs-core';
 
 import { ACCESS_CONTROL_MODULE_GRANT_METADATA } from '../../../access-control.constants.js';
-import { AccessControlRecoverOne } from '../access-control-recover-one.decorator.js';
+import { AccessControlRestoreOne } from '../access-control-restore-one.decorator.js';
 
-describe('@AccessControlRecoverOne', () => {
+describe('@AccessControlRestoreOne', () => {
   const resource = 'a_protected_resource';
 
   @Controller()
   class TestController {
-    @AccessControlRecoverOne(resource)
-    recoverOne() {
+    @AccessControlRestoreOne(resource)
+    restoreOne() {
       return null;
     }
   }
@@ -22,7 +22,7 @@ describe('@AccessControlRecoverOne', () => {
     it('should have restore grants metadata', () => {
       const grants = Reflect.getMetadata(
         ACCESS_CONTROL_MODULE_GRANT_METADATA,
-        controller.recoverOne,
+        controller.restoreOne,
       );
 
       expect(grants).toEqual([
