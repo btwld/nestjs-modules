@@ -452,14 +452,18 @@ ctx.defineOverlay(
 ctx.defineOverlay(ActorCtx, { kind: 'system', name: 'billing-sync' }, { immutable: true });
 ```
 
-`AuthorityInterface` is the contract for deciding access: given the actor, an
-object, an action and the object's columns, `decide()` allows (optionally
+`AuthorityInterface` is the contract for deciding access: given the actor, a
+subject, an action and the subject's columns, `decide()` allows (optionally
 only some columns) or refuses (optionally naming a decision still pending).
 Core ships no implementation; `@concepta/nestjs-repository` enforces one on
 every repository call and ships a CASL-backed one — see its
 [Object Authority](../nestjs-repository/README.md#object-authority).
 `actorKeys(actor)` gives the keys an actor's permissions are usually stored
-under: `role:<name>` for each role, `system:<name>` for a system. A one-entity
+under: `role:<name>` for each role, `system:<name>` for a system.
+`normalizeActor(actor)` copies an actor with exactly what its kind has,
+`{ kind: 'role', roles, userId? }` or `{ kind: 'system', name }`, dropping
+anything else a resolver put on it; the repository asks an authority about,
+and an exception names, that copy. A one-entity
 authority can narrow its column names, `AuthorityInterface<keyof Order & string>`.
 
 Rules are written in one shape wherever they are used, the repository's
@@ -1236,8 +1240,9 @@ exercise correlation behavior directly.
 | `ActorCtx` | `OverlayRef` token for who is acting on a call. Define it `{ immutable: true }` — see [Actor and Authority](#actor-and-authority). |
 | `Actor`, `RoleActorInterface`, `SystemActorInterface` | `{ kind: 'role', roles, userId? }` or `{ kind: 'system', name }`. |
 | `actorKeys(actor)` | `role:<name>` for each role, or `system:<name>`. |
+| `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. |
 | `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
-| `AuthorityRequestInterface` | `{ actor, object, action, columns }`. |
+| `AuthorityRequestInterface` | `{ actor, subject, action, columns }`. |
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns? }` or `{ effect: 'refuse', gate? }`. |
 
 ### Route Audit Exports

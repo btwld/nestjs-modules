@@ -60,7 +60,7 @@ export { RowScopeBaseOptions } from './row-scope/interfaces/row-scope-base-optio
 export {
   RowScopeRegistration,
   RowScopeScopedRegistration,
-  RowScopePublicRegistration,
+  RowScopeOpenRegistration,
 } from './row-scope/interfaces/row-scope-registration.interface.js';
 export {
   AuthorityRegistration,
@@ -107,6 +107,7 @@ export { InvalidColumnValueException } from './exceptions/invalid-column-value.e
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
 export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
 export { AuthorityRefusedException } from './authority/exceptions/authority-refused.exception.js';
+export { AuthorityRefusedDetailsInterface } from './authority/exceptions/authority-refused-details.interface.js';
 export { AuthorityUnboundException } from './authority/exceptions/authority-unbound.exception.js';
 export { AuthorityBootException } from './authority/exceptions/authority-boot.exception.js';
 export { AppendOnlyViolationException } from './write-policy/exceptions/append-only-violation.exception.js';

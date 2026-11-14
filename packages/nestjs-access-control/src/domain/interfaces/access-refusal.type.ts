@@ -1,4 +1,4 @@
-export const ACCESS_REFUSAL_REASONS = [
+export const ACCESS_REFUSALS = [
   'no-actor',
   'no-grant',
   'denied',
@@ -17,4 +17,4 @@ export const ACCESS_REFUSAL_REASONS = [
  * - `access-query`: a route's access query service refused it;
  * - `authority`: the module's authority refuses it.
  */
-export type AccessRefusalReason = (typeof ACCESS_REFUSAL_REASONS)[number];
+export type AccessRefusal = (typeof ACCESS_REFUSALS)[number];

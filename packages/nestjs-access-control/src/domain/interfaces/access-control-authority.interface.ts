@@ -6,7 +6,7 @@ import { type AuthorityInterface } from '@concepta/nestjs-core';
  */
 export interface AccessControlAuthorityInterface {
   /** The authority, as the repository's governed entities use it. */
-  decider: AuthorityInterface;
+  authority: AuthorityInterface;
   /**
    * Resources the authority does not decide, such as a report no entity
    * stands behind: a route on one of them is decided by access control's

@@ -39,14 +39,14 @@ describe('Example: ownership', () => {
         .get('/documents/doc-2')
         .set(bearer('maya'))
         .expect(403)
-        .expect(refused('read on document (access-query)')));
+        .expect(refused('read', 'document', 'access-query')));
 
     it('refuses a member a document that does not exist, like someone else’s', () =>
       api
         .get('/documents/doc-404')
         .set(bearer('maya'))
         .expect(403)
-        .expect(refused('read on document (access-query)')));
+        .expect(refused('read', 'document', 'access-query')));
 
     it('lets a manager read anyone’s document', () =>
       api.get('/documents/doc-2').set(bearer('mia')).expect(200).expect(MAXS));
@@ -85,7 +85,7 @@ describe('Example: ownership', () => {
         .set(bearer('maya'))
         .send({ title: 'Mine now' })
         .expect(403)
-        .expect(refused('update on document (access-query)'));
+        .expect(refused('update', 'document', 'access-query'));
 
       expect(await documentAsAdmin('doc-1')).toEqual({
         ...MAYAS,
@@ -99,7 +99,7 @@ describe('Example: ownership', () => {
         .set(bearer('maya'))
         .send({ ownerId: 'max' })
         .expect(403)
-        .expect(refused('update on document (field)'));
+        .expect(refused('update', 'document', 'field'));
 
       expect(await documentAsAdmin('doc-1')).toEqual(MAYAS);
     });
@@ -125,7 +125,7 @@ describe('Example: ownership', () => {
         .set(bearer('mel'))
         .send({ title: 'Mine now' })
         .expect(403)
-        .expect(refused('update on document (access-query)'));
+        .expect(refused('update', 'document', 'access-query'));
 
       expect(await documentAsAdmin('doc-2')).toEqual(MAXS);
     });
@@ -136,6 +136,6 @@ describe('Example: ownership', () => {
         .set(bearer('mia'))
         .send({ title: 'Edited' })
         .expect(403)
-        .expect(refused('update on document (no-grant)')));
+        .expect(refused('update', 'document', 'no-grant')));
   });
 });

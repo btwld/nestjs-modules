@@ -14,6 +14,7 @@ import {
   type HookResolverService,
   type HookWithSpec,
   HooksCtx,
+  normalizeActor,
   normalizeHookOption,
 } from '@concepta/nestjs-core';
 
@@ -601,7 +602,9 @@ export abstract class RepositoryAdapter<
     const actor = this.resolveActor(ctx);
     if (!ctx || !actor) {
       const [action = ActionEnum.READ] = actions;
-      throw new AuthorityRefusedException(this.metadata.name, action);
+      throw new AuthorityRefusedException(this.entityKey, action, {
+        refusal: 'no-actor',
+      });
     }
 
     const columns = this.metadata.columns.map((column) => column.name);
@@ -609,13 +612,15 @@ export abstract class RepositoryAdapter<
     for (const action of actions) {
       const decision = await authority.decide(ctx, {
         actor,
-        object: this.entityKey,
+        subject: this.entityKey,
         action,
         columns,
       });
 
       if (decision.effect !== 'allow') {
-        throw new AuthorityRefusedException(this.metadata.name, action, {
+        throw new AuthorityRefusedException(this.entityKey, action, {
+          refusal: 'authority',
+          actor,
           gate: decision.gate,
         });
       }
@@ -626,6 +631,7 @@ export abstract class RepositoryAdapter<
     const linked = new Set(linkedColumns(options, this));
     if (allowed.has(ActionEnum.READ)) {
       return {
+        actor,
         actions: allowed,
         readable: allowed.get(ActionEnum.READ),
         linked,
@@ -634,12 +640,13 @@ export abstract class RepositoryAdapter<
 
     const read = await authority.decide(ctx, {
       actor,
-      object: this.entityKey,
+      subject: this.entityKey,
       action: ActionEnum.READ,
       columns,
     });
 
     return {
+      actor,
       actions: allowed,
       readable:
         read.effect === 'allow'
@@ -679,7 +686,8 @@ export abstract class RepositoryAdapter<
     }
 
     const readable = call?.readable;
-    if (readable) this.assertReadableColumns(readable, query);
+    if (call && readable)
+      this.assertReadableColumns(call.actor, readable, query);
 
     // An empty select reads every column, in every driver, so it selects
     // nothing here either.
@@ -691,11 +699,11 @@ export abstract class RepositoryAdapter<
         (!readable || readable.has(column)),
     );
     if (select.length === 0) {
-      if (readable) {
-        throw new AuthorityRefusedException(
-          this.metadata.name,
-          ActionEnum.READ,
-        );
+      if (call && readable) {
+        throw new AuthorityRefusedException(this.entityKey, ActionEnum.READ, {
+          refusal: 'authority',
+          actor: call.actor,
+        });
       }
       // An empty select would read every column, past the ceiling.
       throw new RepositoryQueryException(this.metadata.name, {
@@ -710,6 +718,7 @@ export abstract class RepositoryAdapter<
 
   /** Refuse a read naming a column the actor may not read. */
   private assertReadableColumns(
+    actor: Actor,
     readable: ReadonlySet<string>,
     options: RepositoryFindOneOptions<Entity>,
   ): void {
@@ -729,7 +738,9 @@ export abstract class RepositoryAdapter<
       (column) => !readable.has(column),
     );
     if (refused.length > 0) {
-      throw new AuthorityRefusedException(this.metadata.name, ActionEnum.READ, {
+      throw new AuthorityRefusedException(this.entityKey, ActionEnum.READ, {
+        refusal: 'authority',
+        actor,
         columns: refused,
       });
     }
@@ -754,7 +765,7 @@ export abstract class RepositoryAdapter<
     for (const { relation } of query.join ?? []) {
       if (this.federatedRelations.has(relation)) continue;
 
-      let columns: ReadonlySet<string> | undefined;
+      let target: AuthorizedCallInterface | undefined;
       for (const reached of this.relationsIntoGoverned.get(relation) ?? []) {
         const decided = await reached.authorizeReach([ActionEnum.READ], ctx);
         if (
@@ -762,10 +773,11 @@ export abstract class RepositoryAdapter<
           this.metadata.relations?.find(({ name }) => name === relation)
             ?.targetUrn
         ) {
-          columns = decided?.readable;
+          target = decided;
         }
       }
-      if (!columns) continue;
+      const columns = target?.readable;
+      if (!target || !columns) continue;
       readable.set(relation, columns);
 
       const refused = [
@@ -777,13 +789,11 @@ export abstract class RepositoryAdapter<
         ),
       ];
       if (refused.length > 0) {
-        throw new AuthorityRefusedException(
-          this.metadata.name,
-          ActionEnum.READ,
-          {
-            columns: refused.map((field) => `${relation}.${field}`),
-          },
-        );
+        throw new AuthorityRefusedException(this.entityKey, ActionEnum.READ, {
+          refusal: 'authority',
+          actor: target.actor,
+          columns: refused.map((field) => `${relation}.${field}`),
+        });
       }
     }
 
@@ -841,7 +851,9 @@ export abstract class RepositoryAdapter<
         ? written.filter((column) => !writable.has(column))
         : [];
       if (refused.length > 0) {
-        throw new AuthorityRefusedException(this.metadata.name, action, {
+        throw new AuthorityRefusedException(this.entityKey, action, {
+          refusal: 'authority',
+          actor: call.actor,
           columns: refused,
         });
       }
@@ -917,16 +929,7 @@ export abstract class RepositoryAdapter<
     const appCtx = AppContextHost.from(ctx);
     if (!appCtx.supports(ActorCtx)) return undefined;
 
-    const actor = appCtx.with(ActorCtx);
-    if (actor.kind === 'system') {
-      return { kind: 'system', name: actor.name };
-    }
-
-    return {
-      kind: 'role',
-      roles: [...actor.roles],
-      ...(actor.userId === undefined ? {} : { userId: actor.userId }),
-    };
+    return normalizeActor(appCtx.with(ActorCtx));
   }
 
   protected get permeator(): RepoPermeatorFactory<Entity> {

@@ -120,6 +120,9 @@ async function ordersWith(
 async function refusal(promise: Promise<unknown>): Promise<unknown> {
   const error = await promise.catch((e: unknown) => e);
   expect(error).toBeInstanceOf(AuthorityRefusedException);
+  expect(
+    error instanceof AuthorityRefusedException && error.context.refusal,
+  ).toEqual('authority');
   return error;
 }
 

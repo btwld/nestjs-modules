@@ -753,7 +753,7 @@ describe('row scope declared through a driver that rewrites its entries', () => 
   class RewritingDriver {
     static register(entities: RepositoryProviderOptions[]): DynamicModule {
       for (const entity of entities) {
-        entity.rowScope = { access: 'public', reason: 'rewritten by driver' };
+        entity.rowScope = { access: 'open', reason: 'rewritten by driver' };
       }
       return MemoryRepositoryModuleFixture.register(entities);
     }
@@ -934,7 +934,7 @@ describe('row scope startup checks', () => {
           {
             key: ORDER_LINE_TOKEN,
             entity: OrderLineEntityFixture,
-            rowScope: { access: 'public', reason: 'shared' },
+            rowScope: { access: 'open', reason: 'shared' },
           },
         ],
         {},

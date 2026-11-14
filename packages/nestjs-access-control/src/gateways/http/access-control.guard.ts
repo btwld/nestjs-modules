@@ -5,6 +5,7 @@ import {
   ActorCtx,
   type AppContextHost,
   frozenActor,
+  normalizeActor,
   requireAppContext,
 } from '@concepta/nestjs-core';
 
@@ -103,8 +104,8 @@ export class AccessControlGuard implements CanActivate {
     if (!resolution) {
       throw new AccessRefusedException({
         action: requested.action,
-        subject: requested.resource,
-        reason: 'no-actor',
+        resource: requested.resource,
+        refusal: 'no-actor',
       });
     }
 
@@ -132,9 +133,9 @@ export class AccessControlGuard implements CanActivate {
       throw new AccessRefusedException(
         authorityRefusal ?? {
           action: requested.action,
-          subject: requested.resource,
-          actor: resolution.actor,
-          reason: 'authority',
+          resource: requested.resource,
+          actor: normalizeActor(resolution.actor),
+          refusal: 'authority',
         },
       );
     }
@@ -149,9 +150,9 @@ export class AccessControlGuard implements CanActivate {
           first.grant.resource,
         ) ?? {
           action: first.grant.action,
-          subject: first.grant.resource,
-          actor: resolution.actor,
-          reason: 'no-grant',
+          resource: first.grant.resource,
+          actor: normalizeActor(resolution.actor),
+          refusal: 'no-grant',
         },
       );
     }
@@ -169,9 +170,9 @@ export class AccessControlGuard implements CanActivate {
     ) {
       throw new AccessRefusedException({
         action: query.action,
-        subject: query.resource,
-        actor: resolution.actor,
-        reason: 'access-query',
+        resource: query.resource,
+        actor: normalizeActor(resolution.actor),
+        refusal: 'access-query',
       });
     }
 

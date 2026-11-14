@@ -54,7 +54,7 @@ function decide(
 ) {
   return new CaslAuthority(new RulesFixture(rules)).decide(ctx, {
     actor,
-    object: ORDER_TOKEN,
+    subject: ORDER_TOKEN,
     action,
     columns: COLUMNS,
   });
@@ -182,7 +182,7 @@ describe(CaslAuthority.name, () => {
     ).resolves.toEqual({ effect: 'refuse', gate: 'DEC-12' });
   });
 
-  it('should keep a column deny a narrowing, never a refusal of the object', async () => {
+  it('should keep a column deny a narrowing, never a refusal of the subject', async () => {
     await expect(
       decide(
         {
@@ -240,7 +240,7 @@ describe(CaslAuthority.name, () => {
     const ctx = new AppContextHost();
     const request = {
       actor: CLERK,
-      object: ORDER_TOKEN,
+      subject: ORDER_TOKEN,
       action: ActionEnum.READ,
       columns: COLUMNS,
     };
@@ -264,7 +264,7 @@ describe(CaslAuthority.name, () => {
     const ctx = new AppContextHost();
     const request = {
       actor: CLERK,
-      object: ORDER_TOKEN,
+      subject: ORDER_TOKEN,
       action: ActionEnum.READ,
       columns: COLUMNS,
     };
@@ -278,7 +278,7 @@ describe(CaslAuthority.name, () => {
     expect(calls).toBe(1);
   });
 
-  it('should ignore columns a rule names that the object lacks', async () => {
+  it('should ignore columns a rule names that the subject lacks', async () => {
     await expect(
       decide(
         {
@@ -324,7 +324,7 @@ describe(CaslAuthority.name, () => {
     });
     const authority = new CaslAuthority(rules);
     const ctx = new AppContextHost();
-    const request = { actor: CLERK, object: ORDER_TOKEN, columns: COLUMNS };
+    const request = { actor: CLERK, subject: ORDER_TOKEN, columns: COLUMNS };
 
     await authority.decide(ctx, { ...request, action: ActionEnum.READ });
     await authority.decide(ctx, { ...request, action: ActionEnum.UPDATE });
@@ -343,7 +343,7 @@ describe(CaslAuthority.name, () => {
     const authority = new CaslAuthority(rules);
     const ctx = new AppContextHost();
     const request = {
-      object: ORDER_TOKEN,
+      subject: ORDER_TOKEN,
       action: ActionEnum.READ,
       columns: COLUMNS,
     };

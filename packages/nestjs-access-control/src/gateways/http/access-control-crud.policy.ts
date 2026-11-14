@@ -1,6 +1,6 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
-import { Operation } from '@concepta/nestjs-core';
+import { normalizeActor, Operation } from '@concepta/nestjs-core';
 import {
   type CrudParsedQueryInterface,
   type CrudRequestInterface,
@@ -94,10 +94,10 @@ function refused(
 ): AccessRefusedException {
   return new AccessRefusedException({
     action: query.action,
-    subject: query.resource,
-    actor: query.actor,
-    reason: 'field',
-    ...(field === undefined ? {} : { field }),
+    resource: query.resource,
+    actor: normalizeActor(query.actor),
+    refusal: 'field',
+    ...(field === undefined ? {} : { fields: [field] }),
   });
 }
 

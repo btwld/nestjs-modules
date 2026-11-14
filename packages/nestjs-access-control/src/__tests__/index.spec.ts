@@ -1,6 +1,6 @@
 import {
   ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
-  ACCESS_REFUSAL_REASONS,
+  ACCESS_REFUSALS,
   AccessControlContext,
   AccessControlCreateMany,
   AccessControlCreateOne,
@@ -50,11 +50,11 @@ describe('Index', () => {
     expect(normalizeAccessFieldPath).toEqual(expect.any(Function));
   });
 
-  it('exports the exceptions and refusal reasons', () => {
+  it('exports the exceptions and refusals', () => {
     expect(AccessControlException).toEqual(expect.any(Function));
     expect(AccessRefusedException).toEqual(expect.any(Function));
     expect(AccessRulesInvalidException).toEqual(expect.any(Function));
-    expect(ACCESS_REFUSAL_REASONS).toEqual([
+    expect(ACCESS_REFUSALS).toEqual([
       'no-actor',
       'no-grant',
       'denied',

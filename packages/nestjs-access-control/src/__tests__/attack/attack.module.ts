@@ -151,7 +151,7 @@ const TENANT = { access: 'scoped', resolver: AttackTenantRowScope } as const;
         authority: CaslAuthority,
         actorResolver: AttackActorResolver,
       ) => ({
-        authority: { decider: authority, except: [REPORTS] },
+        authority: { authority, except: [REPORTS] },
         settings: { grants: ROUTE_GRANTS },
         actorResolver,
       }),

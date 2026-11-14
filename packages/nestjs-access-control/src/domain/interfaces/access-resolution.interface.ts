@@ -8,6 +8,6 @@ import { type AccessAbility } from './access-ability.type.js';
  */
 export interface AccessResolutionInterface {
   actor: Actor;
-  rules: AuthorityRuleInterface<string>[];
+  rules: readonly AuthorityRuleInterface<string>[];
   ability: AccessAbility;
 }

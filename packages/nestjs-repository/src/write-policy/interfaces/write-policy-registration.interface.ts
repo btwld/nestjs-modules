@@ -7,7 +7,7 @@
  * Correcting such a record means appending a new one that references it.
  *
  * `reason` is required for the same purpose row scope requires one on a
- * `public` declaration: making a row immutable is a decision someone has to
+ * `open` declaration: making a row immutable is a decision someone has to
  * defend later, so it has to be written down rather than defaulted into.
  * Nothing reads it.
  */

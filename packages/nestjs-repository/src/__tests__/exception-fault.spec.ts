@@ -191,7 +191,10 @@ const CASES: {
   },
   {
     name: 'AuthorityRefusedException',
-    build: () => new AuthorityRefusedException('Order', 'read'),
+    build: () =>
+      new AuthorityRefusedException('orders', 'read', {
+        refusal: 'authority',
+      }),
     fault: 'client',
   },
   {

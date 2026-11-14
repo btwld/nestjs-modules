@@ -110,7 +110,7 @@ describe('Example: multi-tenant access levels', () => {
         .delete('/tenants/globex/projects/p-3')
         .set(bearer('alice'))
         .expect(403)
-        .expect(refused('delete on project (no-grant)'));
+        .expect(refused('delete', 'project', 'no-grant'));
     });
 
     it('shows a contractor on view-own only their own projects', () =>
@@ -133,7 +133,7 @@ describe('Example: multi-tenant access levels', () => {
         .set(bearer('bob'))
         .send({ name: 'Mine now' })
         .expect(403)
-        .expect(refused('update on project (access-query)'));
+        .expect(refused('update', 'project', 'access-query'));
     });
 
     it('makes a member the owner of what they create', async () => {
@@ -156,7 +156,7 @@ describe('Example: multi-tenant access levels', () => {
         .get('/tenants/acme/budget')
         .set(bearer('bob'))
         .expect(403)
-        .expect(refused('read on budget (no-grant)'));
+        .expect(refused('read', 'budget', 'no-grant'));
 
       await api
         .get('/tenants/acme/budget')
@@ -170,6 +170,6 @@ describe('Example: multi-tenant access levels', () => {
         .get('/tenants/globex/projects')
         .set(bearer('bob'))
         .expect(403)
-        .expect(refused('read on project (no-grant)')));
+        .expect(refused('read', 'project', 'no-grant')));
   });
 });

@@ -115,7 +115,7 @@ Further options for scoped, append-only or recorded entities:
 
 | Option | Description |
 | --- | --- |
-| `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'public', reason }` — see [Row Scope](#row-scope) |
+| `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'open', reason }` — see [Row Scope](#row-scope) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
 | `options` | The driver's own options, such as per-transaction settings; type-checked against the driver |
@@ -1947,14 +1947,14 @@ the request's `ctx`.
 
 ### Declaring an entity
 
-Every entity is scoped, public, or undeclared:
+Every entity is scoped, open, or undeclared:
 
 ```ts
 rowScope: { access: 'scoped', resolver: TenantRowScope }
-rowScope: { access: 'public', reason: 'shared reference data, not tenant-owned' }
+rowScope: { access: 'open', reason: 'shared reference data, not tenant-owned' }
 ```
 
-`public` requires a reason because it is a decision someone has to defend
+`open` requires a reason because it is a decision someone has to defend
 later. Undeclared is allowed unless the deployment sets
 `requireRowScopeDeclaration`.
 
@@ -2607,7 +2607,11 @@ export class AuthorityModule {}
   name (`system:<name>`). Rules for one person alone are yours to look up, for
   example by `actor.userId`.
 - Rules are asked for once per `ctx`, so every check in one call reads the
-  same rules even when they are stored and edited at runtime.
+  same rules even when they are stored and edited at runtime. `rulesFor`
+  returns the rules or a promise of them, as access control's grants
+  provider does; the difference is when each is asked: this authority asks
+  once per `ctx`, while access control's grants provider is asked on every
+  check.
 
 Access control's route grants are written in the same shape. They name your
 API, not your storage: a grant's `subject` is a route's resource and its
@@ -2618,7 +2622,7 @@ here, written once; see access control's README for how the two combine.
 
 Any other engine plugs in the same way: implement `AuthorityInterface` from
 `@concepta/nestjs-core`. Its `decide(ctx, request)` is given the actor, the
-entity's key (`object`), the action and every column of the entity, and
+entity's key (`subject`), the action and every column of the entity, and
 answers `{ effect: 'allow' }`, `{ effect: 'allow', columns }` to allow only
 some columns, or `{ effect: 'refuse', gate? }`.
 
@@ -2707,8 +2711,11 @@ bypasses the repository, is outside it.
 ### Refusals
 
 `AuthorityRefusedException` is a `403`. Its message names only the action and
-the entity (`Not allowed to read Order`); the columns refused and any pending
-decision (`gate`) are in its `context`, for logs, never in the response.
+the entity's key (`Not allowed to read orders`). Its `context`, for logs and
+never in the response, holds the `entityKey` and `action`, why it was refused
+(`refusal`: `no-actor` when the call names no actor, `authority` otherwise),
+who asked (`actor`, as the authority was asked about them), and the columns
+refused and any pending decision (`gate`).
 
 ### Authority startup checks
 
@@ -2928,7 +2935,7 @@ to your entity as in [Scoped Hooks](#scoped-hooks).
 A scoped entity's records copy its rows, so its store must declare `rowScope`
 too. Scope the store, and each record is stamped with the caller's scope, such
 as their `tenantId`, and read back only by that scope. Or declare it
-`{ access: 'public', reason }` if every reader of the store may see every
+`{ access: 'open', reason }` if every reader of the store may see every
 scope's records.
 
 ### Transactions
@@ -3320,7 +3327,7 @@ also exported for manual provider wiring.
 | `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
-| `AuthorityRefusedException` | The authority governing an entity refused the caller's action or a column it names, or the call carried no actor (403). The message names the action and entity only; `context.columns` and `context.gate` are for logs — see [Refusals](#refusals) |
+| `AuthorityRefusedException` | The authority governing an entity refused the caller's action or a column it names, or the call carried no actor (403). The message names the action and entity key only; `context.refusal`, `context.actor`, `context.columns` and `context.gate` are for logs — see [Refusals](#refusals) |
 | `AuthorityUnboundException` | A governed entity was asked to serve an operation before its authority was attached — used from another provider's constructor during startup. It refuses rather than running undecided |
 | `AuthorityBootException` | One or more authority checks failed at startup; the message lists every failure — see [Authority startup checks](#authority-startup-checks) |
 | `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. Append a correcting record instead |

@@ -18,7 +18,7 @@ import {
   Post,
   UseInterceptors,
 } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR, BaseExceptionFilter } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 
 import {
@@ -29,6 +29,7 @@ import {
 } from '@concepta/nestjs-core';
 
 import { AccessControlModule } from '../../../access-control.module.js';
+import { AccessRefusedException } from '../../../domain/exceptions/access-refused.exception.js';
 import { AccessRulesInvalidException } from '../../../domain/exceptions/access-rules-invalid.exception.js';
 import { type AccessControlContextInterface } from '../../../domain/interfaces/access-control-context.interface.js';
 import { type AccessGrantsProviderInterface } from '../../../domain/interfaces/access-grants-provider.interface.js';
@@ -734,17 +735,28 @@ describe('AccessControl (e2e)', () => {
         .send({ firstName: 'Jo' })
         .expect(200);
 
+      // The response names no refusal: the exception it was rendered from
+      // does, in its context.
+      const rendered = vi.spyOn(BaseExceptionFilter.prototype, 'catch');
       const response = await api
         .patch('/users/1')
         .set('x-roles', 'member')
         .send({ phone: '555' })
         .expect(403);
+      const [exception] = rendered.mock.calls.at(-1) ?? [];
+      rendered.mockRestore();
 
       expect(response.body).toEqual(
         expect.objectContaining({
-          message: 'Access refused: update on user (field)',
+          message: 'Not allowed to update user',
         }),
       );
+      expect(
+        exception instanceof AccessRefusedException && {
+          refusal: exception.context.refusal,
+          fields: exception.context.fields,
+        },
+      ).toEqual({ refusal: 'field', fields: ['phone'] });
 
       await api
         .patch('/users/1')

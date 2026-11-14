@@ -37,7 +37,7 @@ describe('Example: per-user grants from storage', () => {
       .post('/reports/q3/export')
       .set(bearer('ana'))
       .expect(403)
-      .expect(refused('export on report (no-grant)'));
+      .expect(refused('export', 'report', 'no-grant'));
 
     await api
       .put('/admin/users/ana/rules')
@@ -125,7 +125,7 @@ describe('Example: per-user grants from storage', () => {
       .set(bearer('ana'))
       .send([EXPORT])
       .expect(403)
-      .expect(refused('update on user-rules (no-grant)')));
+      .expect(refused('update', 'user-rules', 'no-grant')));
 
   it('refuses an admin editing their own rules', async () => {
     await api
@@ -143,7 +143,7 @@ describe('Example: per-user grants from storage', () => {
       .post('/reports/q3/export')
       .set(bearer('root'))
       .expect(403)
-      .expect(refused('export on report (no-grant)'));
+      .expect(refused('export', 'report', 'no-grant'));
   });
 
   it('refuses an admin handing the power to edit rules to one user', async () => {

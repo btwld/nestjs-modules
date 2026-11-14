@@ -1,9 +1,9 @@
 import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
 import {
-  type Actor,
   type AuthorityRuleInterface,
   authorityRuleProblems,
+  normalizeActor,
 } from '@concepta/nestjs-core';
 
 import { AccessControlException } from '../exceptions/access-control.exception.js';
@@ -31,25 +31,6 @@ function narrowingRules(
   rules: readonly AuthorityRuleInterface<string>[],
 ): AuthorityRuleInterface<string>[] {
   return rules.filter((rule) => rule.inverted);
-}
-
-/** `actor` with exactly the properties its kind has, in a fixed order. */
-function normalizedActor(actor: Actor): Actor {
-  if (actor.kind === 'system') {
-    return { kind: 'system', name: actor.name };
-  }
-
-  return {
-    kind: 'role',
-    roles: [...actor.roles],
-    ...(actor.userId === undefined ? {} : { userId: actor.userId }),
-  };
-}
-
-function copyActor(actor: Actor): Actor {
-  return actor.kind === 'role'
-    ? { ...actor, roles: [...actor.roles] }
-    : { ...actor };
 }
 
 /**
@@ -80,13 +61,13 @@ export class AccessControlService {
   }
 
   /**
-   * What the module's authority answers for `action` on `subject`, the
-   * resource read as the authority's object.
+   * What the module's authority answers for `action` on `resource`, which
+   * the authority decides as its subject.
    *
    * On a resource the authority leaves out (`except`), or with no
    * authority, `resolution` as it is: the actor's rules decide. On any
    * other, a refusal is final; an allow becomes the actor's allow of
-   * `action` on `subject`, beside `read` when the authority lets the actor
+   * `action` on `resource`, beside `read` when the authority lets the actor
    * read it too, since a write's response shows what a read would. The
    * actor's own rules then narrow it — by denying, since a deny always
    * wins — and can never allow more.
@@ -95,19 +76,19 @@ export class AccessControlService {
     ctx: PlainLiteralObject,
     resolution: AccessResolutionInterface,
     action: string,
-    subject: string,
+    resource: string,
   ): Promise<AccessAuthorization> {
-    if (!this.authority || this.authorityExcept.has(subject)) {
+    if (!this.authority || this.authorityExcept.has(resource)) {
       return { allowed: true, resolution };
     }
-    const authority = this.authority.decider;
+    const { authority } = this.authority;
 
     // The shape a repository asks about, so both share one snapshot.
-    const actor = normalizedActor(resolution.actor);
+    const actor = normalizeActor(resolution.actor);
     const decide = (asked: string) =>
       authority.decide(ctx, {
         actor,
-        object: subject,
+        subject: resource,
         action: asked,
         columns: [],
       });
@@ -118,9 +99,9 @@ export class AccessControlService {
         allowed: false,
         refusal: {
           action,
-          subject,
+          resource,
           actor,
-          reason: 'authority',
+          refusal: 'authority',
           ...(decision.gate === undefined ? {} : { gate: decision.gate }),
         },
       };
@@ -130,7 +111,7 @@ export class AccessControlService {
       action !== 'read' && (await decide('read')).effect === 'allow';
     const rules: AuthorityRuleInterface<string>[] = [
       ...narrowingRules(resolution.rules),
-      { action: reads ? [action, 'read'] : action, subject },
+      { action: reads ? [action, 'read'] : action, subject: resource },
     ];
 
     return {
@@ -170,7 +151,7 @@ export class AccessControlService {
   }
 
   /**
-   * Why a resolved actor may not take `action` on `subject`, or `undefined`
+   * Why a resolved actor may not take `action` on `resource`, or `undefined`
    * when they may. The resource is checked first, then each field. A field
    * above a denied one is refused too: writing `profile` as a whole, as
    * `{ profile: null }` does, replaces a denied `profile.ssn`.
@@ -178,22 +159,23 @@ export class AccessControlService {
   refusal(
     resolution: Pick<AccessResolutionInterface, 'actor' | 'ability'>,
     action: string,
-    subject: string,
+    resource: string,
     options: AccessCheckOptionsInterface = {},
   ): AccessRefusedDetailsInterface | undefined {
-    const { actor, ability } = resolution;
+    const { ability } = resolution;
+    const actor = normalizeActor(resolution.actor);
 
-    if (!ability.can(action, subject)) {
-      if (!ability.relevantRuleFor(action, subject)?.inverted) {
-        return { action, subject, actor, reason: 'no-grant' };
+    if (!ability.can(action, resource)) {
+      if (!ability.relevantRuleFor(action, resource)?.inverted) {
+        return { action, resource, actor, refusal: 'no-grant' };
       }
 
-      const gate = accessGateOf(ability, action, subject);
+      const gate = accessGateOf(ability, action, resource);
       return {
         action,
-        subject,
+        resource,
         actor,
-        reason: 'denied',
+        refusal: 'denied',
         ...(gate === undefined ? {} : { gate }),
       };
     }
@@ -207,16 +189,22 @@ export class AccessControlService {
     // Every rule for the action, field-scoped denies included: `rulesFor`
     // leaves those out when asked without a field.
     const deniedFields = ability
-      .possibleRulesFor(action, subject)
+      .possibleRulesFor(action, resource)
       .filter((rule) => rule.inverted)
       .flatMap((rule) => rule.fields ?? []);
 
     for (const field of fields) {
       if (
-        !ability.can(action, subject, field) ||
+        !ability.can(action, resource, field) ||
         deniedFields.some((denied) => denied.startsWith(`${field}.`))
       ) {
-        return { action, subject, actor, reason: 'field', field };
+        return {
+          action,
+          resource,
+          actor,
+          refusal: 'field',
+          fields: [field],
+        };
       }
     }
 
@@ -226,37 +214,41 @@ export class AccessControlService {
   async can(
     ctx: PlainLiteralObject,
     action: string,
-    subject: string,
+    resource: string,
     options?: AccessCheckOptionsInterface,
   ): Promise<boolean> {
     const resolution = await this.resolve(ctx);
     if (!resolution) return false;
 
-    const authorized = await this.authorize(ctx, resolution, action, subject);
+    const authorized = await this.authorize(ctx, resolution, action, resource);
 
     return (
       authorized.allowed &&
-      !this.refusal(authorized.resolution, action, subject, options)
+      !this.refusal(authorized.resolution, action, resource, options)
     );
   }
 
   /**
    * Throws `AccessRefusedException` unless the actor may take `action` on
-   * `subject`, and on each field in `fields`.
+   * `resource`, and on each field in `fields`.
    */
   async assert(
     ctx: PlainLiteralObject,
     action: string,
-    subject: string,
+    resource: string,
     options?: AccessCheckOptionsInterface,
   ): Promise<void> {
     const resolution = await this.resolve(ctx);
 
     if (!resolution) {
-      throw new AccessRefusedException({ action, subject, reason: 'no-actor' });
+      throw new AccessRefusedException({
+        action,
+        resource,
+        refusal: 'no-actor',
+      });
     }
 
-    const authorized = await this.authorize(ctx, resolution, action, subject);
+    const authorized = await this.authorize(ctx, resolution, action, resource);
     if (!authorized.allowed) {
       throw new AccessRefusedException(authorized.refusal);
     }
@@ -264,7 +256,7 @@ export class AccessControlService {
     const refusal = this.refusal(
       authorized.resolution,
       action,
-      subject,
+      resource,
       options,
     );
 
@@ -317,7 +309,7 @@ export class AccessControlService {
     const query = this.decisions?.decisionFor(ctx)?.query;
 
     // Copied, actor included, so changing the result changes no check.
-    return query && { ...query, actor: copyActor(query.actor) };
+    return query && { ...query, actor: normalizeActor(query.actor) };
   }
 
   /**

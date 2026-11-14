@@ -142,6 +142,7 @@ export { RoleActorInterface } from './domain/authority/interfaces/role-actor.int
 export { SystemActorInterface } from './domain/authority/interfaces/system-actor.interface.js';
 export { actorKeys } from './domain/authority/utils/actor-keys.util.js';
 export { frozenActor } from './domain/authority/utils/frozen-actor.util.js';
+export { normalizeActor } from './domain/authority/utils/normalize-actor.util.js';
 export { AuthorityInterface } from './domain/authority/interfaces/authority.interface.js';
 export { AuthorityRequestInterface } from './domain/authority/interfaces/authority-request.interface.js';
 export { AuthorityDecision } from './domain/authority/interfaces/authority-decision.type.js';

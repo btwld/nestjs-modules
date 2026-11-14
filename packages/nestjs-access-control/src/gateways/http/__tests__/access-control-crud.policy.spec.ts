@@ -162,7 +162,11 @@ describe(AccessControlCrudPolicy.name, () => {
         );
 
         expect(error).toMatchObject({
-          context: { reason: 'field', field: 'secret', subject: 'invoice' },
+          context: {
+            refusal: 'field',
+            fields: ['secret'],
+            resource: 'invoice',
+          },
         });
       },
     );
@@ -190,7 +194,7 @@ describe(AccessControlCrudPolicy.name, () => {
         }),
       );
 
-      expect(error).toMatchObject({ context: { field: 'profile' } });
+      expect(error).toMatchObject({ context: { fields: ['profile'] } });
     });
 
     it('checks a relation’s field by its path', async () => {
@@ -202,7 +206,7 @@ describe(AccessControlCrudPolicy.name, () => {
         }),
       );
 
-      expect(error).toMatchObject({ context: { field: 'secret.name' } });
+      expect(error).toMatchObject({ context: { fields: ['secret.name'] } });
     });
 
     it('checks the query of a write too, since it picks the rows it writes', async () => {
@@ -239,7 +243,7 @@ describe(AccessControlCrudPolicy.name, () => {
         );
 
         expect(error).toMatchObject({
-          context: { reason: 'field', field: 'amount' },
+          context: { refusal: 'field', fields: ['amount'] },
         });
       },
     );
@@ -262,7 +266,7 @@ describe(AccessControlCrudPolicy.name, () => {
       );
 
       expect(error).toMatchObject({
-        context: { reason: 'field', field: 'amount' },
+        context: { refusal: 'field', fields: ['amount'] },
       });
     });
 
@@ -283,7 +287,7 @@ describe(AccessControlCrudPolicy.name, () => {
         }),
       );
 
-      expect(error).toMatchObject({ context: { reason: 'field' } });
+      expect(error).toMatchObject({ context: { refusal: 'field' } });
     });
 
     it('lets a replace through when the caller may write every field', async () => {
@@ -307,7 +311,7 @@ describe(AccessControlCrudPolicy.name, () => {
         }),
       );
 
-      expect(error).toMatchObject({ context: { field: 'amount' } });
+      expect(error).toMatchObject({ context: { fields: ['amount'] } });
     });
   });
 });

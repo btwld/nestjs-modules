@@ -72,7 +72,7 @@ const STORE: RepositoryProviderOptions = {
   key: ACTIVITY_TOKEN,
   entity: ActivityEntityFixture,
   writePolicy: APPEND_ONLY,
-  rowScope: { access: 'public', reason: 'every tenant reads the test log' },
+  rowScope: { access: 'open', reason: 'every tenant reads the test log' },
 };
 
 const TENANT_STORE: RepositoryProviderOptions = {

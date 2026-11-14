@@ -27,14 +27,14 @@ describe('Example: role-based API', () => {
     api
       .get('/invoices')
       .expect(403)
-      .expect(refused('read on invoice (no-actor)')));
+      .expect(refused('read', 'invoice', 'no-actor')));
 
   it('refuses a user with no role', () =>
     api
       .get('/invoices')
       .set(bearer('dee'))
       .expect(403)
-      .expect(refused('read on invoice (no-grant)')));
+      .expect(refused('read', 'invoice', 'no-grant')));
 
   it('shows a viewer invoices without their internal notes', () =>
     api
@@ -60,7 +60,7 @@ describe('Example: role-based API', () => {
       .set(bearer('cy'))
       .send({ customer: 'Globex', amount: 90, status: 'draft' })
       .expect(403)
-      .expect(refused('create on invoice (no-grant)')));
+      .expect(refused('create', 'invoice', 'no-grant')));
 
   it('lets an accountant change the notes but not the amount', async () => {
     // The response shows what ben may read, `amount` included.
@@ -82,7 +82,7 @@ describe('Example: role-based API', () => {
       .set(bearer('ben'))
       .send({ internalNotes: 'Discounted', amount: 1000 })
       .expect(403)
-      .expect(refused('update on invoice (field)'));
+      .expect(refused('update', 'invoice', 'field'));
 
     const { body } = await api
       .get('/invoices/inv-1')
@@ -99,7 +99,7 @@ describe('Example: role-based API', () => {
       .delete('/invoices/inv-1')
       .set(bearer('ben'))
       .expect(403)
-      .expect(refused('delete on invoice (no-grant)'));
+      .expect(refused('delete', 'invoice', 'no-grant'));
 
     await api.delete('/invoices/inv-1').set(bearer('ada')).expect(200);
     await api.get('/invoices/inv-1').set(bearer('ada')).expect(404);

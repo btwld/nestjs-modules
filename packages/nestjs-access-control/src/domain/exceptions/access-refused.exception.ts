@@ -7,16 +7,17 @@ import { type AccessRefusedDetailsInterface } from '../interfaces/access-refused
 import { AccessControlException } from './access-control.exception.js';
 
 /**
- * Thrown when a call is not allowed. Names what was asked and why it was
- * refused.
+ * Thrown when a call is not allowed. The message names the action and the
+ * resource; why it was refused, and the gate when one is pending, are in
+ * the context.
  */
 export class AccessRefusedException extends AccessControlException {
   declare context: RuntimeException['context'] & AccessRefusedDetailsInterface;
 
   constructor(details: AccessRefusedDetailsInterface) {
     super({
-      message: 'Access refused: %s on %s (%s)',
-      messageParams: [details.action, details.subject, details.reason],
+      message: 'Not allowed to %s %s',
+      messageParams: [details.action, details.resource],
       httpStatus: HttpStatus.FORBIDDEN,
       fault: 'client',
     });

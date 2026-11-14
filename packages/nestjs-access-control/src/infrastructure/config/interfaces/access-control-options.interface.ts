@@ -22,7 +22,7 @@ export interface AccessControlOptionsInterface {
   /**
    * Decides each route first, as a repository governed by the same
    * authority decides its data: a route's resource is the authority's
-   * object, its action the verb. The actor's rules then only narrow what it
+   * subject, its action the verb. The actor's rules then only narrow what it
    * allows. On a resource in `except`, and without one, the actor's rules
    * decide alone.
    */

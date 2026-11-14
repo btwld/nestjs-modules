@@ -157,7 +157,7 @@ describe(AccessControlGuard.name, () => {
       ),
     ).rejects.toThrow(
       expect.objectContaining({
-        context: expect.objectContaining({ reason: 'access-query' }),
+        context: expect.objectContaining({ refusal: 'access-query' }),
       }),
     );
   });
@@ -169,8 +169,8 @@ describe(AccessControlGuard.name, () => {
       expect.objectContaining({
         context: expect.objectContaining({
           action: 'read',
-          subject: 'invoice',
-          reason: 'no-actor',
+          resource: 'invoice',
+          refusal: 'no-actor',
         }),
       }),
     );
@@ -282,8 +282,8 @@ describe(AccessControlGuard.name, () => {
       expect.objectContaining({
         context: expect.objectContaining({
           action: 'read',
-          subject: 'invoice',
-          reason: 'denied',
+          resource: 'invoice',
+          refusal: 'denied',
         }),
       }),
     );
@@ -301,10 +301,10 @@ describe(AccessControlGuard.name, () => {
   describe('with an authority', () => {
     const auditor: Actor = { kind: 'role', roles: ['auditor'] };
 
-    /** An authority allowing `<verb> <object>` keys, refusing the rest. */
+    /** An authority allowing `<verb> <subject>` keys, refusing the rest. */
     const allowing = (...allowed: string[]): AuthorityInterface => ({
-      decide: async (_ctx, { action, object }) =>
-        allowed.includes(`${action} ${object}`)
+      decide: async (_ctx, { action, subject }) =>
+        allowed.includes(`${action} ${subject}`)
           ? { effect: 'allow' }
           : { effect: 'refuse', gate: 'DEC-4' },
     });
@@ -319,7 +319,7 @@ describe(AccessControlGuard.name, () => {
           { actorFor: async () => actor },
           new StaticAccessGrantsProvider(grants),
           undefined,
-          { decider: authority },
+          { authority },
         ),
         new Reflector(),
         mock<ModuleRef>(),
@@ -344,8 +344,8 @@ describe(AccessControlGuard.name, () => {
       ).rejects.toThrow(
         expect.objectContaining({
           context: expect.objectContaining({
-            subject: 'invoice',
-            reason: 'authority',
+            resource: 'invoice',
+            refusal: 'authority',
             gate: 'DEC-4',
           }),
         }),

@@ -51,7 +51,7 @@ import {
       imports: [InvoiceAuthorityModule],
       inject: [CaslAuthority],
       useFactory: (authority: CaslAuthority) => ({
-        authority: { decider: authority },
+        authority: { authority },
         settings: { grants: ROUTE_GRANTS },
         actorResolver: {
           actorFor: async (_ctx, context) => {

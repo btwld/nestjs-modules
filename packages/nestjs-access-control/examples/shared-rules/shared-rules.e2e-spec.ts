@@ -3,6 +3,8 @@ import request from 'supertest';
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
+import { refused } from '../shared/demo-e2e.util.js';
+
 import { SharedRulesModule } from './shared-rules.module.js';
 
 describe('Shared rules', () => {
@@ -50,14 +52,11 @@ describe('Shared rules', () => {
   });
 
   it('a clerk may not delete: the route is refused before the handler runs', async () => {
-    const refused = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .delete(`/invoices/${invoiceId}`)
       .set(as('ada'))
-      .expect(403);
-
-    expect(refused.body.message).toEqual(
-      'Access refused: delete on invoices (authority)',
-    );
+      .expect(403)
+      .expect(refused('delete', 'invoices', 'authority'));
   });
 
   it('a manager deletes', async () => {

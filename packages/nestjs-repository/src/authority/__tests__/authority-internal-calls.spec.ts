@@ -137,13 +137,13 @@ describe('calls the repository makes itself', () => {
       expect(authority.requests).toEqual([
         {
           actor: CLERK,
-          object: WIDGET_TOKEN,
+          subject: WIDGET_TOKEN,
           action: 'create',
           columns: WIDGET_COLUMNS,
         },
         {
           actor: CLERK,
-          object: WIDGET_TOKEN,
+          subject: WIDGET_TOKEN,
           action: 'read',
           columns: WIDGET_COLUMNS,
         },
@@ -244,13 +244,13 @@ describe('calls the repository makes itself', () => {
       expect(authority.requests).toEqual([
         {
           actor: CLERK,
-          object: ORDER_TOKEN,
+          subject: ORDER_TOKEN,
           action: 'update',
           columns: ORDER_COLUMNS,
         },
         {
           actor: CLERK,
-          object: ORDER_TOKEN,
+          subject: ORDER_TOKEN,
           action: 'read',
           columns: ORDER_COLUMNS,
         },

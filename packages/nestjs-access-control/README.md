@@ -198,16 +198,16 @@ AccessControlModule.forRootAsync({
   imports: [AuthorityModule],
   inject: [CaslAuthority],
   useFactory: (authority: CaslAuthority) => ({
-    authority: { decider: authority, except: ['reports'] },
+    authority: { authority, except: ['reports'] },
     actorResolver,
   }),
 });
 ```
 
 - **The authority decides each route first.** A route's resource is read
-  as the authority's object and its action as the verb, so
+  as the authority's subject and its action as the verb, so
   `@AccessControlDeleteOne('invoices')` asks whether the actor may `delete`
-  `invoices`. A refusal is a `403` with reason `authority`, before the
+  `invoices`. A refusal is a `403` with refusal `authority`, before the
   handler runs. Name a route's resource as the entity is keyed in
   `RepositoryModule.forRoot()`: a misspelled one is refused by the
   authority, so the mistake shows. Which rows the caller reaches is row
@@ -390,7 +390,10 @@ the template leaves out, and deny what it allows, but cannot undo a deny in
 the template. Every rule set the provider returns is checked before use; a
 set that breaks the rules in [Writing Rules](#writing-rules) refuses the
 call. Caching, and telling other instances about an edit, is up to the
-provider.
+provider. `rulesFor` returns the rules or a promise of them, as the
+repository's `CaslAuthority` rules source does; the difference is when each
+is asked: the CASL authority asks once per `ctx`, while the grants provider
+is asked on every check.
 
 ## Protecting Routes
 
@@ -533,7 +536,7 @@ Register the service with the module's `queryServices`, or, when it injects
 your own providers (such as the store that knows who owns a record), in
 your own module: the check finds it in any module. A route with access
 query services proceeds when one of them allows it, and is refused with
-reason `access-query` otherwise. On a controller, `@AccessControlQuery`
+refusal `access-query` otherwise. On a controller, `@AccessControlQuery`
 applies to every route, unless a route declares its own, which replace the
 controller's. Access query services run only after a grant: on a route
 without one, the call fails rather than skip them. Each one receives:
@@ -683,7 +686,7 @@ authority's rules instead, from wherever your application keeps them.
 | `settings.grants` | `{}` | Rules keyed `role:<name>` or `system:<name>`. Checked at startup. |
 | `actorResolver` | none | Works out who is acting when a call carries no `ActorCtx`. |
 | `grantsProvider` | `settings.grants` | Supplies an actor's rules on every check. |
-| `authority` | none | `{ decider, except? }`: decides each route first, except on resources in `except`; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
+| `authority` | none | `{ authority, except? }`: decides each route first, except on resources in `except`; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
 | `appFilter` | the response filter | Replace it, or `false` for none. |
 | `queryServices` | `[]` | Access query services to register. |
 
@@ -702,15 +705,17 @@ actor overlay of its own.
 | `AccessRefusedException` | 403 | `client` | A call is refused |
 | `AccessRulesInvalidException` | 500 | `usage` | A rule set cannot be used |
 
-`AccessRefusedException` names the action, the resource, the actor, and a
-`reason`:
+`AccessRefusedException`'s message names only the action and the resource,
+such as `Not allowed to delete invoices`. Its context names the `action`,
+the `resource`, the `actor` (who they are only: their kind, and their roles
+and user id or their name), and a `refusal`:
 
-| Reason | Meaning |
+| Refusal | Meaning |
 | --- | --- |
 | `no-actor` | Nobody is acting |
 | `no-grant` | No rule allows it |
 | `denied` | A deny refuses it (also names a pending decision as `gate` when every deny that refused has a `reason`) |
-| `field` | A field it touches is refused (also names the `field`) |
+| `field` | A field it touches is refused (also names the refused `fields`) |
 | `access-query` | The route's access query service refused it |
 | `authority` | The module's authority refuses it (also names any pending decision as `gate`) |
 

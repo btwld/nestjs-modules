@@ -29,8 +29,8 @@ const CASES: {
     build: () =>
       new AccessRefusedException({
         action: 'read',
-        subject: 'user',
-        reason: 'no-grant',
+        resource: 'user',
+        refusal: 'no-grant',
       }),
     fault: 'client',
   },
@@ -64,8 +64,8 @@ describe('exception fault classification', () => {
       'ACCESS_REFUSED_ERROR',
       new AccessRefusedException({
         action: 'read',
-        subject: 'user',
-        reason: 'denied',
+        resource: 'user',
+        refusal: 'denied',
       }),
     ],
     [
@@ -80,8 +80,8 @@ describe('exception fault classification', () => {
     expect(
       new AccessRefusedException({
         action: 'read',
-        subject: 'user',
-        reason: 'denied',
+        resource: 'user',
+        refusal: 'denied',
       }).getStatus(),
     ).toEqual(403);
   });

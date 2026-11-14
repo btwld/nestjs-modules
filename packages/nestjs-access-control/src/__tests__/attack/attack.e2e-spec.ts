@@ -6,6 +6,7 @@ import {
   type INestApplication,
   type PlainLiteralObject,
 } from '@nestjs/common';
+import { BaseExceptionFilter } from '@nestjs/core';
 import { CommandBus } from '@nestjs/cqrs';
 import { Test } from '@nestjs/testing';
 
@@ -25,6 +26,8 @@ import {
   RowScopeCtx,
   Where,
 } from '@concepta/nestjs-repository';
+
+import { AccessRefusedException } from '../../domain/exceptions/access-refused.exception.js';
 
 import { AttackUserStore } from './attack-user.store.js';
 import {
@@ -58,6 +61,20 @@ describe('Attack round: one application, every layer', () => {
   const tokens = new Map<string, string>();
 
   const http = () => request(app.getHttpServer());
+
+  /** Every exception the application rendered, newest last. */
+  const rendered = vi.spyOn(BaseExceptionFilter.prototype, 'catch');
+
+  /**
+   * Why the last call was refused, from the context of the exception it was
+   * rendered from: the response never shows it.
+   */
+  const lastRefusal = () => {
+    const [exception] = rendered.mock.calls.at(-1) ?? [];
+    return exception instanceof AccessRefusedException
+      ? exception.context.refusal
+      : undefined;
+  };
 
   const issue = (sub: string): Promise<string> =>
     app.get(CommandBus).execute(new IssueAccessTokenCommand({}, { sub }));
@@ -229,9 +246,8 @@ describe('Attack round: one application, every layer', () => {
         .set(as('alice'))
         .expect(403);
 
-      expect(refused.body.message).toEqual(
-        'Access refused: delete on invoices (authority)',
-      );
+      expect(refused.body.message).toEqual('Not allowed to delete invoices');
+      expect(lastRefusal()).toEqual('authority');
       expect(await managerRead()).toEqual({
         ...clerkView(),
         internalNotes: 'slow payer',
@@ -282,9 +298,8 @@ describe('Attack round: one application, every layer', () => {
         .set(as('grace'))
         .expect(403);
 
-      expect(refused.body.message).toEqual(
-        'Access refused: read on ledgers (authority)',
-      );
+      expect(refused.body.message).toEqual('Not allowed to read ledgers');
+      expect(lastRefusal()).toEqual('authority');
     });
 
     it("a resource in `except` is decided by access control's grants alone", async () => {
@@ -297,9 +312,8 @@ describe('Attack round: one application, every layer', () => {
         .get('/desk/reports/aging')
         .set(as('alice'))
         .expect(403);
-      expect(refused.body.message).toEqual(
-        'Access refused: read on reports (no-grant)',
-      );
+      expect(refused.body.message).toEqual('Not allowed to read reports');
+      expect(lastRefusal()).toEqual('no-grant');
     });
   });
 

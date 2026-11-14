@@ -11,5 +11,7 @@ export interface AccessGrantsProviderInterface {
   rulesFor(
     ctx: PlainLiteralObject,
     actor: Actor,
-  ): Promise<AuthorityRuleInterface<string>[]>;
+  ):
+    | readonly AuthorityRuleInterface<string>[]
+    | Promise<readonly AuthorityRuleInterface<string>[]>;
 }

@@ -27,7 +27,7 @@ type CaslAuthorityAbility = Ability<[string, string]>;
  *   `conditions`, an unknown property, or CASL's wildcards `manage` and
  *   `all` refuses the call, as does every other call on the same ctx.
  * - A deny's `reason` is reported as the decision still pending (`gate`)
- *   when the deny refuses the object outright and every other deny that
+ *   when the deny refuses the subject outright and every other deny that
  *   applies has one too. A deny naming `fields` narrows the columns instead,
  *   and its `reason` is not reported.
  */
@@ -45,19 +45,19 @@ export class CaslAuthority implements AuthorityInterface {
 
   async decide(
     ctx: PlainLiteralObject,
-    { actor, object, action, columns }: AuthorityRequestInterface,
+    { actor, subject, action, columns }: AuthorityRequestInterface,
   ): Promise<AuthorityDecision> {
     const ability = await this.abilityFor(ctx, actor);
 
-    if (!ability.can(action, object)) {
-      const gate = this.gateOf(ability, action, object);
+    if (!ability.can(action, subject)) {
+      const gate = this.gateOf(ability, action, subject);
       return gate === undefined
         ? { effect: 'refuse' }
         : { effect: 'refuse', gate };
     }
 
     const permitted = new Set(
-      permittedFieldsOf(ability, action, object, {
+      permittedFieldsOf(ability, action, subject, {
         fieldsFrom: (rule) => rule.fields ?? [...columns],
       }),
     );
@@ -81,11 +81,11 @@ export class CaslAuthority implements AuthorityInterface {
   private gateOf(
     ability: CaslAuthorityAbility,
     action: string,
-    object: string,
+    subject: string,
   ): string | undefined {
     // Highest priority first, so the first given is last.
     const reasons = ability
-      .rulesFor(action, object)
+      .rulesFor(action, subject)
       .filter((rule) => rule.inverted)
       .map((rule) => rule.reason);
 

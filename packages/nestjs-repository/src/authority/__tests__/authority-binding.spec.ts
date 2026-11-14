@@ -12,6 +12,7 @@ import {
   type AuthorityInterface,
   type AuthorityRequestInterface,
   CoreModule,
+  type RoleActorInterface,
   RuntimeException,
 } from '@concepta/nestjs-core';
 
@@ -186,7 +187,7 @@ describe('authority binding', () => {
         expect(authority.requests).toEqual(
           asked.map((action) => ({
             actor: { kind: 'role', roles: ['clerk'] },
-            object: ORDER_TOKEN,
+            subject: ORDER_TOKEN,
             action,
             columns: ['id', 'tenantId', 'description', 'dateDeleted'],
           })),
@@ -232,6 +233,14 @@ describe('authority binding', () => {
           AuthorityRefusedException,
         );
         expect(authority.requests).toEqual([]);
+
+        const error = await run(orders, {}).catch((e: unknown) => e);
+        expect(
+          error instanceof AuthorityRefusedException && {
+            refusal: error.context.refusal,
+            actor: error.context.actor,
+          },
+        ).toEqual({ refusal: 'no-actor', actor: undefined });
       },
     );
 
@@ -307,6 +316,32 @@ describe('authority binding', () => {
         expect(error.context).toMatchObject({ gate: 'DEC-12' });
         expect(error.message).not.toContain('DEC-12');
         expect(error.message).not.toContain('clerk');
+      }
+    });
+
+    it('should name the action and entity key in the message, and why and who in the context', async () => {
+      const { orders } = await ordersWith({});
+      const resolved: RoleActorInterface & { email: string } = {
+        kind: 'role',
+        roles: ['clerk'],
+        userId: 'user-1',
+        email: 'clerk@example.com',
+      };
+
+      const error = await orders
+        .find({ ctx: actorCtx(resolved) })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AuthorityRefusedException);
+      if (error instanceof AuthorityRefusedException) {
+        expect(error.message).toEqual(`Not allowed to read ${ORDER_TOKEN}`);
+        expect(error.context.entityKey).toEqual(ORDER_TOKEN);
+        expect(error.context.refusal).toEqual('authority');
+        expect(error.context.actor).toStrictEqual({
+          kind: 'role',
+          roles: ['clerk'],
+          userId: 'user-1',
+        });
       }
     });
 

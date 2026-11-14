@@ -4,6 +4,7 @@ import {
   type Actor,
   type AuthorityInterface,
   type AuthorityRuleInterface,
+  type RoleActorInterface,
 } from '@concepta/nestjs-core';
 
 import { StaticAccessGrantsProvider } from '../../../infrastructure/grants/static-access-grants.provider.js';
@@ -39,8 +40,8 @@ describe(AccessControlService.name, () => {
           constructor: AccessRefusedException,
           context: expect.objectContaining({
             action: 'read',
-            subject: 'user',
-            reason: 'no-actor',
+            resource: 'user',
+            refusal: 'no-actor',
           }),
         }),
       );
@@ -52,11 +53,29 @@ describe(AccessControlService.name, () => {
       ).rejects.toThrow(
         expect.objectContaining({
           context: expect.objectContaining({
-            reason: 'no-grant',
+            refusal: 'no-grant',
             actor: clerk,
           }),
         }),
       );
+    });
+
+    it('names the actor by who they are only, whatever the resolver added', async () => {
+      const resolved: RoleActorInterface & { email: string } = {
+        kind: 'role',
+        roles: ['clerk'],
+        userId: 'user-1',
+        email: 'clerk@example.com',
+      };
+
+      const error = await serviceFor(resolved, {})
+        .assert({}, 'read', 'user')
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(AccessRefusedException);
+      expect(
+        error instanceof AccessRefusedException && error.context.actor,
+      ).toEqual({ kind: 'role', roles: ['clerk'], userId: 'user-1' });
     });
 
     it('allows what a role grants', async () => {
@@ -78,7 +97,7 @@ describe(AccessControlService.name, () => {
 
       await expect(service.assert({}, 'delete', 'user')).rejects.toThrow(
         expect.objectContaining({
-          context: expect.objectContaining({ reason: 'denied' }),
+          context: expect.objectContaining({ refusal: 'denied' }),
         }),
       );
     });
@@ -105,8 +124,8 @@ describe(AccessControlService.name, () => {
       ).rejects.toThrow(
         expect.objectContaining({
           context: expect.objectContaining({
-            reason: 'field',
-            field: 'salary',
+            refusal: 'field',
+            fields: ['salary'],
           }),
         }),
       );
@@ -135,8 +154,8 @@ describe(AccessControlService.name, () => {
       ).rejects.toThrow(
         expect.objectContaining({
           context: expect.objectContaining({
-            reason: 'field',
-            field: 'amount',
+            refusal: 'field',
+            fields: ['amount'],
           }),
         }),
       );
@@ -234,10 +253,10 @@ describe(AccessControlService.name, () => {
           constructor: AccessRefusedException,
           context: expect.objectContaining({
             action: 'update',
-            subject: 'document',
+            resource: 'document',
             actor: clerk,
-            reason: 'field',
-            field: 'ownerId',
+            refusal: 'field',
+            fields: ['ownerId'],
           }),
         }),
       );
@@ -405,7 +424,7 @@ describe(AccessControlService.name, () => {
   });
 
   describe('with an authority', () => {
-    /** Allows `<verb> <object>` keys, refusing the rest. */
+    /** Allows `<verb> <subject>` keys, refusing the rest. */
     const authorityAllowing = (
       ...allowed: string[]
     ): AuthorityInterface & { requests: unknown[] } => {
@@ -414,10 +433,10 @@ describe(AccessControlService.name, () => {
         requests,
         decide: async (_ctx, request) => {
           requests.push(request);
-          if (allowed.includes(`${request.action} ${request.object}`)) {
+          if (allowed.includes(`${request.action} ${request.subject}`)) {
             return { effect: 'allow' };
           }
-          return request.object === 'gated'
+          return request.subject === 'gated'
             ? { effect: 'refuse', gate: 'DEC-4' }
             : { effect: 'refuse' };
         },
@@ -432,7 +451,7 @@ describe(AccessControlService.name, () => {
         actingAs(clerk),
         new StaticAccessGrantsProvider(grants),
         undefined,
-        { decider: authority, except: ['report'] },
+        { authority, except: ['report'] },
       );
 
     it('refuses a resource the authority has no rule for, unless it is left out', async () => {
@@ -442,7 +461,7 @@ describe(AccessControlService.name, () => {
 
       await expect(service.assert({}, 'read', 'invoices')).rejects.toThrow(
         expect.objectContaining({
-          context: expect.objectContaining({ reason: 'authority' }),
+          context: expect.objectContaining({ refusal: 'authority' }),
         }),
       );
     });
@@ -466,14 +485,14 @@ describe(AccessControlService.name, () => {
       expect(await service.can({}, 'update', 'invoice')).toEqual(false);
     });
 
-    it('asks the authority for the verb, on the resource as its object', async () => {
+    it('asks the authority for the verb, on the resource as its subject', async () => {
       const authority = authorityAllowing('read invoice');
       const ctx = {};
 
       await governedService(authority).can(ctx, 'read', 'invoice');
 
       expect(authority.requests).toEqual([
-        { actor: clerk, object: 'invoice', action: 'read', columns: [] },
+        { actor: clerk, subject: 'invoice', action: 'read', columns: [] },
       ]);
     });
 
@@ -500,13 +519,13 @@ describe(AccessControlService.name, () => {
           { actorFor: async () => actor },
           new StaticAccessGrantsProvider({}),
           undefined,
-          { decider: authority },
+          { authority },
         );
 
         await service.can({}, 'read', 'invoice');
 
         expect(authority.requests).toEqual([
-          { actor: asked, object: 'invoice', action: 'read', columns: [] },
+          { actor: asked, subject: 'invoice', action: 'read', columns: [] },
         ]);
       },
     );
@@ -518,7 +537,7 @@ describe(AccessControlService.name, () => {
 
       expect(error).toBeInstanceOf(AccessRefusedException);
       expect(error).toMatchObject({
-        context: { reason: 'authority', gate: 'DEC-4', subject: 'gated' },
+        context: { refusal: 'authority', gate: 'DEC-4', resource: 'gated' },
       });
     });
 
@@ -654,7 +673,7 @@ describe(AccessControlService.name, () => {
         }),
         new StaticAccessGrantsProvider({}),
         undefined,
-        { decider: authority },
+        { authority },
       );
 
       await service.can({}, 'read', 'invoice');
@@ -662,7 +681,7 @@ describe(AccessControlService.name, () => {
       expect(authority.requests).toStrictEqual([
         {
           actor: { kind: 'role', roles: ['clerk'] },
-          object: 'invoice',
+          subject: 'invoice',
           action: 'read',
           columns: [],
         },
@@ -695,7 +714,7 @@ describe(AccessControlService.name, () => {
         subject,
         { fields },
       );
-      return refusal && { reason: refusal.reason, field: refusal.field };
+      return refusal && { refusal: refusal.refusal, fields: refusal.fields };
     };
 
     it('names the action, resource and actor', () => {
@@ -707,10 +726,26 @@ describe(AccessControlService.name, () => {
         ),
       ).toEqual({
         action: 'read',
-        subject: 'user',
+        resource: 'user',
         actor: clerk,
-        reason: 'no-grant',
+        refusal: 'no-grant',
       });
+    });
+
+    it('names the actor by who they are only, whatever the resolver added', () => {
+      const resolved: RoleActorInterface & { email: string } = {
+        kind: 'role',
+        roles: ['clerk'],
+        email: 'clerk@example.com',
+      };
+
+      expect(
+        service.refusal(
+          { actor: resolved, ability: createAccessAbility([]) },
+          'read',
+          'user',
+        )?.actor,
+      ).toStrictEqual({ kind: 'role', roles: ['clerk'] });
     });
 
     it('allows what a rule grants', () => {
@@ -718,8 +753,8 @@ describe(AccessControlService.name, () => {
 
       expect(refusalOf(rules, 'read', 'user')).toBeUndefined();
       expect(refusalOf(rules, 'read', 'org')).toEqual({
-        reason: 'no-grant',
-        field: undefined,
+        refusal: 'no-grant',
+        fields: undefined,
       });
     });
 
@@ -744,9 +779,9 @@ describe(AccessControlService.name, () => {
           ]),
         ).toEqual({
           action: 'approve',
-          subject: 'contract',
+          resource: 'contract',
           actor: clerk,
-          reason: 'denied',
+          refusal: 'denied',
           gate: 'DEC-7',
         });
       });
@@ -769,9 +804,9 @@ describe(AccessControlService.name, () => {
           ]),
         ).toEqual({
           action: 'approve',
-          subject: 'contract',
+          resource: 'contract',
           actor: clerk,
-          reason: 'denied',
+          refusal: 'denied',
           gate: 'DEC-7',
         });
       });
@@ -789,9 +824,9 @@ describe(AccessControlService.name, () => {
           ]),
         ).toEqual({
           action: 'approve',
-          subject: 'contract',
+          resource: 'contract',
           actor: clerk,
-          reason: 'denied',
+          refusal: 'denied',
         });
       });
 
@@ -814,9 +849,9 @@ describe(AccessControlService.name, () => {
 
         expect(refusalUnder(rules)).toEqual({
           action: 'approve',
-          subject: 'contract',
+          resource: 'contract',
           actor: clerk,
-          reason: 'denied',
+          refusal: 'denied',
           gate: 'DEC-7',
         });
       });
@@ -843,10 +878,10 @@ describe(AccessControlService.name, () => {
           ),
         ).toEqual({
           action: 'approve',
-          subject: 'contract',
+          resource: 'contract',
           actor: clerk,
-          reason: 'field',
-          field: 'amount',
+          refusal: 'field',
+          fields: ['amount'],
         });
       });
     });
@@ -868,22 +903,22 @@ describe(AccessControlService.name, () => {
 
       it('refuses a denied field the call names', () => {
         expect(refusalOf(rules, 'update', 'user', ['name', 'role'])).toEqual({
-          reason: 'field',
-          field: 'role',
+          refusal: 'field',
+          fields: ['role'],
         });
       });
 
       it('refuses a denied field inside an array, whatever its position', () => {
         expect(refusalOf(rules, 'update', 'user', ['items.3.amount'])).toEqual({
-          reason: 'field',
-          field: 'items.amount',
+          refusal: 'field',
+          fields: ['items.amount'],
         });
       });
 
       it('refuses a field beneath a denied parent', () => {
         expect(refusalOf(rules, 'update', 'user', ['address.city'])).toEqual({
-          reason: 'field',
-          field: 'address.city',
+          refusal: 'field',
+          fields: ['address.city'],
         });
       });
 
@@ -891,8 +926,8 @@ describe(AccessControlService.name, () => {
       // every field beneath it.
       it('refuses a field above a denied field', () => {
         expect(refusalOf(rules, 'update', 'user', ['items'])).toEqual({
-          reason: 'field',
-          field: 'items',
+          refusal: 'field',
+          fields: ['items'],
         });
       });
 
@@ -908,8 +943,8 @@ describe(AccessControlService.name, () => {
         ];
 
         expect(refusalOf(limited, 'update', 'user', ['0'])).toEqual({
-          reason: 'field',
-          field: '0',
+          refusal: 'field',
+          fields: ['0'],
         });
         expect(
           refusalOf([{ action: 'update', subject: 'user' }], 'update', 'user', [
@@ -937,8 +972,8 @@ describe(AccessControlService.name, () => {
           refusalOf(limited, 'update', 'user', ['name', 'profile.bio']),
         ).toBeUndefined();
         expect(refusalOf(limited, 'update', 'user', ['email'])).toEqual({
-          reason: 'field',
-          field: 'email',
+          refusal: 'field',
+          fields: ['email'],
         });
       });
     });

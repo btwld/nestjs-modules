@@ -1,10 +1,13 @@
-import { type ActionEnum } from '@concepta/nestjs-core';
+import { type ActionEnum, type Actor } from '@concepta/nestjs-core';
 
 /**
  * What an entity's authority allowed one call. A column set that is absent
  * means every column.
  */
 export interface AuthorizedCallInterface {
+  /** Who the call was decided for. */
+  readonly actor: Actor;
+
   /** Each action the call takes, with the columns it may touch. */
   readonly actions: ReadonlyMap<ActionEnum, ReadonlySet<string> | undefined>;
 

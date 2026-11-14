@@ -54,9 +54,9 @@ export { AccessGrants } from './domain/interfaces/access-grants.type.js';
 export { AccessGrantsProviderInterface } from './domain/interfaces/access-grants-provider.interface.js';
 export { AccessQueryInterface } from './domain/interfaces/access-query.interface.js';
 export {
-  ACCESS_REFUSAL_REASONS,
-  AccessRefusalReason,
-} from './domain/interfaces/access-refusal-reason.type.js';
+  ACCESS_REFUSALS,
+  AccessRefusal,
+} from './domain/interfaces/access-refusal.type.js';
 export { AccessRefusedDetailsInterface } from './domain/interfaces/access-refused-details.interface.js';
 export { AccessResolutionInterface } from './domain/interfaces/access-resolution.interface.js';
 export { AccessAuthorization } from './domain/interfaces/access-authorization.type.js';

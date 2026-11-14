@@ -25,7 +25,7 @@ grants and an actor resolver in
   caller's rules for the route's action: it refuses the accountant's change to
   `amount` and lets their change to the notes through.
 - **Nobody acting, or no grant.** A caller who is not signed in is refused
-  with reason `no-actor`; a signed-in user with no role, with `no-grant`.
+  with refusal `no-actor`; a signed-in user with no role, with `no-grant`.
 
 ## Run it
 

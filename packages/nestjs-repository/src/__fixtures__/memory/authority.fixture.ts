@@ -11,7 +11,7 @@ import {
 } from '@concepta/nestjs-core';
 
 /**
- * Decisions keyed `<actor key> <object> <action>`, e.g.
+ * Decisions keyed `<actor key> <subject> <action>`, e.g.
  * `role:clerk orders read`. Any refusal among an actor's keys wins, then any
  * allow; a request nothing answers is refused.
  */
@@ -30,7 +30,7 @@ export class AuthorityFixture implements AuthorityInterface {
     this.requests.push(request);
 
     const decisions = actorKeys(request.actor)
-      .map((key) => this.table[`${key} ${request.object} ${request.action}`])
+      .map((key) => this.table[`${key} ${request.subject} ${request.action}`])
       .filter((decision) => decision !== undefined);
 
     return (
@@ -49,15 +49,15 @@ export function actorCtx(actor: Actor): AppContextHost {
   return ctx;
 }
 
-/** Allow every listed action on `object` to `actorKey`. */
+/** Allow every listed action on `subject` to `actorKey`. */
 export function allow(
   actorKey: string,
-  object: string,
+  subject: string,
   actions: string[],
 ): AuthorityTableFixture {
   return Object.fromEntries(
     actions.map((action): [string, AuthorityDecision] => [
-      `${actorKey} ${object} ${action}`,
+      `${actorKey} ${subject} ${action}`,
       { effect: 'allow' },
     ]),
   );

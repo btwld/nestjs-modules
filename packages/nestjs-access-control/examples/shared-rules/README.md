@@ -16,7 +16,7 @@ it to both the repository (`authority` on the entity) and access control
 
 - **One rule set, two layers.** `INVOICE_RULES` says what each role may do
   with invoices and which columns. Access control decides each route by it
-  before the handler runs: a clerk's `DELETE` is refused there, with reason
+  before the handler runs: a clerk's `DELETE` is refused there, with refusal
   `authority`. The repository decides the data by it: a clerk's list leaves
   out `internalNotes`, though the controller asks for nothing special.
 - **Narrowing for one API.** `ROUTE_GRANTS` are access control's own rules.
