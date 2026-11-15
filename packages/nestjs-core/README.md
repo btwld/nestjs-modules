@@ -1356,6 +1356,7 @@ exercise correlation behavior directly.
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns? }` or `{ effect: 'refuse', gate? }`. |
 | `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, reason? }`. |
 | `authorityRuleProblems(rules, source)` | Every problem with rules read from storage, each naming `source`; empty when they can be used. |
+| `authorityGateOf(rules)` | The `gate` of a refusal, from the rules that apply to the whole subject, highest priority first: the first-given deny's `reason` when every deny has one. For an authority of your own. |
 
 ### Route Audit Exports
 

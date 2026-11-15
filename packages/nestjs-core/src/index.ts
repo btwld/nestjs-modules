@@ -150,6 +150,7 @@ export { AuthorityAllowInterface } from './domain/authority/interfaces/authority
 export { AuthorityRefuseInterface } from './domain/authority/interfaces/authority-refuse.interface.js';
 export { AuthorityRuleInterface } from './domain/authority/interfaces/authority-rule.interface.js';
 export { authorityRuleProblems } from './domain/authority/utils/authority-rule-problems.util.js';
+export { authorityGateOf } from './domain/authority/utils/authority-gate-of.util.js';
 
 // Event context
 export { EventContextHost } from './domain/events/causal-context/event-context.host.js';

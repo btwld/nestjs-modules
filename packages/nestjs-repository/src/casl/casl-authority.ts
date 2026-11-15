@@ -8,6 +8,7 @@ import {
   type AuthorityDecision,
   type AuthorityInterface,
   type AuthorityRequestInterface,
+  authorityGateOf,
   authorityRuleProblems,
 } from '@concepta/nestjs-core';
 
@@ -49,7 +50,8 @@ export class CaslAuthority implements AuthorityInterface {
     const ability = await this.abilityFor(ctx, actor);
 
     if (!ability.can(action, subject)) {
-      const gate = this.gateOf(ability, action, subject);
+      // With no field, CASL gives the rules of the whole subject only.
+      const gate = authorityGateOf(ability.rulesFor(action, subject));
       return gate === undefined
         ? { effect: 'refuse' }
         : { effect: 'refuse', gate };
@@ -68,29 +70,6 @@ export class CaslAuthority implements AuthorityInterface {
       effect: 'allow',
       columns: columns.filter((column) => permitted.has(column)),
     };
-  }
-
-  /**
-   * The decision still pending behind a refusal: the first `reason` among the
-   * denies that apply, in the order they were given, but only when every one
-   * of them has one. A deny without a reason is final, so a refusal it takes
-   * part in is never reported as pending, whatever order the rules come in.
-   * No rule at all is a refusal with nothing pending.
-   */
-  private gateOf(
-    ability: CaslAuthorityAbility,
-    action: string,
-    subject: string,
-  ): string | undefined {
-    // Highest priority first, so the first given is last.
-    const reasons = ability
-      .rulesFor(action, subject)
-      .filter((rule) => rule.inverted)
-      .map((rule) => rule.reason);
-
-    return reasons.every((reason) => reason !== undefined)
-      ? reasons.at(-1)
-      : undefined;
   }
 
   private abilityFor(

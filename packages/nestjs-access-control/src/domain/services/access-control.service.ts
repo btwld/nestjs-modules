@@ -2,6 +2,7 @@ import { type ExecutionContext, type PlainLiteralObject } from '@nestjs/common';
 
 import {
   type AuthorityRuleInterface,
+  authorityGateOf,
   authorityRuleProblems,
   normalizeActor,
 } from '@concepta/nestjs-core';
@@ -19,7 +20,6 @@ import { type AccessQueryInterface } from '../interfaces/access-query.interface.
 import { type AccessRefusedDetailsInterface } from '../interfaces/access-refused-details.interface.js';
 import { type AccessResolutionInterface } from '../interfaces/access-resolution.interface.js';
 import { normalizeAccessFieldPath } from '../utils/access-field-paths.util.js';
-import { accessGateOf } from '../utils/access-gate.util.js';
 import { createAccessAbility } from '../utils/create-access-ability.util.js';
 
 /**
@@ -170,7 +170,8 @@ export class AccessControlService {
         return { action, resource, actor, refusal: 'no-grant' };
       }
 
-      const gate = accessGateOf(ability, action, resource);
+      // With no field, CASL gives the rules of the whole resource only.
+      const gate = authorityGateOf(ability.rulesFor(action, resource));
       return {
         action,
         resource,
