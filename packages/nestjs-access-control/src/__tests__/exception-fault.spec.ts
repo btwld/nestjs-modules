@@ -18,14 +18,17 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'AccessControlException',
+    errorCode: 'ACCESS_CONTROL_ERROR',
     build: () => new AccessControlException(),
     fault: 'internal',
   },
   {
     name: 'AccessRefusedException',
+    errorCode: 'ACCESS_REFUSED_ERROR',
     build: () =>
       new AccessRefusedException({
         action: 'read',
@@ -36,6 +39,7 @@ const CASES: {
   },
   {
     name: 'AccessRulesInvalidException',
+    errorCode: 'ACCESS_RULES_INVALID_ERROR',
     build: () => new AccessRulesInvalidException(['problem']),
     fault: 'usage',
   },
@@ -48,6 +52,10 @@ describe('exception fault classification', () => {
     expect(build().fault).toEqual(fault);
   });
 
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
+  });
+
   it('every RuntimeException subclass in this package is listed above', async () => {
     const discovered = await collectRuntimeExceptionClassNames(
       SRC_DIR,
@@ -56,24 +64,6 @@ describe('exception fault classification', () => {
     const expected = new Set(CASES.map((c) => c.build().constructor.name));
     const missing = discovered.filter((name) => !expected.has(name));
     expect(missing).toEqual([]);
-  });
-
-  it.each<[string, RuntimeException]>([
-    ['ACCESS_CONTROL_ERROR', new AccessControlException()],
-    [
-      'ACCESS_REFUSED_ERROR',
-      new AccessRefusedException({
-        action: 'read',
-        resource: 'user',
-        refusal: 'denied',
-      }),
-    ],
-    [
-      'ACCESS_RULES_INVALID_ERROR',
-      new AccessRulesInvalidException(['problem']),
-    ],
-  ])('sets error code %s', (errorCode, exception) => {
-    expect(exception.errorCode).toEqual(errorCode);
   });
 
   it('refuses with 403', () => {

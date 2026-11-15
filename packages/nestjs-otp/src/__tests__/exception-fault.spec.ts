@@ -22,39 +22,47 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'OtpException (default)',
+    errorCode: 'OTP_ERROR',
     build: () => new OtpException(),
     fault: 'internal',
   },
   {
     name: 'OtpInvalidExpirationDateException',
+    errorCode: 'OTP_INVALID_EXPIRES_IN',
     build: () => new OtpInvalidExpirationDateException(),
     fault: 'client',
   },
   {
     name: 'OtpLimitReachedException',
+    errorCode: 'OTP_LIMIT_REACHED_ERROR',
     build: () => new OtpLimitReachedException(),
     fault: 'client',
   },
   {
     name: 'OtpTypeNotDefinedException',
+    errorCode: 'OTP_TYPE_NOT_DEFINED_ERROR',
     build: () => new OtpTypeNotDefinedException('someType'),
     fault: 'usage',
   },
   {
     name: 'OtpValidationException',
+    errorCode: 'OTP_VALIDATION_ERROR',
     build: () => new OtpValidationException('someSchema', []),
     fault: 'client',
   },
   {
     name: 'OtpNotFoundException',
+    errorCode: 'OTP_NOT_FOUND_ERROR',
     build: () => new OtpNotFoundException({ id: 'id' }),
     fault: 'client',
   },
   {
     name: 'OtpEntityNotFoundException',
+    errorCode: 'OTP_ENTITY_NOT_FOUND_ERROR',
     build: () => new OtpEntityNotFoundException('SomeEntity'),
     fault: 'usage',
   },
@@ -65,6 +73,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

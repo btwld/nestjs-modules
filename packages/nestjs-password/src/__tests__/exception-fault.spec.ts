@@ -20,29 +20,35 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'PasswordException (default)',
+    errorCode: 'PASSWORD_ERROR',
     build: () => new PasswordException(),
     fault: 'internal',
   },
   {
     name: 'PasswordCurrentRequiredException',
+    errorCode: 'PASSWORD_CURRENT_REQUIRED_ERROR',
     build: () => new PasswordCurrentRequiredException(),
     fault: 'client',
   },
   {
     name: 'PasswordNotStrongException',
+    errorCode: 'PASSWORD_NOT_STRONG_ERROR',
     build: () => new PasswordNotStrongException(),
     fault: 'client',
   },
   {
     name: 'PasswordRequiredException',
+    errorCode: 'PASSWORD_REQUIRED_ERROR',
     build: () => new PasswordRequiredException(),
     fault: 'client',
   },
   {
     name: 'PasswordUsedRecentlyException',
+    errorCode: 'PASSWORD_USED_RECENTLY_ERROR',
     build: () => new PasswordUsedRecentlyException(),
     fault: 'client',
   },
@@ -53,6 +59,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

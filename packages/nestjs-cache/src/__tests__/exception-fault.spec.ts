@@ -19,24 +19,29 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'CacheException (default)',
+    errorCode: 'CACHE_ERROR',
     build: () => new CacheException(),
     fault: 'internal',
   },
   {
     name: 'CacheInvalidExpiredDateException',
+    errorCode: 'CACHE_INVALID_EXPIRES_IN',
     build: () => new CacheInvalidExpiredDateException(),
     fault: 'client',
   },
   {
     name: 'CacheNotFoundException',
+    errorCode: 'CACHE_NOT_FOUND_ERROR',
     build: () => new CacheNotFoundException('id'),
     fault: 'client',
   },
   {
     name: 'CacheEntityNotFoundException',
+    errorCode: 'CACHE_ENTITY_NOT_FOUND_ERROR',
     build: () => new CacheEntityNotFoundException('SomeEntity'),
     fault: 'usage',
   },
@@ -47,6 +52,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

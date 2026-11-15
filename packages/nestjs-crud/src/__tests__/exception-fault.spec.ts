@@ -24,39 +24,47 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'CrudException (default)',
+    errorCode: 'CRUD_ERROR',
     build: () => new CrudException(),
     fault: 'internal',
   },
   {
     name: 'CrudContextException',
+    errorCode: 'CRUD_CONTEXT_ERROR',
     build: () => new CrudContextException(),
     fault: 'internal',
   },
   {
     name: 'CrudDecoratorException',
+    errorCode: 'CRUD_DECORATOR_ERROR',
     build: () => new CrudDecoratorException(),
     fault: 'usage',
   },
   {
     name: 'CrudQueryException',
+    errorCode: 'CRUD_QUERY_ERROR',
     build: () => new CrudQueryException('SomeEntity'),
     fault: 'internal',
   },
   {
     name: 'CrudQueryParserException',
+    errorCode: 'CRUD_QUERY_PARSER_ERROR',
     build: () => new CrudQueryParserException(),
     fault: 'client',
   },
   {
     name: 'CrudQueryValidatorException',
+    errorCode: 'CRUD_QUERY_VALIDATOR_ERROR',
     build: () => new CrudQueryValidatorException(),
     fault: 'client',
   },
   {
     name: 'CrudPreconditionRequiredException',
+    errorCode: 'CRUD_PRECONDITION_REQUIRED',
     build: () => new CrudPreconditionRequiredException('SomeEntity'),
     fault: 'client',
   },
@@ -67,6 +75,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

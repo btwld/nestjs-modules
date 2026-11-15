@@ -20,29 +20,35 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'UserException (default)',
+    errorCode: 'USER_ERROR',
     build: () => new UserException(),
     fault: 'internal',
   },
   {
     name: 'UserNotFoundException',
+    errorCode: 'USER_NOT_FOUND_ERROR',
     build: () => new UserNotFoundException({ id: 'id' }),
     fault: 'client',
   },
   {
     name: 'UserCredentialsAlreadyExistException',
+    errorCode: 'USER_CREDENTIALS_ALREADY_EXIST',
     build: () => new UserCredentialsAlreadyExistException(),
     fault: 'client',
   },
   {
     name: 'UserPasswordCurrentInvalidException',
+    errorCode: 'USER_PASSWORD_CURRENT_INVALID',
     build: () => new UserPasswordCurrentInvalidException(),
     fault: 'client',
   },
   {
     name: 'UserPasswordHistoryViolationException',
+    errorCode: 'USER_PASSWORD_HISTORY_VIOLATION',
     build: () => new UserPasswordHistoryViolationException(),
     fault: 'client',
   },
@@ -53,6 +59,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {
