@@ -198,7 +198,10 @@ describe('authority over related rows', () => {
       projects: PROJECTS,
     };
 
-    function start(table: AuthorityTableFixture) {
+    function start(
+      table: AuthorityTableFixture,
+      { rootGoverned = false } = {},
+    ) {
       const authority = new AuthorityFixture(table);
       const departments = governed(
         target('departments', 'Department', [
@@ -223,7 +226,16 @@ describe('authority over related rows', () => {
           ['department', [departments]],
           ['projects', [projects, assignments]],
         ]),
+        ...(rootGoverned
+          ? {
+              authority: {
+                access: 'governed' as const,
+                authority: AuthorityFixture,
+              },
+            }
+          : {}),
       });
+      if (rootGoverned) employees.setAuthority(authority);
       employees.rows = [EMPLOYEE];
       return { authority, employees };
     }
@@ -444,6 +456,76 @@ describe('authority over related rows', () => {
           expect(employees.reads).toEqual([]);
         },
       );
+    });
+
+    describe('a relation matched by a root column the actor may not read', () => {
+      const HIDDEN_KEY = {
+        ...readsOnly('employees', ['id', 'name', 'managerId']),
+        ...readsAll('departments'),
+      };
+      type Read = (
+        employees: EmployeesFixture,
+        options: RepositoryFindOptions<EmployeeFixture>,
+      ) => Promise<unknown>;
+      const reads: { name: string; read: Read }[] = [
+        { name: 'find', read: (e, o) => e.find(o) },
+        { name: 'findOne', read: (e, o) => e.findOne(o) },
+        { name: 'findAndCount', read: (e, o) => e.findAndCount(o) },
+        { name: 'count', read: (e, o) => e.count(o) },
+      ];
+
+      it.each(reads)(
+        'should refuse joining it on $name, since the join holds the column',
+        async ({ read }) => {
+          const { employees } = start(HIDDEN_KEY, { rootGoverned: true });
+
+          await expect(
+            read(employees, {
+              join: [{ relation: 'department' }],
+              ctx: actorCtx(CLERK),
+            }),
+          ).rejects.toThrow(AuthorityRefusedException);
+          expect(employees.reads).toEqual([]);
+        },
+      );
+
+      it.each(reads)(
+        'should refuse filtering by it on $name, since the filter matches the column',
+        async ({ read }) => {
+          const { employees } = start(HIDDEN_KEY, { rootGoverned: true });
+
+          await expect(
+            read(employees, {
+              where: Where.rel('department', Where.eq('id', 'dep-1')),
+              join: [{ relation: 'department' }],
+              ctx: actorCtx(CLERK),
+            }),
+          ).rejects.toThrow(AuthorityRefusedException);
+          expect(employees.reads).toEqual([]);
+        },
+      );
+
+      it('should join it once the actor may read the column', async () => {
+        const { employees } = start(
+          {
+            ...readsOnly('employees', [
+              'id',
+              'name',
+              'managerId',
+              'departmentId',
+            ]),
+            ...readsAll('departments'),
+          },
+          { rootGoverned: true },
+        );
+
+        await expect(
+          employees.find({
+            join: [{ relation: 'department' }],
+            ctx: actorCtx(CLERK),
+          }),
+        ).resolves.toEqual([{ ...OWN, department: DEPARTMENT }]);
+      });
     });
 
     it('should join a many-to-many when target and junction are readable', async () => {

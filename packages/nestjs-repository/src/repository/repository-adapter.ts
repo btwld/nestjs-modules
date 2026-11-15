@@ -803,16 +803,20 @@ export abstract class RepositoryAdapter<
     options: RepositoryFindOneOptions<Entity>,
   ): void {
     const leaves = options.where ? this.whereConditions(options.where) : [];
+    const order = options.order ?? [];
+    const related = new Set([
+      ...(options.join ?? []).map(({ relation }) => relation),
+      ...[...leaves, ...order].flatMap(({ relation }) =>
+        relation ? [relation] : [],
+      ),
+    ]);
     const named = [
       ...(options.select ?? []).map(String),
       ...leaves.filter((leaf) => !leaf.relation).map((leaf) => leaf.field),
-      ...(options.order ?? [])
-        .filter((key) => !key.relation)
-        .map((key) => key.field),
-      // A federated relation is read by one of this entity's columns.
-      ...this.federatedJoins(options.join).map(
-        ({ relation }) => relation.on.from,
-      ),
+      ...order.filter((key) => !key.relation).map((key) => key.field),
+      // A relation is matched by this entity's columns, so joining, filtering
+      // or sorting by one reads them.
+      ...[...related].flatMap((name) => this.relationColumns(name)),
     ];
     const refused = [...new Set(named)].filter(
       (column) => !readable.has(column),
@@ -825,6 +829,18 @@ export abstract class RepositoryAdapter<
         ...this.columnGates(call, ActionEnum.READ, refused),
       });
     }
+  }
+
+  /** This entity's columns `relation` is matched by. */
+  private relationColumns(relation: string): string[] {
+    const federated = this.federatedRelations.get(relation);
+    if (federated) return [federated.relation.on.from];
+    const reported = this.metadata.relations?.find(
+      ({ name }) => name === relation,
+    );
+    return reported
+      ? (reported.joinOn ?? [reported.on]).map(({ from }) => from)
+      : [];
   }
 
   /**

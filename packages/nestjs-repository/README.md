@@ -2777,10 +2777,13 @@ core's [`assertAuthority`](../nestjs-core/README.md#actor-and-authority).
 **Columns:**
 
 - **Reads.** A read that selects, filters or sorts on a column the actor may
-  not read is refused. For an actor limited to some columns, a repository
-  call naming a column that doesn't exist in `select`, `where` or `order` is
-  refused with the same `403` as a hidden one, so the refusal never tells
-  them which hidden columns there are. A `within` naming a column that
+  not read is refused. So is one that joins, filters or sorts by a relation
+  matched on such a column, since the joined row holds its value: an actor
+  who may not read `departmentId` cannot join `department`. For an actor
+  limited to some columns, a repository call naming a column that doesn't
+  exist in `select`, `where` or `order` is refused with the same `403` as a
+  hidden one, so the refusal never tells them which hidden columns there
+  are. A `within` naming a column that
   doesn't exist is a `400`, on a governed entity for every actor the
   authority lets read, checked before their column limits, since the list
   is the developer's own. A
