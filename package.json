@@ -63,7 +63,7 @@
     "watch": "pnpm build && tsc --build --watch",
     "lint": "eslint \"packages/*/src/**/*.{ts,js,json}\" \"packages/*/examples/**/*.ts\"",
     "lint:fix": "pnpm lint --fix",
-    "lint:md": "markdownlint README.md packages/**/*.md",
+    "lint:md": "markdownlint README.md \"packages/**/*.md\" --ignore \"**/node_modules/**\"",
     "lint:md:fix": "pnpm lint:md --fix",
     "lint:all": "pnpm lint && pnpm lint:md",
     "pretest": "tsc -b",
