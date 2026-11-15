@@ -1,3 +1,5 @@
+import { type RepositoryAuthorityOptionsInterface } from './repository-authority-options.interface.js';
+
 /**
  * Core module options for RepositoryModule
  */
@@ -26,15 +28,8 @@ export interface RepositoryModuleOptionsInterface {
    */
   requireWritePolicyDeclaration?: boolean;
 
-  /**
-   * Require every registered entity to declare whether an authority governs
-   * it, or that it is open, with a reason.
-   *
-   * Opt-in for the same reason as `requireRowScopeDeclaration`. Turning it on
-   * makes "nobody decided who may touch this entity" a startup failure
-   * instead of an open entity.
-   */
-  requireAuthorityDeclaration?: boolean;
+  /** How the deployment treats object authority, across every entity. */
+  authority?: RepositoryAuthorityOptionsInterface;
 
   /** How reads of federated relations are bounded. */
   federation?: {

@@ -32,6 +32,7 @@ import {
     // The data: every repository call decided by the shared authority.
     RepositoryModule.forRoot({
       imports: [InvoiceAuthorityModule],
+      authority: { required: true },
       drivers: [
         {
           driver: TypeOrmSqliteRepositoryModule,

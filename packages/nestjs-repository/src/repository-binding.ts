@@ -258,7 +258,7 @@ export function bindRepositories(params: {
 
   const authorityFailures = [
     ...checkEagerRelationsIntoGoverned(adapters),
-    ...(moduleOptions.requireAuthorityDeclaration
+    ...(moduleOptions.authority?.required
       ? checkAuthorityDeclarationCompleteness(adapters)
       : []),
   ];

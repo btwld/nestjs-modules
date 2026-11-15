@@ -16,9 +16,9 @@ export function checkAuthorityDeclarationCompleteness(
     if (adapter.authorityDeclaration) return [];
 
     return [
-      `"${adapter.entityKey}" has no authority declaration, and this ` +
-        'deployment requires one. Declare it governed, or declare it open ' +
-        'with a reason.',
+      `"${adapter.entityKey}" has no authority declaration, and ` +
+        '`authority.required` requires one. Declare it governed, or ' +
+        'declare it open with a reason.',
     ];
   });
 }

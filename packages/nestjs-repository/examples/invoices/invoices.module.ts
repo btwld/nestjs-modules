@@ -51,6 +51,7 @@ export class InvoiceAuthorityModule {}
     }),
     RepositoryModule.forRoot({
       imports: [InvoiceAuthorityModule],
+      authority: { required: true },
       drivers: [
         {
           driver: TypeOrmSqliteRepositoryModule,

@@ -206,7 +206,7 @@ interface RepositoryModuleOptionsInterface {
   defaultTimeout?: number; // Transaction timeout in milliseconds (default: 30000)
   requireRowScopeDeclaration?: boolean; // Fail startup on an entity with no rowScope (default: false)
   requireWritePolicyDeclaration?: boolean; // Fail startup on an entity with no writePolicy (default: false)
-  requireAuthorityDeclaration?: boolean; // Fail startup on an entity with no authority declaration, governed or open (default: false)
+  authority?: { required?: boolean }; // The application is governed: fail startup on an entity with no authority declaration, governed or open (`required` defaults to false)
   federation?: { maxKeys?: number }; // Bound on federated reads (default: 1000) — see `maxKeys`
 }
 ```
@@ -220,7 +220,7 @@ an undeclared entity is a mistake depends on the deployment: an application
 that scopes everything wants it on, one that scopes a handful of entities
 among many does not — see [Row Scope](#row-scope).
 `requireWritePolicyDeclaration` does the same for `writePolicy` — see
-[Write Policy](#write-policy) — and `requireAuthorityDeclaration` for
+[Write Policy](#write-policy) — and `authority: { required: true }` for
 `authority` — see [Object Authority](#object-authority).
 
 ## Architecture Overview
@@ -2523,10 +2523,19 @@ RepositoryModule.forRoot({
 
 `authority` is a provider: export it from a module in `forRoot({ imports })`,
 as you would a row scope resolver. `open` requires a reason because it is a
-decision someone has to defend later. Undeclared is allowed unless the
-deployment sets `requireAuthorityDeclaration`, and an undeclared entity is
-open. An application that governs its data with an authority should turn it
-on, so a new entity is never left open because nobody decided.
+decision someone has to defend later. An application that governs its
+data with an authority says so, and then every entity declares one or the
+other, or startup fails:
+
+```ts
+RepositoryModule.forRoot({
+  authority: { required: true },
+  drivers: [...],
+});
+```
+
+Without it, an entity that declares nothing is open, with nobody having
+decided so; turn it on, so a new entity is never left open by omission.
 
 ### The actor
 
@@ -2892,8 +2901,8 @@ refused under the read entity's `entityKey`, with `columns` naming each as
 - no entity that sets `allowEagerRelations` has a relation into governed
   rows or through a governed junction, which an eager relation would read
   undecided;
-- with `requireAuthorityDeclaration`, every entity carries an `authority`
-  declaration (governed or open).
+- with `authority: { required: true }`, every entity carries an
+  `authority` declaration (governed or open).
 
 A governed entity used before its authority is attached, such as from
 another provider's constructor during startup, refuses every call with

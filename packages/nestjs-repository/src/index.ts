@@ -37,6 +37,7 @@ export {
   RepositoryRootOptions,
 } from './interfaces/repository-root-options.interface.js';
 export { RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
+export { RepositoryAuthorityOptionsInterface } from './interfaces/repository-authority-options.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Row Scope

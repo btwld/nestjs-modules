@@ -475,9 +475,39 @@ describe('authority binding', () => {
         compile(
           [{ key: ORDER_TOKEN, entity: OrderEntityFixture }],
           new AuthorityFixture(),
-          { requireAuthorityDeclaration: true },
+          { authority: { required: true } },
         ),
       ).rejects.toThrow(AuthorityBootException);
+    });
+
+    it('should refuse an undeclared entity when forRootAsync requires declarations', async () => {
+      await expect(
+        Test.createTestingModule({
+          imports: [
+            CoreModule.forRoot({}),
+            RepositoryModule.forRootAsync({
+              imports: [authorityModule(new AuthorityFixture())],
+              drivers: [
+                {
+                  driver: MemoryRepositoryModuleFixture,
+                  entities: [{ key: ORDER_TOKEN, entity: OrderEntityFixture }],
+                },
+              ],
+              useFactory: async () => ({ authority: { required: true } }),
+            }),
+          ],
+        }).compile(),
+      ).rejects.toThrow(AuthorityBootException);
+    });
+
+    it('should accept an undeclared entity when declarations are not required', async () => {
+      await expect(
+        compile(
+          [{ key: ORDER_TOKEN, entity: OrderEntityFixture }],
+          new AuthorityFixture(),
+          { authority: { required: false } },
+        ),
+      ).resolves.toBeDefined();
     });
 
     it('should accept an open entity when declarations are required', async () => {
@@ -491,7 +521,7 @@ describe('authority binding', () => {
             },
           ],
           new AuthorityFixture(),
-          { requireAuthorityDeclaration: true },
+          { authority: { required: true } },
         ),
       ).resolves.toBeDefined();
     });

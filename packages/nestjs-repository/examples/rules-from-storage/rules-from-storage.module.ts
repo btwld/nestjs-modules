@@ -42,6 +42,7 @@ export class StoredAuthorityModule {}
     }),
     RepositoryModule.forRoot({
       imports: [StoredAuthorityModule],
+      authority: { required: true },
       drivers: [
         {
           driver: TypeOrmSqliteRepositoryModule,

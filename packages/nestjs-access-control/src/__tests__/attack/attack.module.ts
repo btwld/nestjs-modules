@@ -129,6 +129,7 @@ const TENANT = { access: 'scoped', resolver: AttackTenantRowScope } as const;
     }),
     RepositoryModule.forRoot({
       imports: [AttackAuthorityModule],
+      authority: { required: true },
       drivers: [
         {
           driver: TypeOrmSqliteRepositoryModule,
