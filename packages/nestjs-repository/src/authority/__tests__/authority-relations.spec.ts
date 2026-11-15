@@ -20,6 +20,8 @@ import {
   type InvoiceFixture,
   InvoiceLineEntityFixture,
   type InvoiceLineFixture,
+  LINE_NOTE_TOKEN,
+  LineNoteEntityFixture,
   RECEIPT_TOKEN,
   ReceiptEntityFixture,
   type ReceiptFixture,
@@ -599,16 +601,229 @@ describe('authority over related rows', () => {
       expect(receipts.stored).toEqual([RECEIPT]);
     });
 
-    it('should not decide a related entity with no rows to remove', async () => {
-      const { invoices } = await start({
-        ...allow('role:admin', INVOICE_TOKEN, ALL),
-        ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
-      });
-      await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+    describe('a parent without related rows', () => {
+      async function refusedBy(promise: Promise<unknown>): Promise<unknown> {
+        const error = await promise.catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(AuthorityRefusedException);
+        return error instanceof AuthorityRefusedException
+          ? error.context.entityKey
+          : undefined;
+      }
 
-      await expect(
-        invoices.delete(INVOICE, { ctx: actorCtx(CLERK) }),
-      ).resolves.toEqual({ id: INVOICE.id });
+      it('should delete nothing when a related entity refuses the delete', async () => {
+        const { invoices, lines, receipts } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['delete']),
+        });
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+
+        await expect(
+          refusedBy(invoices.delete(INVOICE, { ctx: actorCtx(CLERK) })),
+        ).resolves.toEqual(INVOICE_LINE_TOKEN);
+        expect(invoices.stored).toEqual([INVOICE]);
+        expect(lines.stored).toEqual([]);
+        expect(receipts.stored).toEqual([]);
+      });
+
+      it('should delete nothing of a batch when a related entity refuses the delete', async () => {
+        const { invoices } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['delete']),
+        });
+        const OTHER: InvoiceFixture = { ...INVOICE, id: 'inv-2', number: '2' };
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+        await invoices.create(OTHER, { ctx: actorCtx(ADMIN) });
+
+        await expect(
+          refusedBy(
+            invoices.deleteMany([INVOICE, OTHER], { ctx: actorCtx(CLERK) }),
+          ),
+        ).resolves.toEqual(INVOICE_LINE_TOKEN);
+        expect(invoices.stored).toEqual([INVOICE, OTHER]);
+      });
+
+      it('should refuse a batch holding a row never stored as it refuses a stored one', async () => {
+        const { invoices } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['delete']),
+        });
+        const MISSING: InvoiceFixture = {
+          ...INVOICE,
+          id: 'inv-9',
+          number: '9',
+        };
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+
+        await expect(
+          refusedBy(
+            invoices.deleteMany([INVOICE, MISSING], { ctx: actorCtx(CLERK) }),
+          ),
+        ).resolves.toEqual(INVOICE_LINE_TOKEN);
+        expect(invoices.stored).toEqual([INVOICE]);
+      });
+
+      it('should soft delete nothing when a related entity refuses the soft delete', async () => {
+        const { invoices, lines, receipts } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['softDelete']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['softDelete']),
+        });
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+
+        await expect(
+          refusedBy(invoices.softDelete(INVOICE, { ctx: actorCtx(CLERK) })),
+        ).resolves.toEqual(INVOICE_LINE_TOKEN);
+        expect(invoices.stored).toEqual([INVOICE]);
+        expect(lines.stored).toEqual([]);
+        expect(receipts.stored).toEqual([]);
+      });
+
+      it('should restore nothing when a related entity refuses the restore', async () => {
+        const { invoices, lines, receipts } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['restore']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['restore']),
+        });
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+        const deleted = await invoices.softDelete(INVOICE, {
+          ctx: actorCtx(ADMIN),
+        });
+
+        await expect(
+          refusedBy(invoices.restore(deleted, { ctx: actorCtx(CLERK) })),
+        ).resolves.toEqual(INVOICE_LINE_TOKEN);
+        expect(invoices.stored).toEqual([deleted]);
+        expect(lines.stored).toEqual([]);
+        expect(receipts.stored).toEqual([]);
+      });
+
+      it('should delete a parent without related rows when the actor may delete every related entity', async () => {
+        const { invoices } = await start({
+          ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['delete']),
+          ...allow('role:clerk', RECEIPT_TOKEN, ['delete']),
+        });
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+
+        await expect(
+          invoices.delete(INVOICE, { ctx: actorCtx(CLERK) }),
+        ).resolves.toEqual({ id: INVOICE.id });
+        expect(invoices.stored).toEqual([]);
+      });
+    });
+
+    describe('related entities further down', () => {
+      async function deep(table: AuthorityTableFixture) {
+        const authority = new AuthorityFixture({
+          ...allow('role:admin', INVOICE_TOKEN, ALL),
+          ...allow('role:admin', INVOICE_LINE_TOKEN, ALL),
+          ...allow('role:admin', LINE_NOTE_TOKEN, ALL),
+          ...table,
+        });
+        const moduleRef: TestingModule = await Test.createTestingModule({
+          imports: [
+            CoreModule.forRoot({}),
+            RepositoryModule.forRoot({
+              imports: [deciders(authority)],
+              drivers: [
+                {
+                  driver: MemoryRepositoryModuleFixture,
+                  entities: [
+                    {
+                      key: INVOICE_TOKEN,
+                      entity: InvoiceEntityFixture,
+                      authority: GOVERNED,
+                      relations: { lines: { cascade: true } },
+                    },
+                    {
+                      key: INVOICE_LINE_TOKEN,
+                      entity: InvoiceLineEntityFixture,
+                      authority: GOVERNED,
+                      relations: { notes: { cascade: true } },
+                    },
+                    {
+                      key: LINE_NOTE_TOKEN,
+                      entity: LineNoteEntityFixture,
+                      authority: GOVERNED,
+                    },
+                  ],
+                },
+              ],
+            }),
+          ],
+        }).compile();
+        return {
+          invoices: moduleRef.get<MemoryRepositoryFixture<InvoiceFixture>>(
+            getDynamicRepositoryToken(INVOICE_TOKEN),
+          ),
+          lines: moduleRef.get<MemoryRepositoryFixture<InvoiceLineFixture>>(
+            getDynamicRepositoryToken(INVOICE_LINE_TOKEN),
+          ),
+        };
+      }
+
+      it('should refuse a delete an entity two cascades down refuses, with nothing stored between', async () => {
+        const { invoices } = await deep({
+          ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['delete']),
+        });
+        await invoices.create(INVOICE, { ctx: actorCtx(ADMIN) });
+
+        const error = await invoices
+          .delete(INVOICE, { ctx: actorCtx(CLERK) })
+          .catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(AuthorityRefusedException);
+        expect(error).toMatchObject({
+          context: { entityKey: LINE_NOTE_TOKEN },
+        });
+        expect(invoices.stored).toEqual([INVOICE]);
+      });
+
+      it('should delete through every cascade level the actor may delete', async () => {
+        const { invoices } = await deep({
+          ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
+          ...allow('role:clerk', INVOICE_LINE_TOKEN, ['delete']),
+          ...allow('role:clerk', LINE_NOTE_TOKEN, ['delete']),
+        });
+        await invoices.create(
+          { ...INVOICE, lines: [LINE] },
+          { ctx: actorCtx(ADMIN) },
+        );
+
+        await expect(
+          invoices.delete(INVOICE, { ctx: actorCtx(CLERK) }),
+        ).resolves.toEqual({ id: INVOICE.id });
+        expect(invoices.stored).toEqual([]);
+      });
+
+      it.each([
+        ['with the related row stored', true],
+        ['with nothing stored to delete', false],
+      ])(
+        'should refuse a replace that could delete through a refused entity before writing, %s',
+        async (_name, stored) => {
+          const { invoices, lines } = await deep({
+            ...allow('role:clerk', INVOICE_TOKEN, ALL),
+            ...allow('role:clerk', INVOICE_LINE_TOKEN, ALL),
+          });
+          await invoices.create(
+            stored ? { ...INVOICE, lines: [LINE] } : INVOICE,
+            { ctx: actorCtx(ADMIN) },
+          );
+
+          const error = await invoices
+            .replace(
+              INVOICE,
+              { ...INVOICE, number: '2', lines: [] },
+              { ctx: actorCtx(CLERK) },
+            )
+            .catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(AuthorityRefusedException);
+          expect(error).toMatchObject({
+            context: { entityKey: LINE_NOTE_TOKEN },
+          });
+          expect(invoices.stored).toEqual([INVOICE]);
+          expect(lines.stored).toEqual(stored ? [LINE] : []);
+        },
+      );
     });
 
     it('should delete no row of a batch when a related entity refuses any of its rows', async () => {

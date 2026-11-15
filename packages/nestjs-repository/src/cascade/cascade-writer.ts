@@ -65,7 +65,9 @@ export class CascadeWriter {
    * `create` creates; `merge` updates and creates, and deletes a to-one set
    * to `null`; `replace` also deletes. Which of them a write takes depends
    * on what is stored, so each one it could take is decided. The columns
-   * each related row writes, and its own related rows, are decided too.
+   * each related row writes, and its own related rows, are decided too, and
+   * where a related row may be deleted, that delete on everything it
+   * reaches.
    */
   async authorize(
     children: CascadeChildren,
@@ -95,6 +97,16 @@ export class CascadeWriter {
         // A to-one payload always names the one row there is.
         relation.cardinality === 'many',
       );
+      // A related row this write deletes is deleted with its own related
+      // rows, so that delete is decided on everything it reaches, too.
+      if (actions.includes(ActionEnum.DELETE)) {
+        await target.authorizeRemovalReach(
+          ActionEnum.DELETE,
+          'delete',
+          ctx,
+          new Set([target]),
+        );
+      }
     }
   }
 
@@ -218,13 +230,38 @@ export class CascadeWriter {
   }
 
   /**
+   * Decide a delete, soft delete or restore on every entity it could reach
+   * through cascades, however deep, whether or not any of them has rows to
+   * write. Called when the operation starts, before anything about the rows
+   * is read, so the decision depends only on the call, never on what is
+   * stored. `decided` holds the entities already decided, the root among
+   * them, so each is asked once.
+   */
+  async authorizeRemoval(
+    operation: CascadeRemoval,
+    ctx: PlainLiteralObject | undefined,
+    decided: Set<object>,
+  ): Promise<void> {
+    for (const { target } of this.relations.values()) {
+      if (decided.has(target)) continue;
+      decided.add(target);
+      await target.authorizeRemovalReach(
+        REMOVAL_ACTIONS[operation],
+        operation,
+        ctx,
+        decided,
+      );
+    }
+  }
+
+  /**
    * Pass a delete, soft delete or restore of `rows` on to their related rows,
-   * before the rows themselves are written.
+   * before the rows themselves are written. The operation has been decided
+   * on every entity it reaches already (`authorizeRemoval`).
    *
-   * Every related row of every one of `rows` is found, and each related
-   * entity with rows to write decided, before any is written, so a refusal
-   * leaves them all as they were. Finding the rows is the repository's own
-   * read; the writes themselves are decided.
+   * Every related row of every one of `rows` is found before any is written.
+   * Finding the rows is the repository's own read; the writes themselves
+   * are decided again, each through its own repository.
    */
   async remove(
     rows: readonly PlainLiteralObject[],
@@ -257,11 +294,6 @@ export class CascadeWriter {
             : found;
         if (children.length > 0) removals.push({ target, children });
       }
-    }
-
-    const action = REMOVAL_ACTIONS[operation];
-    for (const target of new Set(removals.map(({ target }) => target))) {
-      await target.authorizeReach([action], ctx);
     }
 
     for (const { target, children } of removals) {

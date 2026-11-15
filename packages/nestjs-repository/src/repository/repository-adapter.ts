@@ -33,7 +33,11 @@ import {
   linkedColumns,
 } from '../authority/internal-call.js';
 import { type CascadeRelation } from '../cascade/cascade-relation.interface.js';
-import { type CascadeSync, CascadeWriter } from '../cascade/cascade-writer.js';
+import {
+  type CascadeRemoval,
+  type CascadeSync,
+  CascadeWriter,
+} from '../cascade/cascade-writer.js';
 import { RepoCtx } from '../context/interfaces/repository-context.interface.js';
 import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
 import { EntityNotFoundException } from '../exceptions/entity-not-found.exception.js';
@@ -360,6 +364,33 @@ export abstract class RepositoryAdapter<
   ): Promise<AuthorizedCallInterface | undefined> {
     this.requireBinding();
     return this.authorize(actions, { ctx });
+  }
+
+  /**
+   * Decide this entity's delete, soft delete or restore on every entity its
+   * cascades reach, however deep, when the operation starts: the decision
+   * then depends only on the call, never on which related rows are stored.
+   */
+  private async authorizeCascadeRemoval(
+    operation: CascadeRemoval,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<void> {
+    await this.cascade.authorizeRemoval(operation, ctx, new Set([this]));
+  }
+
+  /**
+   * Decide a cascading delete, soft delete or restore that reaches this
+   * entity: `action` here, then in turn on every entity this one's cascades
+   * reach, skipping those in `decided`.
+   */
+  async authorizeRemovalReach(
+    action: ActionEnum,
+    operation: CascadeRemoval,
+    ctx: PlainLiteralObject | undefined,
+    decided: Set<object>,
+  ): Promise<void> {
+    await this.authorizeReach([action], ctx);
+    await this.cascade.authorizeRemoval(operation, ctx, decided);
   }
 
   /**
@@ -2006,6 +2037,7 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('delete');
     const call = await this.authorize([ActionEnum.DELETE], options);
+    await this.authorizeCascadeRemoval('delete', options?.ctx);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
       entity,
@@ -2043,6 +2075,7 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('deleteMany');
     const call = await this.authorize([ActionEnum.DELETE], options);
+    await this.authorizeCascadeRemoval('delete', options?.ctx);
     return this.permeator.deleteMany.permeate(
       entities,
       async (scoped) => {
@@ -2086,6 +2119,7 @@ export abstract class RepositoryAdapter<
     // Ahead of the no-op for a row already deleted, so that answer is given
     // only to a caller allowed to soft delete.
     const call = await this.authorize([ActionEnum.SOFT_DELETE], options);
+    await this.authorizeCascadeRemoval('softDelete', options?.ctx);
     // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
     // below, so a stale precondition against a row someone else already
     // deleted conflicts instead of quietly succeeding.
@@ -2147,6 +2181,7 @@ export abstract class RepositoryAdapter<
     this.assertAppendable('restore');
     this.requireDeleteDateColumn('restore');
     const call = await this.authorize([ActionEnum.RESTORE], options);
+    await this.authorizeCascadeRemoval('restore', options?.ctx);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(
       entity,
