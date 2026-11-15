@@ -8,12 +8,13 @@ import {
 import { AuthenticationException } from '../../domain/exceptions/authentication.exception.js';
 
 /**
- * Thrown when a guard built with `AuthGuard()` is asked to authenticate a
- * call that is not HTTP, such as a message handler in a microservice that
- * inherits the app's config: it reads the HTTP request only, and what any
- * other call carries is the caller's own payload. A guard that can be
- * turned off lets an `@AuthPublic()` handler through instead; to
- * authenticate another transport, override the guard's `getRequest`.
+ * Thrown when a guard built with `AuthGuard()`, or `AuthRouterGuard`, is
+ * asked to authenticate a call that is not HTTP, such as a message handler
+ * in a microservice that inherits the app's config: it reads the HTTP
+ * request only, and what any other call carries is the caller's own
+ * payload. A guard built with `AuthGuard()` that can be turned off lets an
+ * `@AuthPublic()` handler through instead; to authenticate another
+ * transport with one, override its `getRequest`.
  */
 export class AuthTransportUnsupportedException extends AuthenticationException {
   declare context: RuntimeException['context'] & { transport: ContextType };

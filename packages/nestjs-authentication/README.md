@@ -1828,7 +1828,7 @@ gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 | `VerifyOtpInvalidException` | Verify OTP invalid |
 | `AuthRouterException` | Base router exception (500 by default; `ProviderMissing`/`ProviderNotSupported` render 400. `AuthRouterGuard` classifies an unexpected provider-guard failure as 500/internal; an `HttpException` raised by the delegated guard is re-thrown unchanged.) |
 | `AuthUserConflictException` | Two guards on one call authenticated different users, or either user has no `id` (401) |
-| `AuthTransportUnsupportedException` | A guard built with `AuthGuard()`, not turned off for the handler, ran on a call that isn't HTTP (401 over HTTP; `usage`) |
+| `AuthTransportUnsupportedException` | A guard built with `AuthGuard()`, not turned off for the handler, or `AuthRouterGuard` ran on a call that isn't HTTP (401 over HTTP; `usage`) |
 | `AuthenticationUserPortRequiredException` | `validateToken` or a `ValidateAndVerify*` query ran with no `UserPort` configured (500, `usage`) |
 | `AuthenticationFeatureConfigException` | Feature misconfiguration |
 

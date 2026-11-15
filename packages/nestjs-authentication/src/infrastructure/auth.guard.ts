@@ -26,6 +26,7 @@ import { AuthPublicMetadata } from './decorators/auth-public.decorator.js';
 import { AuthTransportUnsupportedException } from './exceptions/auth-transport-unsupported.exception.js';
 import { AuthUserConflictException } from './exceptions/auth-user-conflict.exception.js';
 import { markAuthenticationGuard } from './utils/authentication-guard.util.js';
+import { isHttpCall } from './utils/is-http-call.util.js';
 
 /**
  * A Guard to use passport for express or fastify
@@ -159,7 +160,7 @@ export const AuthGuard = (
      * override this to return that transport's request.
      */
     getRequest(context: ExecutionContext): unknown {
-      if (!isHttp(context)) {
+      if (!isHttpCall(context)) {
         throw new AuthTransportUnsupportedException(context.getType());
       }
       return context.switchToHttp().getRequest();
@@ -172,10 +173,6 @@ export const AuthGuard = (
 };
 
 type Activation = ReturnType<CanActivate['canActivate']>;
-
-function isHttp(context: ExecutionContext): boolean {
-  return context.getType() === 'http';
-}
 
 async function activation(result: Activation): Promise<boolean> {
   return isObservable(result) ? lastValueFrom(result) : result;
@@ -219,7 +216,7 @@ async function authenticateIfValid(
  * another transport, by overriding `getRequest`, defines nothing.
  */
 function defineAuthUser(context: ExecutionContext): void {
-  if (!isHttp(context)) {
+  if (!isHttpCall(context)) {
     return;
   }
 
