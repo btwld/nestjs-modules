@@ -22,6 +22,9 @@ import {
   ORDER_TOKEN,
   OrderEntityFixture,
   type OrderFixture,
+  VERSIONED_ORDER_TOKEN,
+  VersionedOrderEntityFixture,
+  type VersionedOrderFixture,
 } from '../../__fixtures__/memory/order.fixture.js';
 import { RepositoryQueryException } from '../../exceptions/repository-query.exception.js';
 import { UnknownColumnException } from '../../exceptions/unknown-column.exception.js';
@@ -520,6 +523,224 @@ describe('authority over columns', () => {
         dateDeleted: null,
       });
     });
+  });
+
+  describe('the columns a write reads from the row it is given', () => {
+    const VERSIONED: VersionedOrderFixture = { ...ORDER, version: 1 };
+
+    async function versionedWith(
+      table: AuthorityTableFixture,
+    ): Promise<MemoryRepositoryFixture<VersionedOrderFixture>> {
+      const authority = new AuthorityFixture({
+        [`role:admin ${VERSIONED_ORDER_TOKEN} create`]: { effect: 'allow' },
+        [`role:admin ${VERSIONED_ORDER_TOKEN} read`]: { effect: 'allow' },
+        ...table,
+      });
+
+      @Module({
+        providers: [{ provide: AuthorityFixture, useValue: authority }],
+        exports: [AuthorityFixture],
+      })
+      class DecidersModule {}
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          CoreModule.forRoot({}),
+          RepositoryModule.forRoot({
+            imports: [DecidersModule],
+            drivers: [
+              {
+                driver: MemoryRepositoryModuleFixture,
+                entities: [
+                  {
+                    key: VERSIONED_ORDER_TOKEN,
+                    entity: VersionedOrderEntityFixture,
+                    authority: {
+                      access: 'governed',
+                      authority: AuthorityFixture,
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      }).compile();
+      await moduleRef.init();
+
+      const orders = moduleRef.get<
+        MemoryRepositoryFixture<VersionedOrderFixture>
+      >(getDynamicRepositoryToken(VERSIONED_ORDER_TOKEN));
+      await orders.create(VERSIONED, { ctx: ctxOf(ADMIN) });
+      return orders;
+    }
+
+    /** `role:clerk` may take `actions` on versioned orders, and read `read`. */
+    function clerk(actions: string[], read: string[]): AuthorityTableFixture {
+      return {
+        ...Object.fromEntries(
+          actions.map((action) => [
+            `role:clerk ${VERSIONED_ORDER_TOKEN} ${action}`,
+            { effect: 'allow' },
+          ]),
+        ),
+        [`role:clerk ${VERSIONED_ORDER_TOKEN} read`]: {
+          effect: 'allow',
+          columns: read,
+        },
+      };
+    }
+
+    /** The row as an actor who may not read `hidden` reads it. */
+    function readWithout(
+      hidden: 'version' | 'dateDeleted',
+    ): VersionedOrderFixture {
+      const { id, tenantId, description } = VERSIONED;
+      return hidden === 'version'
+        ? { id, tenantId, description, dateDeleted: null }
+        : { id, tenantId, description, version: 1 };
+    }
+
+    const READ_ALL_BUT = (hidden: string) =>
+      ['id', 'tenantId', 'description', 'dateDeleted', 'version'].filter(
+        (column) => column !== hidden,
+      );
+
+    type Write = (
+      orders: MemoryRepositoryFixture<VersionedOrderFixture>,
+      row: VersionedOrderFixture,
+    ) => Promise<unknown>;
+
+    const WRITES: [string, string[], 'version' | 'dateDeleted', Write][] = [
+      [
+        'an update needing the version',
+        ['update'],
+        'version',
+        (orders, row) =>
+          orders.update(row, { description: 'x' }, { ctx: ctxOf(CLERK) }),
+      ],
+      [
+        'a replace needing the version',
+        ['update'],
+        'version',
+        (orders, row) =>
+          orders.replace(
+            row,
+            { ...row, description: 'x' },
+            { ctx: ctxOf(CLERK) },
+          ),
+      ],
+      [
+        'an update needing the delete date',
+        ['update'],
+        'dateDeleted',
+        (orders, row) =>
+          orders.update(row, { description: 'x' }, { ctx: ctxOf(CLERK) }),
+      ],
+      [
+        'a replace needing the delete date',
+        ['update'],
+        'dateDeleted',
+        (orders, row) =>
+          orders.replace(
+            row,
+            { ...row, description: 'x' },
+            { ctx: ctxOf(CLERK) },
+          ),
+      ],
+      [
+        'a soft delete needing the delete date',
+        ['softDelete'],
+        'dateDeleted',
+        (orders, row) => orders.softDelete(row, { ctx: ctxOf(CLERK) }),
+      ],
+      [
+        'a soft delete stating a version needing the version',
+        ['softDelete'],
+        'version',
+        (orders, row) =>
+          orders.softDelete(row, { expectedVersion: 1, ctx: ctxOf(CLERK) }),
+      ],
+      [
+        'a delete stating a version needing the version',
+        ['delete'],
+        'version',
+        (orders, row) =>
+          orders.delete(row, { expectedVersion: 1, ctx: ctxOf(CLERK) }),
+      ],
+      [
+        'a restore stating a version needing the version',
+        ['restore'],
+        'version',
+        (orders, row) =>
+          orders.restore(row, { expectedVersion: 1, ctx: ctxOf(CLERK) }),
+      ],
+    ];
+
+    it.each(WRITES)(
+      'should refuse %s, read without it, before writing',
+      async (_name, actions, hidden, write) => {
+        const orders = await versionedWith(
+          clerk(actions, READ_ALL_BUT(hidden)),
+        );
+
+        const error = await refusal(write(orders, readWithout(hidden)));
+
+        expect(error).toMatchObject({
+          context: { action: 'read', columns: [hidden] },
+        });
+        expect(orders.stored).toEqual([VERSIONED]);
+      },
+    );
+
+    it.each(WRITES)(
+      'should allow %s, given a row that holds it',
+      async (_name, actions, hidden, write) => {
+        const orders = await versionedWith(
+          clerk(actions, READ_ALL_BUT(hidden)),
+        );
+
+        await expect(write(orders, VERSIONED)).resolves.toBeDefined();
+      },
+    );
+
+    it('should refuse before any hook or read runs', async () => {
+      const orders = await versionedWith(
+        clerk(['update'], READ_ALL_BUT('version')),
+      );
+      orders.queries.length = 0;
+
+      await refusal(
+        orders.update(
+          { ...readWithout('version'), id: 'missing' },
+          { description: 'x' },
+          { ctx: ctxOf(CLERK) },
+        ),
+      );
+      expect(orders.queries).toEqual([]);
+    });
+
+    it.each<[string, string[], Write]>([
+      [
+        'a delete',
+        ['delete'],
+        (orders, row) => orders.delete(row, { ctx: ctxOf(CLERK) }),
+      ],
+      [
+        'a restore',
+        ['restore'],
+        (orders, row) => orders.restore(row, { ctx: ctxOf(CLERK) }),
+      ],
+    ])(
+      'should allow %s stating no version, read without it',
+      async (_name, actions, write) => {
+        const orders = await versionedWith(clerk(actions, []));
+
+        await expect(
+          write(orders, readWithout('version')),
+        ).resolves.toBeDefined();
+      },
+    );
   });
 
   describe('write results', () => {

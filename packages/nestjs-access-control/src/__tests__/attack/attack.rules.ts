@@ -72,6 +72,17 @@ export const AUTHORITY_RULES: Record<string, AuthorityRuleInterface[]> = {
       inverted: true,
     },
   ],
+  // A redactor corrects invoices, but never sees the notes or when an
+  // invoice was deleted.
+  'role:redactor': [
+    { action: ['read', 'update'], subject: INVOICE },
+    {
+      action: ['read', 'update'],
+      subject: INVOICE,
+      fields: ['internalNotes', 'deletedAt'],
+      inverted: true,
+    },
+  ],
   // Intake enters invoices from the mail, and reads nothing back.
   'role:intake': [{ action: 'create', subject: [INVOICE, INVOICE_LINE] }],
   // Collections read invoices and every customer column.

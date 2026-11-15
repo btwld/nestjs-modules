@@ -910,6 +910,42 @@ export abstract class RepositoryAdapter<
   }
 
   /**
+   * Refuse a write whose row lacks a column the write reads from it, the
+   * version it checks or the delete date that says whether the row is live,
+   * when the actor may not read that column: a row they read holds only what
+   * they may read, so the missing column is theirs to be refused, not a
+   * mistake of the code passing it. Decided at the call's entry, from the
+   * row the call passes, never from what is stored.
+   */
+  private assertReadsHeld(
+    call: AuthorizedCallInterface | undefined,
+    entity: PlainLiteralObject,
+    reads: { version: boolean; deleteDate: boolean },
+  ): void {
+    const readable = call?.readable;
+    if (!call || !readable) return;
+
+    const versionColumn = this.getVersionColumn();
+    const deleteDateColumn = this.getDeleteDateColumn();
+    const refused = [
+      ...(reads.version && versionColumn && entity[versionColumn] == null
+        ? [versionColumn]
+        : []),
+      ...(reads.deleteDate && deleteDateColumn && !(deleteDateColumn in entity)
+        ? [deleteDateColumn]
+        : []),
+    ].filter((column) => !readable.has(column));
+
+    if (refused.length > 0) {
+      throw new AuthorityRefusedException(this.entityKey, ActionEnum.READ, {
+        refusal: 'authority',
+        actor: call.actor,
+        columns: refused,
+      });
+    }
+  }
+
+  /**
    * Refuse a replace unless the actor may write every column but the primary
    * key: a replace erases what it leaves out, so it writes them all.
    */
@@ -1880,6 +1916,7 @@ export abstract class RepositoryAdapter<
     this.assertAppendable('update');
     const call = await this.authorize([ActionEnum.UPDATE], options);
     const stored = this.toStoredRow(entity);
+    this.assertReadsHeld(call, stored, { version: true, deleteDate: true });
     const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
     this.assertMutable(stored);
     return this.permeator.update.permeate(
@@ -1987,6 +2024,7 @@ export abstract class RepositoryAdapter<
     const call = await this.authorize([ActionEnum.UPDATE], options);
     this.assertReplaceable(call);
     const stored = this.toStoredRow(entity);
+    this.assertReadsHeld(call, stored, { version: true, deleteDate: true });
     const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
     this.assertMutable(stored);
     return this.permeator.replace.permeate(
@@ -2037,6 +2075,10 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('delete');
     const call = await this.authorize([ActionEnum.DELETE], options);
+    this.assertReadsHeld(call, entity, {
+      version: options?.expectedVersion !== undefined,
+      deleteDate: false,
+    });
     await this.authorizeCascadeRemoval('delete', options?.ctx);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.delete.permeate(
@@ -2119,6 +2161,10 @@ export abstract class RepositoryAdapter<
     // Ahead of the no-op for a row already deleted, so that answer is given
     // only to a caller allowed to soft delete.
     const call = await this.authorize([ActionEnum.SOFT_DELETE], options);
+    this.assertReadsHeld(call, entity, {
+      version: options?.expectedVersion !== undefined,
+      deleteDate: true,
+    });
     await this.authorizeCascadeRemoval('softDelete', options?.ctx);
     // Resolved (and, on a mismatch, thrown) ahead of the idempotent no-op
     // below, so a stale precondition against a row someone else already
@@ -2181,6 +2227,10 @@ export abstract class RepositoryAdapter<
     this.assertAppendable('restore');
     this.requireDeleteDateColumn('restore');
     const call = await this.authorize([ActionEnum.RESTORE], options);
+    this.assertReadsHeld(call, entity, {
+      version: options?.expectedVersion !== undefined,
+      deleteDate: false,
+    });
     await this.authorizeCascadeRemoval('restore', options?.ctx);
     const versionGuard = this.resolveVersionGuard(entity, options, 'skip');
     return this.permeator.restore.permeate(

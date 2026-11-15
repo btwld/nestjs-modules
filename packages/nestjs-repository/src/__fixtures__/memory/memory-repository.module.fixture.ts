@@ -70,6 +70,8 @@ import {
   OrderLineEntityFixture,
   TENANT_ORDER_LINE_METADATA,
   TenantOrderLineEntityFixture,
+  VERSIONED_ORDER_METADATA,
+  VersionedOrderEntityFixture,
 } from './order.fixture.js';
 import {
   NOTE_METADATA,
@@ -112,6 +114,7 @@ const ADAPTERS = new Map<
   [ProjectEntityFixture, memory(PROJECT_METADATA)],
   [DraftEntityFixture, memory(DRAFT_METADATA)],
   [OrderEntityFixture, memory(ORDER_METADATA)],
+  [VersionedOrderEntityFixture, memory(VERSIONED_ORDER_METADATA)],
   [OrderLineEntityFixture, memory(ORDER_LINE_METADATA)],
   [PetEntityFixture, memory(PET_METADATA)],
   [NoteEntityFixture, memory(NOTE_METADATA)],

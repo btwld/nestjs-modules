@@ -384,7 +384,8 @@ the entity and on every column the lookup names: the route's params, any
 default filter, and the request's `filter`, `or` and `s`. They need `read`
 on the version column too (for Update and Replace, and any write sent with
 `If-Match`) and on the delete date (for Update, Replace and SoftDelete), or
-the write fails with a `500`. Only Create and CreateBatch write without
+the repository refuses the write (`403`) naming that column. Only Create
+and CreateBatch write without
 reading. (A repository write of your own needs no read permission: an
 actor who may only create gets back the new row's key.)
 

@@ -21,6 +21,7 @@ import {
   RouteAuditFailedException,
 } from '@concepta/nestjs-core';
 import {
+  AuthorityRefusedException,
   getDynamicRepositoryToken,
   type RepositoryInterface,
   RowScopeCtx,
@@ -138,6 +139,7 @@ describe('Attack round: one application, every layer', () => {
       'jun',
       'ivy',
       'carl',
+      'rita',
       'mallory',
       'gus',
       'ian',
@@ -279,6 +281,21 @@ describe('Attack round: one application, every layer', () => {
         .set(as('alice'))
         .send({ number: 'A-1b' })
         .expect(200, { ...clerkView(), number: 'A-1b' });
+    });
+
+    it('an update by a role that may not read the delete date is refused, not failed', async () => {
+      await http()
+        .patch(`/invoices/${acmeId}`)
+        .set(as('rita'))
+        .send({ number: 'A-1r' })
+        .expect(403);
+
+      const [exception] = rendered.mock.calls.at(-1) ?? [];
+      expect(exception).toBeInstanceOf(AuthorityRefusedException);
+      expect(exception).toMatchObject({
+        context: { action: 'read', columns: ['deletedAt'] },
+      });
+      expect((await managerRead()).number).toEqual('A-1');
     });
 
     it('a create naming an existing invoice cannot overwrite its amount', async () => {

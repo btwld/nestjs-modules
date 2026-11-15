@@ -2739,6 +2739,14 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   the actor.
   A write that sets the delete date soft deletes the row, so it also needs
   `softDelete`.
+- **Columns a write reads from the row you pass.** `update` and `replace`
+  check the row's version, and so do `delete`, `softDelete` and `restore`
+  given an `expectedVersion`; `update`, `replace` and `softDelete` read its
+  delete date to know whether it is live. A row the actor read holds only
+  the columns they may read, so when the row lacks one of these and the
+  actor may not read it, the write is refused (`403`, naming the column)
+  before anything runs. A row that holds it, such as one your code read
+  itself, is written whatever the actor may read.
 - **Write results** hold the columns the actor may read, and the primary key.
   A direct repository write needs no read permission of its own: an actor
   who may only create gets back the new row's key. Generated CRUD writes

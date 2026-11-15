@@ -69,6 +69,33 @@ export const ORDER_METADATA: RepositoryMetadataInterface<OrderFixture> = {
   relations: [],
 };
 
+export const VERSIONED_ORDER_TOKEN = 'versioned-orders';
+
+export interface VersionedOrderFixture extends OrderFixture {
+  version?: number;
+}
+
+export class VersionedOrderEntityFixture implements VersionedOrderFixture {
+  declare id: string;
+  declare tenantId: string;
+  declare description: string;
+  declare dateDeleted?: Date | null;
+  declare version?: number;
+}
+
+/**
+ * An order with a version column. The memory fixture neither guards nor bumps
+ * it, so it serves only what the abstraction checks before the driver.
+ */
+export const VERSIONED_ORDER_METADATA: RepositoryMetadataInterface<VersionedOrderFixture> =
+  {
+    name: 'VersionedOrder',
+    type: VersionedOrderEntityFixture,
+    urn: 'urn:memory:VersionedOrder',
+    columns: [...ORDER_COLUMNS, column('version', { isVersion: true })],
+    relations: [],
+  };
+
 /** A line belongs to an order through `orderId`, or the `order` relation. */
 export const ORDER_LINE_METADATA: RepositoryMetadataInterface<OrderLineFixture> =
   {
