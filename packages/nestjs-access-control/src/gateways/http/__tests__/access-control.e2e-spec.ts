@@ -16,6 +16,7 @@ import {
   type NestInterceptor,
   Patch,
   Post,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR, BaseExceptionFilter } from '@nestjs/core';
@@ -283,6 +284,113 @@ class BillingSystemGuardFixture implements CanActivate {
   providers: [{ provide: APP_GUARD, useClass: BillingSystemGuardFixture }],
 })
 class BillingSystemModuleFixture {}
+
+/** Signs the caller in from `x-user`, as an authentication guard would. */
+@Injectable()
+class SignInGuardFixture implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<{
+      headers: Record<string, string | undefined>;
+      user?: { id: string };
+    }>();
+    const id = request.headers['x-user'];
+    if (id) request.user = { id };
+    return true;
+  }
+}
+
+/** Where authentication runs, relative to access control's guard. */
+@Controller('order')
+class GuardOrderControllerFixture {
+  @Get('below')
+  @AccessControlReadMany('user-list')
+  @UseGuards(SignInGuardFixture)
+  below() {
+    return [];
+  }
+
+  @Get('above')
+  @UseGuards(SignInGuardFixture)
+  @AccessControlReadMany('user-list')
+  above() {
+    return [];
+  }
+}
+
+@Controller('order/controller')
+@UseGuards(SignInGuardFixture)
+class ControllerGuardOrderFixture {
+  @Get()
+  @AccessControlReadMany('user-list')
+  list() {
+    return [];
+  }
+}
+
+describe('AccessControl guard order (e2e)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        AccessControlModule.forRoot({
+          settings: {
+            grants: {
+              'role:clerk': [{ action: 'read', subject: 'user-list' }],
+            },
+          },
+          // Reads the signed-in user from the request, as most resolvers do.
+          actorResolver: {
+            actorFor: async (_ctx, context) => {
+              const user = context
+                ?.switchToHttp()
+                .getRequest<{ user?: { id: string } }>().user;
+              return user
+                ? { kind: 'role', roles: ['clerk'], userId: user.id }
+                : undefined;
+            },
+          },
+        }),
+      ],
+      controllers: [GuardOrderControllerFixture, ControllerGuardOrderFixture],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('should see the user when authentication is below the access decorator', async () => {
+    await supertest(app.getHttpServer())
+      .get('/order/below')
+      .set('x-user', 'u-1')
+      .expect(200);
+  });
+
+  it('should see the user when authentication is on the controller', async () => {
+    await supertest(app.getHttpServer())
+      .get('/order/controller')
+      .set('x-user', 'u-1')
+      .expect(200);
+  });
+
+  it('should refuse everyone with no-actor when authentication is above it', async () => {
+    const rendered = vi.spyOn(BaseExceptionFilter.prototype, 'catch');
+
+    await supertest(app.getHttpServer())
+      .get('/order/above')
+      .set('x-user', 'u-1')
+      .expect(403);
+
+    const [exception] = rendered.mock.calls.at(-1) ?? [];
+    expect(exception).toBeInstanceOf(AccessRefusedException);
+    expect(exception).toMatchObject({ context: { refusal: 'no-actor' } });
+    rendered.mockRestore();
+  });
+});
 
 describe('AccessControl (e2e)', () => {
   let app: INestApplication;

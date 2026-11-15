@@ -322,6 +322,54 @@ describe('authority over columns', () => {
       },
     );
 
+    it.each<{
+      name: string;
+      options: (column: string) => PlainLiteralObject;
+    }>([
+      {
+        name: 'selecting',
+        options: (column) => {
+          // The types allow only columns; a caller building names at
+          // runtime can still send another.
+          const options = {};
+          Reflect.set(options, 'select', ['id', column]);
+          return options;
+        },
+      },
+      {
+        name: 'filtering on',
+        options: (column) => ({ where: Where.eq(column, 'x') }),
+      },
+      {
+        name: 'sorting on',
+        options: (column) => {
+          const options = {};
+          Reflect.set(options, 'order', [{ field: column, order: 'ASC' }]);
+          return options;
+        },
+      },
+    ])(
+      'should refuse $name a column that does not exist as it refuses a hidden one',
+      async ({ options }) => {
+        const orders = await ordersWith(READS);
+
+        const hidden = await refusal(
+          orders.find({ ...options('tenantId'), ctx: ctxOf(CLERK) }),
+        );
+        const unknown = await refusal(
+          orders.find({ ...options('nope'), ctx: ctxOf(CLERK) }),
+        );
+
+        expect(unknown).not.toBeInstanceOf(UnknownColumnException);
+        expect(unknown).toMatchObject({
+          message: hidden instanceof Error ? hidden.message : undefined,
+          httpStatus: 403,
+          context: { refusal: 'authority', columns: ['nope'] },
+        });
+        expect(orders.queries).toEqual([]);
+      },
+    );
+
     it('should not count the columns row scope adds against the caller', async () => {
       const orders = await ordersWith(READS, { scoped: true });
 

@@ -306,6 +306,29 @@ describe(AccessControlService.name, () => {
     });
   });
 
+  // Grants accept any verb, since routes may declare their own, so a typo
+  // is a verb of its own: it fails silently rather than being refused.
+  describe('a mistyped verb in grants', () => {
+    it('grants nothing when an allow misspells it', async () => {
+      const service = serviceFor(clerk, {
+        'role:clerk': [{ action: 'raed', subject: 'invoice' }],
+      });
+
+      expect(await service.can({}, 'read', 'invoice')).toBe(false);
+    });
+
+    it('denies nothing when a deny misspells it', async () => {
+      const service = serviceFor(clerk, {
+        'role:clerk': [
+          { action: 'read', subject: 'invoice' },
+          { action: 'raed', subject: 'invoice', inverted: true },
+        ],
+      });
+
+      expect(await service.can({}, 'read', 'invoice')).toBe(true);
+    });
+  });
+
   describe('systems', () => {
     const grants: AccessGrants = {
       'system:agile': [{ action: 'approve', subject: 'contract' }],
