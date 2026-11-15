@@ -425,7 +425,9 @@ export abstract class RepositoryAdapter<
       call && {
         ...call,
         actions: new Map(
-          [...call.actions].filter(([action]) => kept.includes(action)),
+          [...call.actions].filter(([action]) =>
+            kept.some((one) => one === action),
+          ),
         ),
       };
 
@@ -622,10 +624,14 @@ export abstract class RepositoryAdapter<
    * Returns what was allowed, for the column checks, or `undefined` when
    * nothing decides the call. A write also asks whether the actor may read,
    * without refusing, to know which columns its result may hold.
+   *
+   * A write naming its domain operation passes it as `domainAction`, decided
+   * as that action too, its columns included.
    */
   private async authorize(
     actions: ActionEnum[],
     options: PlainLiteralObject | undefined,
+    domainAction?: string,
   ): Promise<AuthorizedCallInterface | undefined> {
     const authority = this.requireAuthority();
     if (!authority || isInternalCall(options, this)) return undefined;
@@ -639,13 +645,18 @@ export abstract class RepositoryAdapter<
       });
     }
 
+    const asked: string[] = [
+      ...actions,
+      ...(typeof domainAction === 'string' &&
+      !actions.some((action) => action === domainAction)
+        ? [domainAction]
+        : []),
+    ];
+
     const columns = this.metadata.columns.map((column) => column.name);
-    const allowed = new Map<ActionEnum, ReadonlySet<string> | undefined>();
-    const gates = new Map<
-      ActionEnum,
-      Readonly<Partial<Record<string, string>>>
-    >();
-    for (const action of actions) {
+    const allowed = new Map<string, ReadonlySet<string> | undefined>();
+    const gates = new Map<string, Readonly<Partial<Record<string, string>>>>();
+    for (const action of asked) {
       const decision = await authority.decide(ctx, {
         actor,
         subject: this.entityKey,
@@ -704,7 +715,7 @@ export abstract class RepositoryAdapter<
    */
   private columnGates(
     call: AuthorizedCallInterface,
-    action: ActionEnum,
+    action: string,
     columns: readonly string[],
     prefix = '',
   ): Pick<AuthorityRefusedDetailsInterface, 'gates'> {
@@ -1862,7 +1873,11 @@ export abstract class RepositoryAdapter<
     options?: RepositoryCreateOptions,
   ): Promise<Entity> {
     this.requireBinding();
-    const call = await this.authorize([ActionEnum.CREATE], options);
+    const call = await this.authorize(
+      [ActionEnum.CREATE],
+      options,
+      options?.action,
+    );
     return this.permeator.create.permeate(
       entity,
       async (scoped) => {
@@ -1899,7 +1914,11 @@ export abstract class RepositoryAdapter<
     options?: RepositoryCreateOptions,
   ): Promise<Entity[]> {
     this.requireBinding();
-    const call = await this.authorize([ActionEnum.CREATE], options);
+    const call = await this.authorize(
+      [ActionEnum.CREATE],
+      options,
+      options?.action,
+    );
     return this.permeator.createMany.permeate(
       entities,
       async (scoped) => {
@@ -1956,7 +1975,11 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('update');
-    const call = await this.authorize([ActionEnum.UPDATE], options);
+    const call = await this.authorize(
+      [ActionEnum.UPDATE],
+      options,
+      options?.action,
+    );
     const stored = this.toStoredRow(entity);
     this.assertReadsHeld(call, stored, { version: true, deleteDate: true });
     const versionGuard = this.resolveVersionGuard(stored, options, 'guard');
@@ -2014,6 +2037,7 @@ export abstract class RepositoryAdapter<
     const call = await this.authorize(
       [ActionEnum.CREATE, ActionEnum.UPDATE],
       options,
+      options?.action,
     );
     return this.permeator.upsert.permeate(
       entity,
@@ -2063,7 +2087,11 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('replace');
-    const call = await this.authorize([ActionEnum.UPDATE], options);
+    const call = await this.authorize(
+      [ActionEnum.UPDATE],
+      options,
+      options?.action,
+    );
     this.assertReplaceable(call);
     const stored = this.toStoredRow(entity);
     this.assertReadsHeld(call, stored, { version: true, deleteDate: true });
@@ -2116,7 +2144,11 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity> {
     this.requireBinding();
     this.assertAppendable('delete');
-    const call = await this.authorize([ActionEnum.DELETE], options);
+    const call = await this.authorize(
+      [ActionEnum.DELETE],
+      options,
+      options?.action,
+    );
     this.assertReadsHeld(call, entity, {
       version: options?.expectedVersion !== undefined,
       deleteDate: false,
@@ -2158,7 +2190,11 @@ export abstract class RepositoryAdapter<
   ): Promise<Entity[]> {
     this.requireBinding();
     this.assertAppendable('deleteMany');
-    const call = await this.authorize([ActionEnum.DELETE], options);
+    const call = await this.authorize(
+      [ActionEnum.DELETE],
+      options,
+      options?.action,
+    );
     await this.authorizeCascadeRemoval('delete', options?.ctx);
     return this.permeator.deleteMany.permeate(
       entities,
@@ -2202,7 +2238,11 @@ export abstract class RepositoryAdapter<
     const deleteDateColumn = this.requireDeleteDateColumn('softDelete');
     // Ahead of the no-op for a row already deleted, so that answer is given
     // only to a caller allowed to soft delete.
-    const call = await this.authorize([ActionEnum.SOFT_DELETE], options);
+    const call = await this.authorize(
+      [ActionEnum.SOFT_DELETE],
+      options,
+      options?.action,
+    );
     this.assertReadsHeld(call, entity, {
       version: options?.expectedVersion !== undefined,
       deleteDate: true,
@@ -2268,7 +2308,11 @@ export abstract class RepositoryAdapter<
     this.requireBinding();
     this.assertAppendable('restore');
     this.requireDeleteDateColumn('restore');
-    const call = await this.authorize([ActionEnum.RESTORE], options);
+    const call = await this.authorize(
+      [ActionEnum.RESTORE],
+      options,
+      options?.action,
+    );
     this.assertReadsHeld(call, entity, {
       version: options?.expectedVersion !== undefined,
       deleteDate: false,

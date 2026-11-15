@@ -69,12 +69,17 @@ function ctxOf(actor: Actor, tenantId?: string): AppContextHost {
 
 async function ordersWith(
   table: AuthorityTableFixture,
-  options: { scoped?: boolean } = {},
+  options: {
+    scoped?: boolean;
+    /** Handed the authority, to read the requests it is asked. */
+    watch?: (authority: AuthorityFixture) => void;
+  } = {},
 ): Promise<MemoryRepositoryFixture<OrderFixture>> {
   const authority = new AuthorityFixture({
     ...allow('role:admin', ORDER_TOKEN, ALL),
     ...table,
   });
+  options.watch?.(authority);
 
   @Module({
     providers: [
@@ -1008,6 +1013,124 @@ describe('authority over columns', () => {
 
       expect(error).toBeInstanceOf(AuthorityRefusedException);
       expect(gatesOf(error)).toBeUndefined();
+    });
+  });
+
+  // A write naming its domain operation is decided as that action too, so
+  // the authority sees `void`, not only `update`, and both must allow it.
+  describe('a write naming its domain operation', () => {
+    const VOIDS: AuthorityTableFixture = {
+      ...allow('role:clerk', ORDER_TOKEN, ['read', 'update']),
+      [`role:supervisor ${ORDER_TOKEN} void`]: {
+        effect: 'allow',
+        columns: ['description'],
+      },
+      ...allow('role:supervisor', ORDER_TOKEN, ['read', 'update']),
+    };
+    const SUPERVISOR: Actor = { kind: 'role', roles: ['supervisor'] };
+
+    it('should refuse it when the authority refuses the operation, its own action allowed', async () => {
+      const orders = await ordersWith(VOIDS);
+
+      const error = await refusal(
+        orders.update(
+          ORDER,
+          { description: 'void' },
+          { ctx: ctxOf(CLERK), action: 'void' },
+        ),
+      );
+
+      expect(error).toMatchObject({ context: { action: 'void' } });
+      expect(orders.stored).toEqual([ORDER]);
+    });
+
+    it('should let it through when both allow it', async () => {
+      const orders = await ordersWith(VOIDS);
+
+      await orders.update(
+        ORDER,
+        { description: 'void' },
+        { ctx: ctxOf(SUPERVISOR), action: 'void' },
+      );
+
+      expect(orders.stored).toEqual([{ ...ORDER, description: 'void' }]);
+    });
+
+    it('should hold the write to the columns the operation allows', async () => {
+      const orders = await ordersWith(VOIDS);
+
+      const error = await refusal(
+        orders.update(
+          ORDER,
+          { tenantId: 'other' },
+          { ctx: ctxOf(SUPERVISOR), action: 'void' },
+        ),
+      );
+
+      expect(error).toMatchObject({
+        context: { action: 'void', columns: ['tenantId'] },
+      });
+      expect(orders.stored).toEqual([ORDER]);
+    });
+
+    it('should decide a create and a delete as their operation too', async () => {
+      const orders = await ordersWith({
+        ...allow('role:clerk', ORDER_TOKEN, ['create', 'delete']),
+      });
+
+      await expect(
+        refusal(
+          orders.create(
+            { id: 'order-2', tenantId: 'acme' },
+            { ctx: ctxOf(CLERK), action: 'open' },
+          ),
+        ),
+      ).resolves.toMatchObject({ context: { action: 'open' } });
+      await expect(
+        refusal(orders.delete(ORDER, { ctx: ctxOf(CLERK), action: 'retire' })),
+      ).resolves.toMatchObject({ context: { action: 'retire' } });
+      expect(orders.stored).toEqual([ORDER]);
+    });
+
+    it('should decide an operation named as the write’s own action once', async () => {
+      const watched: AuthorityFixture[] = [];
+      const orders = await ordersWith(VOIDS, {
+        watch: (authority) => watched.push(authority),
+      });
+      const [authority] = watched;
+      if (!authority) throw new Error('no authority');
+      authority.requests.length = 0;
+
+      await orders.update(
+        ORDER,
+        { description: 'edited' },
+        { ctx: ctxOf(CLERK), action: 'update' },
+      );
+
+      expect(authority.requests.map(({ action }) => action)).toEqual([
+        'update',
+        'read',
+      ]);
+    });
+
+    // Only writes take an operation: a read handed one decides it not.
+    it('should leave a read decided by read alone, whatever its options hold', async () => {
+      const orders = await ordersWith(VOIDS);
+      const options: PlainLiteralObject = { ctx: ctxOf(CLERK), action: 'void' };
+
+      await expect(orders.find(options)).resolves.toEqual([ORDER]);
+    });
+
+    it('should leave a write naming none decided by its own action alone', async () => {
+      const orders = await ordersWith(VOIDS);
+
+      await orders.update(
+        ORDER,
+        { description: 'edited' },
+        { ctx: ctxOf(CLERK) },
+      );
+
+      expect(orders.stored).toEqual([{ ...ORDER, description: 'edited' }]);
     });
   });
 });

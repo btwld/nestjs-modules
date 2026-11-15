@@ -270,6 +270,7 @@ export {
   RepositoryFindOneOptions,
   RepositoryFindOptions,
   RepositoryCountOptions,
+  RepositoryWriteOptions,
   RepositoryCreateOptions,
   RepositoryUpdateOptions,
   RepositoryUpsertOptions,

@@ -496,6 +496,34 @@ one-entity authority can narrow its column names,
 `AuthorityInterface<keyof Order & string>`. `actorKeys` and `normalizeActor`
 help an authority of your own; see the [API Reference](#api-reference).
 
+Ask the authority about an operation of your domain that has no write of
+its own, such as approving or exporting, with `assertAuthority`. It decides
+for the actor on `ctx`, with no columns, and throws
+`AuthorityActionRefusedException` (`403`, fault `client`) when the
+authority refuses or nobody is acting; why, and any gate, stay in its
+context. A write that carries out an operation names it in its own options
+instead, so the repository decides it with the columns it writes (see
+[What is decided](../nestjs-repository/README.md#what-is-decided)):
+
+```ts
+@CommandHandler(ApproveInvoiceCommand)
+export class ApproveInvoiceHandler {
+  constructor(private readonly authority: CaslAuthority) {}
+
+  async execute({ ctx, invoiceId }: ApproveInvoiceCommand) {
+    await assertAuthority(ctx, this.authority, 'invoice', 'approve');
+    // ...
+  }
+}
+```
+
+The aggregate still decides whether the operation can happen now (an
+invoice already paid can't be voided); the authority decides whether this
+actor may. A `CaslAuthority` refuses rules naming a verb it wasn't told
+of, so declare yours when you construct it,
+`new CaslAuthority(rules, { actions: ['approve'] })` (see
+[Rules with CASL](../nestjs-repository/README.md#rules-with-casl)).
+
 Rules are written in one shape wherever they are used, the repository's
 authority and access control's grants alike: `AuthorityRuleInterface`, plain
 JSON naming an `action` (a verb), a `subject`, optional `fields`, and
@@ -1406,6 +1434,7 @@ exercise correlation behavior directly.
 | `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, pending?, reason? }`. |
 | `authorityRuleProblems(rules, source, names?)` | Every problem with rules read from storage, each naming `source`; empty when they can be used. Given `names` (`AuthorityRuleNamesInterface`), a subject, action or field it doesn't list is one. |
 | `authorityGateOf(rules)` | The `gate` of a refusal, from the rules that refused, as written, highest priority first: the first-given deny's `pending` when every deny is pending. For an authority of your own. |
+| `assertAuthority(ctx, authority, subject, action)` | Throws `AuthorityActionRefusedException` (403) unless the authority allows the actor on `ctx` the action, asked with no columns: for a domain operation with no write of its own. |
 | `authorityPendingGates(rules)` → `AuthorityPendingGateInterface[]` | Every decision still pending in a rule set: `{ gate, action, subject, fields? }` per action and subject of each pending deny. |
 
 ### Route Audit Exports
@@ -1434,6 +1463,7 @@ exercise correlation behavior directly.
 | `ExceptionContext` | Base context shape: `Record<string, unknown> & { originalError?: unknown }`. Extended by `RuntimeExceptionContext`. |
 | `ExceptionInterface` | Minimal interface: `errorCode`, `context?`. Extends `Error`. |
 | `NotAnErrorException` | Wraps a non-`Error` value (e.g. a string or object) into an `Error`. Used internally by `mapNonErrorToException`. |
+| `AuthorityActionRefusedException` | `assertAuthority` refused (403, fault `client`, `AUTHORITY_ACTION_REFUSED_ERROR`). The message names the action and subject; `context.refusal` (`no-actor` or `authority`), `context.actor` and `context.gate` are for logs (`AuthorityActionRefusedDetailsInterface`). A repository's refusal is its own `AuthorityRefusedException`, naming `context.entityKey`; handle both where both can be thrown. |
 
 ### Event Context Exports
 

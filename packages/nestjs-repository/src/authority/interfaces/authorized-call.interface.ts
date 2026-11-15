@@ -1,4 +1,4 @@
-import { type ActionEnum, type Actor } from '@concepta/nestjs-core';
+import { type Actor } from '@concepta/nestjs-core';
 
 /**
  * What an entity's authority allowed one call. A column set that is absent
@@ -8,8 +8,11 @@ export interface AuthorizedCallInterface {
   /** Who the call was decided for. */
   readonly actor: Actor;
 
-  /** Each action the call takes, with the columns it may touch. */
-  readonly actions: ReadonlyMap<ActionEnum, ReadonlySet<string> | undefined>;
+  /**
+   * Each action the call takes, with the columns it may touch: its own, and
+   * the domain operation a write names.
+   */
+  readonly actions: ReadonlyMap<string, ReadonlySet<string> | undefined>;
 
   /**
    * The columns the call's results may hold. A write's result also always
@@ -22,7 +25,7 @@ export interface AuthorizedCallInterface {
    * out because a decision is still pending.
    */
   readonly gates: ReadonlyMap<
-    ActionEnum,
+    string,
     Readonly<Partial<Record<string, string>>>
   >;
 

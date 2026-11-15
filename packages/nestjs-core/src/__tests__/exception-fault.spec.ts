@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'url';
 
+import { AuthorityActionRefusedException } from '../domain/authority/exceptions/authority-action-refused.exception.js';
 import { type RuntimeExceptionFault } from '../domain/exceptions/exception.types.js';
 import { RuntimeException } from '../domain/exceptions/runtime.exception.js';
 import { CurrencyConfigurationException } from '../domain/value-objects/money/exceptions/currency-configuration.exception.js';
@@ -71,6 +72,15 @@ const CASES: {
     errorCode: 'HOOK_PROVIDER_NOT_FOUND',
     build: () => new HookProviderNotFoundException('SomeHook'),
     fault: 'usage',
+  },
+  {
+    name: 'AuthorityActionRefusedException',
+    errorCode: 'AUTHORITY_ACTION_REFUSED_ERROR',
+    build: () =>
+      new AuthorityActionRefusedException('invoice', 'void', {
+        refusal: 'authority',
+      }),
+    fault: 'client',
   },
   {
     name: 'RouteAuditFailedException',

@@ -71,14 +71,29 @@ export interface RepositoryCountOptions extends RepositoryBaseOptions {
 }
 
 /**
+ * Options every write takes.
+ */
+export interface RepositoryWriteOptions extends RepositoryBaseOptions {
+  /**
+   * The domain operation the write carries out, such as `void` or
+   * `approve`. On an entity an authority governs, the write is decided as
+   * this action too, beside its own (`update` and so on), and both must
+   * allow it, every column it writes included: naming one can only narrow
+   * what the write may do. Related rows a cascade writes are decided by
+   * their own actions only.
+   */
+  action?: string;
+}
+
+/**
  * Options for create operations.
  */
-export interface RepositoryCreateOptions extends RepositoryBaseOptions {}
+export interface RepositoryCreateOptions extends RepositoryWriteOptions {}
 
 /**
  * Options for update operations.
  */
-export interface RepositoryUpdateOptions extends RepositoryBaseOptions {
+export interface RepositoryUpdateOptions extends RepositoryWriteOptions {
   /**
    * The version the caller believes this row is currently at. A mismatch
    * throws `OptimisticLockException`, preventing a lost update against a
@@ -90,12 +105,12 @@ export interface RepositoryUpdateOptions extends RepositoryBaseOptions {
 /**
  * Options for upsert operations.
  */
-export interface RepositoryUpsertOptions extends RepositoryBaseOptions {}
+export interface RepositoryUpsertOptions extends RepositoryWriteOptions {}
 
 /**
  * Options for delete operations (including `deleteMany`).
  */
-export interface RepositoryDeleteOptions extends RepositoryBaseOptions {}
+export interface RepositoryDeleteOptions extends RepositoryWriteOptions {}
 
 /**
  * Options for single-entity delete operations (`delete`, `softDelete`).
@@ -113,7 +128,7 @@ export interface RepositoryDeleteOneOptions extends RepositoryDeleteOptions {
 /**
  * Options for restore operations.
  */
-export interface RepositoryRestoreOptions extends RepositoryBaseOptions {
+export interface RepositoryRestoreOptions extends RepositoryWriteOptions {
   /**
    * The version the caller believes this row is currently at. A mismatch
    * throws `OptimisticLockException`.

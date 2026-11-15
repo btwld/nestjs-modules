@@ -2737,6 +2737,26 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
 | `restore` | restore |
 | `upsert` | create **and** update — it does either, depending on what is stored, and deciding both never reveals which |
 
+**Domain operations.** A write that carries out an operation of your
+domain names it in its options, and is decided as that action too: both
+must allow it, the columns it writes included, so naming it can only
+narrow. The authority then sees `void`, not only `update`:
+
+```ts
+await invoices.update(invoice, { status: 'void' }, { ctx, action: 'void' });
+```
+
+Name it in your repository's method for the operation (`void(ctx,
+invoice)`), not in each caller, so no caller can leave it out, and on an
+`update`: a `replace` writes every column, so one an operation's rules
+limit to some columns refuses it. Declare the verb to a `CaslAuthority`,
+`new CaslAuthority(rules, { actions: ['void'] })`, or rules naming it are
+refused (see [Rules with CASL](#rules-with-casl)). Related rows a cascade
+writes are decided by their own actions only, and the activity record
+names the write's own action (`update`), not the operation. An operation
+with no write of its own, such as `approve` or `export`, is asked with
+core's [`assertAuthority`](../nestjs-core/README.md#actor-and-authority).
+
 **Columns:**
 
 - **Reads.** A read that selects, filters or sorts on a column the actor may

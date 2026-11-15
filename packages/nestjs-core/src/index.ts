@@ -152,6 +152,9 @@ export { AuthorityRuleInterface } from './domain/authority/interfaces/authority-
 export { authorityRuleProblems } from './domain/authority/utils/authority-rule-problems.util.js';
 export { AuthorityRuleNamesInterface } from './domain/authority/interfaces/authority-rule-names.interface.js';
 export { authorityGateOf } from './domain/authority/utils/authority-gate-of.util.js';
+export { assertAuthority } from './infrastructure/authority/utils/assert-authority.util.js';
+export { AuthorityActionRefusedException } from './domain/authority/exceptions/authority-action-refused.exception.js';
+export { AuthorityActionRefusedDetailsInterface } from './domain/authority/interfaces/authority-action-refused-details.interface.js';
 export { authorityPendingGates } from './domain/authority/utils/authority-pending-gates.util.js';
 export { AuthorityPendingGateInterface } from './domain/authority/interfaces/authority-pending-gate.interface.js';
 
