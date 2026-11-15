@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,7 +9,11 @@ import {
   Post,
 } from '@nestjs/common';
 
-import { AppContextHost, Ctx } from '@concepta/nestjs-core';
+import {
+  AppContextHost,
+  authorityRuleProblems,
+  Ctx,
+} from '@concepta/nestjs-core';
 import {
   InjectDynamicRepository,
   type RepositoryInterface,
@@ -27,9 +32,17 @@ export class RulesController {
     private readonly rules: RepositoryInterface<StoredRuleEntity>,
   ) {}
 
+  /**
+   * Saves the rule only if `CaslAuthority` can use it: a rule it cannot use
+   * would fail every later call of the actors it names.
+   */
   @Post()
   grant(@Ctx() ctx: AppContextHost, @Body() body: Partial<StoredRuleEntity>) {
-    return this.rules.create(body, { ctx });
+    const { actorKey, ...rule } = body;
+    const problems = authorityRuleProblems([rule], 'body');
+    if (problems.length > 0) throw new BadRequestException(problems);
+
+    return this.rules.create({ ...rule, actorKey }, { ctx });
   }
 
   @Delete(':id')

@@ -146,6 +146,23 @@ describe('Rules from storage', () => {
     });
   });
 
+  it('a rule the authority cannot use is refused before it is saved', async () => {
+    const refused = await request(app.getHttpServer())
+      .post('/rules')
+      .set(as('admin'))
+      .send({ actorKey: 'role:clerk', action: 'manage', subject: DOCUMENT })
+      .expect(400);
+    expect(refused.body.message).toEqual([
+      'body rule 0: action "manage" is reserved',
+    ]);
+
+    // Nothing was stored: the clerk is still refused, not failed by it.
+    await request(app.getHttpServer())
+      .get('/documents')
+      .set(as('clerk'))
+      .expect(403);
+  });
+
   it('only an admin edits the rules', async () => {
     await request(app.getHttpServer())
       .post('/rules')
