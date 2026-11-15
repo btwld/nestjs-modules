@@ -19,4 +19,13 @@ export interface AuthorityInterface<Column extends string = string> {
     ctx: PlainLiteralObject,
     request: AuthorityRequestInterface<Column>,
   ): AuthorityDecision<Column> | Promise<AuthorityDecision<Column>>;
+
+  /**
+   * Told, at startup, each subject it governs and its columns: a repository
+   * calls it with the key and column names of every entity it attaches this
+   * authority to. Optional; an authority that checks the names its rules use
+   * learns them here. Without it, refusing a name it doesn't know, which a
+   * misspelled deny would otherwise not deny, is the authority's own job.
+   */
+  govern?(subject: string, columns: readonly string[]): void;
 }

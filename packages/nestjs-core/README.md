@@ -535,11 +535,19 @@ authorityPendingGates(rules);
 
 `AuthorityRuleInterface` defaults to the six `ActionEnum` verbs, so a
 mistyped verb fails to compile. To add verbs of your own, widen it; to
-narrow, list only the verbs you allow. `settings.grants` and a rules
-source's `rulesFor` accept any verb, since a route may name one of its own,
-so a typo there fails silently: a mistyped allow grants nothing, and a
-mistyped deny denies nothing. Type the rules you write as
-`AuthorityRuleInterface` before passing them in.
+narrow, list only the verbs you allow. Rules read at runtime aren't typed:
+pass `authorityRuleProblems` the names a rule may use, as its third
+argument (`AuthorityRuleNamesInterface`: `subjects`, `actions`, and
+`fields` by subject), and any subject or action it doesn't list is a
+problem, as is a field missing from the fields of a subject it lists
+them for, since a mistyped deny would deny nothing. The repository's
+`CaslAuthority` does this with the entities it governs and their columns
+(see
+[Rules with CASL](../nestjs-repository/README.md#rules-with-casl)).
+Access control's `settings.grants` and grants provider get no such check:
+they accept any name, since a route may name its own, so a typo there
+fails silently. Type the rules you write as `AuthorityRuleInterface`
+before passing them in.
 
 ```ts
 import {
@@ -1392,11 +1400,11 @@ exercise correlation behavior directly.
 | `frozenActor(actor)` | A copy whose `roles` can't change, for defining `ActorCtx`. |
 | `actorKeys(actor)` | The keys an actor's permissions are usually stored under: `role:<name>` for each role, or `system:<name>`. |
 | `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. This copy is what an authority is asked about and what an exception names. |
-| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
+| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`, and optional `govern(subject, columns)`, told at startup each entity key it governs and its columns. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
 | `AuthorityRequestInterface` | `{ actor, subject, action, columns }`. |
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns?, gates? }` or `{ effect: 'refuse', gate? }`; `gates` names the gate of each column left out pending. |
 | `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, pending?, reason? }`. |
-| `authorityRuleProblems(rules, source)` | Every problem with rules read from storage, each naming `source`; empty when they can be used. |
+| `authorityRuleProblems(rules, source, names?)` | Every problem with rules read from storage, each naming `source`; empty when they can be used. Given `names` (`AuthorityRuleNamesInterface`), a subject, action or field it doesn't list is one. |
 | `authorityGateOf(rules)` | The `gate` of a refusal, from the rules that refused, as written, highest priority first: the first-given deny's `pending` when every deny is pending. For an authority of your own. |
 | `authorityPendingGates(rules)` → `AuthorityPendingGateInterface[]` | Every decision still pending in a rule set: `{ gate, action, subject, fields? }` per action and subject of each pending deny. |
 

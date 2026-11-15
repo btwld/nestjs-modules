@@ -1,3 +1,5 @@
+import { type AuthorityRuleNamesInterface } from '../interfaces/authority-rule-names.interface.js';
+
 const RULE_KEYS = new Set([
   'action',
   'subject',
@@ -36,7 +38,34 @@ function isPlainObject(value: unknown): value is object {
   return prototype === Object.prototype || prototype === null;
 }
 
-function problemsOf(rule: unknown): string[] {
+/** The known names as sets, each absent when any name goes. */
+interface KnownNames {
+  subjects?: ReadonlySet<string>;
+  actions?: ReadonlySet<string>;
+  fields?: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+/**
+ * Each field of `list` that isn't a field of one of `subjects` whose fields
+ * are known: a deny naming it would deny nothing there. A subject whose
+ * fields aren't known is left out.
+ */
+function unknownFields(
+  list: readonly string[],
+  subjects: readonly string[],
+  known: KnownNames,
+): string[] {
+  return subjects.flatMap((subject) => {
+    const fields = known.fields?.get(subject);
+    return fields
+      ? list
+          .filter((field) => !fields.has(field))
+          .map((field) => `field "${field}" is not a field of "${subject}"`)
+      : [];
+  });
+}
+
+function problemsOf(rule: unknown, known: KnownNames): string[] {
   if (!isPlainObject(rule)) {
     return ['must be a plain object'];
   }
@@ -77,6 +106,8 @@ function problemsOf(rule: unknown): string[] {
       problems.push(`action "${name}" must be a verb, such as read or approve`);
     } else if (name === RESERVED_ACTION) {
       problems.push(`action "${name}" is reserved`);
+    } else if (known.actions && !known.actions.has(name)) {
+      problems.push(`action "${name}" is not a known action`);
     }
   }
 
@@ -89,6 +120,8 @@ function problemsOf(rule: unknown): string[] {
       problems.push('subject is blank');
     } else if (name === RESERVED_SUBJECT) {
       problems.push(`subject "${name}" is reserved`);
+    } else if (known.subjects && !known.subjects.has(name)) {
+      problems.push(`subject "${name}" is not a known subject`);
     }
   }
 
@@ -109,6 +142,8 @@ function problemsOf(rule: unknown): string[] {
       problems.push(
         'fields name array positions or numeric keys, which fields are checked without; name the field beneath them',
       );
+    } else if (subjects?.length) {
+      problems.push(...unknownFields(list, subjects, known));
     }
   }
 
@@ -142,7 +177,10 @@ function problemsOf(rule: unknown): string[] {
  * neither `manage` nor `all`; `fields`, when given, is a non-empty list
  * naming fields, with no blank entry, pattern or numeric segment;
  * `inverted` is a boolean; `pending`, when given, is a non-blank string on a
- * rule with `inverted: true`; `reason` is a string.
+ * rule with `inverted: true`; `reason` is a string. Given `names`, every
+ * subject and action must also be one it lists, and every field one of the
+ * fields it lists for each of the rule's subjects it lists fields for: a
+ * misspelled deny would otherwise deny nothing.
  *
  * Rules may come from storage, so anything is accepted and checked. Call it
  * before saving rules, as the rules' consumers do before using them.
@@ -150,12 +188,30 @@ function problemsOf(rule: unknown): string[] {
 export function authorityRuleProblems(
   rules: unknown,
   source: string,
+  names: AuthorityRuleNamesInterface = {},
 ): string[] {
   if (!Array.isArray(rules)) {
     return [`${source}: rules must be an array`];
   }
 
+  const known: KnownNames = {
+    ...(names.subjects ? { subjects: new Set(names.subjects) } : {}),
+    ...(names.actions ? { actions: new Set(names.actions) } : {}),
+    ...(names.fields
+      ? {
+          fields: new Map(
+            [...names.fields].map(([subject, fields]) => [
+              subject,
+              new Set(fields),
+            ]),
+          ),
+        }
+      : {}),
+  };
+
   return rules.flatMap((rule: unknown, index) =>
-    problemsOf(rule).map((problem) => `${source} rule ${index}: ${problem}`),
+    problemsOf(rule, known).map(
+      (problem) => `${source} rule ${index}: ${problem}`,
+    ),
   );
 }

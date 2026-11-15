@@ -173,7 +173,13 @@ export function createRepositoryRootModule(params: {
             binding: RepositoryBinding,
             authority: AuthorityInterface,
           ) => {
-            binding.get(options.key)?.setAuthority(authority);
+            const adapter = binding.get(options.key);
+            if (!adapter) return true;
+            adapter.setAuthority(authority);
+            authority.govern?.(
+              options.key,
+              adapter.metadata.columns.map(({ name }) => name),
+            );
             return true;
           },
         },

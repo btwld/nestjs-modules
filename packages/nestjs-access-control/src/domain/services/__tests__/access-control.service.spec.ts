@@ -794,7 +794,13 @@ describe(AccessControlService.name, () => {
           actingAs(clerk),
           new StaticAccessGrantsProvider({}),
           undefined,
-          { authority: new CaslAuthority({ rulesFor: async () => rules }) },
+          {
+            // No repository here to tell it what it governs.
+            authority: new CaslAuthority(
+              { rulesFor: async () => rules },
+              { subjects: ['invoice'] },
+            ),
+          },
         );
 
       // Fields are checked against access control's own denies; the

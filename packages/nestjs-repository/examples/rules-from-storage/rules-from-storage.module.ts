@@ -53,6 +53,9 @@ export class StoredAuthorityModule {}
       ],
     }),
     RepositoryModule.forFeature([DOCUMENT, RULE]),
+    // The rules controller checks a rule against the authority before
+    // saving it.
+    StoredAuthorityModule,
   ],
   controllers: [DocumentController, RulesController],
   providers: [{ provide: APP_GUARD, useClass: DemoActorGuard }],

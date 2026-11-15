@@ -2629,8 +2629,26 @@ export class AuthorityModule {}
   repository asks: only `create`, `read`, `update`, `delete`, `softDelete`
   and `restore`. An authority shared with access control is also asked each
   route's own verbs (such as `approve`) on every resource not in its
-  `except`, so write those in its rules too; see
+  `except`, so write those in its rules too, and declare them (below); see
   [Sharing Rules with the Repository](../nestjs-access-control/README.md#sharing-rules-with-the-repository).
+- **A rule names only what the authority knows.** Its `subject` is an
+  entity the authority governs, which each repository it is attached to
+  tells it at startup with its columns, its `action` one of the six, and
+  each of its `fields` a column of every entity it names, so a rule
+  covering entities with different columns is written once per entity.
+  Declare any other subject or verb when you construct it; fields aren't
+  checked against a declared subject, which has no columns:
+
+  ```ts
+  new CaslAuthority(rules, { subjects: ['report'], actions: ['approve'] });
+  ```
+
+  Any other name is a problem with the rules (below), so a misspelled deny,
+  `subject: 'ordr'` or `fields: ['salry']`, fails the call instead of
+  denying nothing. Provide one `CaslAuthority` per application, as a
+  singleton: an instance is told only what the repositories it is attached
+  to govern, so a transient one, or one shared between applications, knows
+  the wrong names.
 - **`fields`** limits a rule to those columns, by exact name. A rule naming no
   fields covers every column.
 - **A deny (`inverted`) always wins**, whatever order the rules come in, and
@@ -2642,17 +2660,24 @@ export class AuthorityModule {}
   [Actor and Authority](../nestjs-core/README.md#actor-and-authority).
 - **Rules are checked before use.** Rules are refused as
   `authorityRuleProblems` lists them (see core's
-  [Actor and Authority](../nestjs-core/README.md#actor-and-authority)): the
-  call fails with `CaslAuthorityRulesInvalidException`, a `500` (fault
-  `usage`) listing every problem, and every later call on that `ctx` fails
-  the same way. Check stored rules before saving them with
-  `authorityRuleProblems` from `@concepta/nestjs-core`, which runs the same
-  check.
-- **Type your rules to catch typos.** `rulesFor` may return rules of any verb.
-  Type the rules you write as `AuthorityRuleInterface`, which defaults to the
-  six actions, and a mistyped verb fails to compile. Widen it to add verbs of
-  your own, ``AuthorityRuleInterface<`${ActionEnum}` | 'approve'>``, or narrow
-  it to list only the verbs you allow, such as
+  [Actor and Authority](../nestjs-core/README.md#actor-and-authority)), plus
+  any name the authority doesn't know: the call fails with
+  `CaslAuthorityRulesInvalidException`, a `500` (fault `usage`) listing
+  every problem, and every later call on that `ctx` fails the same way.
+  Check stored rules before saving them with the authority's own
+  `ruleProblems(rules)`, which runs the same check, names included.
+
+  This fails closed, and wide: one bad rule under `role:clerk` fails every
+  call of every clerk, on every entity, the rules' own editors included
+  when their rules are stored too. So keep a way to fix stored rules that
+  doesn't depend on them, such as a maintenance script or an actor whose
+  rules are only fixed ones; and when an entity key or column is renamed or
+  removed, migrate the stored rules that name it in the same release.
+- **Type your rules to catch typos sooner.** Type the rules you write as
+  `AuthorityRuleInterface`, which defaults to the six actions, and a
+  mistyped verb fails to compile. Widen it to add verbs of your own,
+  ``AuthorityRuleInterface<`${ActionEnum}` | 'approve'>``, or narrow it to
+  list only the verbs you allow, such as
   `AuthorityRuleInterface<'read' | 'update', 'order', keyof Order & string>`.
 - **Columns another system owns** are written as above: allow them to that
   system's actor, and deny them to everyone else. Which system is the source
@@ -3465,6 +3490,6 @@ also exported for manual provider wiring.
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
 | `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
-| `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityRulesInterface`, `CaslAuthorityRulesInvalidException`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
+| `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityOptionsInterface`, `CaslAuthorityRulesInterface`, `CaslAuthorityRulesInvalidException`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

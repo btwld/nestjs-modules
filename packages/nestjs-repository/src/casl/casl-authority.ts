@@ -4,6 +4,7 @@ import { permittedFieldsOf } from '@casl/ability/extra';
 import { type PlainLiteralObject } from '@nestjs/common';
 
 import {
+  ActionEnum,
   type Actor,
   type AuthorityDecision,
   type AuthorityInterface,
@@ -13,6 +14,7 @@ import {
 } from '@concepta/nestjs-core';
 
 import { CaslAuthorityRulesInvalidException } from './exceptions/casl-authority-rules-invalid.exception.js';
+import { type CaslAuthorityOptionsInterface } from './interfaces/casl-authority-options.interface.js';
 import { type CaslAuthorityRulesInterface } from './interfaces/casl-authority-rules.interface.js';
 
 type CaslAuthorityAbility = Ability<[string, string]>;
@@ -39,8 +41,14 @@ function gateOf(
  * - A deny always wins, whatever order the rules come in.
  * - A rule naming `fields` covers those columns only, by exact name; one
  *   naming none covers every column.
- * - Rules are checked before use: rules `authorityRuleProblems` finds a
- *   problem with refuse the call, as does every other call on the same ctx.
+ * - Rules are checked before use (`ruleProblems`): rules with a problem
+ *   refuse the call, as does every other call on the same ctx. A rule may
+ *   name only an entity this authority governs, which each repository it
+ *   is attached to tells it at startup with its columns, or a subject in
+ *   `options.subjects`; only one of the six actions a repository asks, or a
+ *   verb in `options.actions`; and only fields that are a column of every
+ *   governed entity the rule names. A misspelled deny would otherwise deny
+ *   nothing.
  * - When every deny that refuses the call is `pending`, the first one's
  *   gate is reported as the refusal's `gate`. A deny naming columns narrows
  *   them instead; when every deny refusing a column is pending, its gate is
@@ -56,7 +64,32 @@ export class CaslAuthority implements AuthorityInterface {
     Map<string, Promise<CaslAuthorityAbility>>
   >();
 
-  constructor(private readonly rules: CaslAuthorityRulesInterface) {}
+  /** The entities it was attached to at startup, with their columns. */
+  private readonly governed = new Map<string, readonly string[]>();
+
+  constructor(
+    private readonly rules: CaslAuthorityRulesInterface,
+    private readonly options: CaslAuthorityOptionsInterface = {},
+  ) {}
+
+  govern(subject: string, columns: readonly string[]): void {
+    this.governed.set(subject, [...columns]);
+  }
+
+  /**
+   * Every problem with `rules` as this authority would find it: those
+   * `authorityRuleProblems` lists, and any subject that is neither an entity
+   * it governs nor one of `subjects`, action that is neither one of the six
+   * nor one of `actions`, or field that isn't a column of each governed
+   * entity a rule names. Check stored rules with it before saving them.
+   */
+  ruleProblems(rules: unknown, source = 'rules'): string[] {
+    return authorityRuleProblems(rules, source, {
+      subjects: [...this.governed.keys(), ...(this.options.subjects ?? [])],
+      actions: [...Object.values(ActionEnum), ...(this.options.actions ?? [])],
+      fields: this.governed,
+    });
+  }
 
   async decide(
     ctx: PlainLiteralObject,
@@ -122,7 +155,7 @@ export class CaslAuthority implements AuthorityInterface {
     actor: Actor,
   ): Promise<CaslAuthorityAbility> {
     const rules = await this.rules.rulesFor(ctx, actor);
-    const problems = authorityRuleProblems(rules, 'rules source');
+    const problems = this.ruleProblems(rules, 'rules source');
     if (problems.length > 0) {
       throw new CaslAuthorityRulesInvalidException(problems);
     }

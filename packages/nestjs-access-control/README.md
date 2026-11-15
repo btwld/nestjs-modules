@@ -226,7 +226,10 @@ AccessControlModule.forRootAsync({
 - **Write your routes' own verbs in the authority's rules too.** A
   repository asks only `create`, `read`, `update`, `delete`, `softDelete`
   and `restore`, but the shared authority is also asked each route's own
-  verbs (such as `approve`) on every resource not in `except`.
+  verbs (such as `approve`) on every resource not in `except`. A
+  `CaslAuthority` refuses rules naming a verb, or a resource that isn't an
+  entity it governs, until you declare it
+  ([Rules with CASL](../nestjs-repository/README.md#rules-with-casl)).
 - **Access control asks about the action only.** Its route checks, `can`
   and `assert` ask with no columns: the action, and also `read` when the
   action isn't `read`, since a write's response shows what a read would. A

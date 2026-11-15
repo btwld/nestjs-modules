@@ -163,6 +163,23 @@ describe('Rules from storage', () => {
       .expect(403);
   });
 
+  // A deny of a misspelled entity would deny nothing.
+  it('a rule naming an entity the authority does not govern is refused before it is saved', async () => {
+    const refused = await request(app.getHttpServer())
+      .post('/rules')
+      .set(as('admin'))
+      .send({
+        actorKey: 'role:clerk',
+        action: 'read',
+        subject: 'documnet',
+        inverted: true,
+      })
+      .expect(400);
+    expect(refused.body.message).toEqual([
+      'body rule 0: subject "documnet" is not a known subject',
+    ]);
+  });
+
   it('only an admin edits the rules', async () => {
     await request(app.getHttpServer())
       .post('/rules')

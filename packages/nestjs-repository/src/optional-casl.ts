@@ -9,4 +9,5 @@
 
 export { CaslAuthority } from './casl/casl-authority.js';
 export { CaslAuthorityRulesInterface } from './casl/interfaces/casl-authority-rules.interface.js';
+export { CaslAuthorityOptionsInterface } from './casl/interfaces/casl-authority-options.interface.js';
 export { CaslAuthorityRulesInvalidException } from './casl/exceptions/casl-authority-rules-invalid.exception.js';

@@ -46,13 +46,23 @@ class RulesFixture implements CaslAuthorityRulesInterface {
   }
 }
 
+/**
+ * An authority governing orders, as a repository it is attached to tells
+ * it, whose rules may also name `invoices`.
+ */
+function governing(rules: CaslAuthorityRulesInterface): CaslAuthority {
+  const authority = new CaslAuthority(rules, { subjects: ['invoices'] });
+  authority.govern(ORDER_TOKEN, COLUMNS);
+  return authority;
+}
+
 function decide(
   rules: Record<string, Rule[]>,
   action: ActionEnum,
   actor: Actor = CLERK,
   ctx: PlainLiteralObject = new AppContextHost(),
 ) {
-  return new CaslAuthority(new RulesFixture(rules)).decide(ctx, {
+  return governing(new RulesFixture(rules)).decide(ctx, {
     actor,
     subject: ORDER_TOKEN,
     action,
@@ -283,7 +293,7 @@ describe(CaslAuthority.name, () => {
       ),
     },
   ])('should refuse every call on the ctx for $name', async ({ rules }) => {
-    const authority = new CaslAuthority(new RulesFixture(rules));
+    const authority = governing(new RulesFixture(rules));
     const ctx = new AppContextHost();
     const request = {
       actor: CLERK,
@@ -325,34 +335,111 @@ describe(CaslAuthority.name, () => {
     expect(calls).toBe(1);
   });
 
-  it('should ignore columns a rule names that the subject lacks', async () => {
-    await expect(
-      decide(
-        {
-          'role:clerk': [
-            {
-              action: 'read',
-              subject: ORDER_TOKEN,
-              fields: ['id', 'salary'],
-            },
-          ],
-        },
-        ActionEnum.READ,
-      ),
-    ).resolves.toEqual({ effect: 'allow', columns: ['id'] });
+  // A misspelled column in a deny would deny nothing.
+  it('should refuse rules naming a column the entity lacks', async () => {
+    const error = await decide(
+      {
+        'role:clerk': [
+          { action: 'read', subject: ORDER_TOKEN },
+          {
+            action: 'read',
+            subject: ORDER_TOKEN,
+            fields: ['id', 'salry'],
+            inverted: true,
+          },
+        ],
+      },
+      ActionEnum.READ,
+    ).catch((e: unknown) => e);
+
+    expect(error).toHaveProperty('context.problems', [
+      `rules source rule 1: field "salry" is not a field of "${ORDER_TOKEN}"`,
+    ]);
   });
 
   it('should match a column by its exact name only', async () => {
-    await expect(
-      decide(
+    const error = await decide(
+      {
+        'role:clerk': [
+          { action: 'read', subject: ORDER_TOKEN, fields: ['date'] },
+        ],
+      },
+      ActionEnum.READ,
+    ).catch((e: unknown) => e);
+
+    expect(error).toHaveProperty('context.problems', [
+      `rules source rule 0: field "date" is not a field of "${ORDER_TOKEN}"`,
+    ]);
+  });
+
+  // One rule may cover several entities with different columns.
+  // On an entity lacking it, a deny of the column would deny nothing there.
+  it('should refuse a column every entity a rule names does not have', () => {
+    const authority = governing(new RulesFixture({}));
+    authority.govern('line', ['id', 'description', 'quantity']);
+
+    expect(
+      authority.ruleProblems([
         {
-          'role:clerk': [
-            { action: 'read', subject: ORDER_TOKEN, fields: ['date'] },
-          ],
+          action: 'read',
+          subject: [ORDER_TOKEN, 'line'],
+          fields: ['description', 'quantity'],
+          inverted: true,
         },
-        ActionEnum.READ,
-      ),
-    ).resolves.toEqual({ effect: 'allow', columns: [] });
+      ]),
+    ).toEqual([
+      `rules rule 0: field "quantity" is not a field of "${ORDER_TOKEN}"`,
+    ]);
+  });
+
+  it('should accept a column every entity a rule names has', () => {
+    const authority = governing(new RulesFixture({}));
+    authority.govern('line', ['id', 'description', 'quantity']);
+
+    expect(
+      authority.ruleProblems([
+        {
+          action: 'read',
+          subject: [ORDER_TOKEN, 'line'],
+          fields: ['description'],
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  // A subject declared, not governed, has no columns to check against.
+  it('should accept any field on a declared subject', () => {
+    expect(
+      governing(new RulesFixture({})).ruleProblems([
+        { action: 'read', subject: 'invoices', fields: ['anything'] },
+      ]),
+    ).toEqual([]);
+  });
+
+  // A declared subject beside it doesn't switch off the entity's check.
+  it('should still check the fields of a governed entity named beside a declared subject', () => {
+    expect(
+      governing(new RulesFixture({})).ruleProblems([
+        {
+          action: 'read',
+          subject: [ORDER_TOKEN, 'invoices'],
+          fields: ['salry'],
+          inverted: true,
+        },
+      ]),
+    ).toEqual([
+      `rules rule 0: field "salry" is not a field of "${ORDER_TOKEN}"`,
+    ]);
+  });
+
+  it('should refuse every subject when it governs and declares none', () => {
+    expect(
+      new CaslAuthority(new RulesFixture({})).ruleProblems([
+        { action: 'read', subject: ORDER_TOKEN },
+      ]),
+    ).toEqual([
+      `rules rule 0: subject "${ORDER_TOKEN}" is not a known subject`,
+    ]);
   });
 
   it('should decide a system by its own rules', async () => {
@@ -369,7 +456,7 @@ describe(CaslAuthority.name, () => {
     const rules = new RulesFixture({
       'role:clerk': [{ action: ['read', 'update'], subject: ORDER_TOKEN }],
     });
-    const authority = new CaslAuthority(rules);
+    const authority = governing(rules);
     const ctx = new AppContextHost();
     const request = { actor: CLERK, subject: ORDER_TOKEN, columns: COLUMNS };
 
@@ -387,7 +474,7 @@ describe(CaslAuthority.name, () => {
     const rules = new RulesFixture({
       'role:admin': [{ action: 'read', subject: ORDER_TOKEN }],
     });
-    const authority = new CaslAuthority(rules);
+    const authority = governing(rules);
     const ctx = new AppContextHost();
     const request = {
       subject: ORDER_TOKEN,
@@ -467,5 +554,75 @@ describe(CaslAuthority.name, () => {
     await expect(
       orders.create({ ...order, id: 'order-2' }, { ctx: actorCtx(CLERK) }),
     ).rejects.toThrow(AuthorityRefusedException);
+    // The repository told the authority which entity it governs.
+    expect(
+      moduleRef
+        .get(CaslAuthority)
+        .ruleProblems([{ action: 'read', subject: ORDER_TOKEN }]),
+    ).toEqual([]);
+  });
+
+  // A misspelled deny would deny nothing, so a name the authority doesn't
+  // know refuses the call, as a rule of the wrong shape does.
+  describe('names a rule may use', () => {
+    const DENY_TYPO: Rule = {
+      action: 'read',
+      subject: 'ordr',
+      inverted: true,
+    };
+
+    it('should refuse rules naming a subject it neither governs nor declares', async () => {
+      const error = await decide(
+        {
+          'role:clerk': [{ action: 'read', subject: ORDER_TOKEN }, DENY_TYPO],
+        },
+        ActionEnum.READ,
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(CaslAuthorityRulesInvalidException);
+      expect(error).toHaveProperty('context.problems', [
+        'rules source rule 1: subject "ordr" is not a known subject',
+      ]);
+    });
+
+    it('should refuse rules naming an action neither of the six nor declared', async () => {
+      const error = await decide(
+        {
+          'role:clerk': [{ action: ['read', 'aprove'], subject: ORDER_TOKEN }],
+        },
+        ActionEnum.READ,
+      ).catch((e: unknown) => e);
+
+      expect(error).toHaveProperty('context.problems', [
+        'rules source rule 0: action "aprove" is not a known action',
+      ]);
+    });
+
+    it('should accept the subjects and actions it is given', async () => {
+      const authority = new CaslAuthority(
+        new RulesFixture({
+          'role:clerk': [
+            { action: ['read', 'approve'], subject: ['report', ORDER_TOKEN] },
+          ],
+        }),
+        { subjects: ['report'], actions: ['approve'] },
+      );
+      authority.govern(ORDER_TOKEN, COLUMNS);
+
+      await expect(
+        authority.decide(new AppContextHost(), {
+          actor: CLERK,
+          subject: 'report',
+          action: 'approve',
+          columns: [],
+        }),
+      ).resolves.toEqual({ effect: 'allow' });
+    });
+
+    it('should list the same problems for rules checked before saving', () => {
+      expect(
+        governing(new RulesFixture({})).ruleProblems([DENY_TYPO], 'body'),
+      ).toEqual(['body rule 0: subject "ordr" is not a known subject']);
+    });
   });
 });

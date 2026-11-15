@@ -150,6 +150,7 @@ export { AuthorityAllowInterface } from './domain/authority/interfaces/authority
 export { AuthorityRefuseInterface } from './domain/authority/interfaces/authority-refuse.interface.js';
 export { AuthorityRuleInterface } from './domain/authority/interfaces/authority-rule.interface.js';
 export { authorityRuleProblems } from './domain/authority/utils/authority-rule-problems.util.js';
+export { AuthorityRuleNamesInterface } from './domain/authority/interfaces/authority-rule-names.interface.js';
 export { authorityGateOf } from './domain/authority/utils/authority-gate-of.util.js';
 export { authorityPendingGates } from './domain/authority/utils/authority-pending-gates.util.js';
 export { AuthorityPendingGateInterface } from './domain/authority/interfaces/authority-pending-gate.interface.js';

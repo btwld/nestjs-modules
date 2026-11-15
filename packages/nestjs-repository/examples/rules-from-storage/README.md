@@ -15,10 +15,11 @@ caller who may not read the rules is still decided by them.
   `POST /rules`; the clerk's next `GET /documents` is allowed. Deleting the
   rule takes it away again. Within one request every check reads the same
   rules, because `CaslAuthority` asks for them once per `ctx`.
-- **A rule is checked before it is saved.** `POST /rules` runs
-  `authorityRuleProblems` on the rule and answers `400` with the problems,
-  so a rule `CaslAuthority` cannot use, such as one with `action: 'manage'`,
-  never reaches the table.
+- **A rule is checked before it is saved.** `POST /rules` runs the
+  authority's `ruleProblems` on the rule and answers `400` with the
+  problems, so a rule `CaslAuthority` cannot use, such as one with
+  `action: 'manage'` or a misspelled `subject: 'documnet'`, never reaches
+  the table.
 - **Some columns only.** A rule with `fields: ['id', 'title']` lets an intern
   list documents without their body.
 - **A deny waiting on a decision.** A deny with `pending` refuses as any
