@@ -23,13 +23,12 @@ type CaslAuthorityAbility = Ability<[string, string]>;
  * - A deny always wins, whatever order the rules come in.
  * - A rule naming `fields` covers those columns only, by exact name; one
  *   naming none covers every column.
- * - Rules are checked before use (`authorityRuleProblems`): one with
- *   `conditions`, an unknown property, or CASL's wildcards `manage` and
- *   `all` refuses the call, as does every other call on the same ctx.
- * - A deny's `reason` is reported as the decision still pending (`gate`)
- *   when the deny refuses the subject outright and every other deny that
- *   applies has one too. A deny naming `fields` narrows the columns instead,
- *   and its `reason` is not reported.
+ * - Rules are checked before use: rules `authorityRuleProblems` finds a
+ *   problem with refuse the call, as does every other call on the same ctx.
+ * - When denies of the whole subject refuse the call and every one of them
+ *   has a `reason`, the first one's is reported as the decision still
+ *   pending (`gate`). A deny naming `fields` narrows the columns instead, and
+ *   its `reason` is not reported; a deny without a reason is final.
  */
 export class CaslAuthority implements AuthorityInterface {
   /**

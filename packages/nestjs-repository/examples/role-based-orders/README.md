@@ -25,7 +25,7 @@ call.
   runs outside any request. It defines `ActorCtx` as the `billing-sync`
   system, so it is decided by that system's rules alone.
 - **Nobody acting.** A request without `X-Roles` carries no actor and is
-  refused.
+  refused, a `403` with refusal `no-actor`.
 
 ## Run it
 

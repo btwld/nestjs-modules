@@ -28,9 +28,11 @@ export interface RepositoryFindOneOptions<
   /**
    * The most a row holds when the read selects nothing: these own columns,
    * less any the caller may not read, which are left out rather than
-   * refused. For a default you choose, such as the columns a route shows,
-   * where `select` is for columns the caller asked for: naming one they may
-   * not read in `select` refuses the read. Ignored when `select` is given.
+   * refused; the read is refused when none is left. For a default you
+   * choose, such as the columns a route shows, where `select` is for columns
+   * the caller asked for: naming one they may not read in `select` refuses
+   * the read. Ignored when `select` is given, except that a name that is no
+   * column refuses the read, for every caller.
    */
   within?: (keyof Entity)[];
   where?: WhereClause;

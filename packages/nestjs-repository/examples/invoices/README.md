@@ -19,9 +19,9 @@ to their lines.
   rows a caller reaches and stamps the tenant on what they create; authority
   decides what they may do. A clerk in another tenant sees none of these
   invoices, whatever their role allows.
-- **A cascade decided first.** The repository opens no transaction, so a
-  cascade's related rows are decided before the invoice is written. A junior
-  creating an invoice with lines is refused, and nothing is stored.
+- **A cascade decided first.** A junior creating an invoice with lines is
+  refused, and nothing is stored. A cascade's related rows are decided
+  before the invoice is written, since the repository opens no transaction.
 - **A joined row without a column.** `?include=customer` joins each
   invoice's customer. The clerk's customers hold no `creditLimit`; the
   collector's do.

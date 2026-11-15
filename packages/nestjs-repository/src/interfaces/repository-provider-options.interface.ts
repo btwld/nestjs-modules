@@ -59,7 +59,7 @@ export interface RepositoryProviderOptions<
    * Row scope declaration for this entity.
    *
    * Either names the resolver that scopes its rows, or records that the
-   * entity is deliberately public along with the reason.
+   * entity is deliberately open along with the reason.
    */
   rowScope?: RowScopeRegistration;
 

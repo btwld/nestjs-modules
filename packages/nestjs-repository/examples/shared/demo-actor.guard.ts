@@ -12,8 +12,10 @@ import { RowScopeCtx } from '@concepta/nestjs-repository';
  * with those roles, and `X-Tenant: acme` puts them in a tenant. A request
  * without `X-Roles` has no actor.
  *
- * Your authentication defines `ActorCtx` from the verified user instead,
- * once and immutably, exactly as this does.
+ * In your application, authentication signs the user in (`AuthUserCtx`)
+ * and access control's `actorResolver`, or a guard of your own, defines
+ * `ActorCtx` from the verified user instead, once and immutably, exactly as
+ * this does.
  */
 @Injectable()
 export class DemoActorGuard implements CanActivate {

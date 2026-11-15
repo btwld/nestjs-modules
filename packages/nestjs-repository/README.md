@@ -109,17 +109,19 @@ Every repository is checked while the application is created: a
 misconfigured entity stops `NestFactory.create()` (or `Test.compile()`) with an
 exception naming it. A second registration that reads the same rows, under
 any key or entity class, fails with `RepositoryDuplicateUrnException`, because
-its row scope, write policy and hooks could otherwise disagree with the first.
+its row scope, authority, write policy and hooks could otherwise disagree
+with the first.
 
-Further options for scoped, append-only or recorded entities:
+Further options for scoped, governed, append-only or recorded entities:
 
 | Option | Description |
 | --- | --- |
 | `entities[].rowScope` | Declares the entity `{ access: 'scoped', resolver }` or `{ access: 'open', reason }` — see [Row Scope](#row-scope) |
+| `entities[].authority` | Declares the entity `{ access: 'governed', authority }` or `{ access: 'open', reason }` (`AuthorityRegistration`) — see [Object Authority](#object-authority) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
 | `options` | The driver's own options, such as per-transaction settings; type-checked against the driver |
-| `imports` | Modules exporting the row scope resolvers your entities declare |
+| `imports` | Modules exporting the row scope resolvers and authorities your entities declare |
 
 ```ts
 RepositoryModule.forRoot({
@@ -204,7 +206,7 @@ interface RepositoryModuleOptionsInterface {
   defaultTimeout?: number; // Transaction timeout in milliseconds (default: 30000)
   requireRowScopeDeclaration?: boolean; // Fail startup on an entity with no rowScope (default: false)
   requireWritePolicyDeclaration?: boolean; // Fail startup on an entity with no writePolicy (default: false)
-  requireAuthorityDeclaration?: boolean; // Fail startup on an entity with no authority (default: false)
+  requireAuthorityDeclaration?: boolean; // Fail startup on an entity with no authority declaration, governed or open (default: false)
   federation?: { maxKeys?: number }; // Bound on federated reads (default: 1000) — see `maxKeys`
 }
 ```
@@ -364,9 +366,9 @@ class MyDriverRepository<Entity extends PlainLiteralObject>
 
 **Override `do*` methods only.** A driver must never override a public
 operation method (`find`, `create`, `update`, …): those are where row scope,
-hooks, and the soft-delete guards are invoked, so an override bypasses all of
-them for every entity that driver serves, silently. Nothing enforces this —
-it is a contract a driver author has to keep.
+authority, hooks, and the soft-delete guards are invoked, so an override
+bypasses all of them for every entity that driver serves, silently. Nothing
+enforces this — it is a contract a driver author has to keep.
 
 Each entry in `metadata.columns` must supply `name`, `isPrimary`,
 `isRemoveDate`, and `isVersion`. Set `isVersion: true` on the
@@ -399,8 +401,8 @@ Your driver's module class is what applications list in `forRoot()`'s
 factories inject singleton-scoped: anything request-scoped is never built at
 startup, and `app.init()` refuses it.
 Construct each repository with its key and the optional `HookResolverService`
-only. Row scope, hooks, write policy and the eager opt-in are not yours to
-pass: `forRoot()` binds them to every repository you return, from the
+only. Row scope, authority, hooks, write policy and the eager opt-in are not
+yours to pass: `forRoot()` binds them to every repository you return, from the
 application's entry, and a repository that was never bound refuses every call
 (`RepositoryUnboundException`). Applications never call `register`. Extend
 `RepositoryProviderOptions` with your driver's own entity options, and
@@ -825,8 +827,9 @@ row is invisible to that tenant's cascade, so your database's foreign key then
 refuses the delete. Check foreign keys in `scopeWrite` to prevent it (see
 [Checks this class cannot make](#checks-this-class-cannot-make)).
 
-A cascade finds the related rows it keeps, updates or deletes by reading them
-as the caller, so a caller whose reads are
+A cascade finds the related rows it keeps, updates or deletes under the
+caller's row scope; authority is not asked for those reads (see
+[What is not decided](#what-is-not-decided)). So a caller whose reads are
 [relaxed](#reading-more-broadly-than-you-write) reaches rows they may not
 write. A tenant admin deleting a project that holds a colleague's drafts is
 refused with a `404` rather than leaving those drafts behind.
@@ -864,15 +867,25 @@ A read reaches another table only through a relation it names in `join`:
 | --- | --- |
 | an own column in `select`, `where` or `order` | passed to the driver |
 | a relation in `join`, a `Where.rel()` filter on a joined relation, and a relation sort on a joined to-one relation | passed to the driver |
-| a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`) |
+| a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`); on a governed entity, for an actor limited to some columns, with `AuthorityRefusedException` (`403`), as for a hidden column |
 | a relation that is not declared | refused (`400`) |
 | a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable`, this one holds the caller to every scope column the other does, and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
 | a `Where.rel()` filter or relation sort on a relation missing from `join` | refused (`400`); add it to `join` |
 | a `Where.rel()` filter or relation sort on a field that is not a column of the related entity | refused with `UnknownColumnException` (`400`) |
 | a relation sort on a to-many relation | refused (`400`); a row holds many related rows, so there is no one value to sort it by |
 | a sort direction other than `ASC` or `DESC` | refused (`400`) |
+| own columns in `within`, with no `select` | each row holds only those columns |
+| `within` with a `select` that names columns | `select` wins; `within` is ignored |
+| a non-column in `within` | refused with `UnknownColumnException` (`400`) |
+| `within: []` | refused: `403` for an actor limited to some columns, otherwise `RepositoryQueryException`, a usage error (`500`) |
 
 A read may sort by an own column it doesn't select.
+
+Pass `within` to choose the columns a read returns when it selects nothing,
+on any entity: a default, such as the columns one endpoint shows. On an
+entity an authority governs, the read also leaves out the columns the caller
+may not read, and a `within` naming only those is refused (`403`); see
+[What is decided](#what-is-decided).
 
 ```ts
 // Refused: `orders` is a relation, not a column.
@@ -918,6 +931,11 @@ joined relation is attached whether or not its key columns are selected,
 except a federated one (see [What is refused](#what-is-refused)). A to-one
 relation with no related row holds `null`, and a to-many one holds `[]`.
 
+Where an authority governs the entity, a result holds only the columns the
+caller may read: a read returns, and a joined relation holds, only those,
+and a write's result keeps those plus the primary key (see
+[What is decided](#what-is-decided)).
+
 An entity whose relations load on their own, eagerly, opts in with
 `allowEagerRelations`:
 
@@ -937,9 +955,11 @@ RepositoryModule.forRoot({
 Its rows may then also hold any declared relation, holding that relation's own
 columns, as a join would. A relation loaded inside it, or anything that is not
 a column or a declared relation, still throws. An entity with a relation into
-rows that have a row scope cannot opt in, nor can one with a
+rows that have a row scope cannot opt in, nor can one with a relation into
+rows (or through a junction) an authority governs, nor one with a
 [federated](#federation) relation: startup refuses it (see
-[Relations and row scope](#relations-and-row-scope)).
+[Relations and row scope](#relations-and-row-scope) and
+[Authority startup checks](#authority-startup-checks)).
 
 ## Where Clause Builder
 
@@ -1657,9 +1677,9 @@ sections.
 ```ts
 import { Injectable } from '@nestjs/common';
 import {
+  ActorCtx,
   type AppContextInterface,
   type DeepPartial,
-  OverlayRef,
 } from '@concepta/nestjs-core';
 import {
   RepoHook,
@@ -1668,13 +1688,6 @@ import {
   type RepositoryFindOptions,
   Where,
 } from '@concepta/nestjs-repository';
-
-// Typed token for the signed-in user — attached to the request context by a
-// ContextOverlayInterceptor registered as an APP_INTERCEPTOR (see nestjs-core's
-// Context System docs for the interceptor that populates this).
-export const ActorCtx = new OverlayRef<'withActor', { userId: string }>(
-  'withActor',
-);
 
 @RepoHook()
 @Injectable()
@@ -1701,13 +1714,20 @@ export class OrderDefaultsHook {
     data: DeepPartial<OrderEntity>,
     ctx: AppContextInterface,
   ): Promise<DeepPartial<OrderEntity>> {
-    // `require()` throws when the overlay is absent.
+    // `require()` throws when the call carries no actor (see The actor).
     const actor = ctx.require(ActorCtx).withActor();
+    // null: a system, a job or a seeder
+    const createdBy = actor.kind === 'role' ? (actor.userId ?? null) : null;
 
-    return { ...data, createdBy: actor.userId };
+    return { ...data, createdBy };
   }
 }
 ```
+
+On an entity an authority governs, the columns these hooks add (`archived`,
+`createdBy`) are decided as the caller's: the actor needs read on `archived`
+and create on `createdBy`, or the call is refused (see
+[What is decided](#what-is-decided)).
 
 **Don't isolate tenants with hooks.** A hook runs only on the operations it
 decorates, so a read filter and a create stamp leave `update`, `replace`,
@@ -2459,11 +2479,10 @@ See its [adapter sections](../nestjs-repository-typeorm/README.md#choose-your-ad
 
 Object authority decides what a caller may *do* with an entity: which of
 create, read, update, delete, soft delete and restore, and on which columns.
-Row scope decides which
-rows; authority decides which actions and which columns, so the two combine.
-Like row scope, it holds for every repository call, not only for calls that
-come through a controller: a queue consumer, a job or another module's service
-is decided the same way.
+Row scope decides which rows; authority decides which actions and which
+columns, so the two combine. Like row scope, it holds for every repository
+call, not only for calls that come through a controller: a queue consumer, a
+job or another module's service is decided the same way.
 
 Runnable [examples](./examples) show it end to end: roles and a system over
 one entity, rules an admin edits at runtime, and invoices combining
@@ -2496,40 +2515,56 @@ RepositoryModule.forRoot({
 });
 ```
 
-`authority` is a provider, resolved from `forRoot({ imports })` like a row
-scope resolver. `open` requires a reason because it is a decision someone has
-to defend later. Undeclared is allowed unless the deployment sets
-`requireAuthorityDeclaration`.
+`authority` is a provider: export it from a module in `forRoot({ imports })`,
+as you would a row scope resolver. `open` requires a reason because it is a
+decision someone has to defend later. Undeclared is allowed unless the
+deployment sets `requireAuthorityDeclaration`.
 
 ### The actor
 
 An authority decides for an actor: a person acting through their roles, or a
-system acting on its own authority. Whatever established the caller defines
-it once on the call's `ctx`, immutably: on HTTP, access control's
-`actorResolver` turning the signed-in user into an actor, or a guard of your
-own; elsewhere, a queue consumer or a scheduled job. Authentication alone
-signs the user in but defines no actor:
+system acting on its own authority, such as an integration or a scheduled
+job. Define the actor once per call on its `ctx`, immutably, with
+`frozenActor`. On HTTP, the `actorResolver` you give access control defines
+it from the signed-in user; access control has no default, so without a
+resolver nobody is acting unless something else defines `ActorCtx`. A
+guard of yours can define it first, such as an API-key guard for an
+integration: a call carrying `ActorCtx` uses it. With the global JWT guard,
+a caller without a token is refused (401) by that guard, whatever order it
+runs in relative to yours: mark the routes your guard serves
+`@AuthPublic({ optional: true })`, or turn the global guard off
+(`appGuard: false`). Access control's `AccessContextOverlay` attaches on
+HTTP only; elsewhere its `actorResolver` is still asked, with no request to
+read. On RPC, define `ActorCtx` in a guard that runs before a grant's guard
+(an overlay is too late: guards run before interceptors); in a queue
+consumer or job, on the context it opens. Authentication alone signs the
+user in but defines no actor:
 
 ```ts
-import { ActorCtx } from '@concepta/nestjs-core';
+import { ActorCtx, frozenActor } from '@concepta/nestjs-core';
 
 ctx.defineOverlay(
   ActorCtx,
-  { kind: 'role', roles: ['clerk'], userId: user.id },
+  frozenActor({ kind: 'role', roles: ['clerk'], userId: user.id }),
   { immutable: true },
 );
 
 // A job acting as itself, never as the account it runs under
 ctx.defineOverlay(
   ActorCtx,
-  { kind: 'system', name: 'billing-sync' },
+  frozenActor({ kind: 'system', name: 'billing-sync' }),
   { immutable: true },
 );
 ```
 
-A governed entity refuses a call whose `ctx` carries no actor. The actor is
-read from the `ctx` the call arrived with, before hooks run, so a hook that
-hands on another `ctx` cannot change who is decided.
+An immutable overlay freezes the actor's top level only; `frozenActor`
+freezes its `roles` too, so define the actor with both.
+
+A governed entity refuses a call whose `ctx` carries no actor, a `403` with
+refusal `no-actor`; on HTTP, access control leaves the actor undefined when
+its resolver finds none. A hook cannot
+change who is decided: the actor is read from the `ctx` the call arrived
+with, before hooks run, even if a hook hands on another `ctx`.
 
 ### Rules with CASL
 
@@ -2583,54 +2618,71 @@ class OrderRules implements CaslAuthorityRulesInterface {
 export class AuthorityModule {}
 ```
 
-- **`subject`** is the entity's `forRoot()` key; **`action`** is `create`,
-  `read`, `update`, `delete`, `softDelete` or `restore`.
+- **`subject`** is the entity's `forRoot()` key; **`action`** is what the
+  repository asks: only `create`, `read`, `update`, `delete`, `softDelete`
+  and `restore`. An authority shared with access control is also asked each
+  route's own verbs (such as `approve`) on every resource not in its
+  `except`, so write those in its rules too; see
+  [Sharing Rules with the Repository](../nestjs-access-control/README.md#sharing-rules-with-the-repository).
 - **`fields`** limits a rule to those columns, by exact name. A rule naming no
   fields covers every column.
 - **A deny (`inverted`) always wins**, whatever order the rules come in, and
   whichever of an actor's roles it belongs to.
-- **A deny's `reason`** is reported as a decision still pending — say, a
-  permission nobody has approved yet — in the refusal's context, for logs.
-  Only a deny of the whole entity reports one, and only when every deny that
-  applies has a reason: a deny without one is final.
-- **Rules are checked before use.** A rule with `conditions` (which rows a
-  caller reaches is row scope's to decide), an unknown property, a field
-  pattern, or CASL's wildcards `manage` and `all` refuses the call with
-  `CaslAuthorityRulesInvalidException`, listing every problem.
-  `authorityRuleProblems` from `@concepta/nestjs-core` runs the same check,
-  for an admin screen to call before saving rules.
-- **Type your rules to catch typos.** `rulesFor` takes rules of any verb.
-  Type the rules you write as `AuthorityRuleInterface`, which accepts only
-  the actions above, and a typo fails to compile; narrow the rest too, such
-  as `AuthorityRuleInterface<'read' | 'update', 'order', keyof Order & string>`.
+- **A deny's `reason`** marks a decision still pending, such as a
+  permission nobody has approved yet. When denies of the whole entity refuse
+  a call and every one of them has a `reason`, the first one's reason is
+  reported as the refusal's `gate`, for logs. A deny naming `fields`, or any
+  deny without a reason, reports none: a deny without one is final.
+- **Rules are checked before use.** Rules are refused as
+  `authorityRuleProblems` lists them (see core's
+  [Actor and Authority](../nestjs-core/README.md#actor-and-authority)): the
+  call fails with `CaslAuthorityRulesInvalidException`, a `500` (fault
+  `usage`) listing every problem, and every later call on that `ctx` fails
+  the same way. Check stored rules before saving them with
+  `authorityRuleProblems` from `@concepta/nestjs-core`, which runs the same
+  check.
+- **Type your rules to catch typos.** `rulesFor` may return rules of any verb.
+  Type the rules you write as `AuthorityRuleInterface`, which defaults to the
+  six actions, and a mistyped verb fails to compile. Widen it to add verbs of
+  your own, ``AuthorityRuleInterface<`${ActionEnum}` | 'approve'>``, or narrow
+  it to list only the verbs you allow, such as
+  `AuthorityRuleInterface<'read' | 'update', 'order', keyof Order & string>`.
 - `actorKeys` keys a person by each role (`role:<name>`) and a system by its
   name (`system:<name>`). Rules for one person alone are yours to look up, for
   example by `actor.userId`.
 - Rules are asked for once per `ctx`, so every check in one call reads the
   same rules even when they are stored and edited at runtime. `rulesFor`
-  returns the rules or a promise of them, as access control's grants
-  provider does; the difference is when each is asked: this authority asks
-  once per `ctx`, while access control's grants provider is asked on every
-  check.
+  returns the rules or a promise of them; see access control's
+  [Sharing Rules with the Repository](../nestjs-access-control/README.md#sharing-rules-with-the-repository)
+  to hand routes the same authority.
 
 Access control's route grants are written in the same shape. They name your
 API, not your storage: a grant's `subject` is a route's resource and its
 `fields` are paths in request and response bodies, which a mapper may rename.
-The exception is a generated CRUD route's query (`filter`, `sort`), which
-reaches this repository unchanged and so names columns. Data rules belong
+The exception is a generated CRUD route's query fields (`select`, `filter`,
+`or`, `sort` and `s`), which reach this repository unchanged and so name
+stored columns. Data rules belong
 here, written once; see access control's README for how the two combine.
 
 Any other engine plugs in the same way: implement `AuthorityInterface` from
 `@concepta/nestjs-core`. Its `decide(ctx, request)` is given the actor, the
-entity's key (`subject`), the action and every column of the entity, and
-answers `{ effect: 'allow' }`, `{ effect: 'allow', columns }` to allow only
-some columns, or `{ effect: 'refuse', gate? }`.
+entity's key (`subject`), the action and `columns`, every column of the
+entity when the repository asks, and answers `{ effect: 'allow' }`,
+`{ effect: 'allow', columns }` to allow only some columns, or
+`{ effect: 'refuse', gate? }`. Shared with access control, it is also asked
+by access control's checks (route checks, `can` and `assert`) with no
+columns: the action, and also `read` when the action isn't `read`, since a
+write's response shows what a read would; answer those by the action. If
+your rules
+change at runtime, answer every check on one `ctx` from one snapshot: one
+call may ask `decide` several times, once per action it takes plus a `read`
+for what a write returns.
 
 ### What is decided
 
-Each operation is decided at its entry, before hooks run and before the
-repository reads anything for itself, so a refusal never depends on what is
-stored: a refused caller's create naming a taken key, or delete of a missing
+A refusal never depends on what is stored. Each operation is decided at its
+entry, before hooks run and before the repository reads anything for
+itself: a refused caller's create naming a taken key, or delete of a missing
 row, is a `403`, never a `409` or `404` that would tell them the row exists.
 
 | Operation | Action |
@@ -2646,33 +2698,64 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
 **Columns:**
 
 - **Reads.** A read that selects, filters or sorts on a column the actor may
-  not read is refused. A column that doesn't exist is refused with the same
-  `403` for an actor limited to some columns, so the refusal never tells
-  them which hidden columns there are. A read selecting
-  nothing returns only the columns the actor may read. An actor who may read
-  no column at all is refused.
+  not read is refused. For an actor limited to some columns, a repository
+  call naming a column that doesn't exist in `select`, `where` or `order` is
+  refused with the same `403` as a hidden one, so the refusal never tells
+  them which hidden columns there are. A `within` naming a column that
+  doesn't exist is a `400` for every actor, since the list is the
+  developer's own. On a generated CRUD route, a `?select=`, `?filter=`,
+  `?or=`, `?sort=` or `?s=` naming no column is a `400` before the
+  repository decides, since the route's OpenAPI document makes its column
+  names public, and so is a route default filter or sort naming none. Under
+  an access-control grant limited to some fields, `AccessControlCrudPolicy`
+  runs first, so an unknown `filter`, `or`, `sort` or `s` field there is a
+  `403` with refusal `field`. A read selecting nothing returns only the
+  columns the actor may read. An actor who may read no column at all is
+  refused. A column a hook adds to the query is decided as the caller's,
+  such as the `archived` filter in [Defining a Hook](#defining-a-hook); only
+  the columns row scope adds are not.
 - **A default of your own.** `select` is for columns the caller asked for.
   To shape what a read returns by default, such as the columns one endpoint
   shows, pass `within` instead: the read returns those columns less any the
-  actor may not read, without refusing.
+  actor may not read, without refusing, and is refused when that leaves
+  none (see [What a read may name](#what-a-read-may-name)).
 
   ```ts
   // An actor who may not read `notes` gets id and total.
   orders.find({ within: ['id', 'total', 'notes'], ctx });
   ```
 
-  Generated CRUD routes pass their columns this way, so one actor's hidden
-  column never fails another's list. A hook sees the default in `within`;
-  narrow it there. `RepositoryAdapter` applies `within`, so a repository of
-  your own that doesn't extend it must too.
+  A generated CRUD List or Read without `?select=` passes the route's
+  columns this way, so one actor's hidden column never fails another's
+  read, while a `?select=` naming a hidden column is refused (`403`). A
+  CRUD write's pre-read selects nothing, so it holds the columns the actor
+  may read (see Write results below). A hook sees the default in
+  `within`; narrow it there. Only a `RepositoryInterface` implementation
+  outside `forRoot()`, such as a test double, has to honour `within` itself.
 - **Writes.** Every column a write sets must be writable; the primary key is
   not checked, since it names the row. A `replace` erases what it leaves out,
-  so it needs every column writable. Columns row scope stamps (a tenant id)
-  are not counted against the actor. A write that sets the delete date soft
-  deletes the row, so it also needs `softDelete`.
+  so it needs every column writable, scope columns and the delete date
+  included. A column a hook stamps is decided as the caller's, such as
+  `createdBy` in [Defining a Hook](#defining-a-hook); on any other write,
+  only the columns row scope stamps (a tenant id) are not counted against
+  the actor.
+  A write that sets the delete date soft deletes the row, so it also needs
+  `softDelete`.
 - **Write results** hold the columns the actor may read, and the primary key.
-  A write needs no read permission of its own: an actor who may only create
-  gets back the new row's key.
+  A direct repository write needs no read permission of its own: an actor
+  who may only create gets back the new row's key. Generated CRUD routes
+  differ: on a governed entity, Update, Replace, Delete, SoftDelete and
+  Restore first read the row as the caller, and that read holds only the
+  columns the caller may read. So the caller also needs `read` on the
+  entity and on every column the lookup names: the route's params, any
+  default filter, and the request's `filter`, `or` and `s`. They need
+  `read` on the version column too (for Update and Replace, and any write
+  sent with `If-Match`) and on the delete date (for Update, Replace and
+  SoftDelete), or the write fails with a `500`. Only Create and CreateBatch
+  write without reading. Create, CreateBatch, Update and Replace write the
+  route's params into the row, so those are columns the write sets and must
+  be writable; on all but Replace, a scope column row scope stamps itself is
+  not counted.
 
 **Relations:**
 
@@ -2681,52 +2764,75 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   rows hold only the columns the actor may read of them, and a filter or sort
   on any other is refused. A federated relation is read through its own
   repository, which decides it there.
-- **Cascades** are decided before the parent is written, since the
-  repository opens no transaction: a create needs create on each related
-  entity it writes; an update needs update and create (and delete, for a
-  to-one set to `null`); a `replace` or `upsert` also needs delete. A delete,
-  soft delete or restore finds every related row first, then decides the same
-  action on each related entity it touches before writing any. Each related
-  row's columns, and its own related rows, are checked before the parent is
-  written too: a new row (one without a primary key, in a to-many relation)
-  against create; any other against create and update, and on a `replace` or
-  `upsert` against update on every column, since it may replace a stored row
-  whole.
-  The foreign key a cascade links a related row by is not counted against
-  the actor.
+- **Cascades** need, on each related entity, every action their write could
+  take, all decided before the parent is written, since the repository opens
+  no transaction:
+
+  | Parent write | Actions on each related entity |
+  | --- | --- |
+  | `create`, `createMany` | create |
+  | `update` | update and create; also delete, for a to-one set to `null` |
+  | `replace`, `upsert` | update, create and delete |
+  | `delete`, `deleteMany` | delete |
+  | `softDelete` | softDelete |
+  | `restore` | restore |
+
+  A delete, soft delete or restore is decided when it starts, on every
+  entity its cascades reach, however deep, whether or not any has rows, so
+  a refusal never depends on what is stored; only then are the related rows
+  found, all of them before any is written. Each related row's columns,
+  and its own related rows, are checked before the parent is written too.
+  A new row (one without a primary key, in a to-many relation) is checked
+  against create. Any other is
+  checked against create and update, and on a `replace` or `upsert` against
+  update on every column, since it may replace a stored row whole. The
+  foreign key a cascade links a related row by is not counted against the
+  actor.
 
 ### What is not decided
 
-The repository's own calls: the activity record of a write already decided,
-the read `RowScopeBase` makes to check a row is the caller's before writing
-it, and a cascade's reads finding the related rows to write. They are marked
-inside the package, for the one repository they call, and nothing outside it
-can mark a call. Everything else is decided as its caller — hooks calling
-other repositories, even with the options object they were handed, and
-cascade writes, included.
+Only the repository's own calls skip authority: the activity record of a
+write already decided, the read `RowScopeBase` makes to check a row is the
+caller's before writing it, and a cascade's reads finding the related rows
+to write. You cannot make a call skip authority. Everything else is decided
+as its caller, including cascade writes and hooks calling other
+repositories, even with the options object they were handed.
 
-As with row scope, an ORM's own repository used directly, or SQL that
+As with row scope, the driver's own client used directly, or SQL that
 bypasses the repository, is outside it.
 
 ### Refusals
 
 `AuthorityRefusedException` is a `403`. Its message names only the action and
-the entity's key (`Not allowed to read order`). Its `context`, for logs and
-never in the response, holds the `entityKey` and `action`, why it was refused
-(`refusal`: `no-actor` when the call names no actor, `authority` otherwise),
-who asked (`actor`, as the authority was asked about them), and the columns
-refused and any pending decision (`gate`).
+the entity's key (`Not allowed to read order`). Its `context` is for logs
+and never in the response, whose body holds only `statusCode`, `message`,
+`errorCode` and `error` (the status text). The `context` is
+`AuthorityRefusedDetailsInterface`, plus the `entityKey` and `action`.
+
+| `context` key | Holds |
+| --- | --- |
+| `refusal` | Why it was refused: `no-actor` when the call names no actor, `authority` otherwise |
+| `actor` | Who asked, as the authority was asked about them |
+| `columns` | The columns refused |
+| `gate` | Any pending decision |
+
+A filter or sort on a joined relation's column the actor may not read is
+refused under the read entity's `entityKey`, with `columns` naming each as
+`relation.column`.
 
 ### Authority startup checks
 
 - an authority must be singleton-scoped, and so must everything it depends
   on, checked the same way as row scope resolvers;
 - no entity that sets `allowEagerRelations` has a relation into governed
-  rows, which an eager relation would read undecided;
-- with `requireAuthorityDeclaration`, every entity carries a declaration.
+  rows or through a governed junction, which an eager relation would read
+  undecided;
+- with `requireAuthorityDeclaration`, every entity carries an `authority`
+  declaration (governed or open).
 
-A governed entity whose authority never arrived refuses every call
-(`AuthorityUnboundException`) rather than run undecided.
+A governed entity used before its authority is attached, such as from
+another provider's constructor during startup, refuses every call with
+`AuthorityUnboundException` rather than run undecided.
 
 ## Write Policy
 
@@ -3312,7 +3418,7 @@ also exported for manual provider wiring.
 | `PrimaryKeyImmutableException` | An `update` or `replace` was given data that changes the primary key of the row it names (400). Delete and create to move a record to a new key |
 | `RelationWriteException` | A write payload carried a relation not marked `cascade: true`. An owning relation is written through its foreign key column; any other through the related entity's own repository — see [Writing relations](#writing-relations) |
 | `CascadeWriteException` | A cascade relation in a write payload held something other than its rows: a list of objects for a to-many relation, an object or `null` for a to-one — see [Cascading writes](#cascading-writes) |
-| `UnknownColumnException` | A write payload, or a read's `select`, `where` or `order`, named a property that is not a column of the entity; the message lists them — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
+| `UnknownColumnException` | A write payload, or a read's `select`, `within`, `where` or `order`, named a property that is not a column of the entity; the message lists them (for an actor an authority limits to some columns, a `select`, `where` or `order` gets `AuthorityRefusedException` instead) — see [Writing relations](#writing-relations) and [What a read may name](#what-a-read-may-name) |
 | `InvalidColumnValueException` | A write payload carried a function in place of a column value, or an object in a primary or foreign key column; the message lists the columns |
 | `TransactionTimeoutException` | Transaction exceeded timeout duration |
 | `TransactionClosedException` | A settled scope was used again — `getOrStart`, `enter`, `onCommit`, or `onRollback` after close |
@@ -3330,6 +3436,7 @@ also exported for manual provider wiring.
 | `AuthorityRefusedException` | The authority governing an entity refused the caller's action or a column it names, or the call carried no actor (403). The message names the action and entity key only; `context.refusal`, `context.actor`, `context.columns` and `context.gate` are for logs — see [Refusals](#refusals) |
 | `AuthorityUnboundException` | A governed entity was asked to serve an operation before its authority was attached — used from another provider's constructor during startup. It refuses rather than running undecided |
 | `AuthorityBootException` | One or more authority checks failed at startup; the message lists every failure — see [Authority startup checks](#authority-startup-checks) |
+| `CaslAuthorityRulesInvalidException` | From `optional/casl`: the rules `rulesFor` returned for an actor cannot be used (500, fault `usage`); the message lists every problem, and every later call on the same `ctx` fails too — see [Rules with CASL](#rules-with-casl) |
 | `AppendOnlyViolationException` | An operation would have changed a stored row on an entity declared append-only. Append a correcting record instead |
 | `WritePolicyBootException` | One or more structural write-policy checks failed at startup; the message lists every failure |
 | `ActivityWriteException` | A write's activity record couldn't be stored. A refusal by the store, such as its row scope, keeps its status (a `403` stays a `403`); anything else is a `500`. Without a transaction, the write itself is already stored — see [Transactions](#transactions) |

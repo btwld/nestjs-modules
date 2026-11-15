@@ -250,6 +250,7 @@ interface TypeOrmProviderOptionsInterface<Entity extends PlainLiteralObject>
   factory?: (dataSource: DataSource) => Repository<Entity>; // Custom repository factory
   relations?: Record<string, RelationConfig>;              // Per-relation settings (cascade, …)
   rowScope?: RowScopeRegistration;                         // Declarations, bound by forRoot()
+  authority?: AuthorityRegistration;
   writePolicy?: WritePolicyRegistration;
   activity?: ActivityRegistration;
   allowEagerRelations?: boolean;
@@ -265,9 +266,11 @@ interface TypeOrmProviderOptionsInterface<Entity extends PlainLiteralObject>
   `DataSource`, returns `Repository<Entity>`. Calls outside a run use it;
   inside a run they use the transaction's own repository for the entity, so
   what your custom repository changes doesn't apply there
-- **`relations`**, **`rowScope`**, **`writePolicy`**, **`activity`**,
-  **`allowEagerRelations`**, **`hooks`** -- the entity's declarations, read
-  by `RepositoryModule.forRoot()`; the driver ignores them
+- **`relations`**, **`rowScope`**, **`authority`**, **`writePolicy`**,
+  **`activity`**, **`allowEagerRelations`**, **`hooks`** -- the entity's
+  declarations, read by `RepositoryModule.forRoot()`. The driver reads only
+  `allowEagerRelations`, to decide whether to load eager relations (see
+  [Eager Relations](#eager-relations))
 
 A federated relation into an entity on another data source still needs that
 entity in its own data source's `entities`, since TypeORM resolves a relation
@@ -374,7 +377,8 @@ joined.
 ### TypeORM Features at Your Own Risk
 
 TypeORM behaviour you declare on an entity runs outside the repository's
-guarantees: row scope, write policy and hooks never see what it does.
+guarantees: row scope, authority, write policy and hooks never see what it
+does.
 
 - **Entity listeners and subscribers** (`@BeforeInsert`, `@AfterLoad`,
   `EntitySubscriberInterface`, …) run on every write and on every read that
@@ -402,10 +406,13 @@ guarantees: row scope, write policy and hooks never see what it does.
   dropped from a create or update without an error. An `update` or `replace`
   whose `data` names nothing else fails with `RepositoryQueryException`, since
   TypeORM is left with nothing to set.
-- **`@Column({ select: false })`** leaves the column out of a read only when
-  the read selects nothing; a read that names its columns gets it. Whether it
-  does depends on the read, so it hides nothing: to keep a column from
-  callers, deny it in the entity's authority or exclude it from the route.
+- **`@Column({ select: false })`** does not keep a column from callers. To
+  do that, deny the column in the entity's authority or exclude it from the
+  route. The option leaves the column out only when a read selects nothing;
+  a read that names its columns gets it. A generated CRUD list or read
+  names columns when the route limits them or the client sends `?select=`,
+  and so does any read by an actor the entity's authority limits to some
+  columns.
 - **A column `transformer`** runs on the values `eq`, `in` and the range
   operators compare, but not on a text operator's pattern: `contains`,
   `starts` and `ends` match the value as stored.
