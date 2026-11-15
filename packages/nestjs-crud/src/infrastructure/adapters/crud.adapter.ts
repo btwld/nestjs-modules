@@ -10,6 +10,7 @@ import {
   type EntityColumn,
   isWhereCondition,
   isWhereNever,
+  type OrderSortKey,
   type RepositoryFindOneOptions,
   type RepositoryFindOptions,
   type RepositoryInterface,
@@ -239,6 +240,27 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     return Array.from(uniqueFields);
   }
 
+  /**
+   * The columns a read holds, for List and Read alike.
+   *
+   * The columns the caller asked for are a select, refused when they name
+   * one the caller may not read. Without any, the route's columns are only
+   * the most each row holds: the repository leaves out what the caller may
+   * not read rather than refusing the read.
+   */
+  protected getReadColumns(
+    context: CrudContextInterface<Entity>,
+  ): Pick<RepositoryFindOneOptions<Entity>, 'select' | 'within'> {
+    const { query, options } = context;
+    const columns = this.getSelectFields(query, options.query ?? {});
+    const asked = Boolean(query.fields?.length);
+
+    return {
+      select: asked && columns.length > 0 ? columns : undefined,
+      within: !asked && columns.length > 0 ? columns : undefined,
+    };
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Entity preparation
   // ═══════════════════════════════════════════════════════════════════════════
@@ -430,24 +452,27 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
    * @param context - The CRUD context interface.
    */
   async read(context: CrudContextInterface<Entity>): Promise<Entity> {
-    return this.getOneOrFail(context, { join: true });
+    return this.getOneOrFail(context, { join: true, narrow: true });
   }
 
   /**
    * The one row the request names.
    *
-   * Joins the route's relations only for a read: a write names its row by its
-   * own columns, and the repository refuses a stored row carrying relations.
+   * Joins the route's relations and narrows to the columns asked for only for
+   * a read: a write names its row by its own columns, all of them, and the
+   * repository refuses a stored row carrying relations.
    */
   protected async getOneOrFail(
     context: CrudContextInterface<Entity>,
-    { withDeleted = false, join = false } = {},
+    { withDeleted = false, join = false, narrow = false } = {},
   ): Promise<Entity> {
     const { query } = context;
 
     // Build and validate where clause from all filter sources
     const where = this.buildWhere(context);
     this.validateWhereFields(where);
+
+    const columns = narrow ? this.getReadColumns(context) : {};
 
     // Handle soft-delete query inclusion
     // includeDeleted=1 query param enables fetching soft-deleted entities
@@ -458,6 +483,7 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
       ctx: context,
       where,
       join: join ? context.options?.query?.join : undefined,
+      ...columns,
       withDeleted: includeDeleted || undefined,
     };
 
@@ -490,16 +516,12 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
     const where = this.buildWhere(context);
     this.validateWhereFields(where);
 
-    // The columns the caller asked for are a select, refused when they name
-    // one the caller may not read. Without any, the route's columns are only
-    // the most each row holds: the repository leaves out what the caller may
-    // not read rather than refusing the list.
-    const columns = this.getSelectFields(query, queryOptions);
-    const asked = Boolean(query.fields?.length);
+    const columns = this.getReadColumns(context);
 
-    // Build order clause
+    // Build and validate order clause
     const order =
       query.sort.length > 0 ? query.sort : (queryOptions.sort ?? []);
+    this.validateSortFields(order);
 
     // Calculate pagination
     const take = this.getTake(query, queryOptions);
@@ -514,8 +536,7 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
       ctx: context,
       where,
       join: context.options?.query?.join,
-      select: asked && columns.length > 0 ? columns : undefined,
-      within: !asked && columns.length > 0 ? columns : undefined,
+      ...columns,
       order: order.length > 0 ? order : undefined,
       take: take || undefined,
       skip: skip || undefined,
@@ -610,6 +631,23 @@ export class CrudAdapter<Entity extends PlainLiteralObject> {
       for (const child of clause.conditions) {
         this.validateWhereFields(child);
       }
+    }
+  }
+
+  /**
+   * Validate each sort key's field against entity columns.
+   * Throws BadRequestException for any invalid field.
+   */
+  protected validateSortFields(order: OrderSortKey<Entity>[]): void {
+    const unknown = order.find(
+      // A relation-tagged key sorts by a joined entity's column
+      (key) => !key.relation && !this.isEntityColumn(key.field),
+    );
+
+    if (unknown !== undefined) {
+      throw new BadRequestException(
+        `Invalid sort field '${sanitizeForMessage(unknown.field)}' for entity '${this.entityName()}'`,
+      );
     }
   }
 }

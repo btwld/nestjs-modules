@@ -414,16 +414,18 @@ describe('Attack round: one application, every layer', () => {
       },
     );
 
-    it('a sort or select naming the notes on a read shows nothing more', async () => {
-      for (const query of [
-        'sort=internalNotes,ASC',
-        'select=id,internalNotes',
-      ]) {
-        await http()
-          .get(`/invoices/${acmeId}?${query}`)
-          .set(as('alice'))
-          .expect(200, clerkView());
-      }
+    it('a sort naming the notes on a read shows nothing more', async () => {
+      await http()
+        .get(`/invoices/${acmeId}?sort=internalNotes,ASC`)
+        .set(as('alice'))
+        .expect(200, clerkView());
+    });
+
+    it('a clerk may not select the notes on a read, as on a list', async () => {
+      await http()
+        .get(`/invoices/${acmeId}?select=id,internalNotes`)
+        .set(as('alice'))
+        .expect(403);
     });
 
     it('a manager may filter on the notes', async () => {

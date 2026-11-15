@@ -82,7 +82,7 @@ describe('optimistic locking (If-Match / ETag)', () => {
 
       const response = await request(server)
         .get(`/versioned/${created.id}?select=id`)
-        .expect(200);
+        .expect(200, { id: created.id });
 
       expect(response.headers.etag).not.toMatch(STRONG_VERSION_TAG);
     });

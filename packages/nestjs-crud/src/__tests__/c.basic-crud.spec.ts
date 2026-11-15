@@ -362,7 +362,21 @@ describe('#crud-typeorm', () => {
         return this.crudResolver.list(context);
       }
 
-      @CrudRead({ query: CompanyOps.CrudReadQuery })
+      // `select=...` narrows a Read to a subset of `companySchema`'s fields,
+      // so Read is serialized through a lenient (all-optional) schema.
+      @CrudRead({
+        query: CompanyOps.CrudReadQuery,
+        response: {
+          serialization: {
+            resource: z.object({
+              id: z.number().optional(),
+              name: z.string().optional(),
+              domain: z.string().optional(),
+              description: z.string().nullable().optional(),
+            }),
+          },
+        },
+      })
       read(@Ctx(CrudCtx) context: CrudContextInterface<CompanyEntity>) {
         return this.crudResolver.read(context);
       }
@@ -670,9 +684,7 @@ describe('#crud-typeorm', () => {
           .expect(200)
           .expect({
             id: 1,
-            name: 'Name1',
             domain: 'Domain1',
-            description: null,
           });
       });
     });

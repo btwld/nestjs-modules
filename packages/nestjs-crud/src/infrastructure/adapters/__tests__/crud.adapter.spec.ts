@@ -20,6 +20,23 @@ class TestEntityClass {
   age!: number;
 }
 
+/**
+ * An adapter over an untyped entity: a query string can name any field, so
+ * refusals of unknown ones are made against this.
+ */
+function untypedAdapter() {
+  const repository = createMockRepository<PlainLiteralObject>({
+    name: 'TestEntity',
+    type: TestEntityClass,
+    columns: [
+      { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
+      { name: 'name', isPrimary: false, isRemoveDate: false, isVersion: false },
+      { name: 'age', isPrimary: false, isRemoveDate: false, isVersion: false },
+    ],
+  });
+  return { repository, adapter: new TestCrudAdapter(repository) };
+}
+
 describe('CrudAdapter', () => {
   let adapter: TestCrudAdapter<TestEntity>;
 
@@ -319,6 +336,171 @@ describe('CrudAdapter', () => {
       const options = optionsFor(['name']);
 
       expect(options.select).toEqual(['name', 'id']);
+      expect(options.within).toBeUndefined();
+    });
+
+    it('should refuse a sort field that is not a column', () => {
+      const { adapter: untyped } = untypedAdapter();
+
+      expect(() =>
+        untyped.exposedBuildFindOptions(
+          mockCrudContext({
+            query: {
+              ...mockCrudParsedQuery(),
+              sort: [{ field: 'nickname', order: 'ASC' }],
+            },
+          }),
+        ),
+      ).toThrow(
+        new BadRequestException(
+          "Invalid sort field 'nickname' for entity 'TestEntity'",
+        ),
+      );
+    });
+
+    it('should refuse a route default sort field that is not a column', () => {
+      const { adapter: untyped } = untypedAdapter();
+
+      expect(() =>
+        untyped.exposedBuildFindOptions(
+          mockCrudContext({
+            options: {
+              query: { sort: [{ field: 'nickname', order: 'DESC' }] },
+            },
+          }),
+        ),
+      ).toThrow(
+        new BadRequestException(
+          "Invalid sort field 'nickname' for entity 'TestEntity'",
+        ),
+      );
+    });
+
+    it('should pass a sort on a column through to the repository', () => {
+      const options = adapter.exposedBuildFindOptions(
+        mockCrudContext<TestEntity>({
+          query: {
+            ...mockCrudParsedQuery(),
+            sort: [{ field: 'name', order: 'ASC' }],
+          },
+        }),
+      );
+
+      expect(options.order).toEqual([{ field: 'name', order: 'ASC' }]);
+    });
+
+    it('should leave a relation-tagged sort to the repository', () => {
+      const { adapter: untyped } = untypedAdapter();
+
+      const options = untyped.exposedBuildFindOptions(
+        mockCrudContext({
+          query: {
+            ...mockCrudParsedQuery(),
+            sort: [{ field: 'title', order: 'ASC', relation: 'posts' }],
+          },
+        }),
+      );
+
+      expect(options.order).toEqual([
+        { field: 'title', order: 'ASC', relation: 'posts' },
+      ]);
+    });
+  });
+
+  describe('list', () => {
+    it('should refuse an unknown sort field before the repository is called', async () => {
+      const { adapter: untyped, repository } = untypedAdapter();
+
+      await expect(
+        untyped.list(
+          mockCrudContext({
+            query: {
+              ...mockCrudParsedQuery(),
+              sort: [{ field: 'nickname', order: 'ASC' }],
+            },
+          }),
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "Invalid sort field 'nickname' for entity 'TestEntity'",
+        ),
+      );
+      expect(repository.findAndCount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('read', () => {
+    const readWith = async (
+      fields: string[],
+      query: CrudContextOptionsInterface<PlainLiteralObject>['query'] = {},
+    ) => {
+      const { adapter: untyped, repository } = untypedAdapter();
+      repository.findOne.mockResolvedValue({ id: '1', name: 'Alice' });
+
+      await untyped.read(
+        mockCrudContext({
+          query: { ...mockCrudParsedQuery(), fields },
+          options: { query },
+        }),
+      );
+
+      expect(repository.findOne).toHaveBeenCalledTimes(1);
+      return repository.findOne.mock.calls[0][0];
+    };
+
+    it('should leave the route’s columns to the repository to narrow when the caller selects none', async () => {
+      const options = await readWith([]);
+
+      expect(options.select).toBeUndefined();
+      expect(options.within).toEqual(['id', 'name', 'age']);
+    });
+
+    it('should keep the route’s own narrowing in what the repository narrows within', async () => {
+      const options = await readWith([], { exclude: ['age'] });
+
+      expect(options.select).toBeUndefined();
+      expect(options.within).toEqual(['id', 'name']);
+    });
+
+    it('should select what the caller asks for, with the key and persisted columns', async () => {
+      const options = await readWith(['name'], { persist: ['age'] });
+
+      expect(options.select).toEqual(['age', 'name', 'id']);
+      expect(options.within).toBeUndefined();
+    });
+
+    it('should refuse a select field that is not a column before the repository is called', async () => {
+      const { adapter: untyped, repository } = untypedAdapter();
+
+      await expect(
+        untyped.read(
+          mockCrudContext({
+            query: { ...mockCrudParsedQuery(), fields: ['nickname'] },
+          }),
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "Invalid select field 'nickname' for entity 'TestEntity'",
+        ),
+      );
+      expect(repository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should not narrow the row a write reads first', async () => {
+      const { adapter: untyped, repository } = untypedAdapter();
+      repository.findOne.mockResolvedValue({ id: '1', name: 'Alice' });
+      repository.update.mockResolvedValue({ id: '1', name: 'Bob' });
+
+      await untyped.update(
+        mockCrudContext({
+          query: { ...mockCrudParsedQuery(), fields: ['name'] },
+          options: { query: { exclude: ['name'] } },
+        }),
+        { name: 'Bob' },
+      );
+
+      const options = repository.findOne.mock.calls[0][0];
+      expect(options.select).toBeUndefined();
       expect(options.within).toBeUndefined();
     });
   });

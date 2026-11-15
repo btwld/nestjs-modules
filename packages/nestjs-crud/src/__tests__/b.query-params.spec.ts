@@ -29,6 +29,7 @@ import { CrudExclude } from '../infrastructure/decorators/routes/crud-exclude.de
 import { CrudFilter } from '../infrastructure/decorators/routes/crud-filter.decorator.js';
 import { CrudLimit } from '../infrastructure/decorators/routes/crud-limit.decorator.js';
 import { CrudMaxLimit } from '../infrastructure/decorators/routes/crud-max-limit.decorator.js';
+import { CrudPersist } from '../infrastructure/decorators/routes/crud-persist.decorator.js';
 import { CrudSort } from '../infrastructure/decorators/routes/crud-sort.decorator.js';
 import { CrudCtx } from '../infrastructure/interceptors/crud-context.overlay.js';
 import { CrudContextInterface } from '../infrastructure/interceptors/interfaces/crud-context.interface.js';
@@ -271,6 +272,40 @@ describe('#crud-typeorm', () => {
       }
     }
 
+    // A route narrowing what it returns. `projectSchema` names every column
+    // optionally, so the serializer strips nothing the repository returned.
+    @CrudController({
+      path: 'projects5',
+      entity: CRUD_TEST_PROJECT_ENTITY_NAME,
+      request: {
+        params: {
+          id: {
+            field: 'id',
+            type: 'number',
+            primary: true,
+          },
+        },
+        body: projectSchema,
+      },
+      response: {
+        resource: projectSchema,
+        paginated: projectPaginatedSchema,
+      },
+    })
+    @CrudExclude(['description'])
+    @CrudPersist(['isActive'])
+    class ProjectsController5 {
+      constructor(
+        @Inject(CrudAdapterResolver)
+        public crudResolver: CrudResolverInterface,
+      ) {}
+
+      @CrudRead({ query: ProjectOps.CrudReadQuery })
+      read(@Ctx(CrudCtx) context: CrudContextInterface<ProjectEntity>) {
+        return this.crudResolver.read(context);
+      }
+    }
+
     @CrudController({
       path: 'users',
       entity: CRUD_TEST_USER_ENTITY_NAME,
@@ -373,6 +408,7 @@ describe('#crud-typeorm', () => {
           ProjectsController2,
           ProjectsController3,
           ProjectsController4,
+          ProjectsController5,
           UsersController,
           NotesController,
         ],
@@ -974,6 +1010,53 @@ describe('#crud-typeorm', () => {
           id: expect.any(Number),
           email: expect.any(String),
         });
+      });
+    });
+
+    describe('#read field selection', () => {
+      it('should leave an excluded column out of a read', async () => {
+        await request(server).get('/projects5/1').expect(200, {
+          id: 1,
+          name: 'Project1',
+          isActive: true,
+          companyId: 1,
+        });
+      });
+
+      it('should read only the selected columns, with the key and persisted columns', async () => {
+        await request(server)
+          .get('/projects5/1')
+          .query(qb.select(['name']).queryObject)
+          .expect(200, { id: 1, name: 'Project1', isActive: true });
+      });
+
+      it('should read only the selected columns and the key', async () => {
+        await request(server)
+          .get('/projects/1')
+          .query(qb.select(['name']).queryObject)
+          .expect(200, { id: 1, name: 'Project1' });
+      });
+
+      it('should refuse a select naming no column on a read', async () => {
+        const res = await request(server)
+          .get('/projects/1')
+          .query(qb.select(['unknown']).queryObject)
+          .expect(400);
+        expect(res.body.message).toEqual(
+          "Invalid select field 'unknown' for entity 'ProjectEntity'",
+        );
+      });
+    });
+
+    describe('#sort validation', () => {
+      it('should refuse a sort naming no column on a list', async () => {
+        const res = await request(server)
+          .get('/projects2')
+          .query(qb.sortBy({ field: 'unknown', order: 'ASC' }).queryObject)
+          .expect(400);
+        expect(res.body.message).toEqual(
+          "Invalid sort field 'unknown' for entity 'ProjectEntity'",
+        );
       });
     });
 
