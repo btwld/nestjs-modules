@@ -9,6 +9,7 @@ import {
   type AuthorityDecision,
   type AuthorityInterface,
   type AuthorityRequestInterface,
+  type AuthorityRuleInterface,
   authorityGateOf,
   authorityRuleProblems,
 } from '@concepta/nestjs-core';
@@ -16,8 +17,9 @@ import {
 import { CaslAuthorityRulesInvalidException } from './exceptions/casl-authority-rules-invalid.exception.js';
 import { type CaslAuthorityOptionsInterface } from './interfaces/casl-authority-options.interface.js';
 import { type CaslAuthorityRulesInterface } from './interfaces/casl-authority-rules.interface.js';
+import { type RulesSnapshot } from './interfaces/rules-snapshot.interface.js';
 
-type CaslAuthorityAbility = Ability<[string, string]>;
+type CaslAuthorityAbility = RulesSnapshot['ability'];
 
 /**
  * The gate of a refusal of `action` on `subject`, or of one of its columns,
@@ -56,12 +58,12 @@ function gateOf(
  */
 export class CaslAuthority implements AuthorityInterface {
   /**
-   * One ability per ctx and actor, so every check in a call reads the same
-   * rules.
+   * One snapshot of the rules per ctx and actor, with the ability built from
+   * them, so every check in a call reads the same rules.
    */
-  private readonly abilities = new WeakMap<
+  private readonly snapshots = new WeakMap<
     object,
-    Map<string, Promise<CaslAuthorityAbility>>
+    Map<string, Promise<RulesSnapshot>>
   >();
 
   /** The entities it was attached to at startup, with their columns. */
@@ -95,7 +97,7 @@ export class CaslAuthority implements AuthorityInterface {
     ctx: PlainLiteralObject,
     { actor, subject, action, columns }: AuthorityRequestInterface,
   ): Promise<AuthorityDecision> {
-    const ability = await this.abilityFor(ctx, actor);
+    const { ability } = await this.snapshotFor(ctx, actor);
 
     if (!ability.can(action, subject)) {
       // With no field, CASL gives the rules of the whole subject only.
@@ -132,43 +134,65 @@ export class CaslAuthority implements AuthorityInterface {
     };
   }
 
-  private abilityFor(
+  /**
+   * The rules it decides `actor` by on `ctx`, denies last, the same ones
+   * every check on that ctx reads: for a UI to show what the actor may do.
+   * Copies, so changing them changes no check.
+   */
+  async rulesFor(
     ctx: PlainLiteralObject,
     actor: Actor,
-  ): Promise<CaslAuthorityAbility> {
-    const byActor =
-      this.abilities.get(ctx) ??
-      new Map<string, Promise<CaslAuthorityAbility>>();
-    this.abilities.set(ctx, byActor);
+  ): Promise<AuthorityRuleInterface<string>[]> {
+    const { rules } = await this.snapshotFor(ctx, actor);
 
-    const key = JSON.stringify(actor);
-    let ability = byActor.get(key);
-    if (!ability) {
-      ability = this.createAbility(ctx, actor);
-      byActor.set(key, ability);
-    }
-    return ability;
+    return rules.map((rule) => ({
+      ...rule,
+      action: Array.isArray(rule.action) ? [...rule.action] : rule.action,
+      subject: Array.isArray(rule.subject) ? [...rule.subject] : rule.subject,
+      ...(rule.fields ? { fields: [...rule.fields] } : {}),
+    }));
   }
 
-  private async createAbility(
+  private snapshotFor(
     ctx: PlainLiteralObject,
     actor: Actor,
-  ): Promise<CaslAuthorityAbility> {
-    const rules = await this.rules.rulesFor(ctx, actor);
-    const problems = this.ruleProblems(rules, 'rules source');
+  ): Promise<RulesSnapshot> {
+    const byActor =
+      this.snapshots.get(ctx) ?? new Map<string, Promise<RulesSnapshot>>();
+    this.snapshots.set(ctx, byActor);
+
+    const key = JSON.stringify(actor);
+    let snapshot = byActor.get(key);
+    if (!snapshot) {
+      snapshot = this.createSnapshot(ctx, actor);
+      byActor.set(key, snapshot);
+    }
+    return snapshot;
+  }
+
+  private async createSnapshot(
+    ctx: PlainLiteralObject,
+    actor: Actor,
+  ): Promise<RulesSnapshot> {
+    const given = await this.rules.rulesFor(ctx, actor);
+    const problems = this.ruleProblems(given, 'rules source');
     if (problems.length > 0) {
       throw new CaslAuthorityRulesInvalidException(problems);
     }
 
     // CASL lets the last matching rule decide, so every deny goes last.
+    const rules = [
+      ...given.filter((rule) => !rule.inverted),
+      ...given.filter((rule) => rule.inverted),
+    ];
+
     // CASL needs a field matcher for rules that name columns, although
     // columns are only ever read from the rules, never matched.
-    return new Ability<[string, string]>(
-      [
-        ...rules.filter((rule) => !rule.inverted),
-        ...rules.filter((rule) => rule.inverted),
-      ],
-      { fieldMatcher: (fields) => (field) => fields.includes(field) },
-    );
+    return {
+      rules,
+      ability: new Ability<[string, string]>(rules, {
+        fieldMatcher: (fields) => (field) => fields.includes(field),
+      }),
+    };
   }
 }

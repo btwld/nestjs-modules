@@ -327,19 +327,73 @@ export class AccessControlService {
   }
 
   /**
-   * The actor's rules, denies last, for a UI to show what they may do.
-   * Empty when nobody is acting.
+   * The rules the actor is decided by, denies last, for a UI to show what
+   * they may do. Empty when nobody is acting.
+   *
+   * With an authority that gives its rules (`rulesFor`), the two combined as
+   * they decide: outside `except`, the authority's allows and every deny; on
+   * a resource in `except`, the actor's own rules. With an authority that
+   * doesn't, the actor's own rules only.
    */
   async effectiveRules(
     ctx: PlainLiteralObject,
   ): Promise<AuthorityRuleInterface<string>[]> {
     const resolution = await this.resolve(ctx);
+    if (!resolution) return [];
 
-    return resolution
-      ? [
-          ...resolution.rules.filter((rule) => !rule.inverted),
-          ...resolution.rules.filter((rule) => rule.inverted),
-        ]
-      : [];
+    const own = resolution.rules;
+    const authority = this.authority?.authority;
+    if (!authority?.rulesFor) return denyLast(own);
+
+    const except = this.authorityExcept;
+    const decided = await authority.rulesFor(
+      ctx,
+      normalizeActor(resolution.actor),
+    );
+
+    return denyLast([
+      ...decided.flatMap((rule) =>
+        onSubjects(rule, (subject) => !except.has(subject)),
+      ),
+      ...own
+        .filter((rule) => !rule.inverted)
+        .flatMap((rule) => onSubjects(rule, (subject) => except.has(subject))),
+      ...narrowingRules(own),
+    ]);
   }
+}
+
+/**
+ * `rules` as a UI is shown them: allows first, so every deny comes after
+ * every allow, each holding only what decides. A gate (`pending`) and a
+ * `reason` are for logs and the rules' maintainers, never the caller.
+ * Copies, lists included, so changing them changes no stored rule.
+ */
+function denyLast(
+  rules: readonly AuthorityRuleInterface<string>[],
+): AuthorityRuleInterface<string>[] {
+  return [
+    ...rules.filter((rule) => !rule.inverted),
+    ...rules.filter((rule) => rule.inverted),
+  ].map(({ action, subject, fields, inverted }) => ({
+    action: Array.isArray(action) ? [...action] : action,
+    subject: Array.isArray(subject) ? [...subject] : subject,
+    ...(fields === undefined ? {} : { fields: [...fields] }),
+    ...(inverted === undefined ? {} : { inverted }),
+  }));
+}
+
+/**
+ * `rule` on only the subjects `keep` keeps, as a list of none or one rule.
+ */
+function onSubjects(
+  rule: AuthorityRuleInterface<string>,
+  keep: (subject: string) => boolean,
+): AuthorityRuleInterface<string>[] {
+  if (typeof rule.subject === 'string') {
+    return keep(rule.subject) ? [rule] : [];
+  }
+
+  const subjects = rule.subject.filter(keep);
+  return subjects.length ? [{ ...rule, subject: subjects }] : [];
 }

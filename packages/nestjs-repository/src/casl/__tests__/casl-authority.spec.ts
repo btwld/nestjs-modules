@@ -562,6 +562,57 @@ describe(CaslAuthority.name, () => {
     ).toEqual([]);
   });
 
+  describe('rulesFor', () => {
+    const deny: Rule = {
+      action: 'read',
+      subject: ORDER_TOKEN,
+      fields: ['tenantId'],
+      inverted: true,
+    };
+    const allow: Rule = { action: 'read', subject: ORDER_TOKEN };
+
+    it('should give the rules it decides by, denies last, from the same snapshot', async () => {
+      const rules = new RulesFixture({ 'role:clerk': [deny, allow] });
+      const authority = governing(rules);
+      const ctx = new AppContextHost();
+
+      await authority.decide(ctx, {
+        actor: CLERK,
+        subject: ORDER_TOKEN,
+        action: ActionEnum.READ,
+        columns: COLUMNS,
+      });
+
+      await expect(authority.rulesFor(ctx, CLERK)).resolves.toEqual([
+        allow,
+        deny,
+      ]);
+      expect(rules.calls).toEqual([CLERK]);
+    });
+
+    it('should give copies, so changing them changes no check', async () => {
+      const authority = governing(
+        new RulesFixture({ 'role:clerk': [allow, deny] }),
+      );
+      const ctx = new AppContextHost();
+
+      const [, given] = await authority.rulesFor(ctx, CLERK);
+      given?.fields?.push('description');
+
+      await expect(
+        authority.decide(ctx, {
+          actor: CLERK,
+          subject: ORDER_TOKEN,
+          action: ActionEnum.READ,
+          columns: COLUMNS,
+        }),
+      ).resolves.toEqual({
+        effect: 'allow',
+        columns: ['id', 'description', 'dateDeleted'],
+      });
+    });
+  });
+
   // A misspelled deny would deny nothing, so a name the authority doesn't
   // know refuses the call, as a rule of the wrong shape does.
   describe('names a rule may use', () => {

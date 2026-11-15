@@ -2691,7 +2691,11 @@ export class AuthorityModule {}
   same rules even when they are stored and edited at runtime. `rulesFor`
   returns the rules or a promise of them; see access control's
   [Sharing Rules with the Repository](../nestjs-access-control/README.md#sharing-rules-with-the-repository)
-  to hand routes the same authority.
+  to hand routes the same authority. The authority's own
+  `rulesFor(ctx, actor)` gives copies of the rules it decides an actor by on
+  that `ctx`, denies last and as written, gates and reasons included; access
+  control's `effectiveRules` combines them with the actor's for a UI,
+  keeping only what decides, so send them to a caller through it.
 
 Access control's route grants are written in the same shape. They name your
 API, not your storage: a grant's `subject` is a route's resource and its

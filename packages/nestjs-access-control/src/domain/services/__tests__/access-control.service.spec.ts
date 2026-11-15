@@ -774,9 +774,9 @@ describe(AccessControlService.name, () => {
       ).toEqual({ allowed: true, resolution });
     });
 
-    // What the authority allows is decided per call, never listed, so a UI
-    // shown these rules may offer what a check then refuses.
-    it('shows the actor’s own rules only, never asking the authority', async () => {
+    // An authority that gives no rules decides per call, so a UI shown these
+    // rules may offer what a check then refuses.
+    it('shows the actor’s own rules only under an authority giving none', async () => {
       const authority = authorityAllowing('read invoice', 'update invoice');
       const service = governedService(authority, {
         'role:clerk': [{ action: 'read', subject: 'report' }],
@@ -786,6 +786,133 @@ describe(AccessControlService.name, () => {
         { action: 'read', subject: 'report' },
       ]);
       expect(authority.requests).toEqual([]);
+    });
+
+    describe('effectiveRules under an authority giving its rules', () => {
+      const authorityRules: AuthorityRuleInterface<string>[] = [
+        { action: ['read', 'update'], subject: ['invoice', 'report'] },
+        {
+          action: 'update',
+          subject: 'invoice',
+          fields: ['total'],
+          inverted: true,
+        },
+      ];
+      const giving: AuthorityInterface = {
+        decide: async () => ({ effect: 'refuse' }),
+        rulesFor: async () => authorityRules,
+      };
+
+      it('combines them as they decide, denies last', async () => {
+        const service = governedService(giving, {
+          'role:clerk': [
+            // Outside `except` an allow of the actor's grants nothing...
+            { action: 'delete', subject: 'invoice' },
+            // ...and a deny narrows what the authority allows.
+            {
+              action: 'read',
+              subject: 'invoice',
+              fields: ['notes'],
+              inverted: true,
+            },
+            // On `report`, in `except`, the actor's rules decide alone.
+            { action: 'export', subject: 'report' },
+          ],
+        });
+
+        expect(await service.effectiveRules({})).toEqual([
+          { action: ['read', 'update'], subject: ['invoice'] },
+          { action: 'export', subject: 'report' },
+          {
+            action: 'update',
+            subject: 'invoice',
+            fields: ['total'],
+            inverted: true,
+          },
+          {
+            action: 'read',
+            subject: 'invoice',
+            fields: ['notes'],
+            inverted: true,
+          },
+        ]);
+      });
+
+      // A gate stays in the logs: the caller is shown what decides, never why.
+      it('shows neither a gate nor a reason, the authority’s or the actor’s', async () => {
+        const service = governedService(
+          {
+            ...giving,
+            rulesFor: async () => [
+              { action: 'read', subject: 'invoice' },
+              {
+                action: 'void',
+                subject: 'invoice',
+                inverted: true,
+                pending: 'FIN-12',
+                reason: 'until finance signs off',
+              },
+            ],
+          },
+          {
+            'role:clerk': [
+              {
+                action: 'read',
+                subject: 'invoice',
+                fields: ['notes'],
+                inverted: true,
+                reason: 'notes are internal',
+              },
+            ],
+          },
+        );
+
+        expect(await service.effectiveRules({})).toEqual([
+          { action: 'read', subject: 'invoice' },
+          { action: 'void', subject: 'invoice', inverted: true },
+          {
+            action: 'read',
+            subject: 'invoice',
+            fields: ['notes'],
+            inverted: true,
+          },
+        ]);
+      });
+
+      it('gives copies, so changing them changes no stored grant', async () => {
+        const stored: AuthorityRuleInterface<string>[] = [
+          {
+            action: ['read'],
+            subject: ['report'],
+            fields: ['total'],
+            inverted: true,
+          },
+        ];
+        const service = serviceFor(clerk, { 'role:clerk': stored });
+
+        const [shown] = await service.effectiveRules({});
+        if (!shown || !Array.isArray(shown.action)) throw new Error('none');
+        shown.action.push('update');
+        shown.fields?.push('notes');
+
+        expect(stored).toEqual([
+          {
+            action: ['read'],
+            subject: ['report'],
+            fields: ['total'],
+            inverted: true,
+          },
+        ]);
+      });
+
+      it('asks the authority about the actor acting on the call', async () => {
+        const rulesFor = vi.fn(async () => authorityRules);
+        const service = governedService({ ...giving, rulesFor });
+
+        await service.effectiveRules({});
+
+        expect(rulesFor).toHaveBeenCalledWith({}, clerk);
+      });
     });
 
     describe('shared with the repository as a CaslAuthority', () => {

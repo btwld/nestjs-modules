@@ -1400,7 +1400,7 @@ exercise correlation behavior directly.
 | `frozenActor(actor)` | A copy whose `roles` can't change, for defining `ActorCtx`. |
 | `actorKeys(actor)` | The keys an actor's permissions are usually stored under: `role:<name>` for each role, or `system:<name>`. |
 | `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. This copy is what an authority is asked about and what an exception names. |
-| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`, and optional `govern(subject, columns)`, told at startup each entity key it governs and its columns. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
+| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`, and optional `govern(subject, columns)`, told at startup each entity key it governs and its columns, and `rulesFor(ctx, actor)`, the rules it decides an actor by, for a UI. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
 | `AuthorityRequestInterface` | `{ actor, subject, action, columns }`. |
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns?, gates? }` or `{ effect: 'refuse', gate? }`; `gates` names the gate of each column left out pending. |
 | `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, pending?, reason? }`. |

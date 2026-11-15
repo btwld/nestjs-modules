@@ -804,9 +804,9 @@ repository. See the [CRUD routes](./examples/crud-routes) example.
 
 ## Showing Permissions in a UI
 
-`AccessControlService.effectiveRules` returns the actor's rules, denies
-last, so a UI can grey out what they cannot do. It needs no grant of its
-own:
+`AccessControlService.effectiveRules` returns the rules the actor is
+decided by, denies last, so a UI can grey out what they cannot do. It needs
+no grant of its own:
 
 ```ts
 @Get('me/permissions')
@@ -815,14 +815,26 @@ permissions(@Ctx() ctx: AppContextHost) {
 }
 ```
 
-CASL's frontend packages read the result as is.
+Each rule holds only what decides, `action`, `subject`, `fields` and
+`inverted`: a gate (`pending`) or a `reason` stays out of the response.
+CASL's frontend packages read the result, but match fields their own way:
+here a field covers everything beneath it (a deny on `address` refuses
+`address.city`), and a write of a field is refused when a field beneath it
+is denied, which no rule spells out. Give the frontend's ability a field
+matcher that does the same, or treat its answer for nested fields as a
+hint the API may still refuse.
 
-With an [authority](#sharing-rules-with-the-repository), these are only the
-actor's own rules. On resources in `except` they decide alone. Elsewhere
-their allows grant nothing and their denies still narrow what the authority
-allows, so what the caller may do there is the authority's allows less
-these denies: build the UI's rules from both, the authority's from wherever
-your application keeps them.
+With an [authority](#sharing-rules-with-the-repository) that gives its
+rules, as `CaslAuthority` does, they are combined the way they decide: on
+resources in `except`, the actor's own rules; elsewhere, the authority's
+allows, less its denies and the actor's. The authority's rules name stored
+columns in `fields`, matched by exact name, and yours name API fields, so
+where a mapper renames a field the UI sees both names, and the response
+shows the caller those stored column names. A custom authority gives its rules by
+implementing `rulesFor(ctx, actor)` from `AuthorityInterface`; without it,
+these are only the actor's own rules, and what the caller may do outside
+`except` is the authority's allows less these denies, which the UI has to
+build from both.
 
 ## Options
 

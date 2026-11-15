@@ -1026,11 +1026,30 @@ describe('Attack round: one application, every layer', () => {
       }
     });
 
-    it("a caller's permissions show their own rules, no one else's", async () => {
+    // The authority's rules for the caller's roles and the caller's own
+    // denies, as they decide together; no one else's.
+    it("a caller's permissions show the rules they are decided by, no one else's", async () => {
       await http()
         .get('/desk/me/permissions')
         .set(as('alice'))
         .expect(200, [
+          {
+            action: ['create', 'read', 'update'],
+            subject: ['invoice', 'invoice-line'],
+          },
+          { action: 'read', subject: 'customer' },
+          {
+            action: ['read', 'create', 'update'],
+            subject: 'invoice',
+            fields: ['internalNotes'],
+            inverted: true,
+          },
+          {
+            action: 'read',
+            subject: 'customer',
+            fields: ['creditLimit'],
+            inverted: true,
+          },
           {
             action: 'update',
             subject: 'invoice',

@@ -82,12 +82,12 @@ describe('Example: per-user grants from storage', () => {
       .expect([
         { action: 'read', subject: 'report' },
         { action: 'export', subject: 'report' },
+        // Its reason is for the rules' maintainers, not the caller.
         {
           action: 'read',
           subject: 'report',
           fields: ['payroll'],
           inverted: true,
-          reason: 'payroll is for HR',
         },
       ]);
   });

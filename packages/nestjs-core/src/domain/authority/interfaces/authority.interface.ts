@@ -1,7 +1,9 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
+import { type Actor } from './actor.type.js';
 import { type AuthorityDecision } from './authority-decision.type.js';
 import { type AuthorityRequestInterface } from './authority-request.interface.js';
+import { type AuthorityRuleInterface } from './authority-rule.interface.js';
 
 /**
  * Decides which actions an actor may take on which objects, and on which of
@@ -28,4 +30,18 @@ export interface AuthorityInterface<Column extends string = string> {
    * misspelled deny would otherwise not deny, is the authority's own job.
    */
   govern?(subject: string, columns: readonly string[]): void;
+
+  /**
+   * The rules it decides `actor` by on `ctx`, as written, gates and reasons
+   * included. Access control's `effectiveRules` combines them with the
+   * actor's for a UI, keeping only what decides; send them to a caller
+   * through it, not as they are. Optional; an authority that doesn't decide
+   * from rules leaves it out.
+   */
+  rulesFor?(
+    ctx: PlainLiteralObject,
+    actor: Actor,
+  ):
+    | AuthorityRuleInterface<string>[]
+    | Promise<AuthorityRuleInterface<string>[]>;
 }
