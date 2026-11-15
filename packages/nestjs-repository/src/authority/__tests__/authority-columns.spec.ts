@@ -257,6 +257,13 @@ describe('authority over columns', () => {
         ).rejects.toThrow(RepositoryQueryException);
         expect(orders.queries).toEqual([]);
       });
+
+      it('should refuse an empty one from an actor limited to some columns', async () => {
+        const orders = await ordersWith(READS);
+
+        await refusal(orders.find({ within: [], ctx: ctxOf(CLERK) }));
+        expect(orders.queries).toEqual([]);
+      });
     });
 
     it('should read the readable columns a caller selects', async () => {
@@ -510,6 +517,25 @@ describe('authority over columns', () => {
           ORDER,
           { id: ORDER.id, tenantId: 'acme', description: 'changed' },
           { ctx: ctxOf(CLERK) },
+        ),
+      );
+      expect(orders.stored).toEqual([ORDER]);
+    });
+
+    it('should refuse a replace when a scope column is not writable, though row scope sets it', async () => {
+      const orders = await ordersWith(
+        {
+          ...only('role:clerk', 'update', ['description', 'dateDeleted']),
+          ...allow('role:clerk', ORDER_TOKEN, ['read']),
+        },
+        { scoped: true },
+      );
+
+      await refusal(
+        orders.replace(
+          ORDER,
+          { ...ORDER, description: 'changed' },
+          { ctx: ctxOf(CLERK, 'acme') },
         ),
       );
       expect(orders.stored).toEqual([ORDER]);

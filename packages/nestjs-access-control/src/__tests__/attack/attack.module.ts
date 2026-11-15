@@ -28,7 +28,12 @@ import {
   AttackDeskController,
   AttackHealthController,
 } from './attack.controller.js';
-import { controllers, providers } from './attack.crud.js';
+import {
+  controllers,
+  customerInvoiceRoutes,
+  providers,
+  strictInvoiceRoutes,
+} from './attack.crud.js';
 import {
   AttackCustomerEntity,
   AttackInvoiceEntity,
@@ -61,10 +66,16 @@ export class AttackUserModule {}
   imports: [RepositoryModule.forFeature([INVOICE])],
   controllers: [
     ...Object.values(controllers),
+    ...Object.values(customerInvoiceRoutes.controllers),
+    ...Object.values(strictInvoiceRoutes.controllers),
     AttackDeskController,
     AttackHealthController,
   ],
-  providers,
+  providers: [
+    ...providers,
+    ...customerInvoiceRoutes.providers,
+    ...strictInvoiceRoutes.providers,
+  ],
 })
 export class AttackRoutesModule {}
 

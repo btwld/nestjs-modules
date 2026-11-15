@@ -6,6 +6,10 @@ import {
   type AuthorityRuleInterface,
   type RoleActorInterface,
 } from '@concepta/nestjs-core';
+import {
+  CaslAuthority,
+  CaslAuthorityRulesInvalidException,
+} from '@concepta/nestjs-repository/optional/casl';
 
 import { StaticAccessGrantsProvider } from '../../../infrastructure/grants/static-access-grants.provider.js';
 import { AccessControlException } from '../../exceptions/access-control.exception.js';
@@ -304,6 +308,55 @@ describe(AccessControlService.name, () => {
         false,
       );
     });
+  });
+
+  // Off a checked route there is no execution context, on any transport.
+  describe('the actor resolver, asked outside a route check', () => {
+    const asked = () => {
+      const calls: unknown[][] = [];
+      const service = new AccessControlService(
+        {
+          actorFor: async (...args) => {
+            calls.push(args);
+            return clerk;
+          },
+        },
+        new StaticAccessGrantsProvider({
+          'role:clerk': [{ action: 'read', subject: 'invoice' }],
+        }),
+      );
+      return { calls, service };
+    };
+
+    it.each([
+      [
+        'can',
+        (s: AccessControlService, ctx: PlainLiteralObject) =>
+          s.can(ctx, 'read', 'invoice'),
+      ],
+      [
+        'assert',
+        (s: AccessControlService, ctx: PlainLiteralObject) =>
+          s.assert(ctx, 'read', 'invoice'),
+      ],
+      [
+        'effectiveRules',
+        (s: AccessControlService, ctx: PlainLiteralObject) =>
+          s.effectiveRules(ctx),
+      ],
+    ])(
+      'is asked by %s with the ctx and no execution context',
+      async (_name, check) => {
+        const { calls, service } = asked();
+        const ctx = {};
+
+        await check(service, ctx);
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0]).toBe(ctx);
+        expect(calls[0][1]).toBeUndefined();
+      },
+    );
   });
 
   // Grants accept any verb, since routes may declare their own, so a typo
@@ -719,6 +772,60 @@ describe(AccessControlService.name, () => {
       expect(
         await service.authorize({}, resolution, 'read', 'invoice'),
       ).toEqual({ allowed: true, resolution });
+    });
+
+    // What the authority allows is decided per call, never listed, so a UI
+    // shown these rules may offer what a check then refuses.
+    it('shows the actor’s own rules only, never asking the authority', async () => {
+      const authority = authorityAllowing('read invoice', 'update invoice');
+      const service = governedService(authority, {
+        'role:clerk': [{ action: 'read', subject: 'report' }],
+      });
+
+      expect(await service.effectiveRules({})).toEqual([
+        { action: 'read', subject: 'report' },
+      ]);
+      expect(authority.requests).toEqual([]);
+    });
+
+    describe('shared with the repository as a CaslAuthority', () => {
+      const sharedService = (rules: AuthorityRuleInterface<string>[]) =>
+        new AccessControlService(
+          actingAs(clerk),
+          new StaticAccessGrantsProvider({}),
+          undefined,
+          { authority: new CaslAuthority({ rulesFor: async () => rules }) },
+        );
+
+      // Fields are checked against access control's own denies; the
+      // authority's column rules hold where data passes the repository.
+      it('checks fields against its own denies only, not the authority’s column rules', async () => {
+        const service = sharedService([
+          { action: 'read', subject: 'invoice' },
+          {
+            action: 'read',
+            subject: 'invoice',
+            fields: ['internalNotes'],
+            inverted: true,
+          },
+        ]);
+
+        expect(
+          await service.can({}, 'read', 'invoice', {
+            fields: ['internalNotes'],
+          }),
+        ).toBe(true);
+      });
+
+      it('fails on the authority’s unusable rules with its own exception', async () => {
+        const service = sharedService([
+          { action: 'read', subject: 'invoice', fields: [] },
+        ]);
+
+        await expect(service.assert({}, 'read', 'invoice')).rejects.toThrow(
+          CaslAuthorityRulesInvalidException,
+        );
+      });
     });
   });
 

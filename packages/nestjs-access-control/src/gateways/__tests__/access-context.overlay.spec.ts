@@ -1,6 +1,8 @@
+import { of } from 'rxjs';
 import { mock } from 'vitest-mock-extended';
 
 import { type ArgumentsHost, type ExecutionContext } from '@nestjs/common';
+import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host.js';
 
 import { ActorCtx, getAppContext } from '@concepta/nestjs-core';
 
@@ -53,6 +55,24 @@ describe(AccessContextOverlay.name, () => {
     }).attach(httpContext(request));
 
     expect(getAppContext(request).supports(ActorCtx)).toEqual(false);
+  });
+
+  // Off HTTP the actor is defined by a guard of the implementer's, or the
+  // resolver works it out when a check asks.
+  it('never asks the resolver on another transport', async () => {
+    // A call that has a context, so only the transport keeps it out.
+    const context = new ExecutionContextHost([null, {}]);
+    context.setType('rpc');
+    const actorFor = vi.fn();
+    const handled = of('handled');
+
+    const result = await new AccessContextOverlay({ actorFor }).intercept(
+      context,
+      { handle: () => handled },
+    );
+
+    expect(result).toBe(handled);
+    expect(actorFor).not.toHaveBeenCalled();
   });
 
   it('is a context overlay for ActorCtx', () => {

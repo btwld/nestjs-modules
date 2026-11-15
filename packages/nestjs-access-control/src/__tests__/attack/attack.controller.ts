@@ -74,6 +74,16 @@ export class AttackDeskController {
   }
 
   /**
+   * Open to anyone, with no grant: the repository still decides it, for
+   * whoever signed in, and refuses a caller nobody signed in.
+   */
+  @Get('invoices/open')
+  @AuthPublic({ optional: true })
+  open(@Ctx() ctx: AppContextHost) {
+    return this.invoices.find({ ctx });
+  }
+
+  /**
    * A mistake: reads through a context of its own instead of the call's,
    * so nobody is acting on it. It must be refused, never run unrestricted.
    */

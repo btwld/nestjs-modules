@@ -140,6 +140,8 @@ describe('Attack round: one application, every layer', () => {
       'ivy',
       'carl',
       'rita',
+      'cora',
+      'bill',
       'mallory',
       'gus',
       'ian',
@@ -296,6 +298,81 @@ describe('Attack round: one application, every layer', () => {
         context: { action: 'read', columns: ['deletedAt'] },
       });
       expect((await managerRead()).number).toEqual('A-1');
+    });
+
+    it('a generated write by a role that may not read the invoice is refused at the read that finds it', async () => {
+      for (const call of [
+        () => http().patch(`/invoices/${acmeId}`).send({ number: 'A-1c' }),
+        () => http().delete(`/invoices/${acmeId}`),
+      ]) {
+        await call().set(as('cora')).expect(403);
+
+        const [exception] = rendered.mock.calls.at(-1) ?? [];
+        expect(exception).toBeInstanceOf(AuthorityRefusedException);
+        expect(exception).toMatchObject({
+          context: { action: 'read', refusal: 'authority' },
+        });
+      }
+      expect(await managerRead()).toEqual({
+        ...clerkView(),
+        internalNotes: 'slow payer',
+      });
+    });
+
+    it("a route's customer is a column the write sets, which a biller may not", async () => {
+      await http()
+        .post(`/customers/${customer.id}/invoices`)
+        .set(as('bill'))
+        .send({ number: 'A-9', amount: 300 })
+        .expect(403);
+      expect(rendered.mock.calls.at(-1)?.[0]).toMatchObject({
+        context: { action: 'create', columns: ['customerId'] },
+      });
+
+      await http()
+        .patch(`/customers/${customer.id}/invoices/${acmeId}`)
+        .set(as('bill'))
+        .send({ number: 'A-1c' })
+        .expect(403);
+      expect(rendered.mock.calls.at(-1)?.[0]).toMatchObject({
+        context: { action: 'update', columns: ['customerId'] },
+      });
+      expect(await acmeCount()).toEqual(1);
+      expect((await managerRead()).number).toEqual('A-1');
+
+      // Without the route naming the customer, the same change goes through.
+      await http()
+        .patch(`/invoices/${acmeId}`)
+        .set(as('bill'))
+        .send({ number: 'A-1c' })
+        .expect(200);
+    });
+
+    it("a write's query is the read that finds its row: a clerk may not filter it on the notes", async () => {
+      await http()
+        .patch(
+          `/invoices/${acmeId}?filter=${encodeURIComponent('internalNotes||$eq||slow payer')}`,
+        )
+        .set(as('alice'))
+        .send({ number: 'A-1c' })
+        .expect(403);
+
+      const [exception] = rendered.mock.calls.at(-1) ?? [];
+      expect(exception).toBeInstanceOf(AuthorityRefusedException);
+      expect(exception).toMatchObject({ context: { action: 'read' } });
+      expect((await managerRead()).number).toEqual('A-1');
+    });
+
+    it('a route without a grant is decided for whoever signed in, and refused to nobody', async () => {
+      await http()
+        .get('/desk/invoices/open')
+        .set(as('alice'))
+        .expect(200, [clerkView()]);
+
+      await http().get('/desk/invoices/open').expect(403);
+      expect(rendered.mock.calls.at(-1)?.[0]).toMatchObject({
+        context: { refusal: 'no-actor' },
+      });
     });
 
     it('a create naming an existing invoice cannot overwrite its amount', async () => {
@@ -829,6 +906,36 @@ describe('Attack round: one application, every layer', () => {
         .get(`/invoices/${acmeId}?filter=noSuchColumn||$eq||x`)
         .set(as('alice'))
         .expect(400);
+      await http()
+        .get(
+          `/invoices/${acmeId}?s=${encodeURIComponent('{"noSuchColumn":"x"}')}`,
+        )
+        .set(as('alice'))
+        .expect(400);
+    });
+
+    it('a read ignores its sort, so a sort on a column that does not exist is no error', async () => {
+      await http()
+        .get(`/invoices/${acmeId}?sort=noSuchColumn,ASC`)
+        .set(as('alice'))
+        .expect(200, clerkView());
+      await http()
+        .get('/invoices?sort=noSuchColumn,ASC')
+        .set(as('alice'))
+        .expect(400);
+    });
+
+    it('a response schema requiring a column the caller may not read fails, and shows nothing of it', async () => {
+      const failed = await http()
+        .get(`/strict/invoices/${acmeId}`)
+        .set(as('alice'))
+        .expect(500);
+      expect(failed.text).not.toContain('slow');
+
+      await http()
+        .get(`/strict/invoices/${acmeId}`)
+        .set(as('grace'))
+        .expect(200, { ...clerkView(), internalNotes: 'slow payer' });
     });
 
     it("a refused cross-tenant read carries nothing of the other tenant's row", async () => {

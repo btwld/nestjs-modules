@@ -85,6 +85,18 @@ export const AUTHORITY_RULES: Record<string, AuthorityRuleInterface[]> = {
   ],
   // Intake enters invoices from the mail, and reads nothing back.
   'role:intake': [{ action: 'create', subject: [INVOICE, INVOICE_LINE] }],
+  // A corrector may change and delete invoices, but read none of them.
+  'role:corrector': [{ action: ['update', 'delete'], subject: INVOICE }],
+  // A biller raises and corrects invoices, but never says whose they are.
+  'role:biller': [
+    { action: ['create', 'read', 'update'], subject: INVOICE },
+    {
+      action: ['create', 'update'],
+      subject: INVOICE,
+      fields: ['customerId'],
+      inverted: true,
+    },
+  ],
   // Collections read invoices and every customer column.
   'role:collector': [{ action: 'read', subject: [INVOICE, CUSTOMER] }],
   'system:seeder': [{ action: 'create', subject: CUSTOMER }],

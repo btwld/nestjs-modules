@@ -30,6 +30,7 @@ import { JwtPolicy } from '../domain/policies/jwt.policy.js';
 import { JwtPort } from '../domain/ports/jwt.port.js';
 import { PasswordPort } from '../domain/ports/password.port.js';
 import { UserPort } from '../domain/ports/user.port.js';
+import { AuthenticationFeatureConfigException } from '../infrastructure/exceptions/authentication-feature-config.exception.js';
 import { JwtService } from '../infrastructure/jwt/jwt.service.js';
 
 describe(AuthenticationModule, () => {
@@ -386,6 +387,44 @@ describe(AuthenticationModule, () => {
       commonVars();
       commonTests();
     });
+  });
+
+  describe('a sign-in strategy without a UserPort', () => {
+    it.each([
+      ['jwt', { jwt: {} }],
+      ['refresh', { refresh: {} }],
+    ])(
+      'should fail startup with the %s strategy and no ports.user',
+      async (name, strategies) => {
+        await expect(
+          Test.createTestingModule(
+            testModuleFactory([
+              CqrsModule,
+              AuthenticationModule.forRoot({
+                appGuard: false,
+                settings: {
+                  jwt: {
+                    access: {
+                      secret: 'access-secret',
+                      signOptions: { expiresIn: '1h' },
+                    },
+                    refresh: {
+                      secret: 'refresh-secret',
+                      signOptions: { expiresIn: '7d' },
+                    },
+                  },
+                  strategies,
+                },
+              }),
+            ]),
+          ).compile(),
+        ).rejects.toThrow(
+          new AuthenticationFeatureConfigException(`${name} strategy`, [
+            'UserPort',
+          ]),
+        );
+      },
+    );
   });
 
   function commonVars() {

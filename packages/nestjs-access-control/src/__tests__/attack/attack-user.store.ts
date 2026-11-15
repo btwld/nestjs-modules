@@ -11,6 +11,8 @@ export const ATTACK_USERS: readonly AttackUserInterface[] = [
   user('ivy', ['intake'], 'acme'),
   user('carl', ['collector'], 'acme'),
   user('rita', ['redactor'], 'acme'),
+  user('cora', ['corrector'], 'acme'),
+  user('bill', ['biller'], 'acme'),
   user('mallory', ['clerk'], 'globex'),
   user('gus', ['manager'], 'globex'),
   { ...user('ian', ['clerk'], 'acme'), active: false },

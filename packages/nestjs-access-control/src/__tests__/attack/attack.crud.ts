@@ -130,3 +130,59 @@ export const { controllers, providers } =
       },
     ],
   }).build();
+
+const customerInvoiceWriteSchema = invoiceWriteSchema.omit({
+  customerId: true,
+});
+
+/**
+ * A customer's invoices: the route names the customer, and CRUD writes it
+ * into every invoice it creates or changes.
+ */
+export const customerInvoiceRoutes =
+  new ConfigurableCrudBuilder<AttackInvoiceEntity>({
+    controller: {
+      path: 'customers/:customerId/invoices',
+      entity: INVOICE,
+      request: {
+        body: customerInvoiceWriteSchema,
+        params: {
+          customerId: { field: 'customerId', type: 'uuid' },
+          id: { field: 'id', type: 'uuid', primary: true },
+        },
+      },
+      response: { resource: invoiceSchema },
+    },
+    operations: [
+      {
+        operation: Operation.Create,
+        extraDecorators: [AccessControlCreateOne(INVOICE)],
+      },
+      {
+        operation: Operation.Update,
+        request: { body: customerInvoiceWriteSchema.partial() },
+        extraDecorators: [AccessControlUpdateOne(INVOICE)],
+      },
+    ],
+  }).build();
+
+/**
+ * A mistake: a response schema that requires the notes, which a clerk may
+ * not read, so the repository leaves them out of a clerk's row.
+ */
+export const strictInvoiceRoutes =
+  new ConfigurableCrudBuilder<AttackInvoiceEntity>({
+    controller: {
+      path: 'strict/invoices',
+      entity: INVOICE,
+      response: {
+        resource: invoiceSchema.extend({ internalNotes: z.string() }),
+      },
+    },
+    operations: [
+      {
+        operation: Operation.Read,
+        extraDecorators: [AccessControlReadOne(INVOICE)],
+      },
+    ],
+  }).build();

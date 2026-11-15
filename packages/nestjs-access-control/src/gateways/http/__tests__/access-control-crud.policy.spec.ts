@@ -209,6 +209,43 @@ describe(AccessControlCrudPolicy.name, () => {
       expect(error).toMatchObject({ context: { fields: ['secret.name'] } });
     });
 
+    it('leaves what the caller selects to the response filter and the repository', async () => {
+      await expect(
+        policy.check({
+          ctx: crudCtx(Operation.Read, 'read', { fields: ['secret'] }),
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it.each([
+      { name: 'filter', query: { filter: [eq('noSuchField')] } },
+      {
+        name: 'sort, on a read too',
+        operation: Operation.Read,
+        query: {
+          sort: [{ field: 'noSuchField', order: 'ASC' as const }],
+        },
+      },
+      { name: 'search', query: { search: { noSuchField: 'x' } } },
+    ])(
+      'refuses a $name naming a field that does not exist when the caller may read only named fields',
+      async ({ operation = Operation.List, query }) => {
+        const error = await refusalOf(
+          policy.check({
+            ctx: crudCtx(operation, 'read', query, true, {
+              rules: [
+                { action: 'read', subject: 'invoice', fields: ['customer'] },
+              ],
+            }),
+          }),
+        );
+
+        expect(error).toMatchObject({
+          context: { refusal: 'field', fields: ['noSuchField'] },
+        });
+      },
+    );
+
     it('checks the query of a write too, since it picks the rows it writes', async () => {
       await refusalOf(
         policy.check({
