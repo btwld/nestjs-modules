@@ -2524,7 +2524,9 @@ RepositoryModule.forRoot({
 `authority` is a provider: export it from a module in `forRoot({ imports })`,
 as you would a row scope resolver. `open` requires a reason because it is a
 decision someone has to defend later. Undeclared is allowed unless the
-deployment sets `requireAuthorityDeclaration`.
+deployment sets `requireAuthorityDeclaration`, and an undeclared entity is
+open. An application that governs its data with an authority should turn it
+on, so a new entity is never left open because nobody decided.
 
 ### The actor
 
@@ -2587,8 +2589,14 @@ import {
 const RULES: Record<string, AuthorityRuleInterface[]> = {
   'role:clerk': [
     { action: ['create', 'read', 'update'], subject: 'order' },
-    // Clerks never change a total, whatever else allows it
-    { action: 'update', subject: 'order', fields: ['total'], inverted: true },
+    // Billing owns totals and status: clerks never change them, whatever
+    // else allows it
+    {
+      action: 'update',
+      subject: 'order',
+      fields: ['total', 'status'],
+      inverted: true,
+    },
   ],
   'role:auditor': [{ action: 'read', subject: 'order' }],
   'system:billing-sync': [
@@ -2646,6 +2654,11 @@ export class AuthorityModule {}
   your own, ``AuthorityRuleInterface<`${ActionEnum}` | 'approve'>``, or narrow
   it to list only the verbs you allow, such as
   `AuthorityRuleInterface<'read' | 'update', 'order', keyof Order & string>`.
+- **Columns another system owns** are written as above: allow them to that
+  system's actor, and deny them to everyone else. Which system is the source
+  of truth for a column, and who settles a conflict, are your records; the
+  authority enforces what you decide. History that must never change is an
+  [append-only](#write-policy) entity, not a rule.
 - `actorKeys` keys a person by each role (`role:<name>`) and a system by its
   name (`system:<name>`). Rules for one person alone are yours to look up, for
   example by `actor.userId`.
@@ -2781,7 +2794,9 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   the related rows found, all of them before any is written. A write that
   may delete related rows decides that delete on everything it reaches the
   same way, before the parent is written. Each related row's columns,
-  and its own related rows, are checked before the parent is written too.
+  and its own related rows, are checked before the parent is written too;
+  a column a hook adds to a related row is checked when that row is
+  written, after the parent.
   A new row (one without a primary key, in a to-many relation) is checked
   against create. Any other is
   checked against create and update, and on a `replace` or `upsert` against

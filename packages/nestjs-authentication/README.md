@@ -1655,16 +1655,9 @@ true }` included) lets it through with no user, as do `settings.guards` and
 its `disable` callback. To authenticate another transport's calls in such a
 guard, override `getRequest` to return that transport's request; it defines
 no `AuthUserCtx`. So on other transports nothing in this module defines
-`AuthUserCtx`; off HTTP, access
-control's `actorResolver` is still asked, with no request to read. In RPC
-message handlers, define `AuthUserCtx`, and `ActorCtx` with
-`frozenActor(actor)`, in a guard of yours that reads the user from your
-transport and runs before a grant's guard; an overlay is too late there,
-since guards run before interceptors. If the microservice inherits the
-app's config (`inheritAppConfig`), the global JWT guard runs on message
-handlers too: mark them `@AuthPublic()`. See core's
-[RPC (preview)](../nestjs-core/README.md#rpc-preview). In a WebSocket
-gateway, `@AuthUser()` throws `AppContextUnavailableException`.
+`AuthUserCtx`: core's [RPC (preview)](../nestjs-core/README.md#rpc-preview)
+shows how a message handler signs its caller in and what protects it. In a
+WebSocket gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 
 ---
 

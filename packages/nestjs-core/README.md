@@ -604,12 +604,22 @@ readonly transports: readonly ContextType[] = ['http', 'rpc'];
 ```
 
 Correlation, the authenticated user and crud read the HTTP request, so they
-are absent in message handlers, and access control's `actorResolver` gets no
-request there. To get the user there, write a guard that reads it from your
-transport (for example gRPC metadata, from
-`context.switchToRpc().getContext()`) and defines `AuthUserCtx` and
-`ActorCtx` on `requireAppContext(context)`. It must run before a grant's
-guard; an overlay is too late, since guards run before interceptors.
+are absent in message handlers. What protects a message handler:
+
+- **Signing the caller in is yours.** `@concepta/nestjs-authentication`'s
+  guards refuse a message handler, unless one that can be turned off is
+  off for it (see
+  its [Context Overlay](../nestjs-authentication/README.md#context-overlay)).
+  Write a guard that reads the caller from your transport (for example gRPC
+  metadata, from `context.switchToRpc().getContext()`) and defines
+  `AuthUserCtx` and `ActorCtx` on `requireAppContext(context)`. It must run
+  before a grant's guard; an overlay is too late, since guards run before
+  interceptors.
+- **A grant decides as on HTTP,** for the `ActorCtx` your guard defined, or
+  the actor access control's `actorResolver` works out with no request.
+  With neither, the call is refused.
+- **The [route audit](#route-audit) doesn't see message handlers,** so a
+  handler left without your guard or a grant is not caught at startup.
 
 WebSocket gateways and gRPC call-stream handlers aren't supported yet. There,
 `@Ctx()` and `@Transactional()` throw `AppContextUnavailableException` and
@@ -668,13 +678,19 @@ first request instead.
   names several routes: give them different paths, versions or hosts.
 - **`mode: 'report'`** logs each violation as a warning and starts anyway, for
   a first look at an existing application. A stale or ambiguous `allow`
-  entry is logged the same way. The default is `'throw'`.
+  entry is logged the same way. The default is `'throw'`: run production
+  with it, and keep `allow` short, since each entry is a route the rule no
+  longer checks.
 - **`@PublicRoute()`** marks a route as open on purpose, so rules skip it;
   it only marks the route and opens nothing. `@AuthPublic()` sets it for
   you; apply it yourself on routes your own guard lets through.
 
-Only controller routes are audited: not message handlers (RPC), and not paths
-served outside a controller, such as middleware or Swagger UI.
+Only controller routes are audited: not message handlers (see
+[RPC (preview)](#rpc-preview)), and not paths served outside a controller,
+such as middleware or Swagger UI. Rules check routes, not what a module is
+configured with: that generated CRUD routes have access control's
+[request policy](../nestjs-access-control/README.md#crud-routes) is yours
+to check.
 
 Keep rules and what they inject out of request scope. A rule that can't run
 for that reason fails startup too; it is never skipped.

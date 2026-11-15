@@ -193,6 +193,10 @@ A caller's rules are the rules of every role they hold, plus any rules a
 | an allow and a deny, from any roles | refused |
 | allow `user`, deny `user.password` | allowed, without `password` |
 
+With a [shared authority](#sharing-rules-with-the-repository), the authority
+allows instead, outside `except`: there your rules can only take access
+away, by denying it, never by leaving it out.
+
 ## Sharing Rules with the Repository
 
 When the data behind your routes lives in
@@ -398,7 +402,8 @@ The resolver is given a request only over HTTP: on other transports the
 (the immutable overlay freezes the top level, `frozenActor` freezes
 `roles`). On RPC, define it in a guard that runs before a grant's guard (an
 overlay is too late, since guards run before interceptors), or let the
-resolver work the actor out from `ctx` alone. In a queue
+resolver work the actor out from `ctx` alone; see core's
+[RPC (preview)](../nestjs-core/README.md#rpc-preview). In a queue
 consumer or a job, define it on the context it opens. An integration
 consumer acting for another system defines
 `{ kind: 'system', name: 'billing' }` on the context it opens for each
@@ -453,9 +458,13 @@ AccessControlModule.forRootAsync({
 
 Per-user rules sit on top of the role template: a user rule can allow what
 the template leaves out, and deny what it allows, but cannot undo a deny in
-the template. Every rule set the provider returns is checked before use; a
-set that breaks the rules in [Writing Rules](#writing-rules) fails the call
-with `AccessRulesInvalidException`, a `500`. `rulesFor` returns the rules
+the template. Under a [shared authority](#sharing-rules-with-the-repository),
+outside `except`, only the denies count: a per-user grid takes access away
+by denying it, and leaving a rule out of it changes nothing.
+
+Every rule set the provider returns is checked before use; a set that
+breaks the rules in [Writing Rules](#writing-rules) fails the call with
+`AccessRulesInvalidException`, a `500`. `rulesFor` returns the rules
 or a promise of them. It is asked on every check, so cache in it; telling
 other instances about an edit is up to the provider too.
 
@@ -508,6 +517,10 @@ CRUD routes over an entity an authority governs, though, most writes first
 read the row as the caller, so the caller also needs `read` there (see
 CRUD's
 [Operation-to-Repository Mapping](../nestjs-crud/README.md#operation-to-repository-mapping)).
+This filter applies access control's rules only: an
+[authority's](#sharing-rules-with-the-repository) column rules hold where
+data passes through a governed repository, so data a handler returns from
+elsewhere, such as a cache, isn't filtered by them.
 
 - each item of an array is filtered;
 - a response is a page when its `data` is an array and its `count`,
@@ -649,7 +662,10 @@ existence is private, use row scope.
 ## Checking in Handlers
 
 The route guard checks the resource, not the body. In a checked route's
-handler, pass the fields a write touches to `assertFields`:
+handler, pass the fields a write touches to `assertFields`. It checks access
+control's own rules; an
+[authority's](#sharing-rules-with-the-repository) column rules are checked
+when the write reaches a governed repository:
 
 ```ts
 @Patch(':id')
