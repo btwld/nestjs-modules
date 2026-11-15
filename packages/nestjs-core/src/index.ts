@@ -157,6 +157,8 @@ export { AuthorityActionRefusedException } from './domain/authority/exceptions/a
 export { AuthorityActionRefusedDetailsInterface } from './domain/authority/interfaces/authority-action-refused-details.interface.js';
 export { authorityPendingGates } from './domain/authority/utils/authority-pending-gates.util.js';
 export { AuthorityPendingGateInterface } from './domain/authority/interfaces/authority-pending-gate.interface.js';
+export { authorityRuleGaps } from './domain/authority/utils/authority-rule-gaps.util.js';
+export { AuthorityRuleGapInterface } from './domain/authority/interfaces/authority-rule-gap.interface.js';
 
 // Event context
 export { EventContextHost } from './domain/events/causal-context/event-context.host.js';
@@ -206,4 +208,5 @@ export { RouteAuditViolationInterface } from './infrastructure/route-audit/inter
 export { RouteAuditRuleProvider } from './infrastructure/route-audit/decorators/route-audit-rule-provider.decorator.js';
 export { PublicRoute } from './infrastructure/route-audit/decorators/public-route.decorator.js';
 export { isPublicRoute } from './infrastructure/route-audit/utils/is-public-route.util.js';
+export { isReadMethod } from './infrastructure/route-audit/utils/is-read-method.util.js';
 export { RouteAuditFailedException } from './infrastructure/route-audit/exceptions/route-audit-failed.exception.js';

@@ -9,8 +9,10 @@ import {
   type AuthorityDecision,
   type AuthorityInterface,
   type AuthorityRequestInterface,
+  type AuthorityRuleGapInterface,
   type AuthorityRuleInterface,
   authorityGateOf,
+  authorityRuleGaps,
   authorityRuleProblems,
 } from '@concepta/nestjs-core';
 
@@ -78,6 +80,14 @@ export class CaslAuthority implements AuthorityInterface {
     this.governed.set(subject, [...columns]);
   }
 
+  /** An entity it was attached to, or one of the subjects it was given. */
+  governs(subject: string): boolean {
+    return (
+      this.governed.has(subject) ||
+      (this.options.subjects ?? []).includes(subject)
+    );
+  }
+
   /**
    * Every problem with `rules` as this authority would find it: those
    * `authorityRuleProblems` lists, and any subject that is neither an entity
@@ -87,10 +97,30 @@ export class CaslAuthority implements AuthorityInterface {
    */
   ruleProblems(rules: unknown, source = 'rules'): string[] {
     return authorityRuleProblems(rules, source, {
-      subjects: [...this.governed.keys(), ...(this.options.subjects ?? [])],
-      actions: [...Object.values(ActionEnum), ...(this.options.actions ?? [])],
+      ...this.names(),
       fields: this.governed,
     });
+  }
+
+  /**
+   * Every action on every subject it knows, the same names `ruleProblems`
+   * accepts, that no rule in `rules` decides as a whole (`authorityRuleGaps`).
+   * Pass every rule the application stores, for every actor, once
+   * `ruleProblems` finds none; startup has to have attached every
+   * repository first. A report for a review or an admin screen.
+   */
+  ruleGaps(
+    rules: readonly AuthorityRuleInterface<string>[],
+  ): AuthorityRuleGapInterface[] {
+    return authorityRuleGaps(rules, this.names());
+  }
+
+  /** The subjects and actions its rules may name. */
+  private names(): { subjects: string[]; actions: string[] } {
+    return {
+      subjects: [...this.governed.keys(), ...(this.options.subjects ?? [])],
+      actions: [...Object.values(ActionEnum), ...(this.options.actions ?? [])],
+    };
   }
 
   async decide(

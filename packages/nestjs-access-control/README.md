@@ -245,7 +245,11 @@ AccessControlModule.forRootAsync({
   no entity stands behind, such as `@AccessControlGrant({ resource:
   'report', action: 'export' })`, is decided by your rules as if there
   were no authority, once its resource is in `except`: nothing is allowed
-  without a rule allowing it. Until then, the authority refuses it.
+  without a rule allowing it. Until then, the authority refuses it. A
+  subject the authority governs, an entity it is attached to or a subject
+  you declared on it, is decided by the authority even if `except` names
+  it, and the entry fails startup with `AccessRulesInvalidException`, once
+  every module is built.
 - **Elsewhere, your own rules only narrow, by denying.**
   `settings.grants` and a grants provider still apply, but can never allow
   what the authority refuses:
@@ -504,6 +508,14 @@ isn't marked public with core's `@PublicRoute()`, which every
 exempt, so a missing grant there is not caught at startup. Exempt a
 signed-in route every caller may call with the audit's
 `allow: { requireAcl: ['GET /me'] }`.
+
+The module also adds `requireWriteGrants`, which fails startup for a route
+that may write, on any method but `GET`, `HEAD`, `OPTIONS`, `SEARCH`,
+`PROPFIND` or `QUERY`, yet lets a caller in on a `read` grant. Since any one
+grant lets a caller in, a `POST` granting `read` beside `create` lets every
+reader write. Grant the write's own action, `create`, `update` or one of your
+own such as `approve`; exempt a write-method route that only reads, such as a
+search, with `allow: { requireWriteGrants: ['POST /invoices/search'] }`.
 
 Nothing, such as a cached response, lets a caller through a checked route
 without the check: it runs after every global guard and before every
@@ -843,7 +855,7 @@ build from both.
 | `settings.grants` | `{}` | `AccessGrants`: rules keyed `role:<name>` or `system:<name>`. Used, and checked at startup, only without a `grantsProvider`. |
 | `actorResolver` | none | `AccessActorResolverInterface`: works out who is acting when a call carries no `ActorCtx`. |
 | `grantsProvider` | `StaticAccessGrantsProvider`, over `settings.grants` | `AccessGrantsProviderInterface`: supplies an actor's rules on every check. |
-| `authority` | none | `AccessControlAuthorityInterface`, `{ authority, except? }`: decides each route first, except on resources in `except`; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
+| `authority` | none | `AccessControlAuthorityInterface`, `{ authority, except? }`: decides each route first, except on resources in `except` it doesn't govern; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
 | `appFilter` | `AccessControlFilter`, the response filter | Replace it, or `false` for none. |
 | `queryServices` | `[]` | Access query services to register. |
 

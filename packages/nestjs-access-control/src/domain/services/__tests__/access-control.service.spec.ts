@@ -960,6 +960,108 @@ describe(AccessControlService.name, () => {
         );
       });
     });
+
+    describe('except naming a subject the authority governs', () => {
+      // The clerk's own rules allow everything asked here; the authority,
+      // with no rules, allows nothing.
+      const clerkGrants: AccessGrants = {
+        'role:clerk': [
+          { action: 'read', subject: 'invoice' },
+          { action: 'read', subject: 'ledger' },
+          { action: 'read', subject: 'report' },
+        ],
+      };
+
+      const exceptingService = (
+        except: string[],
+        authority: AuthorityInterface = (() => {
+          const casl = new CaslAuthority(
+            { rulesFor: async () => [] },
+            { subjects: ['ledger'] },
+          );
+          casl.govern('invoice', ['id', 'total']);
+          return casl;
+        })(),
+      ) =>
+        new AccessControlService(
+          actingAs(clerk),
+          new StaticAccessGrantsProvider(clerkGrants),
+          undefined,
+          { authority, except },
+        );
+
+      const startupProblems = (service: AccessControlService): unknown => {
+        try {
+          service.onModuleInit();
+        } catch (error) {
+          return error instanceof AccessRulesInvalidException
+            ? error.context.problems
+            : error;
+        }
+        return [];
+      };
+
+      it('fails startup on an entity it is attached to, and on a subject declared on it', () => {
+        expect(
+          startupProblems(exceptingService(['report', 'invoice', 'ledger'])),
+        ).toEqual([
+          'authority.except names "invoice", which the authority governs; remove it, so the authority decides its routes',
+          'authority.except names "ledger", which the authority governs; remove it, so the authority decides its routes',
+        ]);
+      });
+
+      it('starts with entries naming only subjects it does not govern', () => {
+        expect(startupProblems(exceptingService(['report']))).toEqual([]);
+      });
+
+      it('decides the subject by the authority on every call, whether or not startup checked', async () => {
+        const service = exceptingService(['report', 'invoice']);
+
+        await expect(service.assert({}, 'read', 'invoice')).rejects.toThrow(
+          expect.objectContaining({
+            context: expect.objectContaining({ refusal: 'authority' }),
+          }),
+        );
+        await expect(
+          service.assert({}, 'read', 'report'),
+        ).resolves.toBeUndefined();
+      });
+
+      it('shows the authority’s rules for the subject in effectiveRules, not the actor’s', async () => {
+        const authority = new CaslAuthority({
+          rulesFor: async () => [{ action: 'update', subject: 'invoice' }],
+        });
+        authority.govern('invoice', ['id', 'total']);
+
+        expect(
+          await exceptingService(
+            ['report', 'invoice'],
+            authority,
+          ).effectiveRules({}),
+        ).toEqual([
+          { action: 'update', subject: 'invoice' },
+          { action: 'read', subject: 'report' },
+        ]);
+      });
+
+      it('takes except as written from an authority that cannot say what it governs', async () => {
+        const told: string[] = [];
+        const authority: AuthorityInterface = {
+          decide: async () => ({ effect: 'refuse' }),
+          govern: (subject) => {
+            told.push(subject);
+          },
+        };
+        authority.govern?.('invoice', ['id']);
+        const service = exceptingService(['invoice'], authority);
+
+        expect(told).toEqual(['invoice']);
+        expect(startupProblems(service)).toEqual([]);
+        await expect(
+          service.assert({}, 'read', 'invoice'),
+        ).resolves.toBeUndefined();
+      });
+    });
   });
 
   describe('refusal', () => {

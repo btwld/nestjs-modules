@@ -61,6 +61,38 @@ export class AccessControlService {
   }
 
   /**
+   * Fails startup when `except` names a subject the authority governs,
+   * which the authority decides whatever `except` says. Runs once every
+   * module is built, so every repository has told the authority what it
+   * governs.
+   */
+  onModuleInit(): void {
+    const problems = [...this.authorityExcept]
+      .filter((resource) => !this.leftOut(resource))
+      .map(
+        (resource) =>
+          `authority.except names "${resource}", which the authority governs; remove it, so the authority decides its routes`,
+      );
+
+    if (problems.length) {
+      throw new AccessRulesInvalidException(problems);
+    }
+  }
+
+  /**
+   * Whether the authority leaves `resource` to the actor's rules: it is in
+   * `except`, and the authority doesn't govern it. Asked on every call, so
+   * a governed subject is decided by the authority even where the startup
+   * check never ran.
+   */
+  private leftOut(resource: string): boolean {
+    return (
+      this.authorityExcept.has(resource) &&
+      this.authority?.authority.governs?.(resource) !== true
+    );
+  }
+
+  /**
    * What the module's authority answers for `action` on `resource`, which
    * the authority decides as its subject.
    *
@@ -78,7 +110,7 @@ export class AccessControlService {
     action: string,
     resource: string,
   ): Promise<AccessAuthorization> {
-    if (!this.authority || this.authorityExcept.has(resource)) {
+    if (!this.authority || this.leftOut(resource)) {
       return { allowed: true, resolution };
     }
     const { authority } = this.authority;
@@ -331,8 +363,9 @@ export class AccessControlService {
    * they may do. Empty when nobody is acting.
    *
    * With an authority that gives its rules (`rulesFor`), the two combined as
-   * they decide: outside `except`, the authority's allows and every deny; on
-   * a resource in `except`, the actor's own rules. With an authority that
+   * they decide: on a resource the authority leaves out (in `except`, and
+   * not one it governs), the actor's own rules; elsewhere, the authority's
+   * allows and every deny. With an authority that
    * doesn't, the actor's own rules only.
    */
   async effectiveRules(
@@ -345,7 +378,6 @@ export class AccessControlService {
     const authority = this.authority?.authority;
     if (!authority?.rulesFor) return denyLast(own);
 
-    const except = this.authorityExcept;
     const decided = await authority.rulesFor(
       ctx,
       normalizeActor(resolution.actor),
@@ -353,11 +385,13 @@ export class AccessControlService {
 
     return denyLast([
       ...decided.flatMap((rule) =>
-        onSubjects(rule, (subject) => !except.has(subject)),
+        onSubjects(rule, (subject) => !this.leftOut(subject)),
       ),
       ...own
         .filter((rule) => !rule.inverted)
-        .flatMap((rule) => onSubjects(rule, (subject) => except.has(subject))),
+        .flatMap((rule) =>
+          onSubjects(rule, (subject) => this.leftOut(subject)),
+        ),
       ...narrowingRules(own),
     ]);
   }

@@ -32,6 +32,14 @@ export interface AuthorityInterface<Column extends string = string> {
   govern?(subject: string, columns: readonly string[]): void;
 
   /**
+   * Whether it decides `subject`: one `govern` told it of, or one it was
+   * declared to decide, the same answer for every actor. Access control decides such a subject by the
+   * authority even when its `except` lists it, and fails startup on the
+   * entry. Optional; without it, `except` is taken as written.
+   */
+  governs?(subject: string): boolean;
+
+  /**
    * The rules it decides `actor` by on `ctx`, as written, gates and reasons
    * included. Access control's `effectiveRules` combines them with the
    * actor's for a UI, keeping only what decides; send them to a caller

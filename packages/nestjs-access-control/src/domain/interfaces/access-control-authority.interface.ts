@@ -12,7 +12,9 @@ export interface AccessControlAuthorityInterface {
    * stands behind: a route on one of them is decided by access control's
    * own rules alone. Every other route is decided by the authority first,
    * so a resource misnamed, or added and not listed here, is refused by it
-   * rather than left to access control's rules.
+   * rather than left to access control's rules. A subject the authority
+   * governs is decided by it even if listed here, and listing one fails
+   * startup.
    */
   except?: readonly string[];
 }

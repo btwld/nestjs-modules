@@ -676,4 +676,48 @@ describe(CaslAuthority.name, () => {
       ).toEqual(['body rule 0: subject "ordr" is not a known subject']);
     });
   });
+
+  describe('governs', () => {
+    it('should answer true for an entity it was told of and a subject it was given, false otherwise', () => {
+      const authority = governing(new RulesFixture({}));
+
+      expect(
+        [ORDER_TOKEN, 'invoices', 'report'].map((subject) =>
+          authority.governs(subject),
+        ),
+      ).toEqual([true, true, false]);
+    });
+  });
+
+  describe('ruleGaps', () => {
+    it('should list each action on each subject it knows that no rule decides', () => {
+      const authority = new CaslAuthority(new RulesFixture({}), {
+        subjects: ['report'],
+        actions: ['approve'],
+      });
+      authority.govern(ORDER_TOKEN, COLUMNS);
+
+      expect(
+        authority.ruleGaps([
+          {
+            action: Object.values(ActionEnum).filter(
+              (action) => action !== ActionEnum.RESTORE,
+            ),
+            subject: ORDER_TOKEN,
+          },
+          { action: 'approve', subject: ORDER_TOKEN, inverted: true },
+          { action: 'read', subject: 'report', fields: ['id'] },
+          {
+            action: ['create', 'update', 'delete', 'softDelete', 'restore'],
+            subject: 'report',
+            inverted: true,
+          },
+        ]),
+      ).toEqual([
+        { subject: ORDER_TOKEN, action: 'restore' },
+        { subject: 'report', action: 'read', fields: ['id'] },
+        { subject: 'report', action: 'approve' },
+      ]);
+    });
+  });
 });

@@ -561,6 +561,30 @@ authorityPendingGates(rules);
 // [{ gate: 'FIN-12', action: 'void', subject: 'invoice' }]
 ```
 
+A pair no rule names is refused too, but nobody decided it. List those with
+`authorityRuleGaps(rules, { subjects, actions })`: every action on every
+subject you pass that no rule decides, allow or deny, pending ones
+included. A pair rules name only with `fields` is listed with those
+fields: a call naming fields gets only those, but an allow among them
+allows a call naming none, such as a delete, outright. It is a report, for a
+review that every subject and action was decided: pass every rule you
+store, for every actor:
+
+```ts
+authorityRuleGaps(rules, {
+  subjects: ['invoice', 'customer'],
+  actions: ['read', 'update', 'void'],
+});
+// [
+//   { subject: 'customer', action: 'read' },
+//   { subject: 'customer', action: 'update' },
+//   { subject: 'customer', action: 'void' },
+// ]
+```
+
+Every action is crossed with every subject, so a verb that doesn't apply
+to a subject is listed until a deny says so.
+
 `AuthorityRuleInterface` defaults to the six `ActionEnum` verbs, so a
 mistyped verb fails to compile. To add verbs of your own, widen it; to
 narrow, list only the verbs you allow. Rules read at runtime aren't typed:
@@ -715,6 +739,7 @@ route:
 | `requirePrivateWrites` | core | the route is not public, or only reads: `GET`, `HEAD`, `OPTIONS`, `SEARCH`, `PROPFIND` or `QUERY` |
 | `requireAuth` | `@concepta/nestjs-authentication` | an authentication guard runs on the route, or it is public |
 | `requireAcl` | `@concepta/nestjs-access-control` | the route has a grant decorator, or it is public |
+| `requireWriteGrants` | `@concepta/nestjs-access-control` | the route only reads, as for `requirePrivateWrites`, or none of its grants is `read` |
 
 A route is public when it carries core's `@PublicRoute()`, which every
 `@AuthPublic()` form sets, `{ optional: true }` included. So a public route
@@ -1428,7 +1453,7 @@ exercise correlation behavior directly.
 | `frozenActor(actor)` | A copy whose `roles` can't change, for defining `ActorCtx`. |
 | `actorKeys(actor)` | The keys an actor's permissions are usually stored under: `role:<name>` for each role, or `system:<name>`. |
 | `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. This copy is what an authority is asked about and what an exception names. |
-| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`, and optional `govern(subject, columns)`, told at startup each entity key it governs and its columns, and `rulesFor(ctx, actor)`, the rules it decides an actor by, for a UI. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
+| `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`, and optional `govern(subject, columns)`, told at startup each entity key it governs and its columns, `governs(subject)`, whether it decides a subject, and `rulesFor(ctx, actor)`, the rules it decides an actor by, for a UI. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
 | `AuthorityRequestInterface` | `{ actor, subject, action, columns }`. |
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns?, gates? }` or `{ effect: 'refuse', gate? }`; `gates` names the gate of each column left out pending. |
 | `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, pending?, reason? }`. |
@@ -1436,6 +1461,7 @@ exercise correlation behavior directly.
 | `authorityGateOf(rules)` | The `gate` of a refusal, from the rules that refused, as written, highest priority first: the first-given deny's `pending` when every deny is pending. For an authority of your own. |
 | `assertAuthority(ctx, authority, subject, action)` | Throws `AuthorityActionRefusedException` (403) unless the authority allows the actor on `ctx` the action, asked with no columns: for a domain operation with no write of its own. |
 | `authorityPendingGates(rules)` → `AuthorityPendingGateInterface[]` | Every decision still pending in a rule set: `{ gate, action, subject, fields? }` per action and subject of each pending deny. |
+| `authorityRuleGaps(rules, { subjects, actions })` → `AuthorityRuleGapInterface[]` | Every action on every subject no rule decides as a whole: `{ subject, action, fields? }`, with `fields` when rules name the pair only for those. |
 
 ### Route Audit Exports
 

@@ -4,8 +4,9 @@
  */
 export interface CaslAuthorityOptionsInterface {
   /**
-   * Subjects that are not entities it governs, such as a route's resource
-   * that access control asks it about.
+   * Subjects it decides that are not entities, such as a route's resource
+   * that access control asks it about. Access control decides one of them
+   * by the authority even if its `except` lists it.
    */
   subjects?: readonly string[];
   /** Verbs of your own, such as `approve`. */

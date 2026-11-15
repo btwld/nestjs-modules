@@ -4,16 +4,7 @@ import { RouteAuditRuleProvider } from './decorators/route-audit-rule-provider.d
 import { type RouteAuditRuleInterface } from './interfaces/route-audit-rule.interface.js';
 import { type RouteAuditSubjectInterface } from './interfaces/route-audit-subject.interface.js';
 import { type RouteAuditViolationInterface } from './interfaces/route-audit-violation.interface.js';
-
-/** The methods that only read; every other one may write. */
-const READ_METHODS: ReadonlySet<string> = new Set([
-  'GET',
-  'HEAD',
-  'OPTIONS',
-  'SEARCH',
-  'PROPFIND',
-  'QUERY',
-]);
+import { isReadMethod } from './utils/is-read-method.util.js';
 
 /**
  * `requirePrivateWrites`: no public route writes. A route marked public on
@@ -29,7 +20,7 @@ export class RequirePrivateWritesRouteAuditRule implements RouteAuditRuleInterfa
 
   audit(subject: RouteAuditSubjectInterface): RouteAuditViolationInterface[] {
     return subject.routes
-      .filter((route) => route.public && !READ_METHODS.has(route.method))
+      .filter((route) => route.public && !isReadMethod(route.method))
       .map((route) => ({
         route: route.id,
         message:

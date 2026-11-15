@@ -2646,10 +2646,12 @@ export class AuthorityModule {}
   each of its `fields` a column of every entity it names, so a rule
   covering entities with different columns is written once per entity.
   Declare any other subject or verb when you construct it; fields aren't
-  checked against a declared subject, which has no columns:
+  checked against a declared subject, which has no columns. A declared
+  subject is decided by the authority, so leave it out of access control's
+  `except`, which is for resources the authority doesn't decide:
 
   ```ts
-  new CaslAuthority(rules, { subjects: ['report'], actions: ['approve'] });
+  new CaslAuthority(rules, { subjects: ['dashboard'], actions: ['approve'] });
   ```
 
   Any other name is a problem with the rules (below), so a misspelled deny,
@@ -2657,7 +2659,8 @@ export class AuthorityModule {}
   denying nothing. Provide one `CaslAuthority` per application, as a
   singleton: an instance is told only what the repositories it is attached
   to govern, so a transient one, or one shared between applications, knows
-  the wrong names.
+  the wrong names. `governs(subject)` answers whether a subject is one of
+  them, declared or told; access control asks it about each `except` entry.
 - **`fields`** limits a rule to those columns, by exact name. A rule naming no
   fields covers every column.
 - **A deny (`inverted`) always wins**, whatever order the rules come in, and
@@ -2675,6 +2678,11 @@ export class AuthorityModule {}
   every problem, and every later call on that `ctx` fails the same way.
   Check stored rules before saving them with the authority's own
   `ruleProblems(rules)`, which runs the same check, names included.
+  `ruleGaps(rules)` lists, for the same names, every action on every
+  subject no rule decides (core's `authorityRuleGaps`): log it once the
+  application has started, when every repository has told the authority
+  what it governs, or serve it to an admin screen to review what is still
+  undecided. Pass every rule you store, for every actor.
 
   This fails closed, and wide: one bad rule under `role:clerk` fails every
   call of every clerk, on every entity, the rules' own editors included
