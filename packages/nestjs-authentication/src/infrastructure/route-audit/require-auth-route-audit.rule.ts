@@ -12,7 +12,8 @@ import { GuardsPolicy } from '../../domain/policies/guards.policy.js';
 import { isAuthenticationGuard } from '../utils/authentication-guard.util.js';
 
 /**
- * `requireAuth`: every route is authenticated, or marked `@AuthPublic()`.
+ * `requireAuth`: every route is authenticated, or marked public with core's
+ * `@PublicRoute()`, which `@AuthPublic()` sets.
  *
  * A route is authenticated when an authentication guard runs on it: the JWT
  * guard the module registers globally, a guard given as `appGuard`, or a

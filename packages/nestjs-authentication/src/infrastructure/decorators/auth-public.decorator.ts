@@ -10,8 +10,8 @@ import {
 export interface AuthPublicOptions {
   classLevel?: boolean;
   /**
-   * Authenticate a caller who sends credentials, and let one who sends
-   * none, or bad ones, through as nobody: never refused.
+   * Authenticate a caller whose credentials check out; a 401 from the
+   * guard lets the call through as nobody, any other error still fails it.
    */
   optional?: boolean;
 }
@@ -19,7 +19,10 @@ export interface AuthPublicOptions {
 export type AuthPublicMetadata = true | 'classLevel';
 
 /**
- * Disable ONLY AuthGuards that have the `canDisable` option set to true.
+ * Disable ONLY AuthGuards that have the `canDisable` option set to true,
+ * such as the JWT guard, and mark the route public with `@PublicRoute()`.
+ * A guard that can't be disabled, such as `LocalGuard`, still
+ * authenticates on the route.
  *
  * When applied at the **class level**, pass `{ classLevel: true }` to
  * make the intent explicit and suppress the runtime warning. Without this option,
@@ -27,7 +30,8 @@ export type AuthPublicMetadata = true | 'classLevel';
  *
  * Pass `{ optional: true }` for a public route that still recognises a
  * signed-in caller: credentials, when sent and valid, sign the caller in;
- * missing or invalid ones leave the call anonymous instead of refusing it.
+ * a 401 from the guard leaves the call anonymous instead of refusing it,
+ * and any other error still fails it.
  *
  * @example Method-level (default, no warning):
  * ```ts

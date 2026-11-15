@@ -26,6 +26,7 @@ utilities**.
   - [Specification Guards](#specification-guards)
   - [Consuming Hooks](#consuming-hooks)
 - [Context System](#context-system)
+  - [Actor and Authority](#actor-and-authority)
   - [RPC (preview)](#rpc-preview)
 - [Route Audit](#route-audit)
 - [Exceptions](#exceptions)
@@ -435,11 +436,27 @@ event context starts a fresh pair.
 ### Actor and Authority
 
 `ActorCtx` carries who is acting on a call: a person through their roles, or
-a system acting on its own authority. Whatever established the caller defines
-it once, immutably (on HTTP, access control's `actorResolver`, which turns
-the signed-in user into an actor), and every package that decides access
-reads it from the same place. `frozenActor` copies the actor with its `roles`
-frozen too, so nothing holding the array can change who was decided:
+a system acting on its own authority. Every package that decides access
+reads it. Define it once per call, immutably, and pass a role actor through
+`frozenActor`: it freezes the `roles` array too, so nothing holding the array
+can change who was decided.
+
+On HTTP, the `actorResolver` you give access control defines the actor from
+the signed-in user. Access control has no default: without a resolver,
+nobody is acting unless something else defines `ActorCtx`. A guard of yours
+can define it first, such as an API-key guard for an integration: a call
+carrying `ActorCtx` uses it. With `@concepta/nestjs-authentication`'s global
+JWT guard, a caller without a token is refused (401) by that guard, whatever
+order it runs in relative to yours: mark the routes your guard serves
+`@AuthPublic({ optional: true })`, or turn the global guard off
+(`appGuard: false`).
+
+Access control's `AccessContextOverlay` attaches on HTTP only. Elsewhere its
+`actorResolver` is still asked when a call carries no `ActorCtx`, but with
+no execution context, so it can't read a request. On RPC, define `ActorCtx`
+in a guard that runs before a grant's guard (an overlay is too late: guards
+run before interceptors); in a queue consumer or job, on the context it
+opens:
 
 ```ts
 import { ActorCtx, frozenActor } from '@concepta/nestjs-core';
@@ -453,38 +470,86 @@ ctx.defineOverlay(ActorCtx, { kind: 'system', name: 'billing-sync' }, { immutabl
 ```
 
 `AuthorityInterface` is the contract for deciding access: given the actor, a
-subject, an action and the subject's columns, `decide()` allows (optionally
-only some columns) or refuses (optionally naming a decision still pending).
-Core ships no implementation; `@concepta/nestjs-repository` enforces one on
-every repository call and ships a CASL-backed one — see its
-[Object Authority](../nestjs-repository/README.md#object-authority).
-`actorKeys(actor)` gives the keys an actor's permissions are usually stored
-under: `role:<name>` for each role, `system:<name>` for a system.
-`normalizeActor(actor)` copies an actor with exactly what its kind has,
-`{ kind: 'role', roles, userId? }` or `{ kind: 'system', name }`, dropping
-anything else a resolver put on it; the repository asks an authority about,
-and an exception names, that copy. A one-entity
-authority can narrow its column names, `AuthorityInterface<keyof Order & string>`.
+subject, an action and columns, `decide()` allows (optionally only some
+columns) or refuses (optionally naming a decision still pending). When a
+repository asks, `columns` is every column of the entity. Access control's
+checks (route checks, `can` and `assert`) ask with no columns: the action,
+and also `read` when the action isn't `read`, since a write's response
+shows what a read would. Answer them by the action. A repository asks only
+`create`,
+`read`, `update`, `delete`, `softDelete` and `restore`. An authority shared
+with access control is also asked each route's own verbs (such as
+`approve`) on every resource not in `except`, so write those in its rules
+too.
+
+Core ships no implementation. `@concepta/nestjs-repository` enforces one on
+each entity you register with `authority: { access: 'governed', authority }`,
+and ships a CASL-backed one — see its
+[authority](../nestjs-repository/README.md#object-authority) section. A
+one-entity authority can narrow its column names,
+`AuthorityInterface<keyof Order & string>`. `actorKeys` and `normalizeActor`
+help an authority of your own; see the [API Reference](#api-reference).
 
 Rules are written in one shape wherever they are used, the repository's
 authority and access control's grants alike: `AuthorityRuleInterface`, plain
 JSON naming an `action` (a verb), a `subject`, optional `fields`, and
-`inverted: true` with a `reason` for a deny. Its type accepts only
-`ActionEnum`'s verbs unless you widen it, so a typo in rules you type with it
-fails to compile. Where rules are handed over (`settings.grants`, a rules
-source) any verb is accepted, since a route may name one of its own.
-`authorityRuleProblems(rules, source)` checks rules read from storage,
-listing every problem: conditions, unknown properties, field patterns, and
-CASL's wildcards `manage` and `all` are refused.
+`inverted: true` for a deny. What a field is depends on where the rule is
+used: a repository matches a column by its exact name; access control
+matches a path in a request or response body, which covers everything
+beneath it. A deny's optional `reason` names a decision
+still pending: when denies of the whole subject refuse a call and every one
+of them has a `reason`, the first one's reason is reported as the refusal's
+`gate`. A deny naming `fields`, or any deny without a reason, reports none.
+A deny without a reason is final, so leave it off unless something can
+still lift the deny.
+
+`AuthorityRuleInterface` defaults to the six `ActionEnum` verbs, so a
+mistyped verb fails to compile. To add verbs of your own, widen it; to
+narrow, list only the verbs you allow. `settings.grants` and a rules
+source's `rulesFor` accept any verb, since a route may name one of its own,
+so a typo there fails silently: a mistyped allow grants nothing, and a
+mistyped deny denies nothing. Type the rules you write as
+`AuthorityRuleInterface` before passing them in.
 
 ```ts
-import { type AuthorityRuleInterface } from '@concepta/nestjs-core';
+import {
+  type ActionEnum,
+  type AuthorityRuleInterface,
+} from '@concepta/nestjs-core';
 
 const clerk: AuthorityRuleInterface[] = [
   { action: ['create', 'read', 'update'], subject: 'order' },
   { action: 'update', subject: 'order', fields: ['total'], inverted: true },
 ];
+
+// Widened: the six verbs plus your own
+const approver: AuthorityRuleInterface<`${ActionEnum}` | 'approve'>[] = [
+  { action: ['read', 'approve'], subject: 'order' },
+];
+
+// Narrowed: only these verbs
+const viewer: AuthorityRuleInterface<'read' | 'update'>[] = [
+  { action: 'read', subject: 'order' },
+];
 ```
+
+Check rules read from storage with `authorityRuleProblems(rules, source)`.
+It lists every problem, not just the first; a rule set is refused when any
+rule has one:
+
+- **Shape**: the set isn't an array, or a rule isn't a plain object.
+- **Properties**: any property other than `action`, `subject`, `fields`,
+  `inverted` and `reason` (`conditions` included: which rows a caller
+  reaches is row scope's to decide), or a property defined as a getter.
+- **`action`**: not a string or a non-empty list of strings, or an entry
+  that isn't a verb (empty, or with whitespace or a `:`).
+- **`subject`**: not a string or a non-empty list of strings, or a blank
+  entry.
+- **Wildcards**: CASL's `manage` as an action or `all` as a subject.
+- **`fields`**: not a list of strings, an empty list (leave it out to cover
+  every field), a blank entry, a pattern (`*`), or a numeric segment such
+  as `items.0` (name the field beneath it).
+- **`inverted`** not a boolean, or **`reason`** not a string.
 
 ### RPC (preview)
 
@@ -512,7 +577,10 @@ over from one message to the next.
 
 In a hybrid app (HTTP plus a connected microservice), pass
 `inheritAppConfig` so the overlays run for message handlers too. Without it,
-`@Ctx()` still works but `@UseHooks()` silently does nothing:
+`@Ctx()` still works but `@UseHooks()` silently does nothing. It applies the
+app's global guards too: `@concepta/nestjs-authentication`'s global JWT
+guard then runs on message handlers and can't read a token from a message,
+so mark them `@AuthPublic()` and authenticate them in a guard of your own:
 
 ```ts
 app.connectMicroservice(
@@ -528,9 +596,12 @@ readonly transports: readonly ContextType[] = ['http', 'rpc'];
 ```
 
 Correlation, the authenticated user and crud read the HTTP request, so they
-are absent in message handlers. To get the user there, write an overlay that
-reads it from your transport (for example gRPC metadata, from
-`context.switchToRpc().getContext()`) and defines `AuthUserCtx`.
+are absent in message handlers, and access control's `actorResolver` gets no
+request there. To get the user there, write a guard that reads it from your
+transport (for example gRPC metadata, from
+`context.switchToRpc().getContext()`) and defines `AuthUserCtx` and
+`ActorCtx` on `requireAppContext(context)`. It must run before a grant's
+guard; an overlay is too late, since guards run before interceptors.
 
 WebSocket gateways and gRPC call-stream handlers aren't supported yet. There,
 `@Ctx()` and `@Transactional()` throw `AppContextUnavailableException` and
@@ -546,7 +617,7 @@ start instead, naming each route:
 ```ts
 CoreModule.forRoot({
   routeAudit: {
-    allow: { requireAcl: ['GET /health'] },
+    allow: { requireAcl: ['GET /me'] },
   },
 });
 ```
@@ -561,30 +632,44 @@ route:
 
 | Rule | Added by | Passes when |
 | --- | --- | --- |
-| `requireAuth` | `@concepta/nestjs-authentication` | an authentication guard runs on the route, or it is `@AuthPublic()` |
-| `requireAcl` | `@concepta/nestjs-access-control` | the route has a grant decorator, or it is `@AuthPublic()` |
+| `requireAuth` | `@concepta/nestjs-authentication` | an authentication guard runs on the route, or it is public |
+| `requireAcl` | `@concepta/nestjs-access-control` | the route has a grant decorator, or it is public |
+
+A route is public when it carries core's `@PublicRoute()`, which every
+`@AuthPublic()` form sets, `{ optional: true }` included. So a public route
+is also exempt from `requireAcl`: a missing grant there is not caught at
+startup.
+
+`requireAuth` reports one violation for the whole application instead, with
+no route and not exemptable by `allow`, when more than one route is
+non-public and none has an authentication guard, and when
+`settings.guards.enable` is false. See
+[JWT Bearer Authentication](../nestjs-authentication/README.md#jwt-bearer-authentication).
 
 The audit only looks for routes left open. A mistake that refuses calls, such
 as a guard order that leaves access control without an actor, shows up on the
 first request instead.
 
-- **`allow`** exempts a route from one rule: rule name, then route ids. A
-  route id is `METHOD /path` before any global prefix, with the path
-  `RouterModule` mounts the module at (`GET /admin/invoices/:id`); a declared
-  version adds `v2` and a host adds `@` and the host. An entry that
-  exempts nothing, because the route is gone or now passes, fails startup too,
-  so the list can't go stale.
+- **`allow`** exempts a route from one rule: rule name, then route ids.
+  Copy each id exactly as the violation prints it. A route id is
+  `METHOD /path` before any global prefix, with the path `RouterModule`
+  mounts the module at, then its version and host when it declares them,
+  each after a space: `GET /admin/invoices/:id v2 @api.example.com`. An
+  entry that exempts nothing, because the route is gone or passes the rule,
+  fails startup too, so the list can't go stale. So does an entry whose id
+  names several routes: give them different paths, versions or hosts.
 - **`mode: 'report'`** logs each violation as a warning and starts anyway, for
-  a first look at an existing application. The default is `'throw'`.
-- **`@PublicRoute()`** marks a route as open on purpose, so rules skip it.
-  `@AuthPublic()` sets it for you; apply it yourself on routes your own guard
-  lets through.
+  a first look at an existing application. A stale or ambiguous `allow`
+  entry is logged the same way. The default is `'throw'`.
+- **`@PublicRoute()`** marks a route as open on purpose, so rules skip it;
+  it only marks the route and opens nothing. `@AuthPublic()` sets it for
+  you; apply it yourself on routes your own guard lets through.
 
 Only controller routes are audited: not message handlers (RPC), and not paths
 served outside a controller, such as middleware or Swagger UI.
 
-A rule that can't run, because it or something it injects is request-scoped,
-fails startup too, rather than being skipped.
+Keep rules and what they inject out of request scope. A rule that can't run
+for that reason fails startup too; it is never skipped.
 
 ### Writing a rule
 
@@ -1239,11 +1324,14 @@ exercise correlation behavior directly.
 | `CorrelationContextInterface` | Shape of the resolved overlay: `{ correlationId, causationId }`. |
 | `ActorCtx` | `OverlayRef` token for who is acting on a call. Define it `{ immutable: true }` — see [Actor and Authority](#actor-and-authority). |
 | `Actor`, `RoleActorInterface`, `SystemActorInterface` | `{ kind: 'role', roles, userId? }` or `{ kind: 'system', name }`. |
-| `actorKeys(actor)` | `role:<name>` for each role, or `system:<name>`. |
-| `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. |
+| `frozenActor(actor)` | A copy whose `roles` can't change, for defining `ActorCtx`. |
+| `actorKeys(actor)` | The keys an actor's permissions are usually stored under: `role:<name>` for each role, or `system:<name>`. |
+| `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. This copy is what an authority is asked about and what an exception names. |
 | `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
 | `AuthorityRequestInterface` | `{ actor, subject, action, columns }`. |
 | `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns? }` or `{ effect: 'refuse', gate? }`. |
+| `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, reason? }`. |
+| `authorityRuleProblems(rules, source)` | Every problem with rules read from storage, each naming `source`; empty when they can be used. |
 
 ### Route Audit Exports
 
@@ -1320,7 +1408,7 @@ exercise correlation behavior directly.
 
 | Export | Description |
 | --- | --- |
-| `ActionEnum` | Enum of the actions an authority decides (`CREATE`, `READ`, `UPDATE`, `DELETE`, `SOFT_DELETE`, `RESTORE`). |
+| `ActionEnum` | Enum of the actions a repository asks its authority (`CREATE`, `READ`, `UPDATE`, `DELETE`, `SOFT_DELETE`, `RESTORE`). A route may ask its own, such as `approve`. |
 | `Operation` | String enum of the nine operations: `List`, `Read`, `Create`, `CreateBatch`, `Update`, `Replace`, `Delete`, `SoftDelete`, `Restore`. |
 | `ReadOperations` | Read-only tuple `[List, Read]`. |
 | `WriteOperations` | Read-only tuple `[Create, CreateBatch, Update, Replace]`. |

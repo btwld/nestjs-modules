@@ -123,10 +123,14 @@ function problemsOf(rule: unknown): string[] {
 
 /**
  * Every problem with a rule set (`AuthorityRuleInterface[]`), each prefixed
- * with `source`; empty when the set can be used. A set is usable when every
- * rule is a plain object of plain values, every action is a verb, neither
- * `manage` nor `all` appears, no rule has conditions or an unknown property,
- * and every `fields` list names fields, without patterns.
+ * with `source`; empty when the set can be used. A set is usable when it is
+ * an array and every rule is a plain object of plain values with no
+ * property but `action`, `subject`, `fields`, `inverted` and `reason` (so no
+ * conditions); `action` and `subject` are each a string or a non-empty list,
+ * every action a verb and every subject not blank, with neither `manage`
+ * nor `all`; `fields`, when given, is a non-empty list naming fields, with
+ * no blank entry, pattern or numeric segment; `inverted` is a boolean and
+ * `reason` a string.
  *
  * Rules may come from storage, so anything is accepted and checked. Call it
  * before saving rules, as the rules' consumers do before using them.

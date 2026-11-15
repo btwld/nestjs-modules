@@ -112,8 +112,13 @@ to install them yourself unless you author your own schemas.
 
 ## Quick Start
 
-The minimal setup — JWT verification only, no local login, no MFA — requires
-only `settings.jwt`:
+The minimal setup — JWT bearer auth only, no local login, no MFA — needs
+`settings.jwt`, `settings.strategies.jwt` and a `ports.user`: the JWT guard
+looks up the token's user through `UserPort` on every call, and startup
+fails with `AuthenticationFeatureConfigException` without one. Once `ports`
+is given, `password`, `otp`, `recoveryNotification` and `verifyNotification`
+are required too (see [Port Settings](#port-settings)); the
+[End-to-End Example](#end-to-end-example) shows how to write each one:
 
 ```typescript
 import { AuthenticationModule } from '@concepta/nestjs-authentication';
@@ -136,8 +141,23 @@ import { AuthenticationModule } from '@concepta/nestjs-authentication';
           jwt: {},      // activates JwtStrategy + global APP_GUARD
         },
       },
+      ports: {
+        user: {
+          getByIdQuery: GetUserByIdQuery,
+          getBySubjectQuery: GetUserBySubjectQuery, // the JWT guard's lookup
+          getByUsernameQuery: GetUserByUsernameQuery,
+          getByEmailQuery: GetUserByEmailQuery,
+          updateCommand: UpdateUserCommand,
+        },
+        password: { /* ... */ },
+        otp: { /* ... */ },
+        recoveryNotification: { /* ... */ },
+        verifyNotification: { /* ... */ },
+      },
     }),
   ],
+  // the handlers for the classes above (End-to-End Example, Step 1)
+  providers: [...userQueryHandlers, ...userCommandHandlers],
 })
 export class AppModule {}
 ```
@@ -542,21 +562,32 @@ that enforces JWT verification on every route. Token extraction defaults to
 
 **Decorators:**
 
-- `@AuthPublic()` — exempts a route handler from the global guard. At class
-  level, pass `@AuthPublic({ classLevel: true })` to make the intent explicit;
-  a class-level `@AuthPublic()` without the option triggers a runtime warning
-  on every request. A public route never authenticates, so it sees no user
-  even when the caller sends a valid token.
+- `@AuthPublic()` — turns off the JWT guard on a route, global or applied
+  to the route, along with any guard built with `canDisable: true`, and
+  sets core's `@PublicRoute()`. At class level, pass
+  `@AuthPublic({ classLevel: true })` to make the intent explicit; a
+  class-level `@AuthPublic()` without the option triggers a runtime warning
+  on every request. A guard that can't be turned off, such as `LocalGuard`
+  or `RefreshGuard`, still authenticates on that route. With only the JWT
+  guard, a public route has no signed-in user, even when the caller sends
+  a valid token.
 - `@AuthPublic({ optional: true })` — a public route that still recognises a
-  signed-in caller: a valid token signs them in, and a missing or invalid one
-  leaves the call anonymous rather than refusing it. Any authentication
-  failure counts, a failing user lookup included, so an outage of your user
-  store makes signed-in callers anonymous there. A method's plain
-  `@AuthPublic()` overrides a controller's `{ optional: true }`.
+  signed-in caller. A valid token signs them in. A 401 from the guard
+  leaves the call anonymous instead of failing it; any other error still
+  fails it. The module's own guards answer a missing, invalid or expired
+  token, a user `UserPort` can't find or who is inactive, and a failed
+  lookup with a 401, so those calls go on anonymous: while your user store
+  is down, signed-in callers are anonymous here.
+  A method's plain `@AuthPublic()` overrides a controller's
+  `{ optional: true }`.
 - `@AuthUser()` — injects the verified user object into a route parameter.
 
 ```typescript
-import { AuthPublic, AuthUser } from '@concepta/nestjs-authentication';
+import {
+  AuthPublic,
+  AuthUser,
+  type AuthenticatedUserInterface,
+} from '@concepta/nestjs-authentication';
 
 @AuthPublic({ classLevel: true })
 @Controller('public')
@@ -583,9 +614,9 @@ export class PrivateController {
 **Detecting `@AuthPublic()`:**
 
 `isAuthPublic()` reads the metadata `@AuthPublic()` sets, without depending
-on the underlying metadata key — useful for building tooling (route audits,
-a custom guard) that needs to know whether a route was marked public.
-Checks every target given, not just the first:
+on the underlying metadata key — useful in a custom guard that needs to
+know whether a route is marked `@AuthPublic()`, optional or not. Checks
+every target given, not just the first:
 
 ```typescript
 import { isAuthPublic } from '@concepta/nestjs-authentication';
@@ -593,33 +624,90 @@ import { isAuthPublic } from '@concepta/nestjs-authentication';
 isAuthPublic(context.getHandler(), context.getClass()); // boolean
 ```
 
+To check a route the way the route audit does, use core's
+`isPublicRoute()` instead. The audit reads core's `@PublicRoute()` mark,
+which `@AuthPublic()` also sets.
+
 **Catching unauthenticated routes at startup:**
 
 Turn on core's [route audit](../nestjs-core/README.md#route-audit) and this
 module adds the `requireAuth` rule: startup fails for a route that no
-authentication guard runs on and that isn't `@AuthPublic()`. The global JWT
-guard, a guard given as `appGuard` (a class instance), and any guard built
-with `AuthGuard()` count, subclasses included. A subclass that lets anonymous
-callers through still counts, so mark its routes
-`@AuthPublic({ optional: true })` to keep them visible. Turning guards off
-with `settings.guards.enable: false` fails it for the whole application. A
-`settings.guards.disable` callback decides per call, so the audit can't see
-what it lets through.
+authentication guard runs on and that isn't marked public with core's
+`@PublicRoute()`, which `@AuthPublic()` sets.
 
-A guard of your own that authenticates, without `AuthGuard()`, counts once
-you declare it:
+These count as authentication guards: the global JWT guard, a guard given
+as `appGuard` (a class instance), and any guard built with `AuthGuard()`,
+subclasses included. A subclass that lets anonymous callers through still
+counts, so mark its routes `@AuthPublic({ optional: true })`: each route
+then declares that it is open. Marking a route public, `{ optional: true }`
+included, also exempts it from access control's `requireAcl` audit rule,
+so a missing grant there is not caught at startup.
+
+When more than one route is non-public and no authentication guard runs on
+any of them, globally or on the route, the rule reports one violation for
+the whole application, naming no route, rather than one per route. Turning
+guards off with `settings.guards.enable: false` does the same. `allow`
+can't exempt either, since it names routes. A `settings.guards.disable`
+callback decides per call, so the audit can't see what it lets through.
+
+A guard of your own that authenticates without `AuthGuard()` counts once
+you mark it `@AuthenticationGuard()`. It must define `AuthUserCtx` itself,
+immutably, when nothing has defined it yet, so the guards after it, and an
+access control `actorResolver` that reads `AuthUserCtx`, see the user. It
+looks nobody up for you either, so refuse inactive users in that guard. An
+`actorResolver` that returns no actor for them refuses only routes with a
+grant, `assert` (and `can` answers `false`) and governed repository calls:
+the user is still signed in everywhere else, and `@AuthUser()` sees them.
+
+With the global JWT guard, a caller without a token is refused (401) by
+that guard, whatever order it runs in relative to yours. Mark the routes
+your guard serves
+`@AuthPublic({ optional: true })`, so the JWT guard lets them through, or
+turn the global guard off with `appGuard: false`:
 
 ```typescript
-import { AuthenticationGuard } from '@concepta/nestjs-authentication';
+import {
+  type CanActivate,
+  type ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+
+import {
+  AuthenticationGuard,
+  AuthUserCtx,
+} from '@concepta/nestjs-authentication';
+import { requireAppContext } from '@concepta/nestjs-core';
 
 @Injectable()
 @AuthenticationGuard()
 export class ApiKeyGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    // ...
+  constructor(private readonly apiKeys: ApiKeyService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = await this.apiKeys.userFor(request.headers['x-api-key']);
+
+    if (!user || user.active !== true) {
+      throw new UnauthorizedException();
+    }
+
+    const ctx = requireAppContext(context);
+
+    if (!ctx.supports(AuthUserCtx)) {
+      ctx.defineOverlay(AuthUserCtx, { user }, { immutable: true });
+    }
+    return true;
   }
 }
 ```
+
+When a caller sends both a valid token and an API key, the global JWT
+guard runs first and defines `AuthUserCtx`, so this guard keeps the JWT
+user. The
+module's one-user check (`AuthUserConflictException`, see
+[Context Overlay](#context-overlay)) holds only between guards built with
+`AuthGuard()`; compare the users in your guard if they must match.
 
 **Guards exported:**
 
@@ -1135,7 +1223,7 @@ Presence of a strategy key activates that Passport strategy:
 ```typescript
 settings: {
   strategies: {
-    jwt?: JwtStrategyPolicySettingsInterface;     // { jwtFromRequest?, requireUserValidation? }
+    jwt?: JwtStrategyPolicySettingsInterface;     // { jwtFromRequest? }
     local?: LocalStrategyPolicySettingsInterface; // { usernameField?, passwordField?, loginSchema? }
     refresh?: RefreshStrategyPolicySettingsInterface; // { jwtFromRequest? }
   },
@@ -1145,12 +1233,22 @@ settings: {
 Omitting a strategy key entirely disables that strategy.
 `loginSchema` is any `StandardSchemaV1` (default: `localLoginSchema`).
 
-`requireUserValidation` only matters when no `ports.user` is configured, as
-when you verify tokens another service issues. Token validation through
-`TokenPort` then accepts the token without looking anyone up (the default),
-or, set to `true`, refuses with `AuthenticationUserPortRequiredException`.
-With a `UserPort`, the user is always looked up, and a missing or inactive one
-is refused.
+The JWT and refresh strategies need a `ports.user` to start: they look up
+the token's user on every call and refuse a missing or inactive one.
+
+To check a token yourself, pick by whether its user must be looked up too:
+
+| Call | Checks |
+| --- | --- |
+| `TokenPort.verifyAccessToken` / `verifyRefreshToken` | The token only |
+| `TokenPort.validateToken(ctx, payload)` | A verified payload's user: `false` for a missing or inactive one |
+| `ValidateAndVerifyAccessTokenQuery` / `ValidateAndVerifyRefreshTokenQuery` | The token, then its user: throws for a missing or inactive one |
+
+The user checks need a `UserPort`: without one they throw
+`AuthenticationUserPortRequiredException` (500, fault `usage`) before
+checking anything, reporting the missing port as a misconfiguration
+rather than refusing the caller. To check tokens another service issues
+without a `UserPort`, use `verifyAccessToken` / `verifyRefreshToken`.
 
 ### MFA Settings
 
@@ -1241,8 +1339,13 @@ AuthenticationModule.forRoot({
 ```
 
 - `appGuard: false` — disables the global `APP_GUARD` entirely.
-- `appGuard: MyCustomGuard` — replaces the default `JwtGuard` as the APP_GUARD.
+- `appGuard: myGuard` — a guard instance, used as the `APP_GUARD` in place
+  of `JwtGuard`, as is: nothing is injected into it. To use a `JwtGuard`
+  subclass, set `appGuard: false` and register it as `APP_GUARD` yourself
+  (see [Disabling the Global Guard](#disabling-the-global-guard)).
 - `guards` — registers named guards for `AuthRouterGuard` dispatch.
+
+`appGuard` applies only when `settings.strategies.jwt` is set.
 
 ---
 
@@ -1369,7 +1472,9 @@ To disable the global guard entirely:
 
 ```typescript
 AuthenticationModule.forRoot({
-  settings: { strategies: { jwt: {} } },
+  // settings.jwt and ports as in the Quick Start
+  settings: { jwt, strategies: { jwt: {} } },
+  ports,
   appGuard: false,
 })
 ```
@@ -1383,22 +1488,54 @@ call it returns `true` for. It runs on every request, so base it on the
 route, never on what the client sends: a callback that skips JWT when an
 `x-api-key` header is present lets any client turn authentication off by
 sending that header. For callers authenticated another way, such as API
-keys, authenticate them in a guard of their own instead.
+keys, authenticate them in a guard of their own instead (see the
+`ApiKeyGuard` example under
+[JWT Bearer Authentication](#jwt-bearer-authentication)). With the global
+JWT guard, a caller without a token is refused (401) before that guard
+runs: mark its routes `@AuthPublic({ optional: true })`, or set
+`appGuard: false`.
 
-To replace the default `JwtGuard` with a custom guard as the global APP_GUARD:
+`settings.guards.disable` and `settings.guards.enable: false` apply only to
+the JWT guard and guards built with `canDisable: true`. `LocalGuard`,
+`RefreshGuard` and `AuthRouterGuard` still run.
+
+To replace the default `JwtGuard` with a subclass of your own as the global
+guard, set `appGuard: false` and register the subclass as `APP_GUARD`
+yourself, so Nest injects its dependencies. `forRoot` registers the module
+globally, so the `GuardsPolicy` the guard needs resolves in any module.
+`appGuard` itself takes a guard instance and uses it as is, injecting
+nothing into it, so a `JwtGuard` subclass created with `new` fails on every
+call.
 
 ```typescript
-import { JwtGuard } from '@concepta/nestjs-authentication';
+import { Injectable, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 
+import {
+  AuthenticationModule,
+  JwtGuard,
+} from '@concepta/nestjs-authentication';
+
+@Injectable()
 class MyAppGuard extends JwtGuard {
   // override canActivate or handleRequest
 }
 
-AuthenticationModule.forRoot({
-  settings: { strategies: { jwt: {} } },
-  appGuard: new MyAppGuard(),
+@Module({
+  imports: [
+    AuthenticationModule.forRoot({
+      // settings.jwt and ports as in the Quick Start
+      settings: { jwt, strategies: { jwt: {} } },
+      ports,
+      appGuard: false,
+    }),
+  ],
+  providers: [{ provide: APP_GUARD, useClass: MyAppGuard }],
 })
+export class AppModule {}
 ```
+
+`appGuard` applies only when `settings.strategies.jwt` is set.
 
 ### Context Overlay
 
@@ -1409,11 +1546,13 @@ The authenticated user is published into the Rockets `AppContextHost` as the
 import { AuthUserCtx } from '@concepta/nestjs-authentication';
 import { getAppContext } from '@concepta/nestjs-core';
 
-// In a handler or an interceptor:
+// In a handler on HTTP, where it is always defined (with no user on a
+// call nobody authenticated):
 const { user } = getAppContext(request).with(AuthUserCtx);
 
-// In a guard that runs after authentication, where it is absent on a
-// call nobody authenticated:
+// In a guard, or anything that may run before AuthUserContextOverlay
+// (such as an interceptor that runs before it), where it is absent until
+// the guard that authenticated the call defines it:
 const ctx = getAppContext(request);
 const user = ctx.supports(AuthUserCtx) ? ctx.with(AuthUserCtx).user : undefined;
 ```
@@ -1443,29 +1582,71 @@ AccessControlModule.forRoot({
 });
 ```
 
-The guard that authenticates a call defines it, immutably, so guards that run
-after it, such as an authorization guard, can read it, and nothing later in
-the call can change who the user is. A second guard on the same call that
-authenticates the same user changes nothing; one that authenticates someone
-else refuses the call with `AuthUserConflictException` (401), since one call
-acts for one user. On a call no guard authenticated, such as a public route,
-`AuthUserContextOverlay` (an `APP_INTERCEPTOR`) defines it with no user —
-after every guard, so a guard finds it absent there. Don't define
-`AuthUserCtx` yourself on HTTP: it is already defined by then, and
+A guard built with `AuthGuard()` that authenticates a call defines
+`AuthUserCtx`, immutably. Guards that run after it, such as an
+authorization guard, can read the user, and nothing later in the call can
+change who the user is. One call acts for one user: a second such guard
+that authenticates the same user (the same `id`) changes nothing, and one
+that authenticates someone else refuses the call with
+`AuthUserConflictException` (401), as it does when either user has no
+`id`. This check holds only between guards built with `AuthGuard()`: a
+guard of your own that defines `AuthUserCtx` only when it is absent keeps
+the user an earlier guard signed in.
+
+In a guard of your own that authenticates, mark it
+`@AuthenticationGuard()` and define `AuthUserCtx` yourself, immutably, when
+nothing has defined it yet, so the guards after it see the user (see the
+`ApiKeyGuard` example under
+[JWT Bearer Authentication](#jwt-bearer-authentication)):
+
+```typescript
+const ctx = requireAppContext(context);
+
+if (!ctx.supports(AuthUserCtx)) {
+  ctx.defineOverlay(AuthUserCtx, { user }, { immutable: true });
+}
+```
+
+Setting only `request.user` isn't enough. `AuthUserContextOverlay` copies
+`request.user` into `AuthUserCtx` when nothing defined it, but only after
+every guard has run. Until then, a guard after yours, or an access control
+`actorResolver`, that reads `AuthUserCtx` finds no user. On a call nobody
+authenticated, such as a public route, the overlay defines it with no
+user. Don't define `AuthUserCtx` in a handler or interceptor on HTTP: an
+authenticating guard or `AuthUserContextOverlay` defines it, and
 redefining it fails.
 
 A guard that runs *before* authentication sees neither `request.user` nor
-`AuthUserCtx`: keep authentication global, or list its guard first.
+`AuthUserCtx`, so authentication must run before access control's guard.
+Keep it global, or put its `@UseGuards` below the access-control decorator
+at the same level (class or method): the lower decorator's guard runs
+first. A guard on the controller runs before one on a method.
 
-Every sign-in refuses a user whose `active` isn't `true`, the same way as a
-user `UserPort` can't find: local login, the JWT and refresh guards, and
-token validation through `TokenPort`. Turning a user off takes effect on
-their next call, with no need to wait for their tokens to expire.
+The module's own sign-ins (local login, and the JWT and refresh guards,
+which need a `UserPort` to start) refuse a user whose `active` isn't
+`true`, the same way as a user `UserPort` can't find. So do
+`TokenPort.validateToken` and the `ValidateAndVerify*` queries, which
+require a `UserPort` and throw `AuthenticationUserPortRequiredException`
+(500, `usage`) without one; `TokenPort.verifyAccessToken` /
+`verifyRefreshToken` check only the token. A guard of your own looks
+nobody up: refuse inactive users in that guard. An `actorResolver` that
+returns no actor for them refuses only routes with a grant, `assert` (and
+`can` answers `false`) and governed repository calls: the user is still
+signed in everywhere else, and `@AuthUser()` sees them. Where the module
+looks the user up, turning a user off takes effect on their next call,
+with no need to wait for their tokens to expire.
 
-The overlay reads `request.user`, so it attaches on HTTP only. In RPC message
-handlers, define `AuthUserCtx` from your own overlay that reads the user from
-your transport. See the core README's RPC (preview) section. In a WebSocket
-gateway, `@AuthUser()` throws `AppContextUnavailableException`.
+The overlay reads `request.user`, so it attaches on HTTP only, and so does
+access control's `AccessContextOverlay`; off HTTP, access control's
+`actorResolver` is still asked, with no request to read. In RPC message
+handlers, define `AuthUserCtx`, and `ActorCtx` with `frozenActor(actor)`,
+in a guard of yours that reads the user from your transport and runs
+before a grant's guard; an overlay is too late there, since guards run
+before interceptors. If the microservice inherits the app's config
+(`inheritAppConfig`), the global JWT guard runs on message handlers too and
+can't read a token from a message: mark them `@AuthPublic()`. See the core
+README's RPC (preview) section. In a WebSocket gateway, `@AuthUser()` throws
+`AppContextUnavailableException`.
 
 ---
 
@@ -1507,7 +1688,7 @@ gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 
 | Symbol | Description |
 |---|---|
-| `@AuthPublic(options?)` | Exempts a route (or, with `{ classLevel: true }`, a controller) from the global guard |
+| `@AuthPublic(options?)` | Turns off the JWT guard and any `canDisable: true` guard on a route or a whole controller (at class level, pass `{ classLevel: true }` to silence the per-request warning), and sets core's `@PublicRoute()` |
 | `AuthPublicOptions` / `AuthPublicMetadata` | Decorator option/metadata types |
 | `@AuthUser()` | Injects the authenticated user into a route parameter |
 | `@AuthenticationGuard()` | Declares a guard of your own as authentication for the `requireAuth` route audit rule |
@@ -1628,7 +1809,8 @@ gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 | `VerifyException` | Base verify exception |
 | `VerifyOtpInvalidException` | Verify OTP invalid |
 | `AuthRouterException` | Base router exception (500 by default; `ProviderMissing`/`ProviderNotSupported` render 400. `AuthRouterGuard` classifies an unexpected provider-guard failure as 500/internal; an `HttpException` raised by the delegated guard is re-thrown unchanged.) |
-| `AuthenticationUserPortRequiredException` | UserPort not configured |
+| `AuthUserConflictException` | Two guards on one call authenticated different users, or either user has no `id` (401) |
+| `AuthenticationUserPortRequiredException` | `validateToken` or a `ValidateAndVerify*` query ran with no `UserPort` configured (500, `usage`) |
 | `AuthenticationFeatureConfigException` | Feature misconfiguration |
 
 ### Default CQRS Commands and Queries

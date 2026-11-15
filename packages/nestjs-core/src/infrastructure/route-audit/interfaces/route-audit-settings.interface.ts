@@ -9,7 +9,7 @@ export interface RouteAuditSettingsInterface {
   mode?: 'throw' | 'report';
   /**
    * Routes exempt from a rule, by rule name then route id:
-   * `{ requireAcl: ['GET /health'] }`. An entry that names no route, or
+   * `{ requireAcl: ['GET /me'] }`. An entry that names no route, or
    * several, is itself a violation, so the list can't go stale.
    */
   allow?: Readonly<Record<string, readonly string[]>>;
