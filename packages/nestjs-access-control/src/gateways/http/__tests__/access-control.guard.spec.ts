@@ -242,6 +242,27 @@ describe(AccessControlGuard.name, () => {
     ).toThrow(OverlayImmutableException);
   });
 
+  // Code that runs before the guard could define the decision overlay; the
+  // guard only trusts a check it ran itself.
+  it('checks a call whose decision something else defined first', async () => {
+    const { guard } = guardFor();
+    const context = rpcContext(handlers.read);
+    requireAppContext(context).defineOverlay(AccessDecisionCtx, {
+      query: {
+        actor: { kind: 'role', roles: ['admin'] },
+        action: 'read',
+        resource: 'invoice',
+      },
+      ability: createAccessAbility([{ action: 'read', subject: 'invoice' }]),
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      expect.objectContaining({
+        context: expect.objectContaining({ refusal: 'no-actor' }),
+      }),
+    );
+  });
+
   it('checks a call once when a controller and its route both apply it', async () => {
     const rulesFor = vi
       .fn<AccessGrantsProviderInterface['rulesFor']>()

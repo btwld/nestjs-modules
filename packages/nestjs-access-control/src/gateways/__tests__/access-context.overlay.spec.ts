@@ -33,6 +33,23 @@ describe(AccessContextOverlay.name, () => {
     expect(ctx.removeOverlay(ActorCtx)).toEqual(false);
   });
 
+  // The resolver keeps its own reference, so it gets a frozen copy, never
+  // the object it handed over.
+  it('defines a frozen copy of the actor the resolver returns', async () => {
+    const request = {};
+    const roles = ['a'];
+
+    await new AccessContextOverlay({
+      actorFor: async () => ({ kind: 'role', roles }),
+    }).attach(httpContext(request));
+
+    const actor = getAppContext(request).with(ActorCtx);
+    const actorRoles = actor.kind === 'role' ? actor.roles : undefined;
+    expect(actorRoles).toEqual(['a']);
+    expect(actorRoles).not.toBe(roles);
+    expect(Object.isFrozen(actorRoles)).toBe(true);
+  });
+
   it('leaves an actor already defined, without asking the resolver', async () => {
     const request = {};
     getAppContext(request).defineOverlay(

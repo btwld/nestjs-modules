@@ -467,6 +467,24 @@ describe('authority over columns', () => {
             { ctx },
           ),
       },
+      {
+        name: 'a batch create, on any of its rows',
+        actions: ['create'],
+        write: (orders, ctx) =>
+          orders.createMany(
+            [
+              { id: 'order-2', tenantId: 'acme' },
+              { id: 'order-3', tenantId: 'acme', dateDeleted: new Date() },
+            ],
+            { ctx },
+          ),
+      },
+      {
+        name: 'a replace',
+        actions: ['update'],
+        write: (orders, ctx) =>
+          orders.replace(ORDER, { ...ORDER, dateDeleted: new Date() }, { ctx }),
+      },
     ])(
       'should refuse $name soft deleting a row the actor may not soft delete',
       async ({ write, actions }) => {
@@ -829,6 +847,63 @@ describe('authority over columns', () => {
       ).resolves.toEqual({ id: ORDER.id, description: 'changed' });
       expect(orders.stored).toEqual([{ ...ORDER, description: 'changed' }]);
     });
+
+    it.each<{
+      name: string;
+      actions: string[];
+      write: (
+        orders: MemoryRepositoryFixture<OrderFixture>,
+        ctx: AppContextHost,
+      ) => Promise<unknown>;
+      result: unknown;
+    }>([
+      {
+        name: 'an upsert',
+        actions: ['create', 'update'],
+        write: (orders, ctx) =>
+          orders.upsert({ ...ORDER, description: 'changed' }, { ctx }),
+        result: { id: ORDER.id, description: 'changed' },
+      },
+      {
+        name: 'a replace',
+        actions: ['update'],
+        write: (orders, ctx) =>
+          orders.replace(ORDER, { ...ORDER, description: 'changed' }, { ctx }),
+        result: { id: ORDER.id, description: 'changed' },
+      },
+      {
+        name: 'a soft delete',
+        actions: ['softDelete'],
+        write: (orders, ctx) => orders.softDelete(ORDER, { ctx }),
+        result: { id: ORDER.id, description: ORDER.description },
+      },
+      {
+        name: 'a restore',
+        actions: ['softDelete', 'restore'],
+        write: async (orders, ctx) => {
+          await orders.softDelete(ORDER, { ctx });
+          const [deleted] = orders.stored;
+          return orders.restore(deleted, { ctx });
+        },
+        result: { id: ORDER.id, description: ORDER.description },
+      },
+      {
+        name: 'a batch delete',
+        actions: ['delete'],
+        write: (orders, ctx) => orders.deleteMany([ORDER], { ctx }),
+        result: [{ id: ORDER.id, description: ORDER.description }],
+      },
+    ])(
+      'should return the readable columns and the primary key from $name',
+      async ({ actions, write, result }) => {
+        const orders = await ordersWith({
+          ...allow('role:clerk', ORDER_TOKEN, actions),
+          ...only('role:clerk', 'read', ['description']),
+        });
+
+        await expect(write(orders, ctxOf(CLERK))).resolves.toEqual(result);
+      },
+    );
 
     it('should return only the primary key to an actor who may not read', async () => {
       const orders = await ordersWith(

@@ -4,12 +4,11 @@ import { canReadAccessField } from '../can-read-access-field.util.js';
 import { createAccessAbility } from '../create-access-ability.util.js';
 
 describe(canReadAccessField.name, () => {
+  // A route's query, as the response filter passes it: its action is the
+  // write's, which must not decide what the response shows.
+  const query = { resource: 'invoice', action: 'update' };
   const readable = (rules: AuthorityRuleInterface<string>[], path: string) =>
-    canReadAccessField(
-      createAccessAbility(rules),
-      { resource: 'invoice' },
-      path,
-    );
+    canReadAccessField(createAccessAbility(rules), query, path);
 
   it('answers with the read rules, whatever the route action', () => {
     const rules: AuthorityRuleInterface<string>[] = [

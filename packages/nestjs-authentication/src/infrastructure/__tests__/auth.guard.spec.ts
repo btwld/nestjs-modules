@@ -50,6 +50,25 @@ describe(AuthGuard.name, () => {
     expect(await guardInstance.canActivate(mockContext)).toBe(true);
   });
 
+  // Only `canDisable: true` lets a guard be turned off; options without it
+  // build one that always authenticates.
+  it('should authenticate even with guards disabled when built without canDisable', async () => {
+    const Guard = AuthGuard('local', {});
+    const authenticate = vi.fn(async () => false);
+    Reflect.set(
+      Object.getPrototypeOf(Guard.prototype),
+      'canActivate',
+      authenticate,
+    );
+    const guardInstance = new Guard(
+      new GuardsPolicy({ enable: false }),
+      reflector,
+    );
+
+    expect(await guardInstance.canActivate(mockContext)).toBe(false);
+    expect(authenticate).toHaveBeenCalled();
+  });
+
   it('should respect disable callback', async () => {
     const Guard = AuthGuard('local', { canDisable: true });
     const guardInstance = new Guard(

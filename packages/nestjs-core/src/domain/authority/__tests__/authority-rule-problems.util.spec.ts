@@ -64,6 +64,11 @@ describe(authorityRuleProblems.name, () => {
       'fields name array positions or numeric keys, which fields are checked without; name the field beneath them',
     ],
     [
+      'a field naming a multi-digit array position',
+      { action: 'read', subject: 'user', fields: ['items.12.secret'] },
+      'fields name array positions or numeric keys, which fields are checked without; name the field beneath them',
+    ],
+    [
       'a field pattern',
       { action: 'read', subject: 'user', fields: ['name', 'profile.*'] },
       'fields name patterns, which are not supported',
@@ -92,6 +97,17 @@ describe(authorityRuleProblems.name, () => {
     ).toEqual([
       'rules rule 0: conditions are not supported; which rows a caller reaches is row scope',
     ]);
+  });
+
+  // CASL reads null fields as every field, so a rule meant to name some
+  // would cover the whole subject.
+  it('refuses fields stored as null', () => {
+    expect(
+      authorityRuleProblems(
+        JSON.parse('[{"action":"read","subject":"user","fields":null}]'),
+        'rules',
+      ),
+    ).toEqual(['rules rule 0: fields must be a list of strings']);
   });
 
   it('refuses stored rules of the wrong types without throwing', () => {

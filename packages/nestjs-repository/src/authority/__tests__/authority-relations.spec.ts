@@ -27,11 +27,15 @@ import {
   type ReceiptFixture,
 } from '../../__fixtures__/memory/cascade.fixture.js';
 import {
+  AUTHOR_TAG_TOKEN,
   AUTHOR_TOKEN,
   AuthorEntityFixture,
   type AuthorFixture,
+  AuthorTagEntityFixture,
   POST_TOKEN,
   PostEntityFixture,
+  TAG_TOKEN,
+  TagEntityFixture,
 } from '../../__fixtures__/memory/federation.fixture.js';
 import { MemoryRepositoryFixture } from '../../__fixtures__/memory/memory-repository.fixture.js';
 import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-repository.module.fixture.js';
@@ -48,6 +52,7 @@ import {
 import { RecordingRepositoryFixture } from '../../__fixtures__/relation/recording-repository.fixture.js';
 import {
   BeforeCreate,
+  BeforeRead,
   RepoHook,
 } from '../../hooks/repository-hook.decorators.js';
 import { type RepositoryProviderOptions } from '../../interfaces/repository-provider-options.interface.js';
@@ -125,11 +130,24 @@ describe('authority over related rows', () => {
           return copy;
         });
       }
+      /** The first row for a read naming none, no row for one naming any. */
+      protected override async doFindOne(
+        options: RepositoryFindOptions<EmployeeFixture> = {},
+      ): Promise<EmployeeFixture | null> {
+        const rows = await this.doFind(options);
+        return options.where ? null : (rows[0] ?? null);
+      }
       protected override async doCount(
         options: RepositoryFindOptions<EmployeeFixture> = {},
       ): Promise<number> {
         this.reads.push(options);
         return this.rows.length;
+      }
+      protected override async doFindAndCount(
+        options: RepositoryFindOptions<EmployeeFixture> = {},
+      ): Promise<[EmployeeFixture[], number]> {
+        const rows = await this.doFind(options);
+        return [rows, rows.length];
       }
     }
 
@@ -345,6 +363,71 @@ describe('authority over related rows', () => {
       ).rejects.toThrow(AuthorityRefusedException);
     });
 
+    // Generated CRUD lists with findAndCount and reads with findOne, so each
+    // read decides its joins as find does.
+    describe('on every read', () => {
+      type Read = (
+        employees: EmployeesFixture,
+        options: RepositoryFindOptions<EmployeeFixture>,
+      ) => Promise<unknown>;
+      const READS: { name: string; read: Read }[] = [
+        { name: 'find', read: (e, o) => e.find(o) },
+        { name: 'findOne', read: (e, o) => e.findOne(o) },
+        { name: 'findAndCount', read: (e, o) => e.findAndCount(o) },
+        { name: 'count', read: (e, o) => e.count(o) },
+      ];
+      const NARROWED = { ...OWN, department: { id: 'dep-1' } };
+
+      it.each([
+        { name: 'find', read: READS[0].read, rows: [NARROWED] },
+        { name: 'findOne', read: READS[1].read, rows: NARROWED },
+        { name: 'findAndCount', read: READS[2].read, rows: [[NARROWED], 1] },
+      ])(
+        'should hold only the readable columns of joined rows on $name',
+        async ({ read, rows }) => {
+          const { employees } = start(readsOnly('departments', ['id']));
+
+          await expect(
+            read(employees, {
+              join: [{ relation: 'department' }],
+              ctx: actorCtx(CLERK),
+            }),
+          ).resolves.toEqual(rows);
+        },
+      );
+
+      it.each(READS)(
+        'should refuse a join into rows the actor may not read on $name',
+        async ({ read }) => {
+          const { employees } = start({});
+
+          await expect(
+            read(employees, {
+              join: [{ relation: 'department' }],
+              ctx: actorCtx(CLERK),
+            }),
+          ).rejects.toThrow(AuthorityRefusedException);
+          expect(employees.reads).toEqual([]);
+        },
+      );
+
+      it.each(READS)(
+        'should refuse a filter on a joined column the actor may not read on $name',
+        async ({ read }) => {
+          const { employees } = start(readsOnly('departments', ['id']));
+
+          await expect(
+            read(employees, {
+              where: Where.rel('department', Where.eq('title', 'R')),
+              join: [{ relation: 'department' }],
+              ctx: actorCtx(CLERK),
+            }),
+          ).rejects.toThrow(AuthorityRefusedException);
+          expect(employees.reads).toEqual([]);
+        },
+      );
+    });
+
     it('should join a many-to-many when target and junction are readable', async () => {
       const { employees } = start({
         ...readsOnly('projects', ['title']),
@@ -392,6 +475,147 @@ describe('authority over related rows', () => {
           ],
         }).compile(),
       ).rejects.toThrow(AuthorityBootException);
+    });
+  });
+
+  // A hook can reshape the read, but never who it is decided for.
+  describe('a hook handing the read another actor', () => {
+    async function compileLines(table: AuthorityTableFixture) {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          CoreModule.forRoot({}),
+          RepositoryModule.forRoot({
+            imports: [
+              deciders(new AuthorityFixture(table), [ReadsAsAdminHook]),
+            ],
+            drivers: [
+              {
+                driver: MemoryRepositoryModuleFixture,
+                entities: [
+                  {
+                    key: ORDER_TOKEN,
+                    entity: OrderEntityFixture,
+                    authority: {
+                      access: 'governed',
+                      authority: AuthorityFixture,
+                    },
+                  },
+                  {
+                    key: ORDER_LINE_TOKEN,
+                    entity: OrderLineEntityFixture,
+                    authority: {
+                      access: 'governed',
+                      authority: AuthorityFixture,
+                    },
+                    hooks: [ReadsAsAdminHook],
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      }).compile();
+      await moduleRef.init();
+      return moduleRef.get<MemoryRepositoryFixture<PlainLiteralObject>>(
+        getDynamicRepositoryToken(ORDER_LINE_TOKEN),
+      );
+    }
+
+    const ADMIN_READS = {
+      ...allow('role:admin', ORDER_TOKEN, ['read']),
+      ...allow('role:admin', ORDER_LINE_TOKEN, ['read']),
+    };
+
+    type Read = (
+      lines: MemoryRepositoryFixture<PlainLiteralObject>,
+      options: RepositoryFindOptions<PlainLiteralObject>,
+    ) => Promise<unknown>;
+    const READS: { name: string; read: Read }[] = [
+      { name: 'find', read: (l, o) => l.find(o) },
+      { name: 'findOne', read: (l, o) => l.findOne(o) },
+      { name: 'findAndCount', read: (l, o) => l.findAndCount(o) },
+      { name: 'count', read: (l, o) => l.count(o) },
+    ];
+
+    it.each(READS)(
+      'should decide the root as the caller on $name',
+      async ({ read }) => {
+        const lines = await compileLines(ADMIN_READS);
+
+        await expect(read(lines, { ctx: actorCtx(CLERK) })).rejects.toThrow(
+          AuthorityRefusedException,
+        );
+      },
+    );
+
+    it.each(READS)(
+      'should decide a join as the caller on $name',
+      async ({ read }) => {
+        const lines = await compileLines({
+          ...ADMIN_READS,
+          ...allow('role:clerk', ORDER_LINE_TOKEN, ['read']),
+        });
+
+        await expect(
+          read(lines, {
+            join: [{ relation: 'order' }],
+            ctx: actorCtx(CLERK),
+          }),
+        ).rejects.toThrow(AuthorityRefusedException);
+      },
+    );
+  });
+
+  // Authors and tags are open; only the junction between them is governed.
+  describe('a junction an authority governs', () => {
+    async function compileAuthors(eager: boolean) {
+      return Test.createTestingModule({
+        imports: [
+          CoreModule.forRoot({}),
+          RepositoryModule.forRoot({
+            imports: [deciders(new AuthorityFixture())],
+            drivers: [
+              {
+                driver: MemoryRepositoryModuleFixture,
+                entities: [
+                  {
+                    key: AUTHOR_TOKEN,
+                    entity: AuthorEntityFixture,
+                    ...(eager ? { allowEagerRelations: true } : {}),
+                  },
+                  { key: TAG_TOKEN, entity: TagEntityFixture },
+                  {
+                    key: AUTHOR_TAG_TOKEN,
+                    entity: AuthorTagEntityFixture,
+                    authority: {
+                      access: 'governed',
+                      authority: AuthorityFixture,
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      }).compile();
+    }
+
+    it('should decide a many-to-many join through it', async () => {
+      const moduleRef = await compileAuthors(false);
+      await moduleRef.init();
+      const authors = moduleRef.get<MemoryRepositoryFixture<AuthorFixture>>(
+        getDynamicRepositoryToken(AUTHOR_TOKEN),
+      );
+
+      await expect(
+        authors.find({ join: [{ relation: 'tags' }], ctx: actorCtx(CLERK) }),
+      ).rejects.toThrow(AuthorityRefusedException);
+    });
+
+    it('should refuse at startup an eager entity with a relation through it', async () => {
+      await expect(compileAuthors(true)).rejects.toThrow(
+        AuthorityBootException,
+      );
     });
   });
 
@@ -463,6 +687,7 @@ describe('authority over related rows', () => {
           getDynamicRepositoryToken(key),
         );
       return {
+        authority,
         invoices: repo<InvoiceFixture>(INVOICE_TOKEN),
         lines: repo<InvoiceLineFixture>(INVOICE_LINE_TOKEN),
         receipts: repo<ReceiptFixture>(RECEIPT_TOKEN),
@@ -523,6 +748,74 @@ describe('authority over related rows', () => {
       ).rejects.toThrow(AuthorityRefusedException);
       expect(invoices.stored).toEqual([INVOICE]);
       expect(lines.stored).toEqual([LINE]);
+    });
+
+    // A to-one row named without its key is the stored row when there is
+    // one, so it is decided as an update too, before the parent is written.
+    it('should update nothing when a to-one row named without its key could be updated and the update is refused', async () => {
+      const notTotal: AuthorityDecision = {
+        effect: 'allow',
+        columns: ['tenantId', 'invoiceId', 'dateDeleted'],
+      };
+      const { invoices, receipts } = await seeded({
+        ...allow('role:clerk', INVOICE_TOKEN, ['update']),
+        ...allow('role:clerk', RECEIPT_TOKEN, ['create']),
+        [`role:clerk ${RECEIPT_TOKEN} update`]: notTotal,
+      });
+
+      await expect(
+        invoices.update(
+          INVOICE,
+          { number: '2', receipt: { total: 20 } },
+          { ctx: actorCtx(CLERK) },
+        ),
+      ).rejects.toThrow(AuthorityRefusedException);
+      expect(invoices.stored).toEqual([INVOICE]);
+      expect(receipts.stored).toEqual([RECEIPT]);
+    });
+
+    it('should create no row of a batch when a related entity refuses any row’s related rows', async () => {
+      const { invoices, lines } = await start(
+        allow('role:clerk', INVOICE_TOKEN, ['create']),
+      );
+      const second = { ...INVOICE, id: 'inv-2', number: '2' };
+
+      await expect(
+        invoices.createMany(
+          [INVOICE, { ...second, lines: [{ ...LINE, id: 'line-2' }] }],
+          { ctx: actorCtx(CLERK) },
+        ),
+      ).rejects.toThrow(AuthorityRefusedException);
+      expect(invoices.stored).toEqual([]);
+      expect(lines.stored).toEqual([]);
+    });
+
+    // Decided up front, by the write and by its reach, and again by the
+    // delete itself, which is the caller's: nothing marks it as the
+    // repository's own call.
+    it('should decide the delete of a related row a replace leaves out when it deletes it', async () => {
+      const { authority, invoices, lines } = await seeded({
+        ...allow('role:clerk', INVOICE_TOKEN, ALL),
+        ...allow('role:clerk', INVOICE_LINE_TOKEN, [
+          'create',
+          'update',
+          'delete',
+        ]),
+      });
+      const lineDeletes = () =>
+        authority.requests.filter(
+          ({ subject, action }) =>
+            subject === INVOICE_LINE_TOKEN && action === 'delete',
+        ).length;
+
+      await invoices.replace(
+        INVOICE,
+        { ...INVOICE, number: '2', lines: [] },
+        { ctx: actorCtx(CLERK) },
+      );
+
+      expect(lines.stored).toEqual([]);
+      expect(lineDeletes()).toEqual(3);
     });
 
     it('should update related rows without reading them', async () => {
@@ -984,6 +1277,41 @@ describe('authority over related rows', () => {
         expect(lines.stored.map(({ sku }) => sku)).toEqual(['b']);
       });
 
+      it('should refuse a column a related row’s hook adds that the actor may not write', async () => {
+        @RepoHook()
+        class SkuStampHook {
+          @BeforeCreate({ replace: true })
+          beforeCreate(line: PlainLiteralObject) {
+            return { ...line, sku: 'stamped' };
+          }
+        }
+        const noSku: AuthorityDecision = {
+          effect: 'allow',
+          columns: ['tenantId', 'dateDeleted'],
+        };
+        const { invoices, lines } = await start(
+          {
+            ...allow('role:clerk', INVOICE_TOKEN, ['create']),
+            [`role:clerk ${INVOICE_LINE_TOKEN} create`]: noSku,
+          },
+          [SkuStampHook],
+        );
+
+        const error = await invoices
+          .create(
+            {
+              ...INVOICE,
+              lines: [{ id: LINE.id, tenantId: LINE.tenantId }],
+            },
+            { ctx: actorCtx(CLERK) },
+          )
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(AuthorityRefusedException);
+        expect(error).toMatchObject({ context: { columns: ['sku'] } });
+        expect(lines.stored).toEqual([]);
+      });
+
       it('should leave a related row’s other properties to its write, after its hooks', async () => {
         @RepoHook()
         class SkuFromCodeHook {
@@ -1151,6 +1479,15 @@ describe('authority over related rows', () => {
     });
   });
 });
+
+/** Hands every read on to an admin's ctx. */
+@RepoHook()
+class ReadsAsAdminHook {
+  @BeforeRead()
+  beforeRead(options: RepositoryFindOptions<PlainLiteralObject>) {
+    return { ...options, ctx: actorCtx(ADMIN) };
+  }
+}
 
 function deciders(authority: AuthorityFixture, hooks: Type[] = []) {
   @Module({

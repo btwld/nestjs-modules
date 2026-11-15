@@ -258,6 +258,24 @@ describe(projectAccessFields.name, () => {
     });
   });
 
+  it('hides a denied getter a parent class declares', () => {
+    class Person {
+      get salary() {
+        return 'secret';
+      }
+    }
+    class Employee extends Person {
+      constructor(public firstName = 'John') {
+        super();
+      }
+    }
+
+    const projected = projectAccessFields(new Employee(), only('firstName'));
+
+    expect(projected).toBeInstanceOf(Employee);
+    expect(Reflect.get(Object(projected), 'salary')).toBeUndefined();
+  });
+
   it('hides a denied method the kept prototype carries', () => {
     class Employee {
       constructor(public salaryCents = 1234500) {}

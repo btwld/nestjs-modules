@@ -34,16 +34,18 @@ describe(ValidateTokenHandler.name, () => {
       expect(result).toBe(true);
     });
 
-    it('returns false for an inactive user, as for a missing one', async () => {
-      void userPort.getBySubject;
-      vi.spyOn(userPort, 'getBySubject').mockResolvedValue({
-        ...user,
-        active: false,
-      });
-      const query = new ValidateTokenQuery({}, payload);
+    it.each([false, undefined, null])(
+      'returns false for a user whose active is %s, as for a missing one',
+      async (active) => {
+        const stored = { ...user };
+        Reflect.set(stored, 'active', active);
+        void userPort.getBySubject;
+        vi.spyOn(userPort, 'getBySubject').mockResolvedValue(stored);
+        const query = new ValidateTokenQuery({}, payload);
 
-      await expect(handler.execute(query)).resolves.toBe(false);
-    });
+        await expect(handler.execute(query)).resolves.toBe(false);
+      },
+    );
 
     it('should return false when user is not found', async () => {
       void userPort.getBySubject;

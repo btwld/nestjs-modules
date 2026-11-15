@@ -55,16 +55,20 @@ describe(JwtStrategy, () => {
       await expect(t).rejects.toThrow(JwtUnauthorizedException);
     });
 
-    it('refuses an inactive user like a missing one', async () => {
-      void userPort.getBySubject;
-      vi.spyOn(userPort, 'getBySubject').mockResolvedValueOnce({
-        ...user,
-        active: false,
-      });
+    // Only `active: true` signs in: a user store that leaves it out, or
+    // stores null, refuses the user too.
+    it.each([false, undefined, null])(
+      'refuses a user whose active is %s like a missing one',
+      async (active) => {
+        const stored = { ...user };
+        Reflect.set(stored, 'active', active);
+        void userPort.getBySubject;
+        vi.spyOn(userPort, 'getBySubject').mockResolvedValueOnce(stored);
 
-      await expect(
-        jwtStrategy.validate(authorizationPayload, {}),
-      ).rejects.toThrow(JwtUnauthorizedException);
-    });
+        await expect(
+          jwtStrategy.validate(authorizationPayload, {}),
+        ).rejects.toThrow(JwtUnauthorizedException);
+      },
+    );
   });
 });

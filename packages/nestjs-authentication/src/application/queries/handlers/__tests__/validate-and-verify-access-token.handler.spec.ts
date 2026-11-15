@@ -41,18 +41,20 @@ describe(ValidateAndVerifyAccessTokenHandler.name, () => {
       expect(result).toEqual(payload);
     });
 
-    it('refuses an inactive user like a missing one', async () => {
-      void userPort.getBySubject;
-      vi.spyOn(userPort, 'getBySubject').mockResolvedValue({
-        ...user,
-        active: false,
-      });
-      const query = new ValidateAndVerifyAccessTokenQuery({}, token);
+    it.each([false, undefined, null])(
+      'refuses a user whose active is %s like a missing one',
+      async (active) => {
+        const stored = { ...user };
+        Reflect.set(stored, 'active', active);
+        void userPort.getBySubject;
+        vi.spyOn(userPort, 'getBySubject').mockResolvedValue(stored);
+        const query = new ValidateAndVerifyAccessTokenQuery({}, token);
 
-      await expect(handler.execute(query)).rejects.toThrow(
-        AuthenticationAccessTokenException,
-      );
-    });
+        await expect(handler.execute(query)).rejects.toThrow(
+          AuthenticationAccessTokenException,
+        );
+      },
+    );
 
     it('should throw AuthenticationAccessTokenException when user is not found', async () => {
       void userPort.getBySubject;

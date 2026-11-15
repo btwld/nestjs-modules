@@ -1,3 +1,4 @@
+import { of } from 'rxjs';
 import { mock } from 'vitest-mock-extended';
 
 import {
@@ -272,6 +273,18 @@ describe(AuthRouterGuard.name, () => {
       const result = await guardWithGuards.canActivate(mockExecutionContext);
 
       expect(result).toBe(true);
+    });
+
+    // A provider guard declining asynchronously declines the call too.
+    it.each<[string, CanActivate]>([
+      ['Promise<false>', { canActivate: () => Promise.resolve(false) }],
+      ['an Observable of false', { canActivate: () => of(false) }],
+    ])('should return false when guard returns %s', async (_name, google) => {
+      const guardWithGuards = new AuthRouterGuard({ google });
+
+      await expect(
+        guardWithGuards.canActivate(createMockExecutionContext('google')),
+      ).resolves.toBe(false);
     });
   });
 

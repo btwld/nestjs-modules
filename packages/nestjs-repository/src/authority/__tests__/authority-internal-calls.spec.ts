@@ -280,6 +280,19 @@ describe('calls the repository makes itself', () => {
       ).rejects.toThrow(AuthorityRefusedException);
     });
 
+    // The check is marked on its own options, never on the ctx, so a later
+    // call on the same ctx is decided as its caller.
+    it('should decide a later read on the same ctx as its caller', async () => {
+      const { orders } = await start();
+      const ctx = scopedCtx(CLERK, 'acme');
+
+      await orders.update(ORDER, { description: 'changed' }, { ctx });
+
+      await expect(
+        orders.findOne({ where: Where.eq('id', ORDER.id), ctx }),
+      ).rejects.toThrow(AuthorityRefusedException);
+    });
+
     it('should decide another repository handed the check’s options by a hook', async () => {
       const authority = new AuthorityFixture({
         ...allow('role:admin', ORDER_TOKEN, ['create']),

@@ -124,6 +124,15 @@ class UserControllerFixture {
     };
   }
 
+  @Get('nested')
+  @AccessControlReadOne('user-list')
+  nested() {
+    return {
+      firstName: 'John',
+      address: { city: 'Springfield', street: 'Elm' },
+    };
+  }
+
   @Get()
   @AccessControlReadMany('user-list')
   list() {
@@ -654,6 +663,28 @@ describe('AccessControl (e2e)', () => {
           .expect({ firstName: 'John' });
       },
     );
+
+    it('removes a nested field the caller may not read, keeping its parent', async () => {
+      const api = await createApp({
+        grants: {
+          'role:clerk': [
+            { action: 'read', subject: 'user-list' },
+            {
+              action: 'read',
+              subject: 'user-list',
+              fields: ['address.street'],
+              inverted: true,
+            },
+          ],
+        },
+      });
+
+      await api
+        .get('/users/nested')
+        .set('x-roles', 'clerk')
+        .expect(200)
+        .expect({ firstName: 'John', address: { city: 'Springfield' } });
+    });
 
     it('combines fields across roles, for each item of an array', async () => {
       const api = await createApp({

@@ -197,6 +197,34 @@ describe(AccessControlCrudPolicy.name, () => {
       expect(error).toMatchObject({ context: { fields: ['profile'] } });
     });
 
+    // Fields are checked without array positions, as write checks are.
+    it('checks a field named with an array position without it', async () => {
+      const error = await refusalOf(
+        policy.check({
+          ctx: crudCtx(
+            Operation.List,
+            'read',
+            { filter: [eq('0.amount', 'items')] },
+            true,
+            {
+              rules: [
+                { action: 'read', subject: 'invoice' },
+                {
+                  action: 'read',
+                  subject: 'invoice',
+                  fields: ['items.amount'],
+                  inverted: true,
+                },
+              ],
+            },
+          ),
+        }),
+      );
+
+      // Named as the caller sent it.
+      expect(error).toMatchObject({ context: { fields: ['items.0.amount'] } });
+    });
+
     it('checks a relation’s field by its path', async () => {
       const error = await refusalOf(
         policy.check({
@@ -345,6 +373,19 @@ describe(AccessControlCrudPolicy.name, () => {
             params: { amount: 5 },
           }),
           body: { customer: 'Initech' },
+        }),
+      );
+
+      expect(error).toMatchObject({ context: { fields: ['amount'] } });
+    });
+
+    it('checks the route parameters a batch create writes into every item', async () => {
+      const error = await refusalOf(
+        policy.check({
+          ctx: crudCtx(Operation.CreateBatch, 'create', {}, true, {
+            params: { amount: 5 },
+          }),
+          body: { bulk: [{ customer: 'A' }] },
         }),
       );
 
