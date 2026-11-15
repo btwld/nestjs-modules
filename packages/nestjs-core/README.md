@@ -585,8 +585,10 @@ In a hybrid app (HTTP plus a connected microservice), pass
 `inheritAppConfig` so the overlays run for message handlers too. Without it,
 `@Ctx()` still works but `@UseHooks()` silently does nothing. It applies the
 app's global guards too: `@concepta/nestjs-authentication`'s global JWT
-guard then runs on message handlers and can't read a token from a message,
-so mark them `@AuthPublic()` and authenticate them in a guard of your own:
+guard then runs on message handlers and refuses every one that isn't
+`@AuthPublic()` (see its
+[Context Overlay](../nestjs-authentication/README.md#context-overlay)), so
+mark them `@AuthPublic()` and authenticate them in a guard of your own:
 
 ```ts
 app.connectMicroservice(

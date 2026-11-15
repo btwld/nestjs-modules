@@ -23,6 +23,7 @@ import { AuthUserCtx } from '../gateways/auth-user-context.overlay.js';
 
 import { AuthGuardCtr, AuthGuardOptions } from './auth.guard.types.js';
 import { AuthPublicMetadata } from './decorators/auth-public.decorator.js';
+import { AuthTransportUnsupportedException } from './exceptions/auth-transport-unsupported.exception.js';
 import { AuthUserConflictException } from './exceptions/auth-user-conflict.exception.js';
 import { markAuthenticationGuard } from './utils/authentication-guard.util.js';
 
@@ -150,6 +151,19 @@ export const AuthGuard = (
 
       return activated;
     }
+
+    /**
+     * The request a strategy reads the credentials from: the HTTP request.
+     * On any other transport the call is refused, since what it carries is
+     * the caller's own payload. To authenticate another transport's calls,
+     * override this to return that transport's request.
+     */
+    getRequest(context: ExecutionContext): unknown {
+      if (!isHttp(context)) {
+        throw new AuthTransportUnsupportedException(context.getType());
+      }
+      return context.switchToHttp().getRequest();
+    }
   }
 
   markAuthenticationGuard(AuthGuard);
@@ -158,6 +172,10 @@ export const AuthGuard = (
 };
 
 type Activation = ReturnType<CanActivate['canActivate']>;
+
+function isHttp(context: ExecutionContext): boolean {
+  return context.getType() === 'http';
+}
 
 async function activation(result: Activation): Promise<boolean> {
   return isObservable(result) ? lastValueFrom(result) : result;
@@ -197,10 +215,11 @@ async function authenticateIfValid(
  * can read it: interceptors, which define the other overlays, run after
  * every guard. The first guard to authenticate a call defines it; a later
  * one authenticating the same user changes nothing, and one authenticating
- * someone else refuses the call.
+ * someone else refuses the call. Only on HTTP: a guard that authenticates
+ * another transport, by overriding `getRequest`, defines nothing.
  */
 function defineAuthUser(context: ExecutionContext): void {
-  if (context.getType() !== 'http') {
+  if (!isHttp(context)) {
     return;
   }
 

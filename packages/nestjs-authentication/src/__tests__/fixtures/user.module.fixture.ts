@@ -14,9 +14,15 @@ export const FIXTURE_USER = {
   active: true,
 };
 
+/** A subject whose lookup fails, as it would while the user store is down. */
+export const FAILING_LOOKUP_SUBJECT = 'failing-lookup-subject';
+
 @QueryHandler(MockGetUserBySubjectQuery)
 class GetUserBySubjectHandler {
-  async execute() {
+  async execute(query: MockGetUserBySubjectQuery) {
+    if (query.subject === FAILING_LOOKUP_SUBJECT) {
+      throw new Error('the user store is down');
+    }
     return FIXTURE_USER;
   }
 }

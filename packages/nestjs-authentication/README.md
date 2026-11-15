@@ -1645,16 +1645,24 @@ looks the user up, turning a user off takes effect on their next call,
 with no need to wait for their tokens to expire.
 
 The overlay reads `request.user`, so it attaches on HTTP only, and so does
-access control's `AccessContextOverlay`. On other transports, nothing in
-this module defines `AuthUserCtx`, a guard built with `AuthGuard()`
-included; off HTTP, access control's `actorResolver` is still asked, with
-no request to read. In RPC message
-handlers, define `AuthUserCtx`, and `ActorCtx` with `frozenActor(actor)`,
-in a guard of yours that reads the user from your transport and runs
-before a grant's guard; an overlay is too late there, since guards run
-before interceptors. If the microservice inherits the app's config
-(`inheritAppConfig`), the global JWT guard runs on message handlers too and
-can't read a token from a message: mark them `@AuthPublic()`. See core's
+access control's `AccessContextOverlay`. A guard built with `AuthGuard()`
+reads the HTTP request only. On any other transport it reads nothing from
+the message and refuses the call with `AuthTransportUnsupportedException`
+(the transport's exception filter decides what the caller gets; over HTTP
+it would be a 401), unless the guard is off for that handler: on a guard
+that can be turned off, such as the JWT guard, `@AuthPublic()` (`{ optional:
+true }` included) lets it through with no user, as do `settings.guards` and
+its `disable` callback. To authenticate another transport's calls in such a
+guard, override `getRequest` to return that transport's request; it defines
+no `AuthUserCtx`. So on other transports nothing in this module defines
+`AuthUserCtx`; off HTTP, access
+control's `actorResolver` is still asked, with no request to read. In RPC
+message handlers, define `AuthUserCtx`, and `ActorCtx` with
+`frozenActor(actor)`, in a guard of yours that reads the user from your
+transport and runs before a grant's guard; an overlay is too late there,
+since guards run before interceptors. If the microservice inherits the
+app's config (`inheritAppConfig`), the global JWT guard runs on message
+handlers too: mark them `@AuthPublic()`. See core's
 [RPC (preview)](../nestjs-core/README.md#rpc-preview). In a WebSocket
 gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 
@@ -1820,6 +1828,7 @@ gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 | `VerifyOtpInvalidException` | Verify OTP invalid |
 | `AuthRouterException` | Base router exception (500 by default; `ProviderMissing`/`ProviderNotSupported` render 400. `AuthRouterGuard` classifies an unexpected provider-guard failure as 500/internal; an `HttpException` raised by the delegated guard is re-thrown unchanged.) |
 | `AuthUserConflictException` | Two guards on one call authenticated different users, or either user has no `id` (401) |
+| `AuthTransportUnsupportedException` | A guard built with `AuthGuard()`, not turned off for the handler, ran on a call that isn't HTTP (401 over HTTP; `usage`) |
 | `AuthenticationUserPortRequiredException` | `validateToken` or a `ValidateAndVerify*` query ran with no `UserPort` configured (500, `usage`) |
 | `AuthenticationFeatureConfigException` | Feature misconfiguration |
 

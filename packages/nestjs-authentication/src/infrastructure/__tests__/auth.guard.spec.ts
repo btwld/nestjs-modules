@@ -18,6 +18,7 @@ import { GuardsPolicy } from '../../domain/policies/guards.policy.js';
 import { AuthUserCtx } from '../../gateways/auth-user-context.overlay.js';
 import { AuthGuard } from '../auth.guard.js';
 import { AuthPublic } from '../decorators/auth-public.decorator.js';
+import { AuthTransportUnsupportedException } from '../exceptions/auth-transport-unsupported.exception.js';
 import { AuthUserConflictException } from '../exceptions/auth-user-conflict.exception.js';
 
 vi.mock('@nestjs/passport', () => ({
@@ -87,6 +88,11 @@ describe(AuthGuard.name, () => {
         return null;
       }
 
+      @AuthPublic()
+      public() {
+        return null;
+      }
+
       @AuthPublic({ optional: true })
       optional() {
         return null;
@@ -105,17 +111,29 @@ describe(AuthGuard.name, () => {
 
     /**
      * A guard whose Passport authentication does `outcome` to the request:
-     * the mocked Passport base gets that as its `canActivate`.
+     * the mocked Passport base gets that as its `canActivate`, reading the
+     * request through `getRequest` as Passport does.
      */
-    const guardAuthenticating = (outcome: (request: object) => boolean) => {
-      const Guard = AuthGuard('jwt', { canDisable: true });
+    const guardAuthenticating = (
+      outcome: (request: object) => boolean,
+      { canDisable = true, policy = new GuardsPolicy({ enable: true }) } = {},
+    ) => {
+      const Guard = AuthGuard('jwt', { canDisable });
       Reflect.set(
         Object.getPrototypeOf(Guard.prototype),
         'canActivate',
-        async (context: ExecutionContext) =>
-          outcome(context.switchToHttp().getRequest<object>()),
+        async function (
+          this: { getRequest(context: ExecutionContext): unknown },
+          context: ExecutionContext,
+        ) {
+          const request = this.getRequest(context);
+          if (typeof request !== 'object' || request === null) {
+            throw new Error('no request');
+          }
+          return outcome(request);
+        },
       );
-      return new Guard(new GuardsPolicy({ enable: true }), new Reflector());
+      return new Guard(policy, new Reflector());
     };
 
     const httpContext = (
@@ -212,24 +230,109 @@ describe(AuthGuard.name, () => {
       );
     });
 
-    it('defines no user outside HTTP, where the request is the caller’s payload', async () => {
-      const Guard = AuthGuard('jwt', { canDisable: true });
-      Reflect.set(
-        Object.getPrototypeOf(Guard.prototype),
-        'canActivate',
-        async () => true,
-      );
-      const guard = new Guard(
-        new GuardsPolicy({ enable: true }),
-        new Reflector(),
-      );
-      const context = mock<ExecutionContext>();
-      context.getType.mockReturnValue('rpc');
-      context.getHandler.mockReturnValue(routes.guarded);
-      context.getClass.mockReturnValue(Routes);
+    // Outside HTTP the request a strategy would read is the caller's own
+    // payload, so nothing is authenticated from it.
+    describe('outside HTTP', () => {
+      const messageTo = (handler: () => null) => {
+        const context = mock<ExecutionContext>();
+        context.getType.mockReturnValue('rpc');
+        context.getHandler.mockReturnValue(handler);
+        context.getClass.mockReturnValue(Routes);
+        return context;
+      };
 
-      expect(await guard.canActivate(context)).toBe(true);
-      expect(context.switchToHttp).not.toHaveBeenCalled();
+      it.each([
+        ['that can be turned off, on a handler that is not public', true],
+        ['that cannot be turned off, on any handler', false],
+      ])(
+        'refuses the call in a guard %s, reading nothing',
+        async (_name, canDisable) => {
+          const authenticate = vi.fn(() => true);
+          const context = messageTo(
+            canDisable ? routes.guarded : routes.public,
+          );
+
+          await expect(
+            guardAuthenticating(authenticate, { canDisable }).canActivate(
+              context,
+            ),
+          ).rejects.toThrow(
+            expect.objectContaining({
+              constructor: AuthTransportUnsupportedException,
+              context: expect.objectContaining({ transport: 'rpc' }),
+            }),
+          );
+          expect(authenticate).not.toHaveBeenCalled();
+          expect(context.switchToHttp).not.toHaveBeenCalled();
+        },
+      );
+
+      it.each([
+        ['guards are off', new GuardsPolicy({ enable: false })],
+        [
+          'the disable callback turns the guard off',
+          new GuardsPolicy({ enable: true, disable: () => true }),
+        ],
+      ])(
+        'lets the call through when %s, reading nothing',
+        async (_name, policy) => {
+          const authenticate = vi.fn(() => true);
+          const context = messageTo(routes.guarded);
+
+          expect(
+            await guardAuthenticating(authenticate, { policy }).canActivate(
+              context,
+            ),
+          ).toBe(true);
+          expect(authenticate).not.toHaveBeenCalled();
+          expect(context.switchToHttp).not.toHaveBeenCalled();
+        },
+      );
+
+      // Passport reads the request through `getRequest`, so a guard that
+      // returns its own transport's request authenticates those calls.
+      it('authenticates a guard that reads its own transport’s request', async () => {
+        const request = {};
+        const Guard = AuthGuard('jwt');
+        class MessageGuard extends Guard {
+          getRequest(): unknown {
+            return request;
+          }
+        }
+        Reflect.set(
+          Object.getPrototypeOf(Guard.prototype),
+          'canActivate',
+          async function (this: { getRequest(): unknown }) {
+            return this.getRequest() === request;
+          },
+        );
+        const context = messageTo(routes.guarded);
+
+        expect(
+          await new MessageGuard(
+            new GuardsPolicy({ enable: true }),
+            new Reflector(),
+          ).canActivate(context),
+        ).toBe(true);
+        expect(context.switchToHttp).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['public', routes.public],
+        ['optional', routes.optional],
+      ])(
+        'lets a %s handler through as nobody, reading nothing',
+        async (_name, handler) => {
+          const authenticate = vi.fn(() => true);
+          const context = messageTo(handler);
+
+          expect(
+            await guardAuthenticating(authenticate).canActivate(context),
+          ).toBe(true);
+          expect(authenticate).not.toHaveBeenCalled();
+          expect(context.switchToHttp).not.toHaveBeenCalled();
+        },
+      );
     });
 
     it('leaves an optional route anonymous when authentication declines without refusing', async () => {
