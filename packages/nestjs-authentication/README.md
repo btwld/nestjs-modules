@@ -660,10 +660,12 @@ grant, `assert` (and `can` answers `false`) and governed repository calls:
 the user is still signed in everywhere else, and `@AuthUser()` sees them.
 
 With the global JWT guard, a caller without a token is refused (401) by
-that guard, whatever order it runs in relative to yours. Mark the routes
-your guard serves
-`@AuthPublic({ optional: true })`, so the JWT guard lets them through, or
-turn the global guard off with `appGuard: false`:
+that guard, whichever of the two runs first (a route or controller guard
+of yours always runs after it, since global guards run first); access
+control's check, which runs after authentication, never sees the call.
+Mark the routes your guard serves `@AuthPublic({ optional: true })`, so
+the JWT guard lets them through, or turn the global guard off with
+`appGuard: false`:
 
 ```typescript
 import {
@@ -1491,9 +1493,10 @@ sending that header. For callers authenticated another way, such as API
 keys, authenticate them in a guard of their own instead (see the
 `ApiKeyGuard` example under
 [JWT Bearer Authentication](#jwt-bearer-authentication)). With the global
-JWT guard, a caller without a token is refused (401) before that guard
-runs: mark its routes `@AuthPublic({ optional: true })`, or set
-`appGuard: false`.
+JWT guard, a caller without a token is refused (401) by that guard,
+whichever of the two runs first (a route or controller guard of yours
+always runs after it): mark its routes `@AuthPublic({ optional: true })`,
+or set `appGuard: false`.
 
 `settings.guards.disable` and `settings.guards.enable: false` apply only to
 the JWT guard and guards built with `canDisable: true`. `LocalGuard`,
@@ -1552,7 +1555,7 @@ const { user } = getAppContext(request).with(AuthUserCtx);
 
 // In a guard, or anything that may run before AuthUserContextOverlay
 // (such as an interceptor that runs before it), where it is absent until
-// the guard that authenticated the call defines it:
+// a guard built with AuthGuard() that authenticates the call defines it:
 const ctx = getAppContext(request);
 const user = ctx.supports(AuthUserCtx) ? ctx.with(AuthUserCtx).user : undefined;
 ```
@@ -1610,11 +1613,13 @@ if (!ctx.supports(AuthUserCtx)) {
 Setting only `request.user` isn't enough. `AuthUserContextOverlay` copies
 `request.user` into `AuthUserCtx` when nothing defined it, but only after
 every guard has run. Until then, a guard after yours, or an access control
-`actorResolver`, that reads `AuthUserCtx` finds no user. On a call nobody
-authenticated, such as a public route, the overlay defines it with no
-user. Don't define `AuthUserCtx` in a handler or interceptor on HTTP: an
-authenticating guard or `AuthUserContextOverlay` defines it, and
-redefining it fails.
+`actorResolver` asked before the overlay (from a grant's guard, or from
+`AccessContextOverlay`, an interceptor that may run first), that reads
+`AuthUserCtx` finds it undefined. On a call nobody authenticated, such as
+a public route, the overlay defines it with no user. Don't define
+`AuthUserCtx` in a handler
+or interceptor on HTTP: an authenticating guard or `AuthUserContextOverlay`
+defines it, and redefining it fails.
 
 A guard that runs *before* authentication sees neither `request.user` nor
 `AuthUserCtx`, so authentication must run before access control's guard.
@@ -1624,11 +1629,14 @@ first. A guard on the controller runs before one on a method.
 
 The module's own sign-ins (local login, and the JWT and refresh guards,
 which need a `UserPort` to start) refuse a user whose `active` isn't
-`true`, the same way as a user `UserPort` can't find. So do
-`TokenPort.validateToken` and the `ValidateAndVerify*` queries, which
-require a `UserPort` and throw `AuthenticationUserPortRequiredException`
-(500, `usage`) without one; `TokenPort.verifyAccessToken` /
-`verifyRefreshToken` check only the token. A guard of your own looks
+`true`, the same way as a user `UserPort` can't find.
+`TokenPort.validateToken` (its default query, which `ports.token` can
+replace) and the `ValidateAndVerify*` queries look the user up too:
+`validateToken` answers `false` for a missing or inactive user, and the
+`ValidateAndVerify*` queries throw a 401. They require a `UserPort` and
+throw `AuthenticationUserPortRequiredException` (500, `usage`) without one.
+`TokenPort.verifyAccessToken` / `verifyRefreshToken` check only the token.
+A guard of your own looks
 nobody up: refuse inactive users in that guard. An `actorResolver` that
 returns no actor for them refuses only routes with a grant, `assert` (and
 `can` answers `false`) and governed repository calls: the user is still
@@ -1637,16 +1645,18 @@ looks the user up, turning a user off takes effect on their next call,
 with no need to wait for their tokens to expire.
 
 The overlay reads `request.user`, so it attaches on HTTP only, and so does
-access control's `AccessContextOverlay`; off HTTP, access control's
-`actorResolver` is still asked, with no request to read. In RPC message
+access control's `AccessContextOverlay`. On other transports, nothing in
+this module defines `AuthUserCtx`, a guard built with `AuthGuard()`
+included; off HTTP, access control's `actorResolver` is still asked, with
+no request to read. In RPC message
 handlers, define `AuthUserCtx`, and `ActorCtx` with `frozenActor(actor)`,
 in a guard of yours that reads the user from your transport and runs
 before a grant's guard; an overlay is too late there, since guards run
 before interceptors. If the microservice inherits the app's config
 (`inheritAppConfig`), the global JWT guard runs on message handlers too and
-can't read a token from a message: mark them `@AuthPublic()`. See the core
-README's RPC (preview) section. In a WebSocket gateway, `@AuthUser()` throws
-`AppContextUnavailableException`.
+can't read a token from a message: mark them `@AuthPublic()`. See core's
+[RPC (preview)](../nestjs-core/README.md#rpc-preview). In a WebSocket
+gateway, `@AuthUser()` throws `AppContextUnavailableException`.
 
 ---
 

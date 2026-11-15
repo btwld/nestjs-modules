@@ -261,9 +261,9 @@ nest (`total_cents` stored, `pricing.total` sent). So:
   routes or not;
 - **access control's field rules are for the API alone**: a computed field,
   a response that is not an entity, a nested shape the storage doesn't have.
-  One exception: on generated CRUD routes, query fields (`select`,
-  `filter`, `or`, `sort` and `s`) reach the repository unchanged, so they
-  name stored columns (see [CRUD Routes](#crud-routes)).
+  One exception: on generated CRUD routes, CRUD passes query fields
+  (`select`, `filter`, `or`, `sort` and `s`) to the repository unrenamed,
+  so they name stored columns (see [CRUD Routes](#crud-routes)).
 
 Without an authority, your rules decide alone, as everywhere else in this
 README. See the [Shared rules](./examples/shared-rules) example.
@@ -280,8 +280,11 @@ its own authority, such as an integration or a scheduled job:
 
 For HTTP, pass an `actorResolver` (`AccessActorResolverInterface`) that
 reads the authenticated user from the request. Returning `undefined` means
-nobody is acting. Its `context` argument is the call's execution context on
-HTTP only; it is `undefined` for `can` and `assert` and on other transports:
+nobody is acting. It is asked whenever the module needs an actor and the
+call carries no `ActorCtx`: on HTTP by `AccessContextOverlay` and by a
+grant's guard, with the call's execution context as `context`; with
+`context` undefined by a grant's guard on other transports, and by `can`,
+`assert` and `effectiveRules` everywhere:
 
 ```ts
 AccessControlModule.forRootAsync({
@@ -309,11 +312,14 @@ AccessControlModule.forRootAsync({
 The check runs after every global guard, so a global authentication guard
 has already put the user on the request. With
 `@concepta/nestjs-authentication`, the resolver can read `AuthUserCtx` from
-the call's context instead of `request.user`. The guard that authenticated
-the call defines it. On every other HTTP call, `AuthUserContextOverlay`
-defines it from `request.user` (no user when nobody authenticated), only
-after every guard has run, and the resolver may run before that, so check
-`supports(AuthUserCtx)` first:
+the call's context instead of `request.user`. A guard built with
+`AuthGuard()` that authenticates the call defines it. When none did (a
+public route, or a guard of yours that set only `request.user`), a
+resolver asked before `AuthUserContextOverlay` runs, from a grant's guard
+or from `AccessContextOverlay`, finds `AuthUserCtx` not yet defined (see
+authentication's
+[Context Overlay](../nestjs-authentication/README.md#context-overlay)), so
+check `supports(AuthUserCtx)` first:
 
 ```ts
 actorFor: async (ctx) => {
@@ -353,18 +359,17 @@ public route that still recognises signed-in callers, use
 `401` from the guard leaves the call anonymous.
 
 With the global JWT guard, a caller without a token, such as a system
-sending only an API key, is refused (`401`) by that guard, whatever order
-it runs in relative to your API-key guard: mark the routes that guard
-serves `@AuthPublic({ optional: true })`, or turn the global guard off
+sending only an API key, is refused (`401`) by that guard, whether your
+API-key guard runs before it or after: mark the routes your API-key guard
+serves
+`@AuthPublic({ optional: true })`, or turn the global guard off
 (`appGuard: false`).
 
-Refuse inactive users in the guard that signs them in. The authentication
-module's own sign-ins (local login, the JWT and refresh guards) refuse a
-user whose `active` isn't `true`, and so do `TokenPort.validateToken` and
-the `ValidateAndVerify*` queries, which require a `UserPort`.
-`TokenPort.verifyAccessToken` and `verifyRefreshToken` check only the
-token. A guard of your own looks nobody up: refuse inactive users in that
-guard. A resolver that returns no actor for them refuses only routes with a
+Refuse inactive users in the guard that signs them in: the authentication
+module's own sign-ins do, and a guard of your own must (see
+authentication's
+[Context Overlay](../nestjs-authentication/README.md#context-overlay)).
+A resolver that returns no actor for them refuses only routes with a
 grant, `assert` (and `can` answers `false`) and governed repository calls:
 the user is still signed in everywhere else, and `@AuthUser()` sees them.
 On a refresh route, the user is whoever holds the refresh token; keep
@@ -376,8 +381,9 @@ finds an actor for, routes without a grant included. A route handler, and
 anything it calls, checks with that actor, repositories governed by an
 [authority](../nestjs-repository/README.md#object-authority) included.
 Without an actor, `ActorCtx` stays undefined, and a governed repository
-call refuses with refusal `no-actor` (`403`). The resolver runs once per
-request; cache in it if it reads a database.
+call refuses with refusal `no-actor` (`403`). When the resolver finds no
+actor, the next check asks it again, so one request may ask it more than
+once; cache in it if it reads a database.
 
 Don't define `ActorCtx` in an HTTP interceptor of your own: redefining it
 fails. On a checked route the module has already defined it, and elsewhere
@@ -390,8 +396,9 @@ The resolver is given a request only over HTTP: on other transports the
 "request" is the message payload, which the sender controls. There, define
 `ActorCtx` yourself, once per call, immutably, with `frozenActor(actor)`
 (the immutable overlay freezes the top level, `frozenActor` freezes
-`roles`). On RPC, define it in a guard that runs before a grant's guard: an
-overlay is too late, since guards run before interceptors. In a queue
+`roles`). On RPC, define it in a guard that runs before a grant's guard (an
+overlay is too late, since guards run before interceptors), or let the
+resolver work the actor out from `ctx` alone. In a queue
 consumer or a job, define it on the context it opens. An integration
 consumer acting for another system defines
 `{ kind: 'system', name: 'billing' }` on the context it opens for each
@@ -497,15 +504,10 @@ A checked route's response holds only the fields the caller may read,
 under their `read` rules, whatever the route does. An update's response
 shows what a read of the same record would, not what the caller may write.
 A caller who may write but not read gets an empty response. On generated
-CRUD routes over an entity an authority governs, though, Update, Replace,
-Delete, SoftDelete and Restore first read the row as the caller, and that
-read holds only the columns the caller may read. So the caller also needs
-`read` on the entity and on every column the lookup names: the route's
-params, any default filter, and the request's `filter`, `or` and `s`. They
-need `read` on the version column too (for Update and Replace, and any
-write sent with `If-Match`) and on the delete date (for Update, Replace and
-SoftDelete), or the write fails with a `500`. Only Create and CreateBatch
-write without reading.
+CRUD routes over an entity an authority governs, though, most writes first
+read the row as the caller, so the caller also needs `read` there (see
+CRUD's
+[Operation-to-Repository Mapping](../nestjs-crud/README.md#operation-to-repository-mapping)).
 
 - each item of an array is filtered;
 - a response is a page when its `data` is an array and its `count`,
@@ -743,45 +745,41 @@ Before each request runs, under the grant its route let the caller in on:
 - **Query input.** A `filter`, `or`, `sort` or `s` (search) naming a
   field the caller may not read is refused, on every operation: matching
   or ordering by `salary` tells its value without showing it. `select` is
-  left to the response filter and the repository. Query fields (`select`,
-  `filter`, `or`, `sort` and `s`) reach the repository unchanged, so they
-  name stored columns: when your response schema sends `total_cents` as
-  `total`, deny both. The deny on `total` hides it from responses; the one
-  on `total_cents` stops filtering and sorting by it. A `?select=`,
-  `?filter=`, `?or=`, `?sort=` or `?s=` naming no column is a `400` before
-  the repository decides (column names are public in the route's OpenAPI
-  document). Under a grant limited to some fields, this policy runs first,
-  so an unknown `filter`, `or`, `sort` or `s` field is a `403` with refusal
-  `field`. A column refused in the repository's authority is refused in
-  every query, routes or not.
+  left to the response filter and the repository. CRUD passes query fields
+  (`select`, `filter`, `or`, `sort` and `s`) to the repository unrenamed,
+  so they name stored columns: when your response schema sends
+  `total_cents` as `total`, deny both. The deny on `total` hides it from
+  responses; the one on `total_cents` stops filtering and sorting by it.
+  This policy runs before CRUD's own checks: when your own grants allow
+  `read` only on named fields, with no authority deciding the resource, a
+  `filter`, `or`, `sort` or `s` field naming no column is a `403` with
+  refusal `field`. Otherwise CRUD checks the names itself (see CRUD's
+  [Query Fields](../nestjs-crud/README.md#query-fields)). A column refused
+  in the repository's authority is refused in every query, routes or not.
 - **Write bodies.** A create, an update and each item of a batch create may
   touch only fields the caller may write, as `assertFields` checks them. A
   create and a batch create also write the route's params into the row, so
   those are checked as written fields too. Under the repository's
-  authority, create, batch create, update and replace all write the
-  route's params: those are columns the write sets, and must be writable,
-  except, on a create, batch create or update, a scope column row scope
-  stamps itself. A replace needs every column but the primary key
-  writable, scope columns and the delete date included.
+  authority, a create, batch create, update and replace all write the
+  route's params, and those must be writable, except the primary key; a
+  replace needs every column but the primary key writable (see CRUD's
+  [Operation-to-Repository Mapping](../nestjs-crud/README.md#operation-to-repository-mapping)).
 - **Replace.** A replace erases what its body leaves out, so it is refused
   whenever a field is denied to the caller for the action, or when the
   caller's only allows for it name fields.
 
 What a request selects is not narrowed by these rules: the response filter
 leaves out what the caller may not read. On an entity an authority
-governs, whether or not access control shares the authority, a list or a
-read without `?select=` returns the route's columns less the caller's
-hidden ones, and a `?select=` naming a hidden column is refused (`403`).
-Update, Replace, Delete, SoftDelete and Restore read the row first, as the
-caller (see [Response Filtering](#response-filtering) for the `read` they
-need).
+governs, the repository narrows a list or a read without `?select=` to the
+caller's columns and refuses (`403`) a `?select=` naming a hidden one, and
+most writes read the row first, as the caller (see CRUD's
+[Query Fields](../nestjs-crud/README.md#query-fields)).
 
-So a response may hold fewer fields than the entity: `?select=`,
-`allow`/`exclude`, and an authority hiding columns all leave fields out.
-Mark every field that can be left out `.optional()` in the response
-schema; a missing required field fails serialization with a `500`. Fields
-access control's own rules deny are removed after serialization, so they
-need not be optional.
+So a response may hold fewer fields than the entity: mark every field
+that can be left out `.optional()` in the response schema (see CRUD's
+[Serialization](../nestjs-crud/README.md#serialization)). Fields access
+control's own rules deny are removed after serialization, so they need not
+be optional.
 
 Which rows a generated route reaches is row scope's job, on the entity's
 repository. See the [CRUD routes](./examples/crud-routes) example.

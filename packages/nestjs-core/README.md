@@ -435,39 +435,44 @@ event context starts a fresh pair.
 
 ### Actor and Authority
 
-`ActorCtx` carries who is acting on a call: a person through their roles, or
-a system acting on its own authority. Every package that decides access
-reads it. Define it once per call, immutably, and pass a role actor through
-`frozenActor`: it freezes the `roles` array too, so nothing holding the array
-can change who was decided.
-
-On HTTP, the `actorResolver` you give access control defines the actor from
-the signed-in user. Access control has no default: without a resolver,
-nobody is acting unless something else defines `ActorCtx`. A guard of yours
-can define it first, such as an API-key guard for an integration: a call
-carrying `ActorCtx` uses it. With `@concepta/nestjs-authentication`'s global
-JWT guard, a caller without a token is refused (401) by that guard, whatever
-order it runs in relative to yours: mark the routes your guard serves
-`@AuthPublic({ optional: true })`, or turn the global guard off
-(`appGuard: false`).
-
-Access control's `AccessContextOverlay` attaches on HTTP only. Elsewhere its
-`actorResolver` is still asked when a call carries no `ActorCtx`, but with
-no execution context, so it can't read a request. On RPC, define `ActorCtx`
-in a guard that runs before a grant's guard (an overlay is too late: guards
-run before interceptors); in a queue consumer or job, on the context it
-opens:
+`ActorCtx` carries who is acting on a call: a person through their roles
+(`{ kind: 'role', roles, userId? }`), or a system acting on its own
+authority, such as an integration or a scheduled job
+(`{ kind: 'system', name }`). Every package that decides access reads it.
+Define it once per call, immutably, with `frozenActor(actor)`: an immutable
+overlay freezes the actor's top level, and `frozenActor` freezes its
+`roles` too, so nothing holding the array can change who was decided. A
+call carrying `ActorCtx` uses it:
 
 ```ts
 import { ActorCtx, frozenActor } from '@concepta/nestjs-core';
 
+// A person, through their roles
 ctx.defineOverlay(
   ActorCtx,
   frozenActor({ kind: 'role', roles: user.roles, userId: user.id }),
   { immutable: true },
 );
-ctx.defineOverlay(ActorCtx, { kind: 'system', name: 'billing-sync' }, { immutable: true });
+
+// Or, on a job's own context, a system acting as itself
+jobCtx.defineOverlay(
+  ActorCtx,
+  frozenActor({ kind: 'system', name: 'billing-sync' }),
+  { immutable: true },
+);
 ```
+
+Who defines it depends on the transport. On HTTP, access control's
+`actorResolver` usually does, from the signed-in user; access control has
+no default, so without a resolver nobody is acting unless something else
+defines `ActorCtx`, such as an API-key guard of yours. On RPC, define it in
+a guard that runs before a grant's guard (an overlay is too late: guards
+run before interceptors), or let the resolver work it out from `ctx`
+alone; in a queue consumer or job, on the context it opens. Access
+control's [Who Is Acting](../nestjs-access-control/README.md#who-is-acting)
+covers when its resolver is asked, and authentication's
+[JWT Bearer Authentication](../nestjs-authentication/README.md#jwt-bearer-authentication)
+how its global guard treats a guard of yours.
 
 `AuthorityInterface` is the contract for deciding access: given the actor, a
 subject, an action and columns, `decide()` allows (optionally only some
@@ -480,7 +485,8 @@ shows what a read would. Answer them by the action. A repository asks only
 `read`, `update`, `delete`, `softDelete` and `restore`. An authority shared
 with access control is also asked each route's own verbs (such as
 `approve`) on every resource not in `except`, so write those in its rules
-too.
+too. CRUD's `CrudActionCategory` is a hook category, never an authority
+action.
 
 Core ships no implementation. `@concepta/nestjs-repository` enforces one on
 each entity you register with `authority: { access: 'governed', authority }`,

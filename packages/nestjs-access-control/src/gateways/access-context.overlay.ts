@@ -14,10 +14,12 @@ import { type AccessActorResolverInterface } from '../domain/interfaces/access-a
  * check too, and every repository call the handler makes is decided for
  * the same actor. A checked route's guard has already defined it.
  *
- * Registered by the module when it has an actor resolver. The resolver
- * reads the request, which authentication has prepared before any
- * interceptor runs, so this overlay's place among the others does not
- * matter.
+ * Registered by the module when it has an actor resolver. Authentication's
+ * guards run before any interceptor, so `request.user` is set. Its
+ * `AuthUserCtx` is defined already when a guard built with `AuthGuard()`
+ * authenticated the call; otherwise its own overlay defines it, in no set
+ * order with this one, so a resolver reading `AuthUserCtx` checks
+ * `supports(AuthUserCtx)` first.
  */
 export class AccessContextOverlay extends ContextOverlayInterceptor {
   readonly ref = ActorCtx;

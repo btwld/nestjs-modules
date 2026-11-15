@@ -800,13 +800,14 @@ row: `create`, `update` or `replace`, `delete` for a row a `replace` or
 | --- | --- |
 | `create`, `createMany` | each one listed is created |
 | `update` | left alone if the payload leaves the relation out; otherwise each listed row that is already one of the entity's is updated, any other is created, and the rest are kept |
-| `replace`, `upsert` | as `update`, and the related rows a listed relation leaves out are deleted |
+| `replace`, `upsert` | as `update`, but each listed row that is already one of the entity's is replaced whole, and the related rows a listed to-many relation leaves out are deleted |
 | `delete`, `deleteMany` | deleted first, then the entity |
-| `softDelete` | soft deleted first, then the entity |
+| `softDelete` | soft deleted first, then the entity; an entity already soft deleted is returned as it is, with nothing written |
 | `restore` | every soft-deleted one is restored first, including any deleted on its own before the entity, then the entity |
 
 A to-one relation names the one row the entity has: its payload updates that
-row, or creates it if there is none, and `null` deletes it. A payload with a
+row (replaces it, on a `replace` or `upsert`), or creates it if there is
+none, and `null` deletes it. A payload with a
 different key is refused by the related repository
 (`PrimaryKeyImmutableException`). A to-one with more than one stored row is
 refused with `CascadeWriteException` (`409`). A soft-deleted row is not the one
@@ -2366,13 +2367,18 @@ entity columns.
 `RowScopeCtx` overlay, resolved from the caller's context *before hooks run*
 so nothing downstream can change which caller you enforce against. What you
 receive is a fresh copy of the overlay's values each call, so mutating it
-affects nothing.
+affects nothing, and `undefined` when the call carries no `RowScopeCtx`.
+`RowScopeBase` takes every scope value from it and refuses (`403`) when a
+value it enforces is missing: on a read, each column it doesn't relax; on
+a write, every scope column. Set `RowScopeCtx` from the signed-in user,
+such as a clerk's `ownerId` to limit them to their own rows.
 
 `params.ctx` is plumbing: the context the driver will run under, after hooks.
 Pass it through unchanged on any read your resolver makes, so that read joins
 the caller's transaction. Building a fresh context instead silently drops it.
 
-**Never decide scope from `params.ctx`.** A hook can replace it, and a
+**Never decide scope from `params.ctx` or the actor.** A hook can replace
+`params.ctx`, and a
 resolver reading its tenant from there lets a `beforeRead` hook choose which
 caller is enforced.
 
@@ -2525,20 +2531,13 @@ deployment sets `requireAuthorityDeclaration`.
 An authority decides for an actor: a person acting through their roles, or a
 system acting on its own authority, such as an integration or a scheduled
 job. Define the actor once per call on its `ctx`, immutably, with
-`frozenActor`. On HTTP, the `actorResolver` you give access control defines
-it from the signed-in user; access control has no default, so without a
-resolver nobody is acting unless something else defines `ActorCtx`. A
-guard of yours can define it first, such as an API-key guard for an
-integration: a call carrying `ActorCtx` uses it. With the global JWT guard,
-a caller without a token is refused (401) by that guard, whatever order it
-runs in relative to yours: mark the routes your guard serves
-`@AuthPublic({ optional: true })`, or turn the global guard off
-(`appGuard: false`). Access control's `AccessContextOverlay` attaches on
-HTTP only; elsewhere its `actorResolver` is still asked, with no request to
-read. On RPC, define `ActorCtx` in a guard that runs before a grant's guard
-(an overlay is too late: guards run before interceptors); in a queue
-consumer or job, on the context it opens. Authentication alone signs the
-user in but defines no actor:
+`frozenActor`. On HTTP, the `actorResolver` you give access control usually
+defines it from the signed-in user; authentication alone signs the user in
+but defines no actor. Where else it comes from (a guard of your own, RPC, a
+queue consumer or job) is in core's
+[Actor and Authority](../nestjs-core/README.md#actor-and-authority) and
+access control's
+[Who Is Acting](../nestjs-access-control/README.md#who-is-acting):
 
 ```ts
 import { ActorCtx, frozenActor } from '@concepta/nestjs-core';
@@ -2660,8 +2659,9 @@ Access control's route grants are written in the same shape. They name your
 API, not your storage: a grant's `subject` is a route's resource and its
 `fields` are paths in request and response bodies, which a mapper may rename.
 The exception is a generated CRUD route's query fields (`select`, `filter`,
-`or`, `sort` and `s`), which reach this repository unchanged and so name
-stored columns. Data rules belong
+`or`, `sort` and `s`), which CRUD passes to this repository unrenamed, so
+they name stored columns
+([Query Fields](../nestjs-crud/README.md#query-fields)). Data rules belong
 here, written once; see access control's README for how the two combine.
 
 Any other engine plugs in the same way: implement `AuthorityInterface` from
@@ -2702,14 +2702,13 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   call naming a column that doesn't exist in `select`, `where` or `order` is
   refused with the same `403` as a hidden one, so the refusal never tells
   them which hidden columns there are. A `within` naming a column that
-  doesn't exist is a `400` for every actor, since the list is the
-  developer's own. On a generated CRUD route, a `?select=`, `?filter=`,
-  `?or=`, `?sort=` or `?s=` naming no column is a `400` before the
-  repository decides, since the route's OpenAPI document makes its column
-  names public, and so is a route default filter or sort naming none. Under
-  an access-control grant limited to some fields, `AccessControlCrudPolicy`
-  runs first, so an unknown `filter`, `or`, `sort` or `s` field there is a
-  `403` with refusal `field`. A read selecting nothing returns only the
+  doesn't exist is a `400`, on a governed entity for every actor the
+  authority lets read, checked before their column limits, since the list
+  is the developer's own. A
+  generated CRUD route checks its query fields before the repository
+  decides; see CRUD's
+  [Query Fields](../nestjs-crud/README.md#query-fields). A read selecting
+  nothing returns only the
   columns the actor may read. An actor who may read no column at all is
   refused. A column a hook adds to the query is decided as the caller's,
   such as the `archived` filter in [Defining a Hook](#defining-a-hook); only
@@ -2727,9 +2726,8 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
 
   A generated CRUD List or Read without `?select=` passes the route's
   columns this way, so one actor's hidden column never fails another's
-  read, while a `?select=` naming a hidden column is refused (`403`). A
-  CRUD write's pre-read selects nothing, so it holds the columns the actor
-  may read (see Write results below). A hook sees the default in
+  read (see CRUD's [Query Fields](../nestjs-crud/README.md#query-fields)).
+  A hook sees the default in
   `within`; narrow it there. Only a `RepositoryInterface` implementation
   outside `forRoot()`, such as a test double, has to honour `within` itself.
 - **Writes.** Every column a write sets must be writable; the primary key is
@@ -2743,19 +2741,11 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   `softDelete`.
 - **Write results** hold the columns the actor may read, and the primary key.
   A direct repository write needs no read permission of its own: an actor
-  who may only create gets back the new row's key. Generated CRUD routes
-  differ: on a governed entity, Update, Replace, Delete, SoftDelete and
-  Restore first read the row as the caller, and that read holds only the
-  columns the caller may read. So the caller also needs `read` on the
-  entity and on every column the lookup names: the route's params, any
-  default filter, and the request's `filter`, `or` and `s`. They need
-  `read` on the version column too (for Update and Replace, and any write
-  sent with `If-Match`) and on the delete date (for Update, Replace and
-  SoftDelete), or the write fails with a `500`. Only Create and CreateBatch
-  write without reading. Create, CreateBatch, Update and Replace write the
-  route's params into the row, so those are columns the write sets and must
-  be writable; on all but Replace, a scope column row scope stamps itself is
-  not counted.
+  who may only create gets back the new row's key. Generated CRUD writes
+  differ: most read the row first, as the caller, and all write the route's
+  params; see CRUD's
+  [Operation-to-Repository Mapping](../nestjs-crud/README.md#operation-to-repository-mapping)
+  for the rights that takes.
 
 **Relations:**
 
@@ -2772,15 +2762,17 @@ row, is a `403`, never a `409` or `404` that would tell them the row exists.
   | --- | --- |
   | `create`, `createMany` | create |
   | `update` | update and create; also delete, for a to-one set to `null` |
-  | `replace`, `upsert` | update, create and delete |
+  | `replace`, `upsert` | update and create; also delete, in a to-many relation or for a to-one set to `null` |
   | `delete`, `deleteMany` | delete |
   | `softDelete` | softDelete |
   | `restore` | restore |
 
   A delete, soft delete or restore is decided when it starts, on every
-  entity its cascades reach, however deep, whether or not any has rows, so
-  a refusal never depends on what is stored; only then are the related rows
-  found, all of them before any is written. Each related row's columns,
+  entity its cascades reach, however deep, each asked once, whether or not
+  any has rows, so a refusal never depends on what is stored; only then are
+  the related rows found, all of them before any is written. A write that
+  may delete related rows decides that delete on everything it reaches the
+  same way, before the parent is written. Each related row's columns,
   and its own related rows, are checked before the parent is written too.
   A new row (one without a primary key, in a to-many relation) is checked
   against create. Any other is

@@ -385,13 +385,16 @@ default filter, and the request's `filter`, `or` and `s`. They need `read`
 on the version column too (for Update and Replace, and any write sent with
 `If-Match`) and on the delete date (for Update, Replace and SoftDelete), or
 the write fails with a `500`. Only Create and CreateBatch write without
-reading.
+reading. (A repository write of your own needs no read permission: an
+actor who may only create gets back the new row's key.)
 
 Create, CreateBatch, Update and Replace write the route's params into the
 row. Under an authority those are columns the write sets, so the caller
-must be allowed to write them; on all but Replace, a scope column row
-scope stamps itself is not counted. A Replace needs every column but the
-primary key writable.
+must be allowed to write them, except the primary key: it names the row
+and is never counted, so `/things/:id` needs no right on `id`. On all but
+Replace, a column row scope stamps itself is not counted either, but a
+route param naming a scope column is. A Replace needs every column but the
+primary key writable, scope columns included.
 
 **Row-scoped entities are scoped on every route, with nothing to add here.**
 Because enforcement lives in the repository this table maps onto, a CRUD
@@ -507,26 +510,45 @@ export const userSchema = withNamedComponent(
 selected, `version` included — use `persist` in the route's query options
 if a narrowing client still needs it.
 
-`?select=`, `?filter=`, `?or=`, `?sort=` and `?s=` reach the repository
-unchanged, so they name stored columns. One naming no column is a `400`
-before the repository decides, and so is a route default filter or sort
-naming none (column names are public in the route's OpenAPI document).
-Under an access-control grant limited to some fields,
-`AccessControlCrudPolicy` runs first, so an unknown `filter`, `or`, `sort`
-or `s` field is a `403` with refusal `field` instead.
+### Query Fields
+
+`?select=`, `?filter=`, `?or=`, `?sort=` and `?s=` name stored columns:
+CRUD passes the names to the repository unrenamed. `?filter=`, `?or=` and
+`?s=` become the `where` of List, Read and a write's pre-read, joined with
+the route's params and default filter. `?sort=` is used on List only (Read
+and the pre-read pass no order), and `?select=` on List and Read only.
+
+A field naming no column is a `400` before the repository decides:
+`?filter=`, `?or=` and `?s=` on every route that reads, `?select=` on List
+and Read, and `?sort=` on List (Read ignores it). So is a route default
+filter, or a default sort on List, naming none. Column names are public in
+the route's OpenAPI document; a relation-tagged field is left to the
+repository. Registered as the `requestPolicy`, `AccessControlCrudPolicy`
+runs before these checks on every route a grant checked, Read included,
+and checks `filter`, `or`, `sort` and `s`. When access
+control's own grants allow `read` only on named fields, with no authority
+deciding the resource, an unknown field there is a `403` with refusal
+`field` instead. Under an authority access control shares, CRUD's `400`
+applies.
 
 List and Read narrow alike: a `?select=` is passed as `select`, and without
 one the route's columns are passed as `within`. On an entity an
 [authority](../nestjs-repository/README.md#object-authority) governs, a
-List or Read without `?select=` returns the route's columns less the
-caller's hidden ones, and a `?select=` naming a hidden column is refused
-(`403`). This holds whether or not access control shares the authority. A
-`?select=` is refused too when the route's primary or `persist` columns are
-hidden, since every `?select=` adds them, and so is a `?filter=`, `?or=`,
-`?sort=` or `?s=`, or the route's default filter or sort, naming a hidden
-column. A caller who may read none of the route's columns is refused, not
-given an empty result. The pre-read of a write selects nothing, so it holds
-the columns the caller may read (see the operation mapping above).
+List or Read without `?select=` returns the route's columns, plus the
+primary key and `persist` columns, less the caller's hidden ones. A
+`?select=` naming a hidden column is refused (`403`). This holds whether or
+not access control shares the authority. A `?select=` is refused too when
+the route's primary or `persist` columns are hidden, since every
+`?select=` adds them, and so is a `?filter=`, `?or=` or `?s=`, the route's
+default filter, or on List a `?sort=` or default sort, naming a hidden
+column. Without `?select=`, a `persist` entry naming no column is a `400`
+for every caller the authority lets read, checked before their column
+limits; with one, it is checked with the selected columns, so a caller
+limited to some columns gets a `403`. A caller who may
+read none of the route's columns is refused, not given an empty result.
+The pre-read of a write passes neither `select` nor `within`, so it holds
+every column the caller may read (every column when no authority limits
+them; see the operation mapping above).
 
 ## Controller Build Modes
 
