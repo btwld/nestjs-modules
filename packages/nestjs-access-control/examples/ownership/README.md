@@ -40,7 +40,8 @@ managers read everyone's; admins edit everyone's, owner included.
 
 On repository data, ownership is
 [row scope](../../../nestjs-repository/README.md#row-scope): your resolver
-scopes a limited caller to `{ ownerId: actor.userId }`, and every read and
+scopes a limited caller to their own rows (`ownerId` from the `RowScopeCtx`
+overlay you set from the signed-in user), and every read and
 write through the repository is narrowed to their rows, lists included. No
 access query service or handler filtering is needed.
 

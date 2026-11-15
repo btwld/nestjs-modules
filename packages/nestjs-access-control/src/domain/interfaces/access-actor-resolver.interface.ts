@@ -4,7 +4,8 @@ import { type Actor } from '@concepta/nestjs-core';
 
 /**
  * Works out who is acting for a call that does not already carry an
- * `ActorCtx` overlay. Returning `undefined` refuses the call.
+ * `ActorCtx` overlay. Returning `undefined` means nobody is acting: a
+ * checked route then refuses the call with `no-actor`.
  *
  * On an HTTP call, `context` is its execution context, so the actor can be
  * read from the authenticated request: route checks run after every global

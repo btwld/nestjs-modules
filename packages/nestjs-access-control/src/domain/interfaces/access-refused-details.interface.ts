@@ -19,7 +19,9 @@ export interface AccessRefusedDetailsInterface {
   fields?: string[];
   /**
    * The decision still pending, when the refusal is one: the authority
-   * refused for one, or every deny that refused carries a `reason`.
+   * refused for one, or denies of the whole resource refused and every one
+   * of them carries a `reason` (the first one's). A deny naming fields
+   * reports none.
    */
   gate?: string;
 }

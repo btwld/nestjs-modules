@@ -15,8 +15,9 @@ operation declares the grant it needs through `extraDecorators`.
 ## What to look at
 
 - **Query input is checked too.** A clerk's list leaves out `notes`, and a
-  `sort`, `filter` or `s` (search) naming it is refused: ordering or
+  `filter`, `or`, `sort` or `s` (search) naming it is refused: ordering or
   matching by a field tells its value without showing it. The manager may.
+  `select` is left to the response filter and the repository.
 - **Write fields on generated routes.** No handler of yours runs, so the
   request policy checks the body: the clerk's change to `amount` is
   refused, their change to `customer` goes through.

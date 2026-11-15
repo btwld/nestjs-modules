@@ -1,7 +1,7 @@
 # Multi-Tenant Access Levels
 
 Each user belongs to some tenants, with a role in each. Roles are described
-the way an admin screen shows them, as a level per object, and the levels
+the way an admin screen shows them, as a level per resource, and the levels
 become rules.
 
 | Level | Verbs | Own records only |
@@ -34,12 +34,12 @@ contractor in Acme only.
   the tenant from the route and gives the caller the role they hold there,
   or none. The same person is a manager on `/tenants/acme/...` and a guest
   on `/tenants/globex/...`.
-- **Own-only levels are a record check.** Once a grant lets the call in,
-  [`own-project.query.ts`](./own-project.query.ts) lets a caller whose
-  level in that tenant is own-only for the route's verb reach only the
-  projects they own; rename and delete use it. The list returns a
-  `view-own` caller only their own projects, and create makes the caller
-  the owner. A person is limited unless one of their roles is not.
+- **Own-only levels are a record check.** Rename and delete use
+  [`own-project.query.ts`](./own-project.query.ts). Once a grant lets the
+  call in, it limits a caller to the projects they own when their level in
+  that tenant is own-only for the route's verb. A person is limited unless
+  one of their roles is not. The list returns a `view-own` caller only
+  their own projects, and create makes the caller the owner.
 - **Keeping tenants apart is not access control's job.** Grants say what a
   caller may do to projects, not which tenant's projects they reach. The
   store takes the tenant on every call here; in an application on

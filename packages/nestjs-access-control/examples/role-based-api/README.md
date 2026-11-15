@@ -24,8 +24,12 @@ grants and an actor resolver in
   `AccessControlService.assertFields`, which checks them against the
   caller's rules for the route's action: it refuses the accountant's change to
   `amount` and lets their change to the notes through.
-- **Nobody acting, or no grant.** A caller who is not signed in is refused
-  with refusal `no-actor`; a signed-in user with no role, with `no-grant`.
+- **Nobody acting, or no grant.** The demo guard lets a caller who is not
+  signed in through, so the call reaches the check with nobody acting and
+  gets a `403` with refusal `no-actor` (with
+  `@concepta/nestjs-authentication`, an unauthenticated call is answered
+  `401` first). A signed-in user with no role gets a `403` with refusal
+  `no-grant`.
 
 ## Run it
 

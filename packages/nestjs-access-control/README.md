@@ -1,6 +1,7 @@
 # @concepta/nestjs-access-control
 
-Decide who may do what to which resource, by role and by external system.
+Decide who may do what to which resource, by role and by system (such as
+an integration or a scheduled job).
 You write rules, say who is acting, and mark the routes that need a grant;
 the module refuses everything else, filters responses down to the fields the
 caller may see, and answers the same question inside your command handlers.
@@ -86,8 +87,11 @@ export class UserController {
 ```
 
 An admin reads any user. A member reads them too, but the response holds
-only `id` and `name`. Anyone else, or a call with nobody acting, gets a
-`403`.
+only `id` and `name`. A signed-in caller with no grant gets a `403` (its
+`refusal`, in the exception's context for your logs, is `no-grant`). A call
+that reaches the check with nobody acting gets a `403` too (`no-actor`);
+with `@concepta/nestjs-authentication`, an unauthenticated call is answered
+`401` before that. The response body never names the refusal.
 
 ## Examples
 
@@ -127,33 +131,36 @@ A rule names an action, a resource, and optionally the fields it covers:
   everything beneath it (`address` covers `address.city`), and positions in
   arrays are ignored (`items.amount` covers every item). Leave it out to
   cover every field.
-- **`inverted: true`** makes the rule a deny. Its `reason` is reported as a
-  decision still pending (`gate`) when it refuses a call.
+- **`inverted: true`** makes the rule a deny. When denies of the whole
+  resource refuse a call and every one of them has a `reason`, the first
+  one's reason is reported as a decision still pending (`gate`). A deny
+  naming `fields`, or any deny without a reason, reports none. A deny
+  without a reason is final.
 
 Rules are `AuthorityRuleInterface` from `@concepta/nestjs-core`, the shape
-`@concepta/nestjs-repository`'s authority reads too. `settings.grants`
-accepts any verb, since your routes may declare their own, so a typo there
-grants nothing rather than failing to compile. Type your rules as
-`AuthorityRuleInterface`, which accepts only the verbs above, and a typo
-fails to compile; widen it for verbs of your own,
-`AuthorityRuleInterface<'read' | 'approve'>`. Actions and subjects can be
-lists. A rule set is refused, at startup or when it is loaded, if any rule:
+`@concepta/nestjs-repository`'s authority reads too. Actions and subjects
+can be lists.
 
-- has an action that is not a verb, such as `read all`;
-- uses `manage` or `all`, which CASL treats as "everything";
-- has `conditions`. Which records a caller reaches is row scope's job (see
-  `@concepta/nestjs-repository`), not a grant's;
-- has an empty `fields` list, or a blank entry in it;
-- names a pattern in `fields` (`profile.*`): name the parent (`profile`),
-  which covers everything beneath it;
-- names an array position or numeric key in `fields` (`items.0.amount`):
-  name the field beneath it (`items.amount`) instead;
-- has a property other than `action`, `subject`, `fields`, `inverted` and
-  `reason`.
+Type your rules as `AuthorityRuleInterface`: it defaults to the six
+actions (`create` to `restore` above), so a mistyped verb fails to compile.
+To add verbs of your own, widen it:
+``AuthorityRuleInterface<`${ActionEnum}` | 'approve'>``. To narrow, list
+only the verbs you allow: `AuthorityRuleInterface<'read' | 'update'>`.
+`settings.grants` and a grants provider's `rulesFor` accept any verb, since
+your routes may declare their own, so a typo there fails silently: a
+mistyped allow grants nothing, and a mistyped deny denies nothing. Type the
+rules you write as `AuthorityRuleInterface` before passing them in.
+
+A rule set is refused, at startup or when it is loaded, for any problem
+`authorityRuleProblems` lists: see
+[core's rules](../nestjs-core/README.md#actor-and-authority) for the full
+list. `settings.grants` is refused at startup, too, when a key is not
+`role:<name>` or `system:<name>`.
 
 `authorityRuleProblems(rules, source)` from `@concepta/nestjs-core` lists
-every problem with a rule set, so a screen that edits rules can check them
-before saving.
+every problem with a rule set, and `accessGrantsProblems(grants)` from this
+package every problem with grants keyed by actor, keys included, so a
+screen that edits rules can check them before saving.
 
 To hide a field, allow the resource and deny the field:
 
@@ -213,6 +220,21 @@ AccessControlModule.forRootAsync({
   authority, so the mistake shows. Which rows the caller reaches is row
   scope's job; the repository then decides each read and write by the same
   rules, columns included.
+- **Write your routes' own verbs in the authority's rules too.** A
+  repository asks only `create`, `read`, `update`, `delete`, `softDelete`
+  and `restore`, but the shared authority is also asked each route's own
+  verbs (such as `approve`) on every resource not in `except`.
+- **Access control asks about the action only.** Its route checks, `can`
+  and `assert` ask with no columns: the action, and also `read` when the
+  action isn't `read`, since a write's response shows what a read would. A
+  custom authority answers them by the action. Under a shared
+  `CaslAuthority`, unusable authority rules fail these checks with
+  `CaslAuthorityRulesInvalidException`
+  (`CASL_AUTHORITY_RULES_INVALID_ERROR`); access control's own unusable
+  rules still fail with `AccessRulesInvalidException`. Columns are enforced
+  where data passes through a governed repository: a handler that returns
+  data from elsewhere, such as a cache or another service, is not filtered
+  by the authority's column rules.
 - **`except` names the routes that are yours alone.** A route on a resource
   no entity stands behind, such as `@AccessControlGrant({ resource:
   'report', action: 'export' })`, is decided by your rules as if there
@@ -223,7 +245,10 @@ AccessControlModule.forRootAsync({
   what the authority refuses:
   their denies count, their allows don't. Deny a field to hide it from one
   API's responses, or to refuse it in `assertFields`.
-- `can` and `assert` in handlers decide the same way.
+- `can` and `assert` in handlers decide the same way, asking about the
+  action only. Their `fields` are checked against access control's own
+  denies only; the authority's column rules hold where data passes through
+  a governed repository.
 
 The two rule sets are written the same way but name different things. The
 authority's rules name your storage: an entity and its columns, exactly as
@@ -236,25 +261,27 @@ nest (`total_cents` stored, `pricing.total` sent). So:
   routes or not;
 - **access control's field rules are for the API alone**: a computed field,
   a response that is not an entity, a nested shape the storage doesn't have.
-  One exception: on generated CRUD routes, query fields (`filter`, `sort`,
-  `s`) reach the repository unchanged, so they are stored names (see
-  [CRUD Routes](#crud-routes)).
+  One exception: on generated CRUD routes, query fields (`select`,
+  `filter`, `or`, `sort` and `s`) reach the repository unchanged, so they
+  name stored columns (see [CRUD Routes](#crud-routes)).
 
 Without an authority, your rules decide alone, as everywhere else in this
 README. See the [Shared rules](./examples/shared-rules) example.
 
 ## Who Is Acting
 
-The actor is a person acting through their roles, or an external system
-acting on its own authority:
+The actor is a person acting through their roles, or a system acting on
+its own authority, such as an integration or a scheduled job:
 
 ```ts
 { kind: 'role', roles: ['admin'], userId: 'u-42' }
 { kind: 'system', name: 'billing' }
 ```
 
-For HTTP, pass an `actorResolver` that reads the authenticated user from the
-request. Returning `undefined` means nobody is acting:
+For HTTP, pass an `actorResolver` (`AccessActorResolverInterface`) that
+reads the authenticated user from the request. Returning `undefined` means
+nobody is acting. Its `context` argument is the call's execution context on
+HTTP only; it is `undefined` for `can` and `assert` and on other transports:
 
 ```ts
 AccessControlModule.forRootAsync({
@@ -279,12 +306,14 @@ AccessControlModule.forRootAsync({
 });
 ```
 
-Checked routes are checked by a route guard, which runs after every global
-guard, so a global authentication guard has already put the user on the
-request. With `@concepta/nestjs-authentication`, the resolver can read
-`AuthUserCtx` from the call's context instead of `request.user`: the guard
-that authenticated the call defined it. On a call nobody authenticated it
-is absent when the resolver runs, so check before reading it:
+The check runs after every global guard, so a global authentication guard
+has already put the user on the request. With
+`@concepta/nestjs-authentication`, the resolver can read `AuthUserCtx` from
+the call's context instead of `request.user`. The guard that authenticated
+the call defines it. On every other HTTP call, `AuthUserContextOverlay`
+defines it from `request.user` (no user when nobody authenticated), only
+after every guard has run, and the resolver may run before that, so check
+`supports(AuthUserCtx)` first:
 
 ```ts
 actorFor: async (ctx) => {
@@ -299,10 +328,10 @@ actorFor: async (ctx) => {
 Authentication must run before the check, or the resolver finds nobody and
 every caller is refused with `no-actor`, signed in or not:
 
-- keep the authentication guard global (the default), or on the
-  controller;
-- on a method, list it *below* the access decorator: the lower decorator's
-  guard runs first.
+- keep the authentication guard global (the default);
+- or put its `@UseGuards` *below* the access decorator at the same level,
+  both on the controller or both on the method: the lower decorator's guard
+  runs first. A guard on the controller runs before one on a method.
 
 ```ts
 @Get()
@@ -313,47 +342,77 @@ list() {
 }
 ```
 
-A route marked `@AuthPublic()` never authenticates, so a grant on it
-refuses everyone. For a public route that still recognises signed-in
-callers, use `@AuthPublic({ optional: true })`.
+`@AuthPublic()` turns off the JWT guard and any guard built with
+`canDisable: true`. With only the JWT guard, a public route has no
+signed-in user, so a grant on it refuses every caller with `no-actor`. A
+guard that can't be turned off, such as `LocalGuard` or `RefreshGuard`,
+still authenticates there, and a global guard of your own that defines
+`ActorCtx`, such as an API-key guard, still gets its system through. For a
+public route that still recognises signed-in callers, use
+`@AuthPublic({ optional: true })`: a valid token signs the caller in, and a
+`401` from the guard leaves the call anonymous.
 
-The resolver decides who may act at all. `@concepta/nestjs-authentication`
-already refuses a user turned off (`active: false`) on every call; refuse
-anyone else your application shuts out. On a refresh route, the user is
-whoever holds the refresh token; keep grants off routes that do anything but
-issue tokens.
+With the global JWT guard, a caller without a token, such as a system
+sending only an API key, is refused (`401`) by that guard, whatever order
+it runs in relative to your API-key guard: mark the routes that guard
+serves `@AuthPublic({ optional: true })`, or turn the global guard off
+(`appGuard: false`).
 
-With a resolver, the module then defines the actor on the call's context as
-`ActorCtx` (from `@concepta/nestjs-core`), on every HTTP call, so a route
-handler, or anything it calls, checks with the same actor — repositories
-governed by an
-[authority](../nestjs-repository/README.md#object-authority) included. On a
-route without a grant, the actor is defined by a global interceptor, so your
-own guards and earlier interceptors don't see it yet there. The resolver
-runs once per request; cache in it if it reads a database.
-Don't define `ActorCtx` in an HTTP interceptor of your own: the guard has
-already defined it by then, so redefining it fails.
+Refuse inactive users in the guard that signs them in. The authentication
+module's own sign-ins (local login, the JWT and refresh guards) refuse a
+user whose `active` isn't `true`, and so do `TokenPort.validateToken` and
+the `ValidateAndVerify*` queries, which require a `UserPort`.
+`TokenPort.verifyAccessToken` and `verifyRefreshToken` check only the
+token. A guard of your own looks nobody up: refuse inactive users in that
+guard. A resolver that returns no actor for them refuses only routes with a
+grant, `assert` (and `can` answers `false`) and governed repository calls:
+the user is still signed in everywhere else, and `@AuthUser()` sees them.
+On a refresh route, the user is whoever holds the refresh token; keep
+grants off routes that do anything but issue tokens.
+
+With a resolver, the module defines `ActorCtx` (from
+`@concepta/nestjs-core`) on the context of every HTTP call the resolver
+finds an actor for, routes without a grant included. A route handler, and
+anything it calls, checks with that actor, repositories governed by an
+[authority](../nestjs-repository/README.md#object-authority) included.
+Without an actor, `ActorCtx` stays undefined, and a governed repository
+call refuses with refusal `no-actor` (`403`). The resolver runs once per
+request; cache in it if it reads a database.
+
+Don't define `ActorCtx` in an HTTP interceptor of your own: redefining it
+fails. On a checked route the module has already defined it, and elsewhere
+it may have. On a route without a
+grant, the module defines it in a global interceptor,
+`AccessContextOverlay`, so your own guards and earlier interceptors don't
+see it there yet.
 
 The resolver is given a request only over HTTP: on other transports the
 "request" is the message payload, which the sender controls. There, define
-`ActorCtx` yourself. An integration consumer acting for another system
-defines `{ kind: 'system', name: 'billing' }` on the context it opens for
-each message:
+`ActorCtx` yourself, once per call, immutably, with `frozenActor(actor)`
+(the immutable overlay freezes the top level, `frozenActor` freezes
+`roles`). On RPC, define it in a guard that runs before a grant's guard: an
+overlay is too late, since guards run before interceptors. In a queue
+consumer or a job, define it on the context it opens. An integration
+consumer acting for another system defines
+`{ kind: 'system', name: 'billing' }` on the context it opens for each
+message:
 
 ```ts
-import { ActorCtx, AppContextHost } from '@concepta/nestjs-core';
+import { ActorCtx, AppContextHost, frozenActor } from '@concepta/nestjs-core';
 
 const ctx = new AppContextHost();
 ctx.defineOverlay(
   ActorCtx,
-  { kind: 'system', name: 'billing' },
+  frozenActor({ kind: 'system', name: 'billing' }),
   { immutable: true },
 );
 ```
 
-A call carrying `ActorCtx` uses it; the resolver is asked only when it is
-absent. A system is checked against `system:billing` rules only, never
-against the roles of whatever account it runs under:
+A call carrying `ActorCtx` uses it, on HTTP too, where a guard of yours
+that runs first, such as an API-key guard, may define it; the resolver is
+asked only when it is absent. A system is checked against
+`system:billing` rules only, never against the roles of whatever account
+it runs under:
 
 ```ts
 grants: {
@@ -364,8 +423,8 @@ grants: {
 ## Rules at Runtime
 
 To keep rules in your database, so an admin screen can edit them, pass a
-`grantsProvider`. It is asked for the actor's rules on every check, so an
-edit applies to the next call:
+`grantsProvider` (`AccessGrantsProviderInterface`). It is asked for the
+actor's rules on every check, so an edit applies to the next call:
 
 ```ts
 AccessControlModule.forRootAsync({
@@ -388,12 +447,10 @@ AccessControlModule.forRootAsync({
 Per-user rules sit on top of the role template: a user rule can allow what
 the template leaves out, and deny what it allows, but cannot undo a deny in
 the template. Every rule set the provider returns is checked before use; a
-set that breaks the rules in [Writing Rules](#writing-rules) refuses the
-call. Caching, and telling other instances about an edit, is up to the
-provider. `rulesFor` returns the rules or a promise of them, as the
-repository's `CaslAuthority` rules source does; the difference is when each
-is asked: the CASL authority asks once per `ctx`, while the grants provider
-is asked on every check.
+set that breaks the rules in [Writing Rules](#writing-rules) fails the call
+with `AccessRulesInvalidException`, a `500`. `rulesFor` returns the rules
+or a promise of them. It is asked on every check, so cache in it; telling
+other instances about an edit is up to the provider too.
 
 ## Protecting Routes
 
@@ -419,41 +476,59 @@ approve(@Param('id') id: string) {
 ```
 
 With several grants, the first one the caller holds lets them through. On a
-controller, a
-decorator applies to every route in it, unless a route declares its own.
+controller, a decorator applies to every route in it, unless a route
+declares its own.
 A route with neither is not checked. To catch one at startup, turn on core's
 [route audit](../nestjs-core/README.md#route-audit): this module adds the
-`requireAcl` rule, which fails startup for a route that has no grant and isn't
-`@AuthPublic()`.
+`requireAcl` rule, which fails startup for a route that has no grant and
+isn't marked public with core's `@PublicRoute()`, which every
+`@AuthPublic()` form sets, `{ optional: true }` included. A public route is
+exempt, so a missing grant there is not caught at startup. Exempt a
+signed-in route every caller may call with the audit's
+`allow: { requireAcl: ['GET /me'] }`.
 
-The check is a route guard: it runs after every global guard and before
-every interceptor, so nothing, such as a cached response, can let a caller
-through a checked route without it.
+Nothing, such as a cached response, lets a caller through a checked route
+without the check: it runs after every global guard and before every
+interceptor.
 
 ## Response Filtering
 
-A checked route's response is filtered down to the fields the caller may
-read, under their `read` rules, whatever the route does: an update's
-response shows what a read of the same record would, not what the caller
-may write, and a caller who may write but not read gets an empty response.
+A checked route's response holds only the fields the caller may read,
+under their `read` rules, whatever the route does. An update's response
+shows what a read of the same record would, not what the caller may write.
+A caller who may write but not read gets an empty response. On generated
+CRUD routes over an entity an authority governs, though, Update, Replace,
+Delete, SoftDelete and Restore first read the row as the caller, and that
+read holds only the columns the caller may read. So the caller also needs
+`read` on the entity and on every column the lookup names: the route's
+params, any default filter, and the request's `filter`, `or` and `s`. They
+need `read` on the version column too (for Update and Replace, and any
+write sent with `If-Match`) and on the delete date (for Update, Replace and
+SoftDelete), or the write fails with a `500`. Only Create and CreateBatch
+write without reading.
 
-- each item of an array is filtered, and so is each item of a paginated
-  response's `data`; the page's counters are kept, and its other fields
-  filtered;
-- objects are filtered as they go over the wire, after `toJSON`; an
-  instance of your class stays an instance of it, so a class serializer
-  (such as `ClassSerializerInterceptor`) still applies its own rules
-  afterwards. Getters and methods the caller may not read are blanked on
-  the filtered instance, so a serializer cannot send them, and later code
-  cannot call them;
+- each item of an array is filtered;
+- a response is a page when its `data` is an array and its `count`,
+  `total`, `page` and `pageCount` are numbers: each item of `data` is
+  filtered, the counters are kept, and the page's other fields filtered.
+  Otherwise `data` is filtered as an ordinary field;
+- objects are filtered as they go over the wire, after `toJSON`. An
+  instance with `toJSON` becomes the filtered plain result. An instance of
+  your class without `toJSON` stays an instance of it, so a class
+  serializer that runs after the filter still applies its own rules. On
+  that instance, getters and methods the caller may not read are blanked: a
+  serializer cannot send them, and later code cannot call them;
 - a response with no fields, such as a string, cannot be filtered: it is
-  sent only to a caller who may read the resource;
-- filtering runs after the route's own interceptors, so a route-level
-  response serializer sees the full response first.
+  sent only to a caller who may read the resource.
 
-Rule fields name the paths your handler returns: a class's property names,
-not the names a serializer renames them to on the way out. With
-`@Expose({ name: 'socialSecurity' }) ssn`, deny `ssn`.
+Register a class serializer, such as `ClassSerializerInterceptor`,
+globally, in your root module's `providers`. It then runs after the filter,
+on the filtered instance, so rule fields name the paths your handler
+returns: a class's property names. With
+`@Expose({ name: 'socialSecurity' }) ssn`, deny `ssn`. A serializer on a
+route or controller (`@UseInterceptors`) runs before the filter on the way
+out, so there rule fields must name the serialized names: deny
+`socialSecurity`.
 
 A client that needs the id of what it created, but may not read the
 record, can be granted just that field:
@@ -472,22 +547,23 @@ replace it.
 
 ### Caching responses
 
-The filter is a global interceptor, so it filters only what passes through
-it. A global interceptor that answers a call itself, such as a response
-cache, and that runs before the filter, sends what it stored unfiltered:
-the first caller's view of a record would reach every later caller. Global
-interceptors run in the order they are registered, and the providers of
-your root module are registered first.
+Register a response cache on the route with `@UseInterceptors`, or in a
+module imported after `AccessControlModule`, never in the root module's
+`providers`. It then runs after the filter, stores unfiltered responses,
+and each caller's copy is filtered on the way out.
 
-A response cache must therefore either store unfiltered responses and run
-after the filter, so each caller's copy is filtered on the way out, or keep
-a separate entry per caller. Register a cache that runs after the filter
-in a module imported after `AccessControlModule`, or on the route with
-`@UseInterceptors`, never in the root module's `providers`. A module's
-place is where it is first imported: a cache module also reached through a
-module imported earlier runs before the filter. A cache with an entry per
-caller must drop a caller's entries when their rules change, or a field
-taken away stays visible until the entry expires.
+A cache that runs before the filter answers the call itself and sends what
+it stored unfiltered: the first caller's view of a record would reach
+every later caller. The filter is a global interceptor, and global
+interceptors run in the order they are registered:
+
+- your root module's providers are registered first;
+- a module is registered where it is first imported, so a cache module
+  also reached through a module imported earlier runs before the filter.
+
+A cache that keeps a separate entry per caller may run anywhere, but must
+drop a caller's entries when their rules change, or a field taken away
+stays visible until the entry expires.
 
 ## Record Checks
 
@@ -497,7 +573,8 @@ about the data:
 
 - **On data in `@concepta/nestjs-repository`, it is row scope's.** A row
   scope resolver limits every read and write, through any route or none: a
-  clerk to `{ ownerId: actor.userId }`, a manager to their tenant. See
+  clerk to their own rows, a manager to their tenant, with values from the
+  `RowScopeCtx` overlay you set from the signed-in user. See
   [Row Scope](../nestjs-repository/README.md#row-scope).
 - **On any other route, add an access query service.** It runs after a grant
   lets the call in, and decides from the call's context:
@@ -532,29 +609,37 @@ getOne(@Param('id') id: string) {
 }
 ```
 
-Register the service with the module's `queryServices`, or, when it injects
-your own providers (such as the store that knows who owns a record), in
-your own module: the check finds it in any module. A route with access
-query services proceeds when one of them allows it, and is refused with
-refusal `access-query` otherwise. On a controller, `@AccessControlQuery`
-applies to every route, unless a route declares its own, which replace the
-controller's. Access query services run only after a grant: on a route
-without one, the call fails rather than skip them. Each one receives:
+Register the service with the module's `queryServices`. When it injects
+your own providers, such as the store that knows who owns a record,
+register it in your own module instead: the check finds it in any module.
+
+- A route with access query services proceeds when one of them allows it,
+  and is refused with refusal `access-query` otherwise.
+- On a controller, `@AccessControlQuery` applies to every route, unless a
+  route declares its own, which replace the controller's.
+- Give the route a grant too. Access query services run only after one: on
+  a route without a grant, each call fails, at request time, with
+  `AccessControlException`, a `500`, rather than skip them.
+
+Each one receives:
 
 | Method | Returns |
 | --- | --- |
-| `getQuery()` | the grant the call got through on: actor, action, resource |
+| `getQuery()` | the grant the call got through on (`AccessQueryInterface`): actor, action, resource |
 | `getActor()` | who is acting |
 | `getContext()` | the call's context, as handlers receive it |
-| `getAbility()` | the caller's CASL ability, for further checks |
+| `getAbility()` | the caller's CASL ability (`AccessAbility`), for further checks |
 | `getRequest(property?)` | the request, or one of its properties; `undefined` outside HTTP |
+| `getExecutionContext()` | the route's execution context |
 
-In a handler, `AccessControlService.decision(ctx)` returns the same grant:
-who is acting and the action and resource the call was let through on, or
-`undefined` on a call no route checked.
+In a handler, `AccessControlService.decision(ctx)` returns the same grant,
+an `AccessQueryInterface`: who is acting and the action and resource the
+call was let through on, or `undefined` on a call no route checked.
 
 The two answer a caller differently. A record an access query service
-refuses is a `403`, which tells the caller the record exists. Row scope
+refuses is a `403`, which can tell the caller the record exists, unless the
+service refuses a missing record the same way, as the
+[Ownership](./examples/ownership) example's does. Row scope
 leaves a row outside the caller's reach out of every read, so the route
 answers as it would for a missing record, a `404`. Where even a record's
 existence is private, use row scope.
@@ -577,11 +662,10 @@ async update(
 }
 ```
 
-It checks each field under the grant the route let the caller in on. On a
-route with several grants, that is the one that let them in, so write field
-denies for each action the route grants. It reuses the route's decision, so
-the rules are not resolved again. Called anywhere else, it throws
-`AccessControlException`.
+It checks each field under the grant that let the caller in. On a route
+with several grants, write field denies for each action the route grants.
+It doesn't fetch the caller's rules again. Called outside a checked route,
+it throws `AccessControlException`.
 
 `accessFieldPaths` lists the fields a body sets, which is what a merging
 update touches. A handler that replaces a nested object whole, such as a
@@ -614,13 +698,19 @@ export class UpdateInvoiceHandler {
 `assert` throws `AccessRefusedException` unless the actor may take the
 action on the resource **and on every field in `fields`**. Without `fields`
 only the resource is checked, so always pass the fields a write touches.
-`can` answers the same question with a boolean.
+Under an [authority](#sharing-rules-with-the-repository), `fields` are
+checked against access control's own denies only; the authority's column
+rules hold where data passes through a governed repository.
+`can` answers the same question with a boolean. Both take their options as
+`AccessCheckOptionsInterface`.
 
 ## CRUD Routes
 
 On routes generated by `@concepta/nestjs-crud`, declare each operation's
 grant through `extraDecorators`, and register `AccessControlCrudPolicy` as
-CRUD's request policy, so field denies hold there as on routes you write:
+CRUD's request policy, so field denies hold there as on routes you write.
+`@concepta/nestjs-crud` is an optional peer dependency: install it in your
+application.
 
 ```ts
 import { AccessControlCrudPolicy } from '@concepta/nestjs-access-control/optional/crud';
@@ -632,6 +722,9 @@ CrudModule.forRootAsync({
   }),
 });
 ```
+
+A module's own `requestPolicy` replaces the root's for that module: to keep
+`AccessControlCrudPolicy`'s checks there, compose it into that policy.
 
 ```ts
 {
@@ -647,24 +740,51 @@ delete but never to delete is let through the one route and not the other.
 
 Before each request runs, under the grant its route let the caller in on:
 
-- **Query input.** A `filter`, `or`, search or `sort` naming a field the
-  caller may not read is refused, on every operation: matching or ordering
-  by `salary` tells its value without showing it. Query fields reach the
-  repository unchanged, so they are stored names: when your response
-  schema sends `total_cents` as `total`, deny both. The deny on `total`
-  hides it from responses; the one on `total_cents` stops filtering and
-  sorting by it. A column refused in the repository's authority is refused
-  in every query, routes or not.
+- **Query input.** A `filter`, `or`, `sort` or `s` (search) naming a
+  field the caller may not read is refused, on every operation: matching
+  or ordering by `salary` tells its value without showing it. `select` is
+  left to the response filter and the repository. Query fields (`select`,
+  `filter`, `or`, `sort` and `s`) reach the repository unchanged, so they
+  name stored columns: when your response schema sends `total_cents` as
+  `total`, deny both. The deny on `total` hides it from responses; the one
+  on `total_cents` stops filtering and sorting by it. A `?select=`,
+  `?filter=`, `?or=`, `?sort=` or `?s=` naming no column is a `400` before
+  the repository decides (column names are public in the route's OpenAPI
+  document). Under a grant limited to some fields, this policy runs first,
+  so an unknown `filter`, `or`, `sort` or `s` field is a `403` with refusal
+  `field`. A column refused in the repository's authority is refused in
+  every query, routes or not.
 - **Write bodies.** A create, an update and each item of a batch create may
-  touch only fields the caller may write, as `assertFields` checks them.
+  touch only fields the caller may write, as `assertFields` checks them. A
+  create and a batch create also write the route's params into the row, so
+  those are checked as written fields too. Under the repository's
+  authority, create, batch create, update and replace all write the
+  route's params: those are columns the write sets, and must be writable,
+  except, on a create, batch create or update, a scope column row scope
+  stamps itself. A replace needs every column but the primary key
+  writable, scope columns and the delete date included.
 - **Replace.** A replace erases what its body leaves out, so it is refused
-  whenever a field is denied to the caller for the action.
+  whenever a field is denied to the caller for the action, or when the
+  caller's only allows for it name fields.
 
 What a request selects is not narrowed by these rules: the response filter
-leaves out what the caller may not read. With a shared authority, the
-repository also leaves the caller's hidden columns out of a list. Which rows a
-generated route reaches is row scope's job, on the entity's repository. See the
-[CRUD routes](./examples/crud-routes) example.
+leaves out what the caller may not read. On an entity an authority
+governs, whether or not access control shares the authority, a list or a
+read without `?select=` returns the route's columns less the caller's
+hidden ones, and a `?select=` naming a hidden column is refused (`403`).
+Update, Replace, Delete, SoftDelete and Restore read the row first, as the
+caller (see [Response Filtering](#response-filtering) for the `read` they
+need).
+
+So a response may hold fewer fields than the entity: `?select=`,
+`allow`/`exclude`, and an authority hiding columns all leave fields out.
+Mark every field that can be left out `.optional()` in the response
+schema; a missing required field fails serialization with a `500`. Fields
+access control's own rules deny are removed after serialization, so they
+need not be optional.
+
+Which rows a generated route reaches is row scope's job, on the entity's
+repository. See the [CRUD routes](./examples/crud-routes) example.
 
 ## Showing Permissions in a UI
 
@@ -682,18 +802,21 @@ permissions(@Ctx() ctx: AppContextHost) {
 CASL's frontend packages read the result as is.
 
 With an [authority](#sharing-rules-with-the-repository), these are only the
-actor's own rules: what the authority allows is not among them. Show the
-authority's rules instead, from wherever your application keeps them.
+actor's own rules. On resources in `except` they decide alone. Elsewhere
+their allows grant nothing and their denies still narrow what the authority
+allows, so what the caller may do there is the authority's allows less
+these denies: build the UI's rules from both, the authority's from wherever
+your application keeps them.
 
 ## Options
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `settings.grants` | `{}` | Rules keyed `role:<name>` or `system:<name>`. Checked at startup. |
-| `actorResolver` | none | Works out who is acting when a call carries no `ActorCtx`. |
-| `grantsProvider` | `settings.grants` | Supplies an actor's rules on every check. |
-| `authority` | none | `{ authority, except? }`: decides each route first, except on resources in `except`; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
-| `appFilter` | the response filter | Replace it, or `false` for none. |
+| `settings.grants` | `{}` | `AccessGrants`: rules keyed `role:<name>` or `system:<name>`. Used, and checked at startup, only without a `grantsProvider`. |
+| `actorResolver` | none | `AccessActorResolverInterface`: works out who is acting when a call carries no `ActorCtx`. |
+| `grantsProvider` | `StaticAccessGrantsProvider`, over `settings.grants` | `AccessGrantsProviderInterface`: supplies an actor's rules on every check. |
+| `authority` | none | `AccessControlAuthorityInterface`, `{ authority, except? }`: decides each route first, except on resources in `except`; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
+| `appFilter` | `AccessControlFilter`, the response filter | Replace it, or `false` for none. |
 | `queryServices` | `[]` | Access query services to register. |
 
 `AccessControlModule` offers `forRoot` and `forRootAsync`, which make it
@@ -704,24 +827,56 @@ whose controllers use the decorators: their guard needs
 needs `forRoot` or `forRootAsync` beside it; it adds no response filter or
 actor overlay of its own.
 
+### Constructing by hand
+
+To build `AccessControlService` yourself, pass it:
+
+- your resolver, wrapped in `ActorCtxResolver`, so a call's `ActorCtx`
+  wins over it;
+- a grants provider;
+- an `AccessCtxDecisionSource`, which finds the grant the route guard
+  recorded (`AccessDecisionSourceInterface`, returning an
+  `AccessDecisionInterface`: the grant and the caller's ability).
+
+`AccessControlCrudPolicy` takes the service and, optionally, the same
+decision source. Register `AccessContextOverlay` as a global interceptor to
+define `ActorCtx` from your resolver on every HTTP call.
+
+A guard of your own can decide a call with the service's methods, in this
+order. It can refuse, but it records no grant: the response filter,
+`AccessControlCrudPolicy`, `assertFields` and `decision(ctx)` act only
+behind the route guard the grant decorators add, so keep those decorators
+on any route whose responses or fields must be checked.
+
+| Method | Returns |
+| --- | --- |
+| `resolve(ctx, context?)` | the actor, their checked rules and ability (`AccessResolutionInterface`), or `undefined` when nobody is acting |
+| `authorize(ctx, resolution, action, resource)` | what the authority allows (`AccessAuthorization`): the resolution to check, or the refusal |
+| `refusal(resolution, action, resource, options?)` | why the actor may not (`AccessRefusedDetailsInterface`), or `undefined` |
+
 ## Exceptions
 
-| Exception | Status | Fault | When |
-| --- | --- | --- | --- |
-| `AccessRefusedException` | 403 | `client` | A call is refused |
-| `AccessRulesInvalidException` | 500 | `usage` | A rule set cannot be used |
+| Exception | Status | Fault | `errorCode` | When |
+| --- | --- | --- | --- | --- |
+| `AccessControlException` | 500 | `usage` | `ACCESS_CONTROL_ERROR` | The base of the others; thrown itself for a route with access query services but no grant, or `assertFields` outside a checked route |
+| `AccessRefusedException` | 403 | `client` | `ACCESS_REFUSED_ERROR` | A call is refused |
+| `AccessRulesInvalidException` | 500 | `usage` | `ACCESS_RULES_INVALID_ERROR` | Access control's own rule set cannot be used. Under a shared `CaslAuthority`, unusable authority rules fail the route with `CaslAuthorityRulesInvalidException` (`CASL_AUTHORITY_RULES_INVALID_ERROR`) instead |
 
 `AccessRefusedException`'s message names only the action and the resource,
-such as `Not allowed to delete invoice`. Its context names the `action`,
-the `resource`, the `actor` (who they are only: their kind, and their roles
-and user id or their name), and a `refusal`:
+such as `Not allowed to delete invoice`. The response body holds only
+`statusCode`, `message`, `errorCode` and `error` (the status text). Its
+context is for your logs and
+never in the response: an `AccessRefusedDetailsInterface` naming the
+`action`, the `resource`, the
+`actor` (who they are only: their kind, and their roles and user id or
+their name), and a `refusal`, one of `ACCESS_REFUSALS` (`AccessRefusal`):
 
 | Refusal | Meaning |
 | --- | --- |
 | `no-actor` | Nobody is acting |
 | `no-grant` | No rule allows it |
-| `denied` | A deny refuses it (also names a pending decision as `gate` when every deny that refused has a `reason`) |
-| `field` | A field it touches is refused (also names the refused `fields`) |
+| `denied` | A deny refuses it (also names the first one's reason as `gate` when the denies of the whole resource that refused all have a `reason`) |
+| `field` | A field it touches is refused (also names the first refused field in `fields`, when one field is to blame) |
 | `access-query` | The route's access query service refused it |
 | `authority` | The module's authority refuses it (also names any pending decision as `gate`) |
 
