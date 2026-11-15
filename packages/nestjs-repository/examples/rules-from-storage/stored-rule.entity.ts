@@ -22,7 +22,11 @@ export class StoredRuleEntity {
   @Column({ type: 'boolean', default: false })
   inverted!: boolean;
 
-  /** Why a deny is in place, e.g. the decision it waits on. */
+  /** On a deny waiting on a decision, the gate that closes it. */
+  @Column({ type: 'varchar', nullable: true })
+  pending!: string | null;
+
+  /** Why the rule is in place, for the people who maintain it. */
   @Column({ type: 'varchar', nullable: true })
   reason!: string | null;
 }

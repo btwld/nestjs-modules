@@ -18,6 +18,15 @@ export interface AuthorizedCallInterface {
   readonly readable: ReadonlySet<string> | undefined;
 
   /**
+   * For each action decided, `read` included, the gate of each column left
+   * out because a decision is still pending.
+   */
+  readonly gates: ReadonlyMap<
+    ActionEnum,
+    Readonly<Partial<Record<string, string>>>
+  >;
+
+  /**
    * Columns a write sets that are not counted against the actor: the foreign
    * key a cascade links a related row to its parent by.
    */

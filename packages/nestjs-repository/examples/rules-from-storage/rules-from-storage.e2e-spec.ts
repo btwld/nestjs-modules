@@ -118,7 +118,7 @@ describe('Rules from storage', () => {
       action: 'read',
       subject: DOCUMENT,
       inverted: true,
-      reason: 'DEC-7: documents await legal review',
+      pending: 'DEC-7: documents await legal review',
     });
 
     const response = await request(app.getHttpServer())

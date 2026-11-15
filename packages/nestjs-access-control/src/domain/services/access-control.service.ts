@@ -171,7 +171,9 @@ export class AccessControlService {
       }
 
       // With no field, CASL gives the rules of the whole resource only.
-      const gate = authorityGateOf(ability.rulesFor(action, resource));
+      const gate = authorityGateOf(
+        ability.rulesFor(action, resource).map((rule) => rule.origin),
+      );
       return {
         action,
         resource,
@@ -189,22 +191,33 @@ export class AccessControlService {
 
     // Every rule for the action, field-scoped denies included: `rulesFor`
     // leaves those out when asked without a field.
-    const deniedFields = ability
+    const fieldDenies = ability
       .possibleRulesFor(action, resource)
-      .filter((rule) => rule.inverted)
-      .flatMap((rule) => rule.fields ?? []);
+      .filter((rule) => rule.inverted);
 
     for (const field of fields) {
-      if (
-        !ability.can(action, resource, field) ||
-        deniedFields.some((denied) => denied.startsWith(`${field}.`))
-      ) {
+      // A deny beneath the field refuses it too: writing the field as a
+      // whole would replace what it denies.
+      const beneath = fieldDenies.filter((rule) =>
+        rule.fields?.some((denied) => denied.startsWith(`${field}.`)),
+      );
+
+      if (beneath.length > 0 || !ability.can(action, resource, field)) {
+        // Every rule that applies to the field, highest priority first.
+        const applying = [
+          ...new Set([
+            ...ability.rulesFor(action, resource, field),
+            ...beneath,
+          ]),
+        ].sort((a, b) => a.priority - b.priority);
+        const gate = authorityGateOf(applying.map((rule) => rule.origin));
         return {
           action,
           resource,
           actor,
           refusal: 'field',
           fields: [field],
+          ...(gate === undefined ? {} : { gate }),
         };
       }
     }

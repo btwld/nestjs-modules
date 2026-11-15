@@ -2635,11 +2635,11 @@ export class AuthorityModule {}
   fields covers every column.
 - **A deny (`inverted`) always wins**, whatever order the rules come in, and
   whichever of an actor's roles it belongs to.
-- **A deny's `reason`** marks a decision still pending, such as a
-  permission nobody has approved yet. When denies of the whole entity refuse
-  a call and every one of them has a `reason`, the first one's reason is
-  reported as the refusal's `gate`, for logs. A deny naming `fields`, or any
-  deny without a reason, reports none: a deny without one is final.
+- **A deny's `pending`** marks a decision still to be made, such as a
+  permission nobody has approved yet, by the gate that closes it. A refusal
+  only pending denies take part in names it, as `gate` for the action or in
+  `gates` by column (see [Refusals](#refusals)); see core's
+  [Actor and Authority](../nestjs-core/README.md#actor-and-authority).
 - **Rules are checked before use.** Rules are refused as
   `authorityRuleProblems` lists them (see core's
   [Actor and Authority](../nestjs-core/README.md#actor-and-authority)): the
@@ -2829,7 +2829,8 @@ and never in the response, whose body holds only `statusCode`, `message`,
 | `refusal` | Why it was refused: `no-actor` when the call names no actor, `authority` otherwise |
 | `actor` | Who asked, as the authority was asked about them |
 | `columns` | The columns refused |
-| `gate` | Any pending decision |
+| `gate` | The pending decision that refused the action, if one did |
+| `gates` | For each refused column left out pending, the gate that closes it |
 
 A filter or sort on a joined relation's column the actor may not read is
 refused under the read entity's `entityKey`, with `columns` naming each as
@@ -3448,7 +3449,7 @@ also exported for manual provider wiring.
 | `RepositoryUnboundException` | A repository built outside `RepositoryModule.forRoot()` was asked to serve an operation. Its declarations were never bound, so it refuses rather than run without them |
 | `RowScopeUnboundException` | A repository whose entity is declared scoped was asked to serve an operation before its resolver was attached — used from another provider's constructor during startup. It refuses rather than running unscoped |
 | `RowScopeBootException` | One or more structural row scope checks failed at startup; the message lists every failure |
-| `AuthorityRefusedException` | The authority governing an entity refused the caller's action or a column it names, or the call carried no actor (403). The message names the action and entity key only; `context.refusal`, `context.actor`, `context.columns` and `context.gate` are for logs — see [Refusals](#refusals) |
+| `AuthorityRefusedException` | The authority governing an entity refused the caller's action or a column it names, or the call carried no actor (403). The message names the action and entity key only; `context.refusal`, `context.actor`, `context.columns`, `context.gate` and `context.gates` are for logs — see [Refusals](#refusals) |
 | `AuthorityUnboundException` | A governed entity was asked to serve an operation before its authority was attached — used from another provider's constructor during startup. It refuses rather than running undecided |
 | `AuthorityBootException` | One or more authority checks failed at startup; the message lists every failure — see [Authority startup checks](#authority-startup-checks) |
 | `CaslAuthorityRulesInvalidException` | From `optional/casl`: the rules `rulesFor` returned for an actor cannot be used (500, fault `usage`); the message lists every problem, and every later call on the same `ctx` fails too — see [Rules with CASL](#rules-with-casl) |

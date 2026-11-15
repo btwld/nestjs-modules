@@ -151,6 +151,8 @@ export { AuthorityRefuseInterface } from './domain/authority/interfaces/authorit
 export { AuthorityRuleInterface } from './domain/authority/interfaces/authority-rule.interface.js';
 export { authorityRuleProblems } from './domain/authority/utils/authority-rule-problems.util.js';
 export { authorityGateOf } from './domain/authority/utils/authority-gate-of.util.js';
+export { authorityPendingGates } from './domain/authority/utils/authority-pending-gates.util.js';
+export { AuthorityPendingGateInterface } from './domain/authority/interfaces/authority-pending-gate.interface.js';
 
 // Event context
 export { EventContextHost } from './domain/events/causal-context/event-context.host.js';

@@ -18,6 +18,21 @@ import { type CaslAuthorityRulesInterface } from './interfaces/casl-authority-ru
 type CaslAuthorityAbility = Ability<[string, string]>;
 
 /**
+ * The gate of a refusal of `action` on `subject`, or of one of its columns,
+ * read from the rules as written: CASL keeps each as its `origin`.
+ */
+function gateOf(
+  ability: CaslAuthorityAbility,
+  action: string,
+  subject: string,
+  column?: string,
+): string | undefined {
+  return authorityGateOf(
+    ability.rulesFor(action, subject, column).map((rule) => rule.origin),
+  );
+}
+
+/**
  * An authority answering from rules (`AuthorityRuleInterface`), which
  * `rules` supplies for each actor, decided by CASL.
  *
@@ -26,10 +41,10 @@ type CaslAuthorityAbility = Ability<[string, string]>;
  *   naming none covers every column.
  * - Rules are checked before use: rules `authorityRuleProblems` finds a
  *   problem with refuse the call, as does every other call on the same ctx.
- * - When denies of the whole subject refuse the call and every one of them
- *   has a `reason`, the first one's is reported as the decision still
- *   pending (`gate`). A deny naming `fields` narrows the columns instead, and
- *   its `reason` is not reported; a deny without a reason is final.
+ * - When every deny that refuses the call is `pending`, the first one's
+ *   gate is reported as the refusal's `gate`. A deny naming columns narrows
+ *   them instead; when every deny refusing a column is pending, its gate is
+ *   reported in the decision's `gates`. A deny that isn't pending is final.
  */
 export class CaslAuthority implements AuthorityInterface {
   /**
@@ -51,7 +66,7 @@ export class CaslAuthority implements AuthorityInterface {
 
     if (!ability.can(action, subject)) {
       // With no field, CASL gives the rules of the whole subject only.
-      const gate = authorityGateOf(ability.rulesFor(action, subject));
+      const gate = gateOf(ability, action, subject);
       return gate === undefined
         ? { effect: 'refuse' }
         : { effect: 'refuse', gate };
@@ -66,9 +81,21 @@ export class CaslAuthority implements AuthorityInterface {
       return { effect: 'allow' };
     }
 
+    // A column is left out by a deny naming it, or by no allow covering it;
+    // only the first can be pending.
+    const gates = Object.fromEntries(
+      columns
+        .filter((column) => !permitted.has(column))
+        .flatMap((column) => {
+          const gate = gateOf(ability, action, subject, column);
+          return gate === undefined ? [] : [[column, gate]];
+        }),
+    );
+
     return {
       effect: 'allow',
       columns: columns.filter((column) => permitted.has(column)),
+      ...(Object.keys(gates).length ? { gates } : {}),
     };
   }
 

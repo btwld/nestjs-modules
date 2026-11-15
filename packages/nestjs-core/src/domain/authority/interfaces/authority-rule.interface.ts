@@ -12,10 +12,12 @@ import { type ActionEnum } from '../../enums/action.enum.js';
  *   exact name; access control matches a path in a request or response body,
  *   which covers everything beneath it.
  * - `inverted: true` makes the rule a deny. A deny always wins over an allow.
- * - `reason`: on a deny, the decision still pending behind it. When denies
- *   of the whole subject refuse a call and every one of them has a reason,
- *   the first one's is reported as the refusal's `gate`; a deny naming
- *   `fields`, or any deny without a reason, reports none.
+ * - `pending`: on a deny, the decision still pending behind it, named by the
+ *   gate that closes it, such as `cfo-approval`. It refuses like any deny,
+ *   and is reported as the refusal's `gate` when every deny that refused
+ *   the call, or the field, is pending. A deny without it is final.
+ * - `reason`: why the rule is there, for the people who maintain it. Never
+ *   reported.
  *
  * The type parameters narrow what a rule may name, so a typo fails to
  * compile: `Action` defaults to `ActionEnum`'s six verbs. Widen it for verbs
@@ -41,5 +43,6 @@ export interface AuthorityRuleInterface<
   subject: Subject | Subject[];
   fields?: Field[];
   inverted?: boolean;
+  pending?: string;
   reason?: string;
 }

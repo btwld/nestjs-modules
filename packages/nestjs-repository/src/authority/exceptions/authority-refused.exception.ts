@@ -14,7 +14,8 @@ import { type AuthorityRefusedDetailsInterface } from './authority-refused-detai
  *
  * The message names the action and the entity key only. Why it was refused
  * (`refusal`), who asked (`actor`), the columns refused and any pending
- * decision (`gate`) stay in the context for logs.
+ * decision (`gate`, or `gates` by refused column) stay in the context for
+ * logs.
  */
 export class AuthorityRefusedException extends RuntimeException {
   declare context: RuntimeException['context'] &
@@ -47,6 +48,7 @@ export class AuthorityRefusedException extends RuntimeException {
         : { actor: normalizeActor(details.actor) }),
       ...(details.gate === undefined ? {} : { gate: details.gate }),
       ...(details.columns === undefined ? {} : { columns: details.columns }),
+      ...(details.gates === undefined ? {} : { gates: details.gates }),
     };
     this.errorCode = 'AUTHORITY_REFUSED_ERROR';
   }

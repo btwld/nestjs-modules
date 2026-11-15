@@ -940,4 +940,74 @@ describe('authority over columns', () => {
       ]);
     });
   });
+
+  // A column left out pending a decision names its gate in the refusal; a
+  // column left out for good names none.
+  describe('pending columns', () => {
+    const PENDING: AuthorityTableFixture = {
+      [`role:clerk ${ORDER_TOKEN} read`]: {
+        effect: 'allow',
+        columns: ['id'],
+        gates: { tenantId: 'DEC-1' },
+      },
+      [`role:clerk ${ORDER_TOKEN} create`]: {
+        effect: 'allow',
+        columns: ['id', 'tenantId'],
+        gates: { description: 'DEC-2' },
+      },
+    };
+    const gatesOf = (error: unknown) =>
+      error instanceof AuthorityRefusedException
+        ? error.context.gates
+        : undefined;
+
+    it('should name the gate of a pending column a read is refused for', async () => {
+      const orders = await ordersWith(PENDING);
+
+      const error = await refusal(
+        orders.find({
+          where: Where.and(
+            Where.eq('tenantId', 'acme'),
+            Where.eq('description', 'first'),
+          ),
+          ctx: ctxOf(CLERK),
+        }),
+      );
+
+      expect(error).toMatchObject({
+        context: { columns: ['tenantId', 'description'] },
+      });
+      expect(gatesOf(error)).toEqual({ tenantId: 'DEC-1' });
+    });
+
+    it('should name the gate of a pending column a write is refused for', async () => {
+      const orders = await ordersWith(PENDING);
+
+      const error = await refusal(
+        orders.create(
+          { id: 'order-2', description: 'second', dateDeleted: null },
+          { ctx: ctxOf(CLERK) },
+        ),
+      );
+
+      expect(error).toMatchObject({
+        context: { action: 'create', columns: ['description', 'dateDeleted'] },
+      });
+      expect(gatesOf(error)).toEqual({ description: 'DEC-2' });
+    });
+
+    it('should name no gates when every refused column is final', async () => {
+      const orders = await ordersWith(PENDING);
+
+      const error = await refusal(
+        orders.create(
+          { id: 'order-2', dateDeleted: null },
+          { ctx: ctxOf(CLERK) },
+        ),
+      );
+
+      expect(error).toBeInstanceOf(AuthorityRefusedException);
+      expect(gatesOf(error)).toBeUndefined();
+    });
+  });
 });

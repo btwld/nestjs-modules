@@ -62,13 +62,16 @@ export class StoredRules implements CaslAuthorityRulesInterface {
 
     return [
       ...fixed,
-      ...stored.map(({ action, subject, fields, inverted, reason }) => ({
-        action,
-        subject,
-        inverted,
-        ...(fields ? { fields } : {}),
-        ...(reason ? { reason } : {}),
-      })),
+      ...stored.map(
+        ({ action, subject, fields, inverted, pending, reason }) => ({
+          action,
+          subject,
+          inverted,
+          ...(fields ? { fields } : {}),
+          ...(pending ? { pending } : {}),
+          ...(reason ? { reason } : {}),
+        }),
+      ),
     ];
   }
 }

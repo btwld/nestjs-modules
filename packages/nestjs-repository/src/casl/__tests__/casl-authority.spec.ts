@@ -133,7 +133,7 @@ describe(CaslAuthority.name, () => {
     ).resolves.toEqual({ effect: 'refuse' });
   });
 
-  it("should give a deny's reason as the decision still pending", async () => {
+  it("should give a pending deny's gate as the decision still pending", async () => {
     await expect(
       decide(
         {
@@ -143,7 +143,7 @@ describe(CaslAuthority.name, () => {
               action: 'read',
               subject: ORDER_TOKEN,
               inverted: true,
-              reason: 'DEC-12',
+              pending: 'DEC-12',
             },
           ],
         },
@@ -152,12 +152,31 @@ describe(CaslAuthority.name, () => {
     ).resolves.toEqual({ effect: 'refuse', gate: 'DEC-12' });
   });
 
+  it("should report no gate for a final deny's reason", async () => {
+    await expect(
+      decide(
+        {
+          'role:clerk': [
+            { action: 'read', subject: ORDER_TOKEN },
+            {
+              action: 'read',
+              subject: ORDER_TOKEN,
+              inverted: true,
+              reason: 'orders are read by billing only',
+            },
+          ],
+        },
+        ActionEnum.READ,
+      ),
+    ).resolves.toEqual({ effect: 'refuse' });
+  });
+
   it('should report a pending decision only when every deny that applies is one', async () => {
     const gated: Rule = {
       action: 'read',
       subject: ORDER_TOKEN,
       inverted: true,
-      reason: 'DEC-12',
+      pending: 'DEC-12',
     };
     const final: Rule = {
       action: 'read',
@@ -176,13 +195,13 @@ describe(CaslAuthority.name, () => {
     }
     await expect(
       decide(
-        { 'role:clerk': [allow, gated, { ...gated, reason: 'DEC-13' }] },
+        { 'role:clerk': [allow, gated, { ...gated, pending: 'DEC-13' }] },
         ActionEnum.READ,
       ),
     ).resolves.toEqual({ effect: 'refuse', gate: 'DEC-12' });
   });
 
-  it('should keep a column deny a narrowing, never a refusal of the subject', async () => {
+  it('should keep a pending column deny a narrowing, reporting its gate', async () => {
     await expect(
       decide(
         {
@@ -193,7 +212,7 @@ describe(CaslAuthority.name, () => {
               subject: ORDER_TOKEN,
               fields: ['tenantId'],
               inverted: true,
-              reason: 'DEC-12',
+              pending: 'DEC-12',
             },
           ],
         },
@@ -202,6 +221,34 @@ describe(CaslAuthority.name, () => {
     ).resolves.toEqual({
       effect: 'allow',
       columns: ['id', 'description', 'dateDeleted'],
+      gates: { tenantId: 'DEC-12' },
+    });
+  });
+
+  it('should report a column gate only when every deny on that column is pending', async () => {
+    const pending: Rule = {
+      action: 'update',
+      subject: ORDER_TOKEN,
+      fields: ['tenantId', 'description'],
+      inverted: true,
+      pending: 'DEC-12',
+    };
+
+    await expect(
+      decide(
+        {
+          'role:clerk': [
+            { action: 'update', subject: ORDER_TOKEN },
+            pending,
+            { ...pending, fields: ['description'], pending: undefined },
+          ],
+        },
+        ActionEnum.UPDATE,
+      ),
+    ).resolves.toEqual({
+      effect: 'allow',
+      columns: ['id', 'dateDeleted'],
+      gates: { tenantId: 'DEC-12' },
     });
   });
 

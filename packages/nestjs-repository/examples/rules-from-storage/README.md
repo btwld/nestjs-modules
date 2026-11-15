@@ -21,8 +21,8 @@ caller who may not read the rules is still decided by them.
   never reaches the table.
 - **Some columns only.** A rule with `fields: ['id', 'title']` lets an intern
   list documents without their body.
-- **A deny waiting on a decision.** A deny with a `reason` refuses as any
-  deny does. The response never names the reason; the refusal your logs see
+- **A deny waiting on a decision.** A deny with `pending` refuses as any
+  deny does. The response never names the gate; the refusal your logs see
   carries it as `context.gate`.
 
 ## Run it

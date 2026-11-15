@@ -896,7 +896,7 @@ describe(AccessControlService.name, () => {
           'contract',
         );
 
-      it('reports the reason of the deny that refused as the pending gate', () => {
+      it('reports the gate of the pending deny that refused', () => {
         expect(
           refusalUnder([
             { action: 'approve', subject: 'contract' },
@@ -904,7 +904,7 @@ describe(AccessControlService.name, () => {
               action: 'approve',
               subject: 'contract',
               inverted: true,
-              reason: 'DEC-7',
+              pending: 'DEC-7',
             },
           ]),
         ).toEqual({
@@ -916,20 +916,21 @@ describe(AccessControlService.name, () => {
         });
       });
 
-      it('reports the first reason given when every deny that applies has one', () => {
+      it('reports the first gate given when every deny that applies is pending', () => {
         expect(
           refusalUnder([
+            { action: 'approve', subject: 'contract' },
             {
               action: 'approve',
               subject: 'contract',
               inverted: true,
-              reason: 'DEC-7',
+              pending: 'DEC-7',
             },
             {
               action: 'approve',
               subject: 'contract',
               inverted: true,
-              reason: 'DEC-8',
+              pending: 'DEC-8',
             },
           ]),
         ).toEqual({
@@ -941,16 +942,21 @@ describe(AccessControlService.name, () => {
         });
       });
 
-      it('reports no gate when a deny that applies has no reason', () => {
+      it('reports no gate when a deny that applies is final, its reason included', () => {
         expect(
           refusalUnder([
             {
               action: 'approve',
               subject: 'contract',
               inverted: true,
-              reason: 'DEC-7',
+              pending: 'DEC-7',
             },
-            { action: 'approve', subject: 'contract', inverted: true },
+            {
+              action: 'approve',
+              subject: 'contract',
+              inverted: true,
+              reason: 'contracts are approved by legal only',
+            },
           ]),
         ).toEqual({
           action: 'approve',
@@ -967,7 +973,7 @@ describe(AccessControlService.name, () => {
             action: 'approve',
             subject: 'contract',
             inverted: true,
-            reason: 'DEC-7',
+            pending: 'DEC-7',
           },
           {
             action: 'approve',
@@ -986,32 +992,127 @@ describe(AccessControlService.name, () => {
         });
       });
 
-      it('reports no gate on a field refusal', () => {
-        expect(
+      describe('on a field', () => {
+        const fieldRefusal = (
+          rules: AuthorityRuleInterface<string>[],
+          field: string,
+        ) =>
           service.refusal(
-            {
-              actor: clerk,
-              ability: createAccessAbility([
+            { actor: clerk, ability: createAccessAbility(rules) },
+            'approve',
+            'contract',
+            { fields: [field] },
+          );
+        const pendingAmount: AuthorityRuleInterface<string> = {
+          action: 'approve',
+          subject: 'contract',
+          fields: ['terms.amount'],
+          inverted: true,
+          pending: 'DEC-7',
+        };
+
+        it('reports the gate of the pending deny that refused the field', () => {
+          expect(
+            fieldRefusal(
+              [{ action: 'approve', subject: 'contract' }, pendingAmount],
+              'terms.amount',
+            ),
+          ).toEqual({
+            action: 'approve',
+            resource: 'contract',
+            actor: clerk,
+            refusal: 'field',
+            fields: ['terms.amount'],
+            gate: 'DEC-7',
+          });
+        });
+
+        // Writing `terms` as a whole replaces the pending `terms.amount`.
+        it('reports the gate of a pending deny beneath the field', () => {
+          expect(
+            fieldRefusal(
+              [{ action: 'approve', subject: 'contract' }, pendingAmount],
+              'terms',
+            ),
+          ).toEqual({
+            action: 'approve',
+            resource: 'contract',
+            actor: clerk,
+            refusal: 'field',
+            fields: ['terms'],
+            gate: 'DEC-7',
+          });
+        });
+
+        // Closing the field's own gate would still leave the final deny
+        // beneath it refusing a write of the whole field.
+        it('reports no gate when a deny beneath the field is final', () => {
+          expect(
+            fieldRefusal(
+              [
                 { action: 'approve', subject: 'contract' },
+                { ...pendingAmount, fields: ['terms'] },
                 {
                   action: 'approve',
                   subject: 'contract',
-                  fields: ['amount'],
+                  fields: ['terms.amount'],
                   inverted: true,
-                  reason: 'DEC-7',
                 },
-              ]),
-            },
-            'approve',
-            'contract',
-            { fields: ['amount'] },
-          ),
-        ).toEqual({
-          action: 'approve',
-          resource: 'contract',
-          actor: clerk,
-          refusal: 'field',
-          fields: ['amount'],
+              ],
+              'terms',
+            ),
+          ).toEqual({
+            action: 'approve',
+            resource: 'contract',
+            actor: clerk,
+            refusal: 'field',
+            fields: ['terms'],
+          });
+        });
+
+        it('reports no gate when a deny on the field is final', () => {
+          expect(
+            fieldRefusal(
+              [
+                { action: 'approve', subject: 'contract' },
+                pendingAmount,
+                {
+                  action: 'approve',
+                  subject: 'contract',
+                  fields: ['terms.amount'],
+                  inverted: true,
+                },
+              ],
+              'terms.amount',
+            ),
+          ).toEqual({
+            action: 'approve',
+            resource: 'contract',
+            actor: clerk,
+            refusal: 'field',
+            fields: ['terms.amount'],
+          });
+        });
+
+        it('reports no gate for a field no rule allows', () => {
+          expect(
+            fieldRefusal(
+              [
+                {
+                  action: 'approve',
+                  subject: 'contract',
+                  fields: ['notes'],
+                },
+              ],
+              'terms',
+            ),
+          ).toEqual({
+            action: 'approve',
+            resource: 'contract',
+            actor: clerk,
+            refusal: 'field',
+            fields: ['terms'],
+          });
         });
       });
     });

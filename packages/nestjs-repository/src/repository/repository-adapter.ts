@@ -20,6 +20,7 @@ import {
 
 import { ActivityWriter } from '../activity/activity-writer.js';
 import { AuthorityBootException } from '../authority/exceptions/authority-boot.exception.js';
+import { type AuthorityRefusedDetailsInterface } from '../authority/exceptions/authority-refused-details.interface.js';
 import { AuthorityRefusedException } from '../authority/exceptions/authority-refused.exception.js';
 import { AuthorityUnboundException } from '../authority/exceptions/authority-unbound.exception.js';
 import {
@@ -640,6 +641,10 @@ export abstract class RepositoryAdapter<
 
     const columns = this.metadata.columns.map((column) => column.name);
     const allowed = new Map<ActionEnum, ReadonlySet<string> | undefined>();
+    const gates = new Map<
+      ActionEnum,
+      Readonly<Partial<Record<string, string>>>
+    >();
     for (const action of actions) {
       const decision = await authority.decide(ctx, {
         actor,
@@ -657,6 +662,7 @@ export abstract class RepositoryAdapter<
       }
 
       allowed.set(action, decision.columns && new Set(decision.columns));
+      if (decision.gates) gates.set(action, decision.gates);
     }
 
     const linked = new Set(linkedColumns(options, this));
@@ -665,6 +671,7 @@ export abstract class RepositoryAdapter<
         actor,
         actions: allowed,
         readable: allowed.get(ActionEnum.READ),
+        gates,
         linked,
       };
     }
@@ -675,6 +682,9 @@ export abstract class RepositoryAdapter<
       action: ActionEnum.READ,
       columns,
     });
+    if (read.effect === 'allow' && read.gates) {
+      gates.set(ActionEnum.READ, read.gates);
+    }
 
     return {
       actor,
@@ -683,8 +693,30 @@ export abstract class RepositoryAdapter<
         read.effect === 'allow'
           ? read.columns && new Set(read.columns)
           : new Set(),
+      gates,
       linked,
     };
+  }
+
+  /**
+   * The gates of `columns` refused under `action`, as a refusal's details
+   * carry them: each named as refused, after `prefix`.
+   */
+  private columnGates(
+    call: AuthorizedCallInterface,
+    action: ActionEnum,
+    columns: readonly string[],
+    prefix = '',
+  ): Pick<AuthorityRefusedDetailsInterface, 'gates'> {
+    const byColumn = call.gates.get(action);
+    const gates = Object.fromEntries(
+      columns.flatMap((column) => {
+        const gate = byColumn?.[column];
+        return gate === undefined ? [] : [[`${prefix}${column}`, gate]];
+      }),
+    );
+
+    return Object.keys(gates).length ? { gates } : {};
   }
 
   /**
@@ -717,8 +749,7 @@ export abstract class RepositoryAdapter<
     }
 
     const readable = call?.readable;
-    if (call && readable)
-      this.assertReadableColumns(call.actor, readable, query);
+    if (call && readable) this.assertReadableColumns(call, readable, query);
 
     // An empty select reads every column, in every driver, so it selects
     // nothing here either.
@@ -731,9 +762,16 @@ export abstract class RepositoryAdapter<
     );
     if (select.length === 0) {
       if (call && readable) {
+        // The columns the read was limited to, none of them readable.
+        const refused = columns.filter(
+          (column) =>
+            (!ceiling || ceiling.includes(column)) && !readable.has(column),
+        );
         throw new AuthorityRefusedException(this.entityKey, ActionEnum.READ, {
           refusal: 'authority',
           actor: call.actor,
+          ...(refused.length ? { columns: refused } : {}),
+          ...this.columnGates(call, ActionEnum.READ, refused),
         });
       }
       // An empty select would read every column, past the ceiling.
@@ -749,7 +787,7 @@ export abstract class RepositoryAdapter<
 
   /** Refuse a read naming a column the actor may not read. */
   private assertReadableColumns(
-    actor: Actor,
+    call: AuthorizedCallInterface,
     readable: ReadonlySet<string>,
     options: RepositoryFindOneOptions<Entity>,
   ): void {
@@ -771,8 +809,9 @@ export abstract class RepositoryAdapter<
     if (refused.length > 0) {
       throw new AuthorityRefusedException(this.entityKey, ActionEnum.READ, {
         refusal: 'authority',
-        actor,
+        actor: call.actor,
         columns: refused,
+        ...this.columnGates(call, ActionEnum.READ, refused),
       });
     }
   }
@@ -824,6 +863,7 @@ export abstract class RepositoryAdapter<
           refusal: 'authority',
           actor: target.actor,
           columns: refused.map((field) => `${relation}.${field}`),
+          ...this.columnGates(target, ActionEnum.READ, refused, `${relation}.`),
         });
       }
     }
@@ -886,6 +926,7 @@ export abstract class RepositoryAdapter<
           refusal: 'authority',
           actor: call.actor,
           columns: refused,
+          ...this.columnGates(call, action, refused),
         });
       }
     }
@@ -941,6 +982,7 @@ export abstract class RepositoryAdapter<
         refusal: 'authority',
         actor: call.actor,
         columns: refused,
+        ...this.columnGates(call, ActionEnum.READ, refused),
       });
     }
   }

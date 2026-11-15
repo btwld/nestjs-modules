@@ -502,12 +502,36 @@ JSON naming an `action` (a verb), a `subject`, optional `fields`, and
 `inverted: true` for a deny. What a field is depends on where the rule is
 used: a repository matches a column by its exact name; access control
 matches a path in a request or response body, which covers everything
-beneath it. A deny's optional `reason` names a decision
-still pending: when denies of the whole subject refuse a call and every one
-of them has a `reason`, the first one's reason is reported as the refusal's
-`gate`. A deny naming `fields`, or any deny without a reason, reports none.
-A deny without a reason is final, so leave it off unless something can
-still lift the deny.
+beneath it.
+
+A deny that waits on a decision says so with `pending`, naming the gate
+that closes it. It refuses like any other deny until you remove it, and the
+refusal names its gate: when every deny that refused the call, or the field
+or column, is pending, and a rule allows it once they are gone, the first
+one's gate is reported as the refusal's `gate` (for a column, in its
+`gates`). A deny without `pending` is final.
+`reason` explains a rule to the people who maintain it and is never
+reported. List every decision still pending in a rule set with
+`authorityPendingGates(rules)`, for example to review what is left to
+decide:
+
+```ts
+const rules: AuthorityRuleInterface<`${ActionEnum}` | 'void'>[] = [
+  { action: ['read', 'update'], subject: 'invoice' },
+  // Refused until finance signs off on who may void
+  { action: 'void', subject: 'invoice', inverted: true, pending: 'FIN-12' },
+  {
+    action: 'update',
+    subject: 'invoice',
+    fields: ['total'],
+    inverted: true,
+    reason: 'totals come from billing',
+  },
+];
+
+authorityPendingGates(rules);
+// [{ gate: 'FIN-12', action: 'void', subject: 'invoice' }]
+```
 
 `AuthorityRuleInterface` defaults to the six `ActionEnum` verbs, so a
 mistyped verb fails to compile. To add verbs of your own, widen it; to
@@ -545,7 +569,7 @@ rule has one:
 
 - **Shape**: the set isn't an array, or a rule isn't a plain object.
 - **Properties**: any property other than `action`, `subject`, `fields`,
-  `inverted` and `reason` (`conditions` included: which rows a caller
+  `inverted`, `pending` and `reason` (`conditions` included: which rows a caller
   reaches is row scope's to decide), or a property defined as a getter.
 - **`action`**: not a string or a non-empty list of strings, or an entry
   that isn't a verb (empty, or with whitespace or a `:`).
@@ -556,6 +580,8 @@ rule has one:
   every field), a blank entry, a pattern (`*`), or a numeric segment such
   as `items.0` (name the field beneath it).
 - **`inverted`** not a boolean, or **`reason`** not a string.
+- **`pending`**: blank or not a string, or on a rule that isn't a deny
+  (`inverted: true`): read as an allow, it would grant what it holds back.
 
 ### RPC (preview)
 
@@ -1368,10 +1394,11 @@ exercise correlation behavior directly.
 | `normalizeActor(actor)` | A copy with only `kind` and `roles`/`userId` or `name`; every other property dropped. This copy is what an authority is asked about and what an exception names. |
 | `AuthorityInterface` | `decide(ctx, request)` → `AuthorityDecision`. Implemented by an application or by `CaslAuthority` in `@concepta/nestjs-repository/optional/casl`. |
 | `AuthorityRequestInterface` | `{ actor, subject, action, columns }`. |
-| `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns? }` or `{ effect: 'refuse', gate? }`. |
-| `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, reason? }`. |
+| `AuthorityDecision`, `AuthorityAllowInterface`, `AuthorityRefuseInterface` | `{ effect: 'allow', columns?, gates? }` or `{ effect: 'refuse', gate? }`; `gates` names the gate of each column left out pending. |
+| `AuthorityRuleInterface` | One rule in plain JSON: `{ action, subject, fields?, inverted?, pending?, reason? }`. |
 | `authorityRuleProblems(rules, source)` | Every problem with rules read from storage, each naming `source`; empty when they can be used. |
-| `authorityGateOf(rules)` | The `gate` of a refusal, from the rules that apply to the whole subject, highest priority first: the first-given deny's `reason` when every deny has one. For an authority of your own. |
+| `authorityGateOf(rules)` | The `gate` of a refusal, from the rules that refused, as written, highest priority first: the first-given deny's `pending` when every deny is pending. For an authority of your own. |
+| `authorityPendingGates(rules)` → `AuthorityPendingGateInterface[]` | Every decision still pending in a rule set: `{ gate, action, subject, fields? }` per action and subject of each pending deny. |
 
 ### Route Audit Exports
 

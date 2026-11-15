@@ -15,6 +15,12 @@ describe(authorityRuleProblems.name, () => {
             inverted: true,
             reason: 'secret',
           },
+          {
+            action: 'approve',
+            subject: 'invoice',
+            inverted: true,
+            pending: 'cfo-approval',
+          },
           { action: 'read', subject: 'user', fields: ['v2', '2fa.code'] },
         ],
         'role:admin',
@@ -23,6 +29,26 @@ describe(authorityRuleProblems.name, () => {
   });
 
   it.each<[string, AuthorityRuleInterface<string>, string]>([
+    [
+      'a pending allow, which would grant what it holds back',
+      { action: 'approve', subject: 'invoice', pending: 'cfo-approval' },
+      'pending is on a deny only: set inverted to true',
+    ],
+    [
+      'a pending rule explicitly not a deny',
+      {
+        action: 'approve',
+        subject: 'invoice',
+        inverted: false,
+        pending: 'cfo-approval',
+      },
+      'pending is on a deny only: set inverted to true',
+    ],
+    [
+      'a blank pending gate',
+      { action: 'approve', subject: 'invoice', inverted: true, pending: ' ' },
+      'pending must name its gate, a non-blank string',
+    ],
     [
       'an action with a possession',
       { action: 'read:any', subject: 'user' },
@@ -108,6 +134,17 @@ describe(authorityRuleProblems.name, () => {
         'rules',
       ),
     ).toEqual(['rules rule 0: fields must be a list of strings']);
+  });
+
+  it('refuses a stored pending gate that is not a string', () => {
+    expect(
+      authorityRuleProblems(
+        JSON.parse(
+          '[{"action":"approve","subject":"invoice","inverted":true,"pending":1}]',
+        ),
+        'rules',
+      ),
+    ).toEqual(['rules rule 0: pending must name its gate, a non-blank string']);
   });
 
   it('refuses stored rules of the wrong types without throwing', () => {

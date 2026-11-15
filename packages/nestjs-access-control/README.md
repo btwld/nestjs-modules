@@ -131,11 +131,10 @@ A rule names an action, a resource, and optionally the fields it covers:
   everything beneath it (`address` covers `address.city`), and positions in
   arrays are ignored (`items.amount` covers every item). Leave it out to
   cover every field.
-- **`inverted: true`** makes the rule a deny. When denies of the whole
-  resource refuse a call and every one of them has a `reason`, the first
-  one's reason is reported as a decision still pending (`gate`). A deny
-  naming `fields`, or any deny without a reason, reports none. A deny
-  without a reason is final.
+- **`inverted: true`** makes the rule a deny. Add **`pending`** to a deny
+  that waits on a decision, naming the gate that closes it; a refusal only
+  pending denies take part in reports it as `gate`. See core's
+  [Actor and Authority](../nestjs-core/README.md#actor-and-authority).
 
 Rules are `AuthorityRuleInterface` from `@concepta/nestjs-core`, the shape
 `@concepta/nestjs-repository`'s authority reads too. Actions and subjects
@@ -889,8 +888,8 @@ their name), and a `refusal`, one of `ACCESS_REFUSALS` (`AccessRefusal`):
 | --- | --- |
 | `no-actor` | Nobody is acting |
 | `no-grant` | No rule allows it |
-| `denied` | A deny refuses it (also names the first one's reason as `gate` when the denies of the whole resource that refused all have a `reason`) |
-| `field` | A field it touches is refused (also names the first refused field in `fields`, when one field is to blame) |
+| `denied` | A deny refuses it (also names the first one's gate as `gate` when every deny of the whole resource that refused is `pending`) |
+| `field` | A field it touches is refused (also names the first refused field in `fields`, when one field is to blame, and its `gate` when every deny refusing it is `pending`) |
 | `access-query` | The route's access query service refused it |
 | `authority` | The module's authority refuses it (also names any pending decision as `gate`) |
 

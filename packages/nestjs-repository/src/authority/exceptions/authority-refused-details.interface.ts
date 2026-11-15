@@ -16,4 +16,9 @@ export interface AuthorityRefusedDetailsInterface {
   gate?: string;
   /** The columns refused, when the refusal is of columns. */
   columns?: string[];
+  /**
+   * For each refused column whose refusal is a decision still pending, the
+   * gate that closes it.
+   */
+  gates?: Record<string, string>;
 }
