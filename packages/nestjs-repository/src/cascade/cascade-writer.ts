@@ -63,11 +63,11 @@ export class CascadeWriter {
    * would leave the parent changed without its related rows.
    *
    * `create` creates; `merge` updates and creates, and deletes a to-one set
-   * to `null`; `replace` also deletes. Which of them a write takes depends
-   * on what is stored, so each one it could take is decided. The columns
-   * each related row writes, and its own related rows, are decided too, and
-   * where a related row may be deleted, that delete on everything it
-   * reaches.
+   * to `null`; `replace` also deletes the to-many rows it leaves out. Which
+   * of them a write takes depends on what is stored, so each one it could
+   * take is decided. The columns each related row writes, and its own
+   * related rows, are decided too, and where a related row may be deleted,
+   * that delete on everything it reaches.
    */
   async authorize(
     children: CascadeChildren,
@@ -77,16 +77,19 @@ export class CascadeWriter {
     for (const [name, { relation, target }] of this.relations) {
       if (!children.has(name)) continue;
 
+      // A to-one payload keeps the one row there is, so only `null` deletes
+      // it; a to-many replace deletes the rows its payload leaves out.
+      const deletes =
+        relation.cardinality === 'one'
+          ? children.get(name) === null
+          : mode === 'replace';
       const actions =
         mode === 'create'
           ? [ActionEnum.CREATE]
           : [
               ActionEnum.UPDATE,
               ActionEnum.CREATE,
-              ...(mode === 'replace' ||
-              (relation.cardinality === 'one' && children.get(name) === null)
-                ? [ActionEnum.DELETE]
-                : []),
+              ...(deletes ? [ActionEnum.DELETE] : []),
             ];
       await target.authorizeCascade(
         actions,

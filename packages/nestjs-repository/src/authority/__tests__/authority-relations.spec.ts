@@ -540,6 +540,57 @@ describe('authority over related rows', () => {
       expect(lines.stored).toEqual([{ ...LINE, sku: 'b' }]);
     });
 
+    describe('a to-one related row a write names', () => {
+      const CLERK_TABLE = {
+        ...allow('role:clerk', INVOICE_TOKEN, ALL),
+        ...allow('role:clerk', RECEIPT_TOKEN, ['read', 'create', 'update']),
+      };
+
+      it('should replace without the delete it can never take', async () => {
+        const { invoices, receipts } = await seeded(CLERK_TABLE);
+
+        await invoices.replace(
+          INVOICE,
+          { ...INVOICE, number: '2', receipt: { ...RECEIPT, total: 20 } },
+          { ctx: actorCtx(CLERK) },
+        );
+
+        expect(invoices.stored).toEqual([{ ...INVOICE, number: '2' }]);
+        expect(receipts.stored).toEqual([{ ...RECEIPT, total: 20 }]);
+      });
+
+      it('should upsert without the delete it can never take', async () => {
+        const { invoices, receipts } = await start(CLERK_TABLE);
+
+        await invoices.upsert(
+          { ...INVOICE, receipt: RECEIPT },
+          { ctx: actorCtx(CLERK) },
+        );
+
+        expect(invoices.stored).toEqual([INVOICE]);
+        expect(receipts.stored).toEqual([RECEIPT]);
+      });
+
+      it('should refuse setting it to null without the delete, before writing', async () => {
+        const { invoices, receipts } = await seeded(CLERK_TABLE);
+
+        const error = await invoices
+          .update(
+            INVOICE,
+            { number: '2', receipt: null },
+            { ctx: actorCtx(CLERK) },
+          )
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(AuthorityRefusedException);
+        expect(error).toMatchObject({
+          context: { entityKey: RECEIPT_TOKEN, action: 'delete' },
+        });
+        expect(invoices.stored).toEqual([INVOICE]);
+        expect(receipts.stored).toEqual([RECEIPT]);
+      });
+    });
+
     it('should delete no related row when any related entity refuses', async () => {
       const { invoices, lines, receipts } = await seeded({
         ...allow('role:clerk', INVOICE_TOKEN, ['delete']),
