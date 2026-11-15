@@ -45,6 +45,34 @@ done — see git history for what shipped. Reference notes that are not work liv
       tests and READMEs that name them; list them with
       `grep -rhoE "errorCode = '[A-Z_]+'" packages/*/src | grep -v "_ERROR'"`.
 
+  5. **One meaning for "public route"** (M, DX) — "public" means different things
+      depending on who reads it (user, 2026-11-15). Review them and settle on one
+      notion every module reads the same way. Today:
+      - core's `@PublicRoute()` is an audit mark only and opens nothing; core reads it with
+        `isPublicRoute`;
+      - authentication's `@AuthPublic()` turns off only guards built with
+        `canDisable` (the JWT guard) and sets the mark. A guard that can't be turned off
+        (`LocalGuard`, `RefreshGuard`) still authenticates, so a public route is not
+        necessarily unauthenticated. It is read with a second check, `isAuthPublic`, and
+        `@PublicRoute()` alone does not open the JWT guard;
+      - `{ optional: true }` is public, yet signs a valid caller in. `{ classLevel:
+        true }` only silences a warning emitted on every request;
+      - `settings.guards.enable: false` and the `settings.guards.disable` callback open
+        routes with no mark at all;
+      - the route audit reads the mark three ways. `requireAuth` and `requireAcl` skip
+        a marked route, so a missing grant there isn't caught. `requirePrivateWrites`
+        treats the mark as anonymous, so a credentialed refresh or sign-in needs an
+        `allow` entry;
+      - at runtime a grant on a public route still runs and refuses a caller with no
+        actor. Off HTTP, `@AuthPublic()` is the only way past the JWT guard.
+
+      Questions to settle:
+      - Are "open on purpose" (audit), "no sign-in required" (authentication) and "no
+        grant required" (access control) one concept or three?
+      - Should a guard that authenticates on its own (sign-in, refresh) be a distinct,
+        named kind of route rather than public plus an `allow` entry?
+      - Should the `disable` callback have to mark what it opens?
+
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.
