@@ -166,14 +166,8 @@ describe('row scope bound through RepositoryModule.forRoot', () => {
     ).toEqual(['acme']);
   });
 
-  // Each read sends the driver the scoped query, whatever path it takes.
+  // `find` is shown above; the other reads are scoped the same way.
   it.each<[string, () => Promise<unknown>, unknown]>([
-    [
-      'find',
-      async () =>
-        (await orders.find({ ctx: ACME })).map((order) => order.description),
-      ['acme'],
-    ],
     [
       'findAndCount',
       async () => {

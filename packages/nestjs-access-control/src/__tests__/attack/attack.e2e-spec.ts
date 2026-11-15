@@ -77,6 +77,17 @@ describe('Attack round: one application, every layer', () => {
       : undefined;
   };
 
+  /**
+   * The exception `call` was rendered from, its own only: what earlier
+   * calls rendered is cleared first.
+   */
+  const renderedBy = async (call: () => PromiseLike<unknown>) => {
+    rendered.mockClear();
+    await call();
+    const [exception] = rendered.mock.calls.at(-1) ?? [];
+    return exception;
+  };
+
   const issue = (sub: string): Promise<string> =>
     app.get(CommandBus).execute(new IssueAccessTokenCommand({}, { sub }));
 
@@ -286,13 +297,14 @@ describe('Attack round: one application, every layer', () => {
     });
 
     it('an update by a role that may not read the delete date is refused, not failed', async () => {
-      await http()
-        .patch(`/invoices/${acmeId}`)
-        .set(as('rita'))
-        .send({ number: 'A-1r' })
-        .expect(403);
+      const exception = await renderedBy(() =>
+        http()
+          .patch(`/invoices/${acmeId}`)
+          .set(as('rita'))
+          .send({ number: 'A-1r' })
+          .expect(403),
+      );
 
-      const [exception] = rendered.mock.calls.at(-1) ?? [];
       expect(exception).toBeInstanceOf(AuthorityRefusedException);
       expect(exception).toMatchObject({
         context: { action: 'read', columns: ['deletedAt'] },
@@ -305,9 +317,10 @@ describe('Attack round: one application, every layer', () => {
         () => http().patch(`/invoices/${acmeId}`).send({ number: 'A-1c' }),
         () => http().delete(`/invoices/${acmeId}`),
       ]) {
-        await call().set(as('cora')).expect(403);
+        const exception = await renderedBy(() =>
+          call().set(as('cora')).expect(403),
+        );
 
-        const [exception] = rendered.mock.calls.at(-1) ?? [];
         expect(exception).toBeInstanceOf(AuthorityRefusedException);
         expect(exception).toMatchObject({
           context: { action: 'read', refusal: 'authority' },
@@ -320,21 +333,27 @@ describe('Attack round: one application, every layer', () => {
     });
 
     it("a route's customer is a column the write sets, which a biller may not", async () => {
-      await http()
-        .post(`/customers/${customer.id}/invoices`)
-        .set(as('bill'))
-        .send({ number: 'A-9', amount: 300 })
-        .expect(403);
-      expect(rendered.mock.calls.at(-1)?.[0]).toMatchObject({
+      const created = await renderedBy(() =>
+        http()
+          .post(`/customers/${customer.id}/invoices`)
+          .set(as('bill'))
+          .send({ number: 'A-9', amount: 300 })
+          .expect(403),
+      );
+      expect(created).toBeInstanceOf(AuthorityRefusedException);
+      expect(created).toMatchObject({
         context: { action: 'create', columns: ['customerId'] },
       });
 
-      await http()
-        .patch(`/customers/${customer.id}/invoices/${acmeId}`)
-        .set(as('bill'))
-        .send({ number: 'A-1c' })
-        .expect(403);
-      expect(rendered.mock.calls.at(-1)?.[0]).toMatchObject({
+      const updated = await renderedBy(() =>
+        http()
+          .patch(`/customers/${customer.id}/invoices/${acmeId}`)
+          .set(as('bill'))
+          .send({ number: 'A-1c' })
+          .expect(403),
+      );
+      expect(updated).toBeInstanceOf(AuthorityRefusedException);
+      expect(updated).toMatchObject({
         context: { action: 'update', columns: ['customerId'] },
       });
       expect(await acmeCount()).toEqual(1);
@@ -346,18 +365,20 @@ describe('Attack round: one application, every layer', () => {
         .set(as('bill'))
         .send({ number: 'A-1c' })
         .expect(200);
+      expect((await managerRead()).number).toEqual('A-1c');
     });
 
     it("a write's query is the read that finds its row: a clerk may not filter it on the notes", async () => {
-      await http()
-        .patch(
-          `/invoices/${acmeId}?filter=${encodeURIComponent('internalNotes||$eq||slow payer')}`,
-        )
-        .set(as('alice'))
-        .send({ number: 'A-1c' })
-        .expect(403);
+      const exception = await renderedBy(() =>
+        http()
+          .patch(
+            `/invoices/${acmeId}?filter=${encodeURIComponent('internalNotes||$eq||slow payer')}`,
+          )
+          .set(as('alice'))
+          .send({ number: 'A-1c' })
+          .expect(403),
+      );
 
-      const [exception] = rendered.mock.calls.at(-1) ?? [];
       expect(exception).toBeInstanceOf(AuthorityRefusedException);
       expect(exception).toMatchObject({ context: { action: 'read' } });
       expect((await managerRead()).number).toEqual('A-1');
@@ -369,10 +390,12 @@ describe('Attack round: one application, every layer', () => {
         .set(as('alice'))
         .expect(200, [clerkView()]);
 
-      await http().get('/desk/invoices/open').expect(403);
-      expect(rendered.mock.calls.at(-1)?.[0]).toMatchObject({
-        context: { refusal: 'no-actor' },
-      });
+      const exception = await renderedBy(() =>
+        http().get('/desk/invoices/open').expect(403),
+      );
+      // No grant to check, so the repository refuses nobody acting.
+      expect(exception).toBeInstanceOf(AuthorityRefusedException);
+      expect(exception).toMatchObject({ context: { refusal: 'no-actor' } });
     });
 
     it('a create naming an existing invoice cannot overwrite its amount', async () => {
@@ -914,7 +937,8 @@ describe('Attack round: one application, every layer', () => {
         .expect(400);
     });
 
-    it('a read ignores its sort, so a sort on a column that does not exist is no error', async () => {
+    // A caller whose read rules name fields gets the policy's 403 instead.
+    it('a read by a caller denied only some columns ignores its sort, so a sort on a column that does not exist is no error', async () => {
       await http()
         .get(`/invoices/${acmeId}?sort=noSuchColumn,ASC`)
         .set(as('alice'))
@@ -930,7 +954,9 @@ describe('Attack round: one application, every layer', () => {
         .get(`/strict/invoices/${acmeId}`)
         .set(as('alice'))
         .expect(500);
-      expect(failed.text).not.toContain('slow');
+      // The repository already left the value out; the schema's error must
+      // not name the column it missed either.
+      expect(failed.text).not.toContain('internalNotes');
 
       await http()
         .get(`/strict/invoices/${acmeId}`)

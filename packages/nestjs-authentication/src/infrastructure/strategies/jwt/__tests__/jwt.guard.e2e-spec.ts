@@ -96,23 +96,33 @@ describe('JwtGuard (e2e)', () => {
       expect(message).not.toHaveProperty('user');
     });
 
-    it.each([
-      ['@AuthPublic()', UserControllerFixtures.prototype.getPublic],
-      [
-        '@AuthPublic({ optional: true })',
-        UserControllerFixtures.prototype.getOptional,
-      ],
-    ])(
-      'lets an %s handler through, signing nobody in',
-      async (_name, handler) => {
-        const message = signedMessage();
+    it('lets an @AuthPublic() handler through', async () => {
+      await expect(
+        app
+          .get(JwtGuard)
+          .canActivate(
+            contextOf(
+              signedMessage(),
+              UserControllerFixtures.prototype.getPublic,
+            ),
+          ),
+      ).resolves.toBe(true);
+    });
 
-        await expect(
-          app.get(JwtGuard).canActivate(contextOf(message, handler)),
-        ).resolves.toBe(true);
-        expect(message).not.toHaveProperty('user');
-      },
-    );
+    // An optional handler would sign a caller in, so it is the one that
+    // shows the message's token is never read.
+    it('lets an @AuthPublic({ optional: true }) handler through, signing nobody in', async () => {
+      const message = signedMessage();
+
+      await expect(
+        app
+          .get(JwtGuard)
+          .canActivate(
+            contextOf(message, UserControllerFixtures.prototype.getOptional),
+          ),
+      ).resolves.toBe(true);
+      expect(message).not.toHaveProperty('user');
+    });
   });
 
   describe('AuthUserCtx', () => {

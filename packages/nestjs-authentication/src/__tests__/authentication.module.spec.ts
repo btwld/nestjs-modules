@@ -396,29 +396,32 @@ describe(AuthenticationModule, () => {
     ])(
       'should fail startup with the %s strategy and no ports.user',
       async (name, strategies) => {
-        await expect(
-          Test.createTestingModule(
-            testModuleFactory([
-              CqrsModule,
-              AuthenticationModule.forRoot({
-                appGuard: false,
-                settings: {
-                  jwt: {
-                    access: {
-                      secret: 'access-secret',
-                      signOptions: { expiresIn: '1h' },
-                    },
-                    refresh: {
-                      secret: 'refresh-secret',
-                      signOptions: { expiresIn: '7d' },
-                    },
+        const compiled = Test.createTestingModule(
+          testModuleFactory([
+            CqrsModule,
+            AuthenticationModule.forRoot({
+              appGuard: false,
+              settings: {
+                jwt: {
+                  access: {
+                    secret: 'access-secret',
+                    signOptions: { expiresIn: '1h' },
                   },
-                  strategies,
+                  refresh: {
+                    secret: 'refresh-secret',
+                    signOptions: { expiresIn: '7d' },
+                  },
                 },
-              }),
-            ]),
-          ).compile(),
-        ).rejects.toThrow(
+                strategies,
+              },
+            }),
+          ]),
+        ).compile();
+
+        await expect(compiled).rejects.toThrow(
+          AuthenticationFeatureConfigException,
+        );
+        await expect(compiled).rejects.toThrow(
           new AuthenticationFeatureConfigException(`${name} strategy`, [
             'UserPort',
           ]),

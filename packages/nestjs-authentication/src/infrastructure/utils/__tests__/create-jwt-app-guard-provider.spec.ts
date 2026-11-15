@@ -33,7 +33,7 @@ describe('createJwtAppGuardProvider', () => {
     expect(appGuardFor(WITH_JWT, {}, defaultGuard)).toBe(defaultGuard);
   });
 
-  it('should register the appGuard instance as it is, injecting nothing', () => {
+  it('should register the appGuard instance itself, not one built for it', () => {
     expect(appGuardFor(WITH_JWT, { appGuard: yours }, defaultGuard)).toBe(
       yours,
     );

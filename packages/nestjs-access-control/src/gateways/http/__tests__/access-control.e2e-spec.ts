@@ -386,18 +386,21 @@ describe('AccessControl guard order (e2e)', () => {
       .expect(200);
   });
 
-  it('should refuse everyone with no-actor when authentication is above it', async () => {
+  it('should refuse a signed-in caller with no-actor when authentication is above it', async () => {
     const rendered = vi.spyOn(BaseExceptionFilter.prototype, 'catch');
+    let exception: unknown;
+    try {
+      await supertest(app.getHttpServer())
+        .get('/order/above')
+        .set('x-user', 'u-1')
+        .expect(403);
+      [exception] = rendered.mock.calls.at(-1) ?? [];
+    } finally {
+      rendered.mockRestore();
+    }
 
-    await supertest(app.getHttpServer())
-      .get('/order/above')
-      .set('x-user', 'u-1')
-      .expect(403);
-
-    const [exception] = rendered.mock.calls.at(-1) ?? [];
     expect(exception).toBeInstanceOf(AccessRefusedException);
     expect(exception).toMatchObject({ context: { refusal: 'no-actor' } });
-    rendered.mockRestore();
   });
 });
 
@@ -877,13 +880,18 @@ describe('AccessControl (e2e)', () => {
       // The response names no refusal: the exception it was rendered from
       // does, in its context.
       const rendered = vi.spyOn(BaseExceptionFilter.prototype, 'catch');
-      const response = await api
-        .patch('/users/1')
-        .set('x-roles', 'member')
-        .send({ phone: '555' })
-        .expect(403);
-      const [exception] = rendered.mock.calls.at(-1) ?? [];
-      rendered.mockRestore();
+      let exception: unknown;
+      let response: { body: unknown };
+      try {
+        response = await api
+          .patch('/users/1')
+          .set('x-roles', 'member')
+          .send({ phone: '555' })
+          .expect(403);
+        [exception] = rendered.mock.calls.at(-1) ?? [];
+      } finally {
+        rendered.mockRestore();
+      }
 
       expect(response.body).toEqual(
         expect.objectContaining({

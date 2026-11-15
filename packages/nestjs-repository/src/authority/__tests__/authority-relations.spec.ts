@@ -130,12 +130,20 @@ describe('authority over related rows', () => {
           return copy;
         });
       }
-      /** The first row for a read naming none, no row for one naming any. */
+      /** The first row, or the one an `id` equality names. */
       protected override async doFindOne(
         options: RepositoryFindOptions<EmployeeFixture> = {},
       ): Promise<EmployeeFixture | null> {
         const rows = await this.doFind(options);
-        return options.where ? null : (rows[0] ?? null);
+        const where: unknown = options.where;
+        const id =
+          typeof where === 'object' &&
+          where !== null &&
+          Reflect.get(where, 'field') === 'id' &&
+          Reflect.get(where, 'operator') === 'eq'
+            ? Reflect.get(where, 'value')
+            : undefined;
+        return rows.find((row) => id === undefined || row.id === id) ?? null;
       }
       protected override async doCount(
         options: RepositoryFindOptions<EmployeeFixture> = {},
@@ -297,14 +305,19 @@ describe('authority over related rows', () => {
 
     it('should find no row through a narrowed join', async () => {
       const { employees } = start(readsOnly('departments', ['id']));
-
-      await expect(
+      const read = (id: string) =>
         employees.findOne({
-          where: Where.eq('id', 'emp-9'),
+          where: Where.eq('id', id),
           join: [{ relation: 'department' }],
           ctx: actorCtx(CLERK),
-        }),
-      ).resolves.toBeNull();
+        });
+
+      await expect(read('emp-9')).resolves.toBeNull();
+      // The same read finds the row that is there, narrowed.
+      await expect(read(EMPLOYEE.id)).resolves.toEqual({
+        ...OWN,
+        department: { id: 'dep-1' },
+      });
     });
 
     it.each([
@@ -365,23 +378,21 @@ describe('authority over related rows', () => {
 
     // Generated CRUD lists with findAndCount and reads with findOne, so each
     // read decides its joins as find does.
-    describe('on every read', () => {
+    // The reads `find` and `count` are decided as above; these are the
+    // others, which generated CRUD Read and List go through.
+    describe('on every other read', () => {
       type Read = (
         employees: EmployeesFixture,
         options: RepositoryFindOptions<EmployeeFixture>,
       ) => Promise<unknown>;
-      const READS: { name: string; read: Read }[] = [
-        { name: 'find', read: (e, o) => e.find(o) },
-        { name: 'findOne', read: (e, o) => e.findOne(o) },
-        { name: 'findAndCount', read: (e, o) => e.findAndCount(o) },
-        { name: 'count', read: (e, o) => e.count(o) },
-      ];
+      const findOne: Read = (e, o) => e.findOne(o);
+      const findAndCount: Read = (e, o) => e.findAndCount(o);
+      const count: Read = (e, o) => e.count(o);
       const NARROWED = { ...OWN, department: { id: 'dep-1' } };
 
       it.each([
-        { name: 'find', read: READS[0].read, rows: [NARROWED] },
-        { name: 'findOne', read: READS[1].read, rows: NARROWED },
-        { name: 'findAndCount', read: READS[2].read, rows: [[NARROWED], 1] },
+        { name: 'findOne', read: findOne, rows: NARROWED },
+        { name: 'findAndCount', read: findAndCount, rows: [[NARROWED], 1] },
       ])(
         'should hold only the readable columns of joined rows on $name',
         async ({ read, rows }) => {
@@ -396,7 +407,10 @@ describe('authority over related rows', () => {
         },
       );
 
-      it.each(READS)(
+      it.each([
+        { name: 'findOne', read: findOne },
+        { name: 'findAndCount', read: findAndCount },
+      ])(
         'should refuse a join into rows the actor may not read on $name',
         async ({ read }) => {
           const { employees } = start({});
@@ -411,7 +425,11 @@ describe('authority over related rows', () => {
         },
       );
 
-      it.each(READS)(
+      it.each([
+        { name: 'findOne', read: findOne },
+        { name: 'findAndCount', read: findAndCount },
+        { name: 'count', read: count },
+      ])(
         'should refuse a filter on a joined column the actor may not read on $name',
         async ({ read }) => {
           const { employees } = start(readsOnly('departments', ['id']));
@@ -480,6 +498,11 @@ describe('authority over related rows', () => {
 
   // A hook can reshape the read, but never who it is decided for.
   describe('a hook handing the read another actor', () => {
+    const opened: TestingModule[] = [];
+    afterEach(async () => {
+      await Promise.all(opened.splice(0).map((m) => m.close()));
+    });
+
     async function compileLines(table: AuthorityTableFixture) {
       const moduleRef = await Test.createTestingModule({
         imports: [
@@ -515,6 +538,7 @@ describe('authority over related rows', () => {
           }),
         ],
       }).compile();
+      opened.push(moduleRef);
       await moduleRef.init();
       return moduleRef.get<MemoryRepositoryFixture<PlainLiteralObject>>(
         getDynamicRepositoryToken(ORDER_LINE_TOKEN),
@@ -602,19 +626,26 @@ describe('authority over related rows', () => {
 
     it('should decide a many-to-many join through it', async () => {
       const moduleRef = await compileAuthors(false);
-      await moduleRef.init();
-      const authors = moduleRef.get<MemoryRepositoryFixture<AuthorFixture>>(
-        getDynamicRepositoryToken(AUTHOR_TOKEN),
-      );
+      try {
+        await moduleRef.init();
+        const authors = moduleRef.get<MemoryRepositoryFixture<AuthorFixture>>(
+          getDynamicRepositoryToken(AUTHOR_TOKEN),
+        );
 
-      await expect(
-        authors.find({ join: [{ relation: 'tags' }], ctx: actorCtx(CLERK) }),
-      ).rejects.toThrow(AuthorityRefusedException);
+        await expect(
+          authors.find({ join: [{ relation: 'tags' }], ctx: actorCtx(CLERK) }),
+        ).rejects.toThrow(AuthorityRefusedException);
+      } finally {
+        await moduleRef.close();
+      }
     });
 
     it('should refuse at startup an eager entity with a relation through it', async () => {
-      await expect(compileAuthors(true)).rejects.toThrow(
-        AuthorityBootException,
+      const compiled = compileAuthors(true);
+
+      await expect(compiled).rejects.toThrow(AuthorityBootException);
+      await expect(compiled).rejects.toThrow(
+        `"${AUTHOR_TOKEN}" allows eager relations, but "tags" reach rows an authority governs`,
       );
     });
   });
@@ -802,11 +833,21 @@ describe('authority over related rows', () => {
           'delete',
         ]),
       });
-      const lineDeletes = () =>
-        authority.requests.filter(
-          ({ subject, action }) =>
-            subject === INVOICE_LINE_TOKEN && action === 'delete',
-        ).length;
+      // Each line delete asked, with whether the invoice was written yet.
+      const asked: { actor: unknown; afterWrite: boolean }[] = [];
+      const decide = authority.decide.bind(authority);
+      vi.spyOn(authority, 'decide').mockImplementation((ctx, request) => {
+        if (
+          request.subject === INVOICE_LINE_TOKEN &&
+          request.action === 'delete'
+        ) {
+          asked.push({
+            actor: request.actor,
+            afterWrite: invoices.stored.some(({ number }) => number === '2'),
+          });
+        }
+        return decide(ctx, request);
+      });
 
       await invoices.replace(
         INVOICE,
@@ -815,7 +856,10 @@ describe('authority over related rows', () => {
       );
 
       expect(lines.stored).toEqual([]);
-      expect(lineDeletes()).toEqual(3);
+      expect(asked.map(({ actor }) => actor)).toEqual(asked.map(() => CLERK));
+      expect(asked.filter(({ afterWrite }) => afterWrite)).toEqual([
+        { actor: CLERK, afterWrite: true },
+      ]);
     });
 
     it('should update related rows without reading them', async () => {

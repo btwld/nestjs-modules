@@ -261,15 +261,31 @@ describe(AuthGuard.name, () => {
       };
 
       it.each([
-        ['that can be turned off, on a handler that is not public', true],
-        ['that cannot be turned off, on any handler', false],
+        [
+          'that can be turned off, on a handler that is not public',
+          true,
+          routes.guarded,
+        ],
+        [
+          'that cannot be turned off, on a guarded handler',
+          false,
+          routes.guarded,
+        ],
+        [
+          'that cannot be turned off, on a public handler',
+          false,
+          routes.public,
+        ],
+        [
+          'that cannot be turned off, on an optional handler',
+          false,
+          routes.optional,
+        ],
       ])(
         'refuses the call in a guard %s, reading nothing',
-        async (_name, canDisable) => {
+        async (_name, canDisable, handler) => {
           const authenticate = vi.fn(() => true);
-          const context = messageTo(
-            canDisable ? routes.guarded : routes.public,
-          );
+          const context = messageTo(handler);
 
           await expect(
             guardAuthenticating(authenticate, { canDisable }).canActivate(
@@ -340,7 +356,7 @@ describe(AuthGuard.name, () => {
         ['public', routes.public],
         ['optional', routes.optional],
       ])(
-        'lets a %s handler through as nobody, reading nothing',
+        'lets a %s handler through without authenticating, reading nothing',
         async (_name, handler) => {
           const authenticate = vi.fn(() => true);
           const context = messageTo(handler);

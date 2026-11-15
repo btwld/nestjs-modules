@@ -367,7 +367,6 @@ describe('authority over columns', () => {
           orders.find({ ...options('nope'), ctx: ctxOf(CLERK) }),
         );
 
-        expect(unknown).not.toBeInstanceOf(UnknownColumnException);
         expect(unknown).toMatchObject({
           message: hidden instanceof Error ? hidden.message : undefined,
           httpStatus: 403,

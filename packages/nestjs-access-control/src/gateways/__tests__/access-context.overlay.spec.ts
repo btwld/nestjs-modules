@@ -4,7 +4,7 @@ import { mock } from 'vitest-mock-extended';
 import { type ArgumentsHost, type ExecutionContext } from '@nestjs/common';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host.js';
 
-import { ActorCtx, getAppContext } from '@concepta/nestjs-core';
+import { type Actor, ActorCtx, getAppContext } from '@concepta/nestjs-core';
 
 import { AccessContextOverlay } from '../access-context.overlay.js';
 
@@ -38,13 +38,17 @@ describe(AccessContextOverlay.name, () => {
   it('defines a frozen copy of the actor the resolver returns', async () => {
     const request = {};
     const roles = ['a'];
+    const resolved: Actor = { kind: 'role', roles };
 
     await new AccessContextOverlay({
-      actorFor: async () => ({ kind: 'role', roles }),
+      actorFor: async () => resolved,
     }).attach(httpContext(request));
 
+    // The overlay itself is immutable; what it holds must not change
+    // through the resolver's reference either.
     const actor = getAppContext(request).with(ActorCtx);
     const actorRoles = actor.kind === 'role' ? actor.roles : undefined;
+    roles.push('admin');
     expect(actorRoles).toEqual(['a']);
     expect(actorRoles).not.toBe(roles);
     expect(Object.isFrozen(actorRoles)).toBe(true);
