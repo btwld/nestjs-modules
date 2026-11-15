@@ -218,7 +218,7 @@ export class Book {
           driver: DrizzlePostgresRepositoryModule,
           entities: [
             {
-              key: 'books',
+              key: 'book',
               entity: Book,
               table: books,
               removeDate: 'removedAt',
@@ -234,8 +234,8 @@ export class AppModule {}
 ```
 
 Each key gets a repository from your adapter (`DrizzlePostgresRepository`,
-…). Import `RepositoryModule.forFeature(['books'])` in a module to inject it
-there with `@InjectDynamicRepository('books')`. Rows come back as instances
+…). Import `RepositoryModule.forFeature(['book'])` in a module to inject it
+there with `@InjectDynamicRepository('book')`. Rows come back as instances
 of `entity`, holding the table's columns.
 
 ### Provider Options
@@ -250,6 +250,7 @@ interface DrizzleProviderOptionsInterface<Entity extends PlainLiteralObject>
   removeDate?: string;                // Key in `table` of the soft-delete date column
   version?: string;                   // Key in `table` of the version column
   rowScope?: RowScopeRegistration;    // Declarations, bound by forRoot()
+  authority?: AuthorityRegistration;
   writePolicy?: WritePolicyRegistration;
   activity?: ActivityRegistration;
   hooks?: HookOption[];
@@ -270,9 +271,9 @@ interface DrizzleProviderOptionsInterface<Entity extends PlainLiteralObject>
 - **`version`** -- an integer column the driver owns: `create` starts it at
   1, and each write that changes the row moves it on by one; never set it
   yourself
-- **`rowScope`**, **`writePolicy`**, **`activity`**, **`hooks`** -- the
-  entity's declarations, read by `RepositoryModule.forRoot()`; the driver
-  ignores them
+- **`rowScope`**, **`authority`**, **`writePolicy`**, **`activity`**,
+  **`hooks`** -- the entity's declarations, read by
+  `RepositoryModule.forRoot()`; the driver ignores them
 
 A table is matched by its connection and its schema-qualified name, so the
 same table reached through two connections counts as two: give each
@@ -287,7 +288,7 @@ import { InjectDynamicRepository, type RepositoryInterface } from '@concepta/nes
 @Injectable()
 export class BookService {
   constructor(
-    @InjectDynamicRepository('books')
+    @InjectDynamicRepository('book')
     private readonly bookRepo: RepositoryInterface<Book>,
   ) {}
 
@@ -345,7 +346,8 @@ separate statements, so a concurrent writer can still win.
 ### Drizzle Features at Your Own Risk
 
 Drizzle behaviour you declare on a table runs outside the repository's
-guarantees: row scope, write policy and hooks never see what it does.
+guarantees: row scope, authority, write policy and hooks never see what it
+does.
 
 - **`$defaultFn` and `$onUpdate`** fill in values as Drizzle builds each
   insert or update, after the repository checked it. `$onUpdate` stamps its
@@ -390,7 +392,7 @@ import { TransactionScope } from '@concepta/nestjs-repository';
 export class BookService {
   constructor(
     private readonly txScope: TransactionScope,
-    @InjectDynamicRepository('books')
+    @InjectDynamicRepository('book')
     private readonly bookRepo: RepositoryInterface<Book>,
   ) {}
 
@@ -432,7 +434,7 @@ RepositoryModule.forRoot({
   drivers: [
     {
       driver: DrizzlePostgresRepositoryModule,
-      entities: [{ key: 'orders', entity: Order, table: orders }],
+      entities: [{ key: 'order', entity: Order, table: orders }],
       options: {
         transactionSettings: (ctx) => ({
           'app.tenant_id': ctx.supports(RowScopeCtx)

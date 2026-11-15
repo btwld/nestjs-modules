@@ -11,14 +11,26 @@ export const AuthUserCtx = new OverlayRef<
   AuthUserContextInterface
 >('withAuthUser');
 
+/**
+ * Defines `AuthUserCtx` on calls no authentication guard defined it on,
+ * such as public routes, where it holds no user. A guard that
+ * authenticates a call defines it first, so guards after it can read the
+ * user.
+ */
 @Injectable()
 export class AuthUserContextOverlay extends ContextOverlayInterceptor {
   readonly ref = AuthUserCtx;
 
   attach(context: ExecutionContext): void {
+    const ctx = this.appContext(context);
+
+    if (ctx.supports(AuthUserCtx)) {
+      return;
+    }
+
     const request = context
       .switchToHttp()
       .getRequest<{ user?: AuthenticatedUserInterface }>();
-    this.appContext(context).defineOverlay(AuthUserCtx, { user: request.user });
+    ctx.defineOverlay(AuthUserCtx, { user: request.user }, { immutable: true });
   }
 }

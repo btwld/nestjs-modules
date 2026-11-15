@@ -420,7 +420,8 @@ response serialization:
 ```ts
 import { Module } from '@nestjs/common';
 import { Operation } from '@concepta/nestjs-core';
-import { CrudCqrsResolver, CrudModule } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import {
   UserInterface,
   userCreateSchema,
@@ -447,7 +448,7 @@ import {
 @Module({
   imports: [
     // ... CoreModule, CqrsModule, RepositoryModule, PasswordModule,
-    //     UserModule, CrudModule.forRoot({ defaultResolver: CrudCqrsResolver })
+    //     UserModule, CrudModule.forRoot({})
 
     CrudModule.forFeature<UserInterface>({
       crud: {

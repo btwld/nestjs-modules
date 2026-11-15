@@ -42,7 +42,9 @@ export class RefreshStrategy extends PassportStrategyFactory<JwtPassportStrategy
       payload.sub,
     );
 
-    if (!user) {
+    // An inactive user is refused like a missing one, so refreshing stops
+    // minting tokens as soon as the user is turned off.
+    if (user?.active !== true) {
       throw new RefreshUnauthorizedException();
     }
 

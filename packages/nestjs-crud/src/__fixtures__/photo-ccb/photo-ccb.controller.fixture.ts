@@ -1,5 +1,6 @@
 import { Operation } from '@concepta/nestjs-core';
 
+import { type CrudControllerOptionsInterface } from '../../infrastructure/interfaces/crud-controller-options.interface.js';
 import { ConfigurableCrudBuilder } from '../../infrastructure/utils/configurable-crud.builder.js';
 import { CRUD_TEST_PHOTO_CCB_ENTITY_NAME } from '../crud-test.constants.js';
 import { type PhotoEntityInterfaceFixture } from '../photo/interfaces/photo-entity.interface.fixture.js';
@@ -12,45 +13,53 @@ import { photoPaginatedSchema } from '../photo/schemas/photo-paginated.schema.fi
 import { photoUpdateSchema } from '../photo/schemas/photo-update.schema.fixture.js';
 import { photoSchema } from '../photo/schemas/photo.schema.fixture.js';
 
-const crudBuilder = new ConfigurableCrudBuilder<PhotoEntityInterfaceFixture>({
-  controller: {
-    path: 'photo',
-    entity: CRUD_TEST_PHOTO_CCB_ENTITY_NAME,
-    request: { body: photoSchema },
-    response: {
-      resource: photoSchema,
-      paginated: photoPaginatedSchema,
-    },
-  },
-  operations: [
-    { operation: Operation.List },
-    { operation: Operation.Read },
-    {
-      operation: Operation.CreateBatch,
-      request: { bodyBatch: photoCreateBatchSchema },
+/**
+ * The photo controller and its providers, built to dispatch through
+ * `resolver` (the adapter resolver by default).
+ */
+export const buildPhotoCcbFixture = (
+  resolver?: CrudControllerOptionsInterface<PhotoEntityInterfaceFixture>['resolver'],
+) =>
+  new ConfigurableCrudBuilder<PhotoEntityInterfaceFixture>({
+    controller: {
+      path: 'photo',
+      entity: CRUD_TEST_PHOTO_CCB_ENTITY_NAME,
+      resolver,
+      request: { body: photoSchema },
       response: {
-        serialization: { resource: photoCreateBatchResponseSchema },
+        resource: photoSchema,
+        paginated: photoPaginatedSchema,
       },
     },
-    {
-      operation: Operation.Create,
-      request: { body: photoCreateSchema },
-    },
-    {
-      operation: Operation.Update,
-      request: { body: photoUpdateSchema },
-    },
-    {
-      operation: Operation.Replace,
-      request: { body: photoUpdateSchema },
-    },
-    { operation: Operation.Delete },
-    { operation: Operation.SoftDelete, path: 'soft/:id' },
-    { operation: Operation.Restore, path: 'restore/:id' },
-  ],
-});
+    operations: [
+      { operation: Operation.List },
+      { operation: Operation.Read },
+      {
+        operation: Operation.CreateBatch,
+        request: { bodyBatch: photoCreateBatchSchema },
+        response: {
+          serialization: { resource: photoCreateBatchResponseSchema },
+        },
+      },
+      {
+        operation: Operation.Create,
+        request: { body: photoCreateSchema },
+      },
+      {
+        operation: Operation.Update,
+        request: { body: photoUpdateSchema },
+      },
+      {
+        operation: Operation.Replace,
+        request: { body: photoUpdateSchema },
+      },
+      { operation: Operation.Delete },
+      { operation: Operation.SoftDelete, path: 'soft/:id' },
+      { operation: Operation.Restore, path: 'restore/:id' },
+    ],
+  }).build();
 
-const { controllers, providers } = crudBuilder.build();
+const { controllers, providers } = buildPhotoCcbFixture();
 const { PhotoCcbController } = controllers;
 
 export class PhotoCcbControllerFixture extends PhotoCcbController {}

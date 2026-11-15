@@ -126,8 +126,14 @@ export class ConfigurableCrudBuilder<
     if (this.isControllerClassOptions(options.controller)) {
       // Path 1: Pre-decorated class - generate handlers and adapter provider
       const controllerClass = options.controller.class;
-      const { handlers, queries, queryHandlers, commands, commandHandlers } =
-        this.collectClassesFromController(controllerClass);
+      const {
+        handlers,
+        resolvers,
+        queries,
+        queryHandlers,
+        commands,
+        commandHandlers,
+      } = this.collectClassesFromController(controllerClass);
 
       // Extract adapter from controller metadata
       const reflectionService = new CrudMetaview<Entity>();
@@ -152,7 +158,7 @@ export class ConfigurableCrudBuilder<
         });
       }
 
-      const providers: Provider[] = [...handlers];
+      const providers: Provider[] = [...handlers, ...resolvers];
       const adapters: ConfigurableCrudClassesMap = {};
 
       // Create adapter provider if we have an adapter type
@@ -203,8 +209,14 @@ export class ConfigurableCrudBuilder<
     );
 
     // Collect classes from the controller's decorator metadata
-    const { handlers, queries, queryHandlers, commands, commandHandlers } =
-      this.collectClassesFromController(ConfigurableControllerClass);
+    const {
+      handlers,
+      resolvers,
+      queries,
+      queryHandlers,
+      commands,
+      commandHandlers,
+    } = this.collectClassesFromController(ConfigurableControllerClass);
 
     // Build adapters map
     const adapters: ConfigurableCrudClassesMap = {};
@@ -213,7 +225,7 @@ export class ConfigurableCrudBuilder<
     }
 
     return {
-      providers: [adapterProvider, ...handlers],
+      providers: [adapterProvider, ...handlers, ...resolvers],
       controllers: {
         [ConfigurableControllerClass.name]: ConfigurableControllerClass,
       },
@@ -408,6 +420,7 @@ export class ConfigurableCrudBuilder<
    */
   private collectClassesResult(): {
     handlers: Type[];
+    resolvers: Type[];
     queries: ConfigurableCrudClassesMap;
     queryHandlers: ConfigurableCrudClassesMap;
     commands: ConfigurableCrudClassesMap;
@@ -415,6 +428,7 @@ export class ConfigurableCrudBuilder<
   } {
     return {
       handlers: [],
+      resolvers: [],
       queries: {},
       queryHandlers: {},
       commands: {},
@@ -438,6 +452,13 @@ export class ConfigurableCrudBuilder<
       const operation = reflectionService.getOperation(method);
 
       if (!operation) continue;
+
+      // The resolver a route names is provided with it, so naming one is
+      // enough to use it.
+      const resolver = reflectionService.getResolver(controller, method);
+      if (resolver && !result.resolvers.includes(resolver)) {
+        result.resolvers.push(resolver);
+      }
 
       if (isReadOperation(operation)) {
         // Collect query class
@@ -708,10 +729,16 @@ export class ConfigurableCrudBuilder<
     CrudInit()(controllerClass);
 
     // Collect classes from the now-decorated controller
-    const { handlers, queries, queryHandlers, commands, commandHandlers } =
-      this.collectClassesFromController(controllerClass);
+    const {
+      handlers,
+      resolvers,
+      queries,
+      queryHandlers,
+      commands,
+      commandHandlers,
+    } = this.collectClassesFromController(controllerClass);
 
-    const providers: Provider[] = [...handlers];
+    const providers: Provider[] = [...handlers, ...resolvers];
     const adapters: ConfigurableCrudClassesMap = {};
 
     // Create adapter provider if we have adapter type

@@ -133,7 +133,7 @@ export function checkDeclarationCompleteness(adapters: AnyAdapter[]): string[] {
 
     return [
       `"${adapter.entityKey}" has no row scope declaration, and this ` +
-        'deployment requires one. Declare it scoped, or declare it public ' +
+        'deployment requires one. Declare it scoped, or declare it open ' +
         'with a reason.',
     ];
   });

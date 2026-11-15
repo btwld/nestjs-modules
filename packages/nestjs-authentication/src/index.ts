@@ -38,6 +38,7 @@ export {
   AuthPublicOptions,
 } from './infrastructure/decorators/auth-public.decorator.js';
 export { isAuthPublic } from './infrastructure/decorators/is-auth-public.util.js';
+export { AuthenticationGuard } from './infrastructure/decorators/authentication-guard.decorator.js';
 
 export { AuthenticationOptionsInterface } from './infrastructure/config/interfaces/authentication-options.interface.js';
 export { AuthenticationOptionsExtrasInterface } from './infrastructure/config/interfaces/authentication-options-extras.interface.js';
@@ -91,6 +92,8 @@ export { JwtStrategy } from './infrastructure/strategies/jwt/jwt.strategy.js';
 export { JwtGuard } from './infrastructure/strategies/jwt/jwt.guard.js';
 export { JwtAuthenticationException } from './infrastructure/strategies/jwt/exceptions/jwt-authentication.exception.js';
 export { JwtUnauthorizedException } from './infrastructure/strategies/jwt/exceptions/jwt-unauthorized.exception.js';
+export { AuthUserConflictException } from './infrastructure/exceptions/auth-user-conflict.exception.js';
+export { AuthTransportUnsupportedException } from './infrastructure/exceptions/auth-transport-unsupported.exception.js';
 
 // auth-local feature
 export { LocalService } from './application/services/local/local.service.js';

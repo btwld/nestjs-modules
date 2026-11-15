@@ -9,6 +9,7 @@ import {
 } from '@concepta/nestjs-core';
 
 import { ActionSpecification } from './action.specification.js';
+import { type CrudActionCategory } from './interfaces/crud-action-category.type.js';
 import { type CrudSpecContextInterface } from './interfaces/crud-spec-context.interface.js';
 import { OperationSpecification } from './operation.specification.js';
 
@@ -51,7 +52,7 @@ export const CrudSpec = {
    * @param actions - One or more actions to match
    */
   action: (
-    ...actions: ActionEnum[]
+    ...actions: CrudActionCategory[]
   ): SpecificationInterface<CrudSpecContextInterface> =>
     new ActionSpecification(actions),
 

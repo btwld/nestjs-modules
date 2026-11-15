@@ -1,66 +1,57 @@
-import { AccessControl } from 'accesscontrol';
 import { mock } from 'vitest-mock-extended';
 
-import {
-  type ArgumentsHost,
-  Controller,
-  type ExecutionContext,
-} from '@nestjs/common';
+import { type ExecutionContext } from '@nestjs/common';
 
-type HttpArgumentsHost = ReturnType<ArgumentsHost['switchToHttp']>;
+import { AppContextHost } from '@concepta/nestjs-core';
 
-import { ActionEnum } from '@concepta/nestjs-core';
-
-import { AccessControlReadOne } from '../../gateways/decorators/access-control-read-one.decorator.js';
 import { AccessControlContext } from '../access-control.context.js';
-import { PossessionEnum } from '../enums/possession.enum.js';
+import { type AccessQueryInterface } from '../interfaces/access-query.interface.js';
+import { createAccessAbility } from '../utils/create-access-ability.util.js';
 
 describe(AccessControlContext.name, () => {
-  it('should return expected values', () => {
-    @Controller()
-    @AccessControlReadOne('a_resource_name')
-    class TestController {}
+  it('returns what it was given', () => {
+    const ctx = new AppContextHost();
+    const executionContext = mock<ExecutionContext>();
+    const ability = createAccessAbility([
+      { action: 'read', subject: 'invoice' },
+    ]);
+    const query: AccessQueryInterface = {
+      actor: { kind: 'role', roles: ['clerk'], userId: 'u1' },
+      action: 'read',
+      resource: 'invoice',
+    };
 
-    const rules = new AccessControl();
-    rules.grant('role1').readAny('a_resource_name');
+    const context = new AccessControlContext({
+      ctx,
+      query,
+      ability,
+      request: { body: { b1: 'xyz' } },
+      executionContext,
+    });
 
-    const argsHost = mock<HttpArgumentsHost>();
-    argsHost.getRequest.mockReturnValue({ body: { b1: 'xyz' } });
+    expect(context.getContext()).toBe(ctx);
+    expect(context.getActor()).toEqual(query.actor);
+    expect(context.getQuery()).toEqual(query);
+    expect(context.getAbility()).toBe(ability);
+    expect(context.getRequest()).toEqual({ body: { b1: 'xyz' } });
+    expect(context.getRequest('body')).toEqual({ b1: 'xyz' });
+    expect(context.getRequest('not-a-real-prop')).toBeUndefined();
+    expect(context.getExecutionContext()).toBe(executionContext);
+  });
 
-    const context = mock<ExecutionContext>();
-    context.getClass.mockReturnValue(TestController);
-    context.switchToHttp.mockReturnValue(argsHost);
-
-    const expectedAccessControlContext = new AccessControlContext({
-      request: {
-        body: { b1: 'xyz' },
-      },
-      user: { id: 1234 },
+  it('has no request property without a request', () => {
+    const context = new AccessControlContext({
+      ctx: new AppContextHost(),
       query: {
-        possession: PossessionEnum.OWN,
-        resource: 'resource_create_own',
-        action: ActionEnum.READ,
+        actor: { kind: 'system', name: 'agile' },
+        action: 'read',
+        resource: 'invoice',
       },
-      accessControl: rules,
-      executionContext: context,
+      ability: createAccessAbility([]),
+      request: undefined,
+      executionContext: mock<ExecutionContext>(),
     });
 
-    expect(expectedAccessControlContext.getRequest()).toEqual({
-      body: { b1: 'xyz' },
-    });
-    expect(expectedAccessControlContext.getRequest('body')).toEqual({
-      b1: 'xyz',
-    });
-    expect(expectedAccessControlContext.getRequest('not-a-real-prop')).toEqual(
-      undefined,
-    );
-    expect(expectedAccessControlContext.getUser()).toEqual({ id: 1234 });
-    expect(expectedAccessControlContext.getQuery()).toEqual({
-      possession: PossessionEnum.OWN,
-      resource: 'resource_create_own',
-      action: ActionEnum.READ,
-    });
-    expect(expectedAccessControlContext.getAccessControl()).toEqual(rules);
-    expect(expectedAccessControlContext.getExecutionContext()).toEqual(context);
+    expect(context.getRequest('body')).toBeUndefined();
   });
 });

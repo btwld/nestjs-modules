@@ -6,6 +6,8 @@ import {
   RuntimeException,
 } from '@concepta/nestjs-core';
 
+import { internalCall } from '../authority/internal-call.js';
+
 import { ActivityWriteException } from './exceptions/activity-write.exception.js';
 import { type ActivityBinding } from './interfaces/activity-binding.interface.js';
 import { type ActivityEntity } from './interfaces/activity-entity.interface.js';
@@ -18,7 +20,8 @@ import {
  * Records the stored rows a write altered, one record per row, through the
  * store's own repository with the caller's ctx. The records join whatever
  * transaction the caller opened, and the store's hooks, row scope and write
- * policy apply to them.
+ * policy apply to them. Its authority does not: the write they record was
+ * already decided.
  */
 export class ActivityWriter {
   constructor(
@@ -64,7 +67,10 @@ export class ActivityWriter {
     });
 
     try {
-      await this.binding.store.createMany(records, { ctx });
+      await this.binding.store.createMany(
+        records,
+        internalCall({ ctx }, this.binding.store),
+      );
     } catch (error) {
       // A store refusal keeps its status and fault, so a scope the caller
       // lacks reads as the refusal it is, not as a server failure.

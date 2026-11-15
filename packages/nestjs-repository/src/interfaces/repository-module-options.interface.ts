@@ -1,3 +1,5 @@
+import { type RepositoryAuthorityOptionsInterface } from './repository-authority-options.interface.js';
+
 /**
  * Core module options for RepositoryModule
  */
@@ -25,6 +27,9 @@ export interface RepositoryModuleOptionsInterface {
    * failure instead of a default.
    */
   requireWritePolicyDeclaration?: boolean;
+
+  /** How the deployment treats object authority, across every entity. */
+  authority?: RepositoryAuthorityOptionsInterface;
 
   /** How reads of federated relations are bounded. */
   federation?: {

@@ -141,7 +141,7 @@ Assignment rows carry an `assigneeId`, so in a multi-tenant deployment they are
 rows you will want scoped — while the role definitions themselves are usually
 shared. Both are declared on the same `RepositoryModule.forRoot()`
 entries above via `rowScope`: the assignment entity `scoped`, the role
-entity `public` with a reason. See the Row Scope section of
+entity `open` with a reason. See the Row Scope section of
 `@concepta/nestjs-repository`.
 
 ### Using Commands and Queries Directly
@@ -528,7 +528,8 @@ the role request handlers:
 ```ts
 import { Module } from '@nestjs/common';
 import { Operation } from '@concepta/nestjs-core';
-import { CrudModule, CrudCqrsResolver } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
 import {
   RoleInterface,
   roleCreateSchema,

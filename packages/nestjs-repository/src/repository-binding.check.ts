@@ -1,6 +1,8 @@
 import { type OnModuleInit } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 
+import { AuthorityBootException } from './authority/exceptions/authority-boot.exception.js';
+import { isAuthorityGoverned } from './authority/interfaces/authority-registration.interface.js';
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
 import {
   REPOSITORY_BINDING,
@@ -15,8 +17,9 @@ import {
 
 /**
  * Refuse to start when the repositories were not bound at startup, a
- * driver's transaction factory was never registered, or a scoped entity's
- * resolver was never attached.
+ * driver's transaction factory was never registered, a scoped entity's
+ * resolver was never attached, or a governed entity's authority was never
+ * attached.
  *
  * Runs once every provider is built, and depends on nothing that could be
  * request-scoped: anything request-scoped behind the binding, a transaction
@@ -49,6 +52,24 @@ export class RepositoryBindingCheck implements OnModuleInit {
 
     if (failures.length > 0) {
       throw new RowScopeBootException(failures);
+    }
+
+    const authorityFailures = [...binding].flatMap(([key, adapter]) => {
+      const declaration = adapter.authorityDeclaration;
+      if (!isAuthorityGoverned(declaration) || adapter.hasAuthority) {
+        return [];
+      }
+
+      return [
+        `"${key}" declares the authority ${declaration.authority.name}, ` +
+          'which was never built at startup because it, or something it ' +
+          'depends on, is request-scoped. Keep the authority and its ' +
+          'dependencies singleton-scoped and read the caller from ctx.',
+      ];
+    });
+
+    if (authorityFailures.length > 0) {
+      throw new AuthorityBootException(authorityFailures);
     }
   }
 

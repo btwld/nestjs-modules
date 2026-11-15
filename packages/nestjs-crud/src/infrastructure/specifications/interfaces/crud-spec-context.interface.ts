@@ -1,4 +1,6 @@
-import { type ActionEnum, type Operation } from '@concepta/nestjs-core';
+import { type Operation } from '@concepta/nestjs-core';
+
+import { type CrudActionCategory } from './crud-action-category.type.js';
 
 /**
  * Minimal context interface for domain specifications.
@@ -9,5 +11,6 @@ import { type ActionEnum, type Operation } from '@concepta/nestjs-core';
  */
 export interface CrudSpecContextInterface {
   operation: Operation;
-  action: ActionEnum;
+  /** The operation's category for hooks, not an authority's action. */
+  action: CrudActionCategory;
 }

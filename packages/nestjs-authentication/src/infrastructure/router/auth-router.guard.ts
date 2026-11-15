@@ -9,6 +9,10 @@ import {
   Inject,
 } from '@nestjs/common';
 
+import { AuthTransportUnsupportedException } from '../exceptions/auth-transport-unsupported.exception.js';
+import { markAuthenticationGuard } from '../utils/authentication-guard.util.js';
+import { isHttpCall } from '../utils/is-http-call.util.js';
+
 import { AuthRouterGuards } from './auth-router.constants.js';
 import { AuthRouterGuardsRecord } from './auth-router.types.js';
 import { AuthRouterAuthenticationFailedException } from './exceptions/auth-router-authentication-failed.exception.js';
@@ -31,6 +35,12 @@ export class AuthRouterGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // The provider comes from the HTTP request; any other call carries the
+    // caller's own payload, as it does for the guards it delegates to.
+    if (!isHttpCall(context)) {
+      throw new AuthTransportUnsupportedException(context.getType());
+    }
+
     const request = context.switchToHttp().getRequest();
     const rawProvider = request.query?.provider;
     const rawCode = request.query?.code;
@@ -150,3 +160,5 @@ export class AuthRouterGuard implements CanActivate {
     return guardInstance;
   }
 }
+
+markAuthenticationGuard(AuthRouterGuard);

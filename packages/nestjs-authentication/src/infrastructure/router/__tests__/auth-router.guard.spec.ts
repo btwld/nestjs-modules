@@ -1,3 +1,4 @@
+import { of } from 'rxjs';
 import { mock } from 'vitest-mock-extended';
 
 import {
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
+import { AuthTransportUnsupportedException } from '../../exceptions/auth-transport-unsupported.exception.js';
 import { AuthRouterGuards } from '../auth-router.constants.js';
 import { AuthRouterGuard } from '../auth-router.guard.js';
 import { AuthRouterAuthenticationFailedException } from '../exceptions/auth-router-authentication-failed.exception.js';
@@ -66,6 +68,7 @@ describe(AuthRouterGuard.name, () => {
     const httpArgsHost = mock<HttpArgumentsHost>();
     httpArgsHost.getRequest.mockReturnValue(mockRequest);
     const ctx = mock<ExecutionContext>();
+    ctx.getType.mockReturnValue('http');
     ctx.switchToHttp.mockReturnValue(httpArgsHost);
     return ctx;
   };
@@ -96,6 +99,20 @@ describe(AuthRouterGuard.name, () => {
     it('should be an instance of AuthRouter', () => {
       expect(guard).toBeInstanceOf(AuthRouterGuard);
     });
+  });
+
+  // A message carries the caller's own payload, so no provider is read
+  // from it and no provider guard runs.
+  it('should refuse a call that is not HTTP, reading nothing', async () => {
+    const context = mock<ExecutionContext>();
+    context.getType.mockReturnValue('rpc');
+    const google = vi.spyOn(mockAuthRouterGuards.google, 'canActivate');
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      AuthTransportUnsupportedException,
+    );
+    expect(context.switchToHttp).not.toHaveBeenCalled();
+    expect(google).not.toHaveBeenCalled();
   });
 
   describe('canActivate - Provider Validation', () => {
@@ -256,6 +273,18 @@ describe(AuthRouterGuard.name, () => {
       const result = await guardWithGuards.canActivate(mockExecutionContext);
 
       expect(result).toBe(true);
+    });
+
+    // A provider guard declining asynchronously declines the call too.
+    it.each<[string, CanActivate]>([
+      ['Promise<false>', { canActivate: () => Promise.resolve(false) }],
+      ['an Observable of false', { canActivate: () => of(false) }],
+    ])('should return false when guard returns %s', async (_name, google) => {
+      const guardWithGuards = new AuthRouterGuard({ google });
+
+      await expect(
+        guardWithGuards.canActivate(createMockExecutionContext('google')),
+      ).resolves.toBe(false);
     });
   });
 

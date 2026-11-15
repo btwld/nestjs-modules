@@ -1,0 +1,18 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "typeRoots": [
+      "../node_modules/@types",
+      "../../../node_modules/@types",
+      "../../../node_modules"
+    ],
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@concepta/nestjs-repository": ["../src/index.ts"],
+      "@concepta/nestjs-repository/optional/casl": ["../src/optional-casl.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

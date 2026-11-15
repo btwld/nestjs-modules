@@ -1,7 +1,7 @@
 import { AccessControlUpdateOne } from './access-control-update-one.decorator.js';
 
 /**
- * Update one resource grant shortcut.
+ * Replace one resource grant shortcut: a replace is an update.
  *
  * @param resource - The grant resource.
  */

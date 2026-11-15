@@ -19,24 +19,29 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'FederatedException (default)',
+    errorCode: 'FEDERATED_ERROR',
     build: () => new FederatedException(),
     fault: 'internal',
   },
   {
     name: 'IdentityCreateUserException',
+    errorCode: 'FEDERATED_IDENTITY_CREATE_USER_ERROR',
     build: () => new IdentityCreateUserException('SomeEntity'),
     fault: 'internal',
   },
   {
     name: 'IdentityFindUserException',
+    errorCode: 'FEDERATED_IDENTITY_FIND_USER_ERROR',
     build: () => new IdentityFindUserException('SomeEntity', { id: 'user-id' }),
     fault: 'client',
   },
   {
     name: 'IdentityUserRelationshipException',
+    errorCode: 'FEDERATED_IDENTITY_USER_RELATIONSHIP_ERROR',
     build: () => new IdentityUserRelationshipException('identity-id'),
     fault: 'internal',
   },
@@ -47,6 +52,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

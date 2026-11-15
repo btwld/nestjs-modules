@@ -72,23 +72,6 @@ describe('repository binding', () => {
     expect(() => repo.bind({})).toThrow(RepositoryBootException);
   });
 
-  it('refuses a resolver before the entity is bound as scoped', () => {
-    const repo = new TestRepositoryAdapter('rows');
-
-    expect(() => repo.setRowScopeResolver(new Resolver())).toThrow(
-      RowScopeBootException,
-    );
-  });
-
-  it('refuses a resolver for an entity bound as public', () => {
-    const repo = new TestRepositoryAdapter('rows');
-    repo.bind({ rowScope: { access: 'public', reason: 'shared' } });
-
-    expect(() => repo.setRowScopeResolver(new Resolver())).toThrow(
-      RowScopeBootException,
-    );
-  });
-
   it('scopes a scoped entity once its resolver is attached', async () => {
     const repo = new TestRepositoryAdapter('rows');
     repo.bind({ rowScope: { access: 'scoped', resolver: Resolver } });

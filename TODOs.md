@@ -36,6 +36,52 @@ done — see git history for what shipped. Reference notes that are not work liv
       correctly, or confirm 4.5.x's behavior is actually fine and the tests need
       updating, then widen the range back.
 
+  4. **errorCodes without the `_ERROR` suffix** (S, wire-visible) — the convention is
+      that every `errorCode` ends in `_ERROR` (user, 2026-11-14). About 55 v8 codes
+      don't: core 13 (`HOOK_NOT_DECORATED`, `OVERLAY_*`, `CURRENCY_*`, `MONEY_*`,
+      `APP_CONTEXT_UNAVAILABLE`, `RUNTIME_EXCEPTION`), repository 29 (`ENTITY_NOT_FOUND`,
+      `ROW_SCOPE_*`, `TRANSACTION_*`, `*_BOOT_CHECK_FAILED`, ...), TypeORM driver 4,
+      Drizzle driver 2, user 3, otp 1, cache 1, crud 1. Rename in one sweep, with the
+      tests and READMEs that name them; list them with
+      `grep -rhoE "errorCode = '[A-Z_]+'" packages/*/src | grep -v "_ERROR'"`.
+
+  5. **One meaning for "public route"** (M, DX) — "public" means different things
+      depending on who reads it (user, 2026-11-15). Review them and settle on one
+      notion every module reads the same way. Today:
+      - core's `@PublicRoute()` is an audit mark only and opens nothing; core reads it with
+        `isPublicRoute`;
+      - authentication's `@AuthPublic()` turns off only guards built with
+        `canDisable` (the JWT guard) and sets the mark. A guard that can't be turned off
+        (`LocalGuard`, `RefreshGuard`) still authenticates, so a public route is not
+        necessarily unauthenticated. It is read with a second check, `isAuthPublic`, and
+        `@PublicRoute()` alone does not open the JWT guard;
+      - `{ optional: true }` is public, yet signs a valid caller in. `{ classLevel:
+        true }` only silences a warning emitted on every request;
+      - `settings.guards.enable: false` and the `settings.guards.disable` callback open
+        routes with no mark at all;
+      - the route audit reads the mark three ways. `requireAuth` and `requireAcl` skip
+        a marked route, so a missing grant there isn't caught. `requirePrivateWrites`
+        treats the mark as anonymous, so a credentialed refresh or sign-in needs an
+        `allow` entry;
+      - at runtime a grant on a public route still runs and refuses a caller with no
+        actor. Off HTTP, `@AuthPublic()` is the only way past the JWT guard.
+
+      Questions to settle:
+      - Are "open on purpose" (audit), "no sign-in required" (authentication) and "no
+        grant required" (access control) one concept or three?
+      - Should a guard that authenticates on its own (sign-in, refresh) be a distinct,
+        named kind of route rather than public plus an `allow` entry?
+      - Should the `disable` callback have to mark what it opens?
+  6. **Field-scoped allows on calls that name no fields** (S, security) — an allow
+      naming `fields` allows the whole call when that call names no columns (user,
+      2026-11-15). CASL counts a field-scoped allow on a check without a field, so
+      `{ action: 'delete', subject: 'order', fields: ['status'] }` allows the whole
+      delete, and the same goes for `softDelete`, `restore` and a domain operation
+      asserted with `assertAuthority`. Decide whether `authorityRuleProblems` should
+      refuse `fields` on actions that ask no columns, whether such an allow should count
+      only when the call names one of its fields, or whether today's behaviour stays and
+      is documented as the rule.
+
 # Parked
 
 Not ranked: reference notes, and work waiting on something else.

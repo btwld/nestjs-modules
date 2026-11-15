@@ -110,7 +110,7 @@ class StubAdapter extends RepositoryAdapter<PlainLiteralObject> {
 }
 
 const scoped = { access: 'scoped', resolver: Resolver } as const;
-const publicly = { access: 'public', reason: 'shared reference data' } as const;
+const open = { access: 'open', reason: 'shared reference data' } as const;
 
 const boundScoped = (entityKey: string, entityName: string): StubAdapter => {
   const adapter = new StubAdapter(entityKey, entityName, scoped);
@@ -134,7 +134,7 @@ describe('row scope boot checks', () => {
     });
 
     it.each([
-      ['declared public', publicly],
+      ['declared open', open],
       ['not declared', undefined],
     ])('fails a relation from an entity %s', (_case, declaration) => {
       const failures = checkRelationsIntoScoped([
@@ -157,18 +157,11 @@ describe('row scope boot checks', () => {
       const relation = toScoped('orders');
       const failures = checkRelationsIntoScoped([
         boundScoped('orders', 'Order'),
-        new StubAdapter(
-          'categories',
-          'Category',
-          publicly,
-          [relation],
-          undefined,
-          {
-            reader: new FederationReader(new RepositoryRegistryService()),
-            relations: new Map([['orders', { relation }]]),
-            maxKeys: 10,
-          },
-        ),
+        new StubAdapter('categories', 'Category', open, [relation], undefined, {
+          reader: new FederationReader(new RepositoryRegistryService()),
+          relations: new Map([['orders', { relation }]]),
+          maxKeys: 10,
+        }),
       ]);
 
       expect(failures).toEqual([]);
@@ -177,7 +170,7 @@ describe('row scope boot checks', () => {
     it('fails an owning relation as well as an inverse one', () => {
       const failures = checkRelationsIntoScoped([
         boundScoped('orders', 'Order'),
-        new StubAdapter('notes', 'Note', publicly, [
+        new StubAdapter('notes', 'Note', open, [
           toScoped('order', {
             cardinality: 'one',
             on: { from: 'orderId', to: 'id' },
@@ -204,7 +197,7 @@ describe('row scope boot checks', () => {
 
       const failures = checkRelationsIntoScoped([
         invoices,
-        new StubAdapter('folders', 'Folder', publicly, [
+        new StubAdapter('folders', 'Folder', open, [
           toScoped('documents', {
             targetEntity: 'Document',
             targetUrn: 'urn:memory:documents',
@@ -220,7 +213,7 @@ describe('row scope boot checks', () => {
       // Same class name, another data source.
       const failures = checkRelationsIntoScoped([
         boundScoped('orders', 'Order'),
-        new StubAdapter('categories', 'Category', publicly, [
+        new StubAdapter('categories', 'Category', open, [
           toScoped('orders', { targetUrn: 'urn:memory:archive:Order' }),
         ]),
       ]);
@@ -231,7 +224,7 @@ describe('row scope boot checks', () => {
     it('fails a many-to-many whose junction rows are scoped', () => {
       const failures = checkRelationsIntoScoped([
         boundScoped('assignments', 'Assignment'),
-        new StubAdapter('users', 'User', publicly, [
+        new StubAdapter('users', 'User', open, [
           toScoped('roles', {
             targetEntity: 'Role',
             targetUrn: 'urn:memory:Role',
@@ -257,7 +250,7 @@ describe('row scope boot checks', () => {
       const adapters = [
         boundScoped('orders', 'Order'),
         new StubAdapter('lines', 'OrderLine', scoped, [toScoped('order')]),
-        new StubAdapter('tags', 'Tag', publicly, [
+        new StubAdapter('tags', 'Tag', open, [
           toScoped('categories', {
             targetEntity: 'Category',
             targetUrn: 'urn:memory:Category',
@@ -349,7 +342,7 @@ describe('row scope boot checks', () => {
       expect(
         checkDeclarationCompleteness([
           new StubAdapter('a', 'A', scoped),
-          new StubAdapter('b', 'B', publicly),
+          new StubAdapter('b', 'B', open),
         ]),
       ).toEqual([]);
     });

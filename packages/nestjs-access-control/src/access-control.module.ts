@@ -31,7 +31,11 @@ export class AccessControlModule extends AccessControlModuleClass {
     return {
       module: AccessControlModule,
       imports: createAccessControlImports(options),
-      providers: createAccessControlProviders({ overrides: options }),
+      providers: createAccessControlProviders({
+        overrides: options,
+        providers: options.queryServices,
+        appWide: false,
+      }),
       exports: createAccessControlExports(),
     };
   }

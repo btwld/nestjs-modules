@@ -62,5 +62,18 @@ describe(RefreshStrategy, () => {
         refreshStrategy.validate(authorizationPayloadInterface, {});
       await expect(t).rejects.toThrow(RefreshUnauthorizedException);
     });
+
+    it.each([false, undefined, null])(
+      'refuses a user whose active is %s like a missing one',
+      async (active) => {
+        const stored = { ...user };
+        Reflect.set(stored, 'active', active);
+        vi.spyOn(userPort, 'getBySubject').mockResolvedValue(stored);
+
+        await expect(
+          refreshStrategy.validate(authorizationPayloadInterface, {}),
+        ).rejects.toThrow(RefreshUnauthorizedException);
+      },
+    );
   });
 });

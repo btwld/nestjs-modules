@@ -1,6 +1,10 @@
 import { Injectable, PlainLiteralObject } from '@nestjs/common';
 
-import { RepositoryInterface, WhereClause } from '@concepta/nestjs-repository';
+import {
+  RepositoryFindOptions,
+  RepositoryInterface,
+  WhereClause,
+} from '@concepta/nestjs-repository';
 
 import { CrudAdapter } from '../../../infrastructure/adapters/crud.adapter.js';
 import { CrudContextOptionsInterface } from '../../../infrastructure/interceptors/interfaces/crud-context-options.interface.js';
@@ -29,6 +33,12 @@ export class TestCrudAdapter<
 
   exposedValidateWhereFields(clause: WhereClause | undefined): void {
     return this.validateWhereFields(clause);
+  }
+
+  exposedBuildFindOptions(
+    context: CrudContextInterface<T>,
+  ): RepositoryFindOptions<T> {
+    return this.buildFindOptions(context);
   }
 
   exposedGetSelectFields(

@@ -4,6 +4,13 @@ import { type ModuleRef } from '@nestjs/core';
 import { activityBindingOf } from './activity/activity-boot-checks.js';
 import { ActivityBootException } from './activity/exceptions/activity-boot.exception.js';
 import {
+  checkAuthorityDeclarationCompleteness,
+  checkEagerRelationsIntoGoverned,
+  findRelationsIntoGoverned,
+} from './authority/authority-boot-checks.js';
+import { AuthorityBootException } from './authority/exceptions/authority-boot.exception.js';
+import { isAuthorityGoverned } from './authority/interfaces/authority-registration.interface.js';
+import {
   cascadeRelationsOf,
   checkCascadeCycles,
   checkCascadeTargets,
@@ -140,6 +147,14 @@ export function bindRepositories(params: {
     ),
   );
 
+  const governedUrns = new Set(
+    entries.flatMap(({ options }, index) =>
+      isAuthorityGoverned(options.authority)
+        ? [adapters[index].metadata.urn]
+        : [],
+    ),
+  );
+
   const maxKeys =
     moduleOptions.federation?.maxKeys ?? FEDERATION_DEFAULT_MAX_KEYS;
   if (!Number.isInteger(maxKeys) || maxKeys < 1) {
@@ -180,12 +195,18 @@ export function bindRepositories(params: {
 
     adapter.bind({
       rowScope: options.rowScope,
+      authority: options.authority,
       hooks: options.hooks,
       writePolicy: options.writePolicy,
       allowEagerRelations: options.allowEagerRelations,
       relationsIntoScoped: findRelationsIntoScoped(
         adapter.metadata,
         scopedUrns,
+        adaptersByUrn,
+      ),
+      relationsIntoGoverned: findRelationsIntoGoverned(
+        adapter.metadata,
+        governedUrns,
         adaptersByUrn,
       ),
       federation: federated.relations.size
@@ -233,6 +254,16 @@ export function bindRepositories(params: {
 
   if (activityFailures.length > 0) {
     throw new ActivityBootException(activityFailures);
+  }
+
+  const authorityFailures = [
+    ...checkEagerRelationsIntoGoverned(adapters),
+    ...(moduleOptions.authority?.required
+      ? checkAuthorityDeclarationCompleteness(adapters)
+      : []),
+  ];
+  if (authorityFailures.length > 0) {
+    throw new AuthorityBootException(authorityFailures);
   }
 
   const hookFailures = [...checkHooksUsable(adapters, moduleRef)];

@@ -1,10 +1,10 @@
 import { type Type } from '@nestjs/common';
 
-import { type CanAccess } from '../policies/can-access.policy.js';
+import { type CanAccess } from './can-access.interface.js';
 
 export interface AccessControlQueryOptionInterface {
   /**
-   * Service used for advanced validation
+   * The access query service that decides the route.
    */
   service: Type<CanAccess>;
 }

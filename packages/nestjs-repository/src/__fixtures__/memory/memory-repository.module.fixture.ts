@@ -64,12 +64,20 @@ import {
   type MemoryRepositoryOptionsFixture,
 } from './memory-repository.fixture.js';
 import {
+  HALF_TENANT_ORDER_LINE_METADATA,
+  HalfTenantOrderLineEntityFixture,
+  LINKED_ORDER_LINE_METADATA,
+  LinkedOrderLineEntityFixture,
+} from './order-line-join.fixture.js';
+import {
   ORDER_LINE_METADATA,
   ORDER_METADATA,
   OrderEntityFixture,
   OrderLineEntityFixture,
   TENANT_ORDER_LINE_METADATA,
   TenantOrderLineEntityFixture,
+  VERSIONED_ORDER_METADATA,
+  VersionedOrderEntityFixture,
 } from './order.fixture.js';
 import {
   NOTE_METADATA,
@@ -109,9 +117,12 @@ const ADAPTERS = new Map<
   [PayoutEntityFixture, memory(PAYOUT_METADATA)],
   [CategoryEntityFixture, memory(CATEGORY_METADATA)],
   [TenantOrderLineEntityFixture, memory(TENANT_ORDER_LINE_METADATA)],
+  [HalfTenantOrderLineEntityFixture, memory(HALF_TENANT_ORDER_LINE_METADATA)],
+  [LinkedOrderLineEntityFixture, memory(LINKED_ORDER_LINE_METADATA)],
   [ProjectEntityFixture, memory(PROJECT_METADATA)],
   [DraftEntityFixture, memory(DRAFT_METADATA)],
   [OrderEntityFixture, memory(ORDER_METADATA)],
+  [VersionedOrderEntityFixture, memory(VERSIONED_ORDER_METADATA)],
   [OrderLineEntityFixture, memory(ORDER_LINE_METADATA)],
   [PetEntityFixture, memory(PET_METADATA)],
   [NoteEntityFixture, memory(NOTE_METADATA)],

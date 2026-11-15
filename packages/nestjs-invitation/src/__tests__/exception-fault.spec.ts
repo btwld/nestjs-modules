@@ -21,34 +21,41 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'InvitationException (default)',
+    errorCode: 'INVITATION_ERROR',
     build: () => new InvitationException(),
     fault: 'internal',
   },
   {
     name: 'InvitationAlreadyAcceptedException',
+    errorCode: 'INVITATION_ALREADY_ACCEPTED_ERROR',
     build: () => new InvitationAlreadyAcceptedException(),
     fault: 'client',
   },
   {
     name: 'InvitationRevokedException',
+    errorCode: 'INVITATION_REVOKED_ERROR',
     build: () => new InvitationRevokedException(),
     fault: 'client',
   },
   {
     name: 'InvitationNotFoundException',
+    errorCode: 'INVITATION_NOT_FOUND_ERROR',
     build: () => new InvitationNotFoundException('id'),
     fault: 'client',
   },
   {
     name: 'InvitationUserUndefinedException',
+    errorCode: 'INVITATION_USER_UNDEFINED_ERROR',
     build: () => new InvitationUserUndefinedException(),
     fault: 'usage',
   },
   {
     name: 'InvitationNotAcceptedException',
+    errorCode: 'INVITATION_NOT_ACCEPTED_ERROR',
     build: () => new InvitationNotAcceptedException(),
     fault: 'internal',
   },
@@ -59,6 +66,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

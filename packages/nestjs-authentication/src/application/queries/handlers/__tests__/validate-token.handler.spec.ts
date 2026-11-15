@@ -1,14 +1,21 @@
 import { mock } from 'vitest-mock-extended';
 
-import { JwtStrategyPolicy } from '../../../../domain/policies/jwt-strategy.policy.js';
-import { type UserPort } from '../../../../domain/ports/user.port.js';
+import {
+  type AuthenticationUserResult,
+  type UserPort,
+} from '../../../../domain/ports/user.port.js';
 import { AuthenticationUserPortRequiredException } from '../../../exceptions/authentication-user-port-required.exception.js';
 import { ValidateTokenQuery } from '../../impl/validate-token.query.js';
 import { ValidateTokenHandler } from '../validate-token.handler.js';
 
 describe(ValidateTokenHandler.name, () => {
   const payload = { sub: 'user-1' };
-  const user = { id: 'user-1' };
+  const user: NonNullable<AuthenticationUserResult> = {
+    id: 'user-1',
+    email: 'user@example.com',
+    username: 'user',
+    active: true,
+  };
 
   describe('with UserPort', () => {
     let userPort: UserPort;
@@ -16,16 +23,29 @@ describe(ValidateTokenHandler.name, () => {
 
     beforeEach(() => {
       userPort = mock<UserPort>();
-      handler = new ValidateTokenHandler(new JwtStrategyPolicy({}), userPort);
+      handler = new ValidateTokenHandler(userPort);
     });
 
     it('should return true when user is found', async () => {
       void userPort.getBySubject;
-      vi.spyOn(userPort, 'getBySubject').mockResolvedValue(user as never);
+      vi.spyOn(userPort, 'getBySubject').mockResolvedValue(user);
       const query = new ValidateTokenQuery({}, payload);
       const result = await handler.execute(query);
       expect(result).toBe(true);
     });
+
+    it.each([false, undefined, null])(
+      'returns false for a user whose active is %s, as for a missing one',
+      async (active) => {
+        const stored = { ...user };
+        Reflect.set(stored, 'active', active);
+        void userPort.getBySubject;
+        vi.spyOn(userPort, 'getBySubject').mockResolvedValue(stored);
+        const query = new ValidateTokenQuery({}, payload);
+
+        await expect(handler.execute(query)).resolves.toBe(false);
+      },
+    );
 
     it('should return false when user is not found', async () => {
       void userPort.getBySubject;
@@ -44,28 +64,8 @@ describe(ValidateTokenHandler.name, () => {
   });
 
   describe('without UserPort', () => {
-    it('should return true (fail-open) when requireUserValidation is not set', async () => {
-      const handler = new ValidateTokenHandler(new JwtStrategyPolicy({}), null);
-      const query = new ValidateTokenQuery({}, payload);
-      const result = await handler.execute(query);
-      expect(result).toBe(true);
-    });
-
-    it('should return true (fail-open) when requireUserValidation is false', async () => {
-      const handler = new ValidateTokenHandler(
-        new JwtStrategyPolicy({ requireUserValidation: false }),
-        null,
-      );
-      const query = new ValidateTokenQuery({}, payload);
-      const result = await handler.execute(query);
-      expect(result).toBe(true);
-    });
-
-    it('should throw AuthenticationUserPortRequiredException when requireUserValidation is true', async () => {
-      const handler = new ValidateTokenHandler(
-        new JwtStrategyPolicy({ requireUserValidation: true }),
-        null,
-      );
+    it('refuses to validate, rather than accepting every signed token', async () => {
+      const handler = new ValidateTokenHandler(null);
       const query = new ValidateTokenQuery({}, payload);
       await expect(handler.execute(query)).rejects.toThrow(
         AuthenticationUserPortRequiredException,

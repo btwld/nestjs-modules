@@ -458,13 +458,13 @@ describe('row scope ordering guarantees', () => {
       await expect(declared.find({})).resolves.toEqual([]);
     });
 
-    it('does not refuse an entity declared public', async () => {
-      const publicRepo = new TestAdapter('rows');
-      publicRepo.bind({
-        rowScope: { access: 'public', reason: 'shared reference data' },
+    it('does not refuse an entity declared open', async () => {
+      const openRepo = new TestAdapter('rows');
+      openRepo.bind({
+        rowScope: { access: 'open', reason: 'shared reference data' },
       });
 
-      await expect(publicRepo.find({})).resolves.toEqual([]);
+      await expect(openRepo.find({})).resolves.toEqual([]);
     });
   });
 

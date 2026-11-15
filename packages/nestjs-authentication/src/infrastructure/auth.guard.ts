@@ -1,6 +1,9 @@
+import { isObservable, lastValueFrom } from 'rxjs';
+
 import {
   CanActivate,
   ExecutionContext,
+  HttpException,
   Inject,
   Injectable,
   NotImplementedException,
@@ -8,11 +11,22 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
 
-import { AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN } from '../authentication.constants.js';
+import { requireAppContext } from '@concepta/nestjs-core';
+
+import {
+  AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+  AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+} from '../authentication.constants.js';
+import { type AuthenticatedUserInterface } from '../domain/interfaces/authenticated-user.interface.js';
 import { GuardsPolicy } from '../domain/policies/guards.policy.js';
+import { AuthUserCtx } from '../gateways/auth-user-context.overlay.js';
 
 import { AuthGuardCtr, AuthGuardOptions } from './auth.guard.types.js';
 import { AuthPublicMetadata } from './decorators/auth-public.decorator.js';
+import { AuthTransportUnsupportedException } from './exceptions/auth-transport-unsupported.exception.js';
+import { AuthUserConflictException } from './exceptions/auth-user-conflict.exception.js';
+import { markAuthenticationGuard } from './utils/authentication-guard.util.js';
+import { isHttpCall } from './utils/is-http-call.util.js';
 
 /**
  * A Guard to use passport for express or fastify
@@ -63,7 +77,7 @@ export const AuthGuard = (
       this.options = options;
     }
 
-    canActivate(context: ExecutionContext) {
+    async canActivate(context: ExecutionContext): Promise<boolean> {
       // does this guard allow disabling?
       if (this.options.canDisable === true) {
         // check if guards are enabled globally, default to true
@@ -102,6 +116,19 @@ export const AuthGuard = (
 
         // disabled via context?
         if (isDisabled) {
+          // optional authentication signs in a caller whose credentials
+          // check out, and lets anyone else through as nobody
+          if (
+            this.reflector.getAllAndOverride<boolean | undefined>(
+              AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+              [contextHandler, contextClass],
+            ) === true
+          ) {
+            await authenticateIfValid(context, () =>
+              super.canActivate(context),
+            );
+          }
+
           // yes, immediate activation
           return true;
         }
@@ -117,12 +144,105 @@ export const AuthGuard = (
       }
 
       // call parent
-      return super.canActivate(context);
+      const activated = await activation(super.canActivate(context));
+
+      if (activated) {
+        defineAuthUser(context);
+      }
+
+      return activated;
+    }
+
+    /**
+     * The request a strategy reads the credentials from: the HTTP request.
+     * On any other transport the call is refused, since what it carries is
+     * the caller's own payload. To authenticate another transport's calls,
+     * override this to return that transport's request.
+     */
+    getRequest(context: ExecutionContext): unknown {
+      if (!isHttpCall(context)) {
+        throw new AuthTransportUnsupportedException(context.getType());
+      }
+      return context.switchToHttp().getRequest();
     }
   }
 
+  markAuthenticationGuard(AuthGuard);
+
   return AuthGuard;
 };
+
+type Activation = ReturnType<CanActivate['canActivate']>;
+
+async function activation(result: Activation): Promise<boolean> {
+  return isObservable(result) ? lastValueFrom(result) : result;
+}
+
+/**
+ * Authenticates the call when its credentials check out; a refusal (401)
+ * leaves it anonymous, any other failure still fails the call. The
+ * module's own guards report every authentication failure as a refusal,
+ * a failing user lookup included, so with them any failure is anonymous.
+ */
+async function authenticateIfValid(
+  context: ExecutionContext,
+  authenticate: () => Activation,
+): Promise<void> {
+  let authenticated: boolean;
+
+  try {
+    authenticated = await activation(authenticate());
+  } catch (error) {
+    if (!(error instanceof HttpException) || error.getStatus() !== 401) {
+      throw error;
+    }
+    return;
+  }
+
+  // Outside the try: a second user on the call is a refusal, not a reason
+  // to go on as nobody.
+  if (authenticated) {
+    defineAuthUser(context);
+  }
+}
+
+/**
+ * Defines the authenticated user on the call's context as `AuthUserCtx`,
+ * immutably, so guards that run after this one, such as access control,
+ * can read it: interceptors, which define the other overlays, run after
+ * every guard. The first guard to authenticate a call defines it; a later
+ * one authenticating the same user changes nothing, and one authenticating
+ * someone else refuses the call. Only on HTTP: a guard that authenticates
+ * another transport, by overriding `getRequest`, defines nothing.
+ */
+function defineAuthUser(context: ExecutionContext): void {
+  if (!isHttpCall(context)) {
+    return;
+  }
+
+  const user = context
+    .switchToHttp()
+    .getRequest<{ user?: AuthenticatedUserInterface }>().user;
+
+  if (!user) {
+    return;
+  }
+
+  const ctx = requireAppContext(context);
+
+  if (!ctx.supports(AuthUserCtx)) {
+    ctx.defineOverlay(AuthUserCtx, { user }, { immutable: true });
+    return;
+  }
+
+  // The same user only when both carry the same id: a user without one
+  // can't be told apart from another, so it counts as someone else.
+  const first = ctx.with(AuthUserCtx).user?.id;
+
+  if (first === undefined || user.id === undefined || first !== user.id) {
+    throw new AuthUserConflictException();
+  }
+}
 
 export const FastifyAuthGuard = (_strategyName: string): AuthGuardCtr => {
   class FastifyAuthGuard implements CanActivate {

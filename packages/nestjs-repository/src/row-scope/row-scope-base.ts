@@ -2,6 +2,7 @@ import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
 
 import { RuntimeException } from '@concepta/nestjs-core';
 
+import { internalCall } from '../authority/internal-call.js';
 import { type WhereClause } from '../repository/interfaces/where-clause.interface.js';
 import { Where } from '../repository/where.helpers.js';
 
@@ -276,11 +277,20 @@ export abstract class RowScopeBase<
       ...this.predicatesOf(values),
     ];
 
-    const found = await repository.findOne({
-      where: conditions.length === 1 ? conditions[0] : Where.and(...conditions),
-      withDeleted: true,
-      ctx,
-    });
+    // Not decided by the entity's authority: the write it guards was, and
+    // needs no read permission of its own.
+    const found = await repository.findOne(
+      internalCall(
+        {
+          // A write with no scope columns was refused before this read, so
+          // there is always the key and at least one scope column.
+          where: Where.and(...conditions),
+          withDeleted: true,
+          ctx,
+        },
+        repository,
+      ),
+    );
 
     if (!found) {
       this.refuse(HttpStatus.NOT_FOUND, notFound);

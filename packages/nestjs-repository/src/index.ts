@@ -37,6 +37,7 @@ export {
   RepositoryRootOptions,
 } from './interfaces/repository-root-options.interface.js';
 export { RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
+export { RepositoryAuthorityOptionsInterface } from './interfaces/repository-authority-options.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Row Scope
@@ -60,8 +61,13 @@ export { RowScopeBaseOptions } from './row-scope/interfaces/row-scope-base-optio
 export {
   RowScopeRegistration,
   RowScopeScopedRegistration,
-  RowScopePublicRegistration,
+  RowScopeOpenRegistration,
 } from './row-scope/interfaces/row-scope-registration.interface.js';
+export {
+  AuthorityRegistration,
+  AuthorityGovernedRegistration,
+  AuthorityOpenRegistration,
+} from './authority/interfaces/authority-registration.interface.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Write Policy
@@ -101,6 +107,10 @@ export { UnknownColumnException } from './exceptions/unknown-column.exception.js
 export { InvalidColumnValueException } from './exceptions/invalid-column-value.exception.js';
 export { RowScopeUnboundException } from './row-scope/exceptions/row-scope-unbound.exception.js';
 export { RowScopeBootException } from './row-scope/exceptions/row-scope-boot.exception.js';
+export { AuthorityRefusedException } from './authority/exceptions/authority-refused.exception.js';
+export { AuthorityRefusedDetailsInterface } from './authority/exceptions/authority-refused-details.interface.js';
+export { AuthorityUnboundException } from './authority/exceptions/authority-unbound.exception.js';
+export { AuthorityBootException } from './authority/exceptions/authority-boot.exception.js';
 export { AppendOnlyViolationException } from './write-policy/exceptions/append-only-violation.exception.js';
 export { WritePolicyBootException } from './write-policy/exceptions/write-policy-boot.exception.js';
 export { CorrectionChainDepthException } from './write-policy/exceptions/correction-chain-depth.exception.js';
@@ -261,6 +271,7 @@ export {
   RepositoryFindOneOptions,
   RepositoryFindOptions,
   RepositoryCountOptions,
+  RepositoryWriteOptions,
   RepositoryCreateOptions,
   RepositoryUpdateOptions,
   RepositoryUpsertOptions,

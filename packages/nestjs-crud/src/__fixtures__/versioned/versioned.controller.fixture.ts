@@ -26,7 +26,11 @@ const crudBuilder =
     },
     operations: [
       { operation: Operation.List },
-      { operation: Operation.Read },
+      // `select=...` narrows a Read, so its schema names every field optionally.
+      {
+        operation: Operation.Read,
+        response: { serialization: { resource: versionedSchema.partial() } },
+      },
       { operation: Operation.Create, request: { body: versionedCreateSchema } },
       { operation: Operation.Update, request: { body: versionedUpdateSchema } },
       {

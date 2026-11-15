@@ -309,6 +309,16 @@ describe('RowScopeBase', () => {
         expect(findOne).not.toHaveBeenCalled();
       },
     );
+
+    it('stamps over a scope column the value leaves undefined', async () => {
+      await expect(
+        write(scoped(repoOf().repo), {
+          operation: RowScopeOperation.CREATE,
+          value: { name: 'x', tenantId: undefined },
+          target: undefined,
+        }),
+      ).resolves.toEqual({ name: 'x', tenantId: 'acme' });
+    });
   });
 
   describe('rule 4 — the scope column takes precedence', () => {
@@ -530,6 +540,27 @@ describe('RowScopeBase', () => {
       expect(read(relaxing(), { where }, caller('global'))).toEqual({ where });
     });
 
+    // `relax` names columns, so a column read from another key relaxes by
+    // its column, and a key's name relaxes nothing.
+    it.each([
+      ['its column', ['region'], {}],
+      [
+        'its key, which is no column',
+        ['area'],
+        { where: { field: 'region', operator: 'eq', value: 'eu' } },
+      ],
+    ])(
+      'relaxes a column read from another key by %s only',
+      (_case, relaxed, expected) => {
+        const resolver = new TestRowScope({
+          scope: [{ column: 'region', key: 'area' }],
+          relax: () => relaxed,
+        });
+
+        expect(read(resolver, {}, { area: 'eu' })).toEqual(expected);
+      },
+    );
+
     it('relaxes nothing without a scope', () => {
       expect(relaxing().relaxedColumns(undefined)).toEqual([]);
     });
@@ -575,6 +606,27 @@ describe('RowScopeBase', () => {
   });
 
   describe('composite scope', () => {
+    it('reads by every column together', () => {
+      expect(
+        read(
+          new TestRowScope({ scope: ['tenantId', 'region'] }),
+          {},
+          {
+            tenantId: 'acme',
+            region: 'eu',
+          },
+        ),
+      ).toEqual({
+        where: {
+          operator: 'and',
+          conditions: [
+            { field: 'tenantId', operator: 'eq', value: 'acme' },
+            { field: 'region', operator: 'eq', value: 'eu' },
+          ],
+        },
+      });
+    });
+
     it('predicates and stamps every column', async () => {
       const { repo, findOne } = repoWith(SINGLE_KEY, [
         { id: 'row-1', tenantId: 'acme', region: 'eu' },

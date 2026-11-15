@@ -2,6 +2,7 @@ import { mock } from 'vitest-mock-extended';
 
 import { type PasswordPort } from '../../../../domain/ports/password.port.js';
 import { type UserPort } from '../../../../domain/ports/user.port.js';
+import { LocalUserInactiveException } from '../../../exceptions/local-user-inactive.exception.js';
 import { type LocalValidateUserInterface } from '../interfaces/local-validate-user.interface.js';
 import { LocalService } from '../local.service.js';
 
@@ -57,6 +58,23 @@ describe(LocalService.name, () => {
         `User with username '${USERNAME}' is inactive`,
       );
     });
+
+    // Only `active: true` signs in, whatever the user store leaves out.
+    it.each([undefined, null])(
+      'should refuse a user whose active is %s as inactive',
+      async (active) => {
+        const stored = { ...USER };
+        Reflect.set(stored, 'active', active);
+        void userPort.getByUsername;
+        vi.spyOn(userPort, 'getByUsername').mockResolvedValue(stored);
+        void passwordPort.validate;
+        vi.spyOn(passwordPort, 'validate').mockResolvedValue(true);
+
+        await expect(
+          service.validateUser({}, { username: USERNAME, password: PASSWORD }),
+        ).rejects.toThrow(LocalUserInactiveException);
+      },
+    );
 
     it('should throw an error if the password is invalid', async () => {
       void userPort.getByUsername;

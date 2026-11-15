@@ -18,7 +18,7 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  * value. The store
  * must be another registered entity, append-only, not itself recorded, and
  * carry every column of `ActivityInterface`; for a scoped entity it must also
- * declare a row scope, scoped or public. `omit` names the entity's own
+ * declare a row scope, scoped or open. `omit` names the entity's own
  * columns, and only alongside `values`.
  */
 export function activityBindingOf(
@@ -88,7 +88,7 @@ export function activityBindingOf(
     failures.push(
       `${label} names store "${registration.store}", which declares no ` +
         `rowScope while ${adapter.metadata.name} is scoped. Scope the store, ` +
-        "or declare it rowScope: { access: 'public', reason }.",
+        "or declare it rowScope: { access: 'open', reason }.",
     );
   }
 

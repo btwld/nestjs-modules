@@ -135,6 +135,31 @@ export {
 } from './infrastructure/context/correlation-context.overlay.js';
 export { CorrelationContextInterface } from './infrastructure/context/interfaces/correlation-context.interface.js';
 
+// Actor and authority
+export { ActorCtx } from './infrastructure/context/actor.context.js';
+export { Actor } from './domain/authority/interfaces/actor.type.js';
+export { RoleActorInterface } from './domain/authority/interfaces/role-actor.interface.js';
+export { SystemActorInterface } from './domain/authority/interfaces/system-actor.interface.js';
+export { actorKeys } from './domain/authority/utils/actor-keys.util.js';
+export { frozenActor } from './domain/authority/utils/frozen-actor.util.js';
+export { normalizeActor } from './domain/authority/utils/normalize-actor.util.js';
+export { AuthorityInterface } from './domain/authority/interfaces/authority.interface.js';
+export { AuthorityRequestInterface } from './domain/authority/interfaces/authority-request.interface.js';
+export { AuthorityDecision } from './domain/authority/interfaces/authority-decision.type.js';
+export { AuthorityAllowInterface } from './domain/authority/interfaces/authority-allow.interface.js';
+export { AuthorityRefuseInterface } from './domain/authority/interfaces/authority-refuse.interface.js';
+export { AuthorityRuleInterface } from './domain/authority/interfaces/authority-rule.interface.js';
+export { authorityRuleProblems } from './domain/authority/utils/authority-rule-problems.util.js';
+export { AuthorityRuleNamesInterface } from './domain/authority/interfaces/authority-rule-names.interface.js';
+export { authorityGateOf } from './domain/authority/utils/authority-gate-of.util.js';
+export { assertAuthority } from './infrastructure/authority/utils/assert-authority.util.js';
+export { AuthorityActionRefusedException } from './domain/authority/exceptions/authority-action-refused.exception.js';
+export { AuthorityActionRefusedDetailsInterface } from './domain/authority/interfaces/authority-action-refused-details.interface.js';
+export { authorityPendingGates } from './domain/authority/utils/authority-pending-gates.util.js';
+export { AuthorityPendingGateInterface } from './domain/authority/interfaces/authority-pending-gate.interface.js';
+export { authorityRuleGaps } from './domain/authority/utils/authority-rule-gaps.util.js';
+export { AuthorityRuleGapInterface } from './domain/authority/interfaces/authority-rule-gap.interface.js';
+
 // Event context
 export { EventContextHost } from './domain/events/causal-context/event-context.host.js';
 export { EventContextInterface } from './domain/events/causal-context/interfaces/event-context.interface.js';
@@ -173,3 +198,15 @@ export { HooksCtx } from './infrastructure/hook/hook.context.overlay.js';
 export { normalizeHookOption } from './infrastructure/hook/utils/normalize-hook-option.js';
 export { HookNotDecoratedException } from './infrastructure/hook/exceptions/hook-not-decorated.exception.js';
 export { HookProviderNotFoundException } from './infrastructure/hook/exceptions/hook-provider-not-found.exception.js';
+
+// Route audit feature
+export { AuditedRouteInterface } from './infrastructure/route-audit/interfaces/audited-route.interface.js';
+export { RouteAuditRuleInterface } from './infrastructure/route-audit/interfaces/route-audit-rule.interface.js';
+export { RouteAuditSettingsInterface } from './infrastructure/route-audit/interfaces/route-audit-settings.interface.js';
+export { RouteAuditSubjectInterface } from './infrastructure/route-audit/interfaces/route-audit-subject.interface.js';
+export { RouteAuditViolationInterface } from './infrastructure/route-audit/interfaces/route-audit-violation.interface.js';
+export { RouteAuditRuleProvider } from './infrastructure/route-audit/decorators/route-audit-rule-provider.decorator.js';
+export { PublicRoute } from './infrastructure/route-audit/decorators/public-route.decorator.js';
+export { isPublicRoute } from './infrastructure/route-audit/utils/is-public-route.util.js';
+export { isReadMethod } from './infrastructure/route-audit/utils/is-read-method.util.js';
+export { RouteAuditFailedException } from './infrastructure/route-audit/exceptions/route-audit-failed.exception.js';

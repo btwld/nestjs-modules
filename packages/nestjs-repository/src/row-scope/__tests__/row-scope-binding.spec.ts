@@ -13,6 +13,10 @@ import { AppContextHost, CoreModule } from '@concepta/nestjs-core';
 
 import { type MemoryRepositoryFixture } from '../../__fixtures__/memory/memory-repository.fixture.js';
 import { MemoryRepositoryModuleFixture } from '../../__fixtures__/memory/memory-repository.module.fixture.js';
+import {
+  HalfTenantOrderLineEntityFixture,
+  LinkedOrderLineEntityFixture,
+} from '../../__fixtures__/memory/order-line-join.fixture.js';
 import { OrderLineRowScopeFixture } from '../../__fixtures__/memory/order-line-row-scope.fixture.js';
 import {
   JoinableTenantRowScopeFixture,
@@ -107,9 +111,11 @@ async function compile(
   entities: RepositoryProviderOptions[],
   moduleOptions: RepositoryModuleOptionsInterface = {},
   imports: ModuleMetadata['imports'] = [ResolverModule],
+  rootImports: ModuleMetadata['imports'] = [],
 ): Promise<TestingModule> {
   return Test.createTestingModule({
     imports: [
+      ...rootImports,
       RepositoryModule.forRoot({
         ...moduleOptions,
         imports,
@@ -158,6 +164,27 @@ describe('row scope bound through RepositoryModule.forRoot', () => {
     expect(
       (await orders.find({ ctx: ACME })).map((order) => order.description),
     ).toEqual(['acme']);
+  });
+
+  // `find` is shown above; the other reads are scoped the same way.
+  it.each<[string, () => Promise<unknown>, unknown]>([
+    [
+      'findAndCount',
+      async () => {
+        const [rows, total] = await orders.findAndCount({ ctx: ACME });
+        return { descriptions: rows.map((order) => order.description), total };
+      },
+      { descriptions: ['acme'], total: 1 },
+    ],
+    ['count', () => orders.count({ ctx: GLOBEX }), 1],
+  ])('%s reads only the caller rows', async (_read, read, expected) => {
+    expect(await read()).toEqual(expected);
+  });
+
+  it("finds no other tenant's row by its key", async () => {
+    await expect(
+      orders.findOne({ where: Where.eq('id', globexOrder.id), ctx: ACME }),
+    ).resolves.toBeNull();
   });
 
   // The scope pre-check has to find the caller's own row through the scoped
@@ -220,6 +247,38 @@ describe('row scope bound through RepositoryModule.forRoot', () => {
     ).rejects.toMatchObject({ httpStatus: HttpStatus.NOT_FOUND });
 
     expect(storedOrders()).toHaveLength(2);
+  });
+
+  it("answers 404 to a replace of another tenant's row, leaving it", async () => {
+    await expect(
+      orders.replace(
+        globexOrder,
+        { id: globexOrder.id, description: 'taken' },
+        { ctx: ACME },
+      ),
+    ).rejects.toMatchObject({ httpStatus: HttpStatus.NOT_FOUND });
+
+    expect(storedOrders()).toEqual([
+      { description: 'acme', tenantId: 'acme' },
+      { description: 'globex', tenantId: 'globex' },
+    ]);
+  });
+
+  // A line has no delete date, so only row scope makes the upsert look it up.
+  it("answers 404 to an upsert onto another tenant's line, leaving it", async () => {
+    const line = await orderLines.create(
+      { sku: 'globex', orderId: globexOrder.id },
+      { ctx: GLOBEX },
+    );
+
+    await expect(
+      orderLines.upsert(
+        { id: line.id, sku: 'taken', orderId: acmeOrder.id },
+        { ctx: ACME },
+      ),
+    ).rejects.toMatchObject({ httpStatus: HttpStatus.NOT_FOUND });
+
+    expect(orderLines.stored).toEqual([line]);
   });
 
   it("answers 404 to an upsert onto another tenant's soft-deleted row", async () => {
@@ -515,6 +574,39 @@ describe('a join between entities scoped on the same terms', () => {
   ])('is refused when %s', async (_case, root, target) => {
     await expect(findLines(target, root)).rejects.toMatchObject(REFUSED);
   });
+
+  // A pair counts only when it names the scope column on both sides.
+  it('is refused when each pair names the scope column on one side only', async () => {
+    await expect(
+      findLines(
+        JoinableTenantRowScopeFixture,
+        JoinableTenantRowScopeFixture,
+        HalfTenantOrderLineEntityFixture,
+      ),
+    ).rejects.toMatchObject({
+      httpStatus: HttpStatus.BAD_REQUEST,
+      fault: 'client',
+      message:
+        'Cannot join "order" of HalfTenantOrderLine: the rows it reads are ' +
+        'scoped on the same terms, but the join leaves out tenantId, so it ' +
+        'could reach rows outside that scope. Make the relation join on ' +
+        '(tenantId, orderId, sku).',
+    });
+  });
+
+  // Its junction's rows would be read unscoped, whatever the join matches.
+  it('is refused through a junction, though it joins on the scope column', async () => {
+    await expect(
+      findLines(
+        JoinableTenantRowScopeFixture,
+        JoinableTenantRowScopeFixture,
+        LinkedOrderLineEntityFixture,
+      ),
+    ).rejects.toMatchObject({
+      ...JOIN_REFUSAL,
+      message: JOIN_REFUSAL.message.replace('OrderLine', 'LinkedOrderLine'),
+    });
+  });
 });
 
 describe('a caller relaxed on reads', () => {
@@ -538,17 +630,28 @@ describe('a caller relaxed on reads', () => {
     role: 'global-admin',
   });
 
+  /** Hands every read of a project the tenant admin's ctx. */
+  @RepoHook()
+  class ActsAsTenantAdminHook {
+    @BeforeRead()
+    beforeRead(options: RepositoryFindOptions<ProjectFixture>) {
+      return { ...options, ctx: TENANT_ADMIN };
+    }
+  }
+
   @Module({
     imports: [RepositoryModule.forFeature([PROJECT_TOKEN, DRAFT_TOKEN])],
     providers: [
       ProjectRowScopeFixture,
       StrictProjectRowScopeFixture,
       DraftRowScopeFixture,
+      ActsAsTenantAdminHook,
     ],
     exports: [
       ProjectRowScopeFixture,
       StrictProjectRowScopeFixture,
       DraftRowScopeFixture,
+      ActsAsTenantAdminHook,
     ],
   })
   class DraftResolverModule {}
@@ -561,6 +664,7 @@ describe('a caller relaxed on reads', () => {
   async function start(
     projectResolver: Type<RowScopeInterface> = ProjectRowScopeFixture,
     cascade = false,
+    projectHooks: NonNullable<RepositoryProviderOptions['hooks']> = [],
   ): Promise<void> {
     moduleRef = await compile(
       [
@@ -569,6 +673,7 @@ describe('a caller relaxed on reads', () => {
           entity: ProjectEntityFixture,
           rowScope: { access: 'scoped', resolver: projectResolver },
           relations: { drafts: { cascade } },
+          hooks: projectHooks,
         },
         {
           key: DRAFT_TOKEN,
@@ -578,6 +683,8 @@ describe('a caller relaxed on reads', () => {
       ],
       {},
       [DraftResolverModule],
+      // Hooks need CoreModule to run.
+      projectHooks.length > 0 ? [CoreModule.forRoot()] : [],
     );
     await moduleRef.init();
 
@@ -722,6 +829,15 @@ describe('a caller relaxed on reads', () => {
       );
     });
 
+    // A hook may change the ctx the read runs with, never the caller its
+    // join is judged for.
+    it("refuses a user's join though a hook hands the read a tenant admin's ctx", async () => {
+      await start(ProjectRowScopeFixture, false, [ActsAsTenantAdminHook]);
+      await expect(projectsWithDrafts(ALICE)).rejects.toMatchObject(
+        refused('drafts', 'Project'),
+      );
+    });
+
     it("lets a tenant admin join a project to its tenant's drafts", async () => {
       await start();
       await expect(projectsWithDrafts(TENANT_ADMIN)).rejects.toThrow(
@@ -753,7 +869,7 @@ describe('row scope declared through a driver that rewrites its entries', () => 
   class RewritingDriver {
     static register(entities: RepositoryProviderOptions[]): DynamicModule {
       for (const entity of entities) {
-        entity.rowScope = { access: 'public', reason: 'rewritten by driver' };
+        entity.rowScope = { access: 'open', reason: 'rewritten by driver' };
       }
       return MemoryRepositoryModuleFixture.register(entities);
     }
@@ -934,7 +1050,7 @@ describe('row scope startup checks', () => {
           {
             key: ORDER_LINE_TOKEN,
             entity: OrderLineEntityFixture,
-            rowScope: { access: 'public', reason: 'shared' },
+            rowScope: { access: 'open', reason: 'shared' },
           },
         ],
         {},

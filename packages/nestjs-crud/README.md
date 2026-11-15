@@ -26,6 +26,7 @@ build modes: fully generated, pre-decorated, and hybrid.
 - [Serialization and Validation](#serialization-and-validation)
 - [OpenAPI Documents](#openapi-documents)
 - [Resolvers](#resolvers)
+- [Request Policy](#request-policy)
 - [CQRS Integration](#cqrs-integration)
 - [Specifications and Hooks](#specifications-and-hooks)
 - [Exceptions](#exceptions)
@@ -64,7 +65,7 @@ schemas (Standard Schema) — `zod` is a direct dependency.
 | `@nestjs/swagger` | Yes | OpenAPI decorator support — install explicitly |
 | `rxjs` | Yes | Interceptor pipeline |
 | `@concepta/nestjs-repository-typeorm` | No | TypeORM repository driver |
-| `@nestjs/cqrs` | No | Optional peer — only when using `CrudCqrsResolver` |
+| `@nestjs/cqrs` | No | Only for `CrudCqrsResolver`, from `@concepta/nestjs-crud/optional/cqrs` |
 
 ## Quick Start
 
@@ -148,6 +149,11 @@ export const photoPaginatedSchema = withNamedComponent(
   'PhotoPaginated',
 );
 ```
+
+Required fields suit a route whose responses always hold them. Mark a field
+`.optional()` when a response can leave it out (`?select=`,
+`allow`/`exclude`, or an authority hiding columns); see
+[Serialization](#serialization).
 
 ### Feature Module
 
@@ -369,9 +375,27 @@ export class SomeService {
 | Restore | `restore()` | `restore()` |
 
 Update, Replace, Delete, SoftDelete and Restore each call `findOne()` first to
-resolve the row (Restore with `withDeleted`), then pass it to the repository
-operation. That is why they return `404` for a row the caller cannot see, and
-why `@BeforeFindOne`/`@BeforeRead` hooks fire on a `PATCH`.
+resolve the row (Restore with `withDeleted`), then pass it to the
+repository operation. That is why they return `404` for a row the caller
+cannot see, and why `@BeforeFindOne`/`@BeforeRead` hooks fire on a `PATCH`.
+On an entity an authority governs, that read is the caller's, and it holds
+only the columns the caller may read. So the caller also needs `read` on
+the entity and on every column the lookup names: the route's params, any
+default filter, and the request's `filter`, `or` and `s`. They need `read`
+on the version column too (for Update and Replace, and any write sent with
+`If-Match`) and on the delete date (for Update, Replace and SoftDelete), or
+the repository refuses the write (`403`) naming that column. Only Create
+and CreateBatch write without
+reading. (A repository write of your own needs no read permission: an
+actor who may only create gets back the new row's key.)
+
+Create, CreateBatch, Update and Replace write the route's params into the
+row. Under an authority those are columns the write sets, so the caller
+must be allowed to write them, except the primary key: it names the row
+and is never counted, so `/things/:id` needs no right on `id`. On all but
+Replace, a column row scope stamps itself is not counted either, but a
+route param naming a scope column is. A Replace needs every column but the
+primary key writable, scope columns included.
 
 **Row-scoped entities are scoped on every route, with nothing to add here.**
 Because enforcement lives in the repository this table maps onto, a CRUD
@@ -384,10 +408,11 @@ section of `@concepta/nestjs-repository`.
 
 **Nested rows in a body.** A body may carry the rows of a relation marked
 `cascade: true` in `RepositoryModule.forRoot()`, and they are written with the
-entity: `PATCH` (`update`) creates and updates the rows it lists, `PUT`
-(`replace`) also deletes the ones it leaves out, and `DELETE` deletes them
-first. Any other relation in a body is a `400`. Add the relation to your
-request schema to accept it. See Cascading writes in
+entity: `PATCH` (`update`) creates and updates the rows it lists, and a
+to-one relation set to `null` deletes its row; `PUT` (`replace`) also
+deletes the ones it leaves out, and `DELETE` deletes them first. Any other
+relation in a body is a `400`. Add the relation to your request schema to
+accept it. See Cascading writes in
 `@concepta/nestjs-repository`.
 
 **Update / Replace and optimistic locking.** When the entity carries a
@@ -427,7 +452,9 @@ PATCH /users/1  If-Match: "3"   -> 409                (stale, rejected)
   validator. Narrowing with `?select=` suppresses it defensively, since the
   tag is a row validator that doesn't vary by representation and a client
   that cached the full body must not get served a validator for the wrong
-  shape. There is no `ETag` on List or CreateBatch — HTTP has no per-item
+  shape. A Read whose row leaves the version column out (`allow`/`exclude`,
+  or an authority hiding it) carries none either, since Read narrows like
+  List. There is no `ETag` on List or CreateBatch — HTTP has no per-item
   entity-tag inside a collection body. Suppressing our own `ETag` doesn't
   disable conditional `GET` entirely: Express (or Fastify) still
   auto-generates its own weak, content-hash `ETag` for any response that
@@ -483,6 +510,46 @@ export const userSchema = withNamedComponent(
 `?select=`/`allow`/`exclude` narrowing drops any field not explicitly
 selected, `version` included — use `persist` in the route's query options
 if a narrowing client still needs it.
+
+### Query Fields
+
+`?select=`, `?filter=`, `?or=`, `?sort=` and `?s=` name stored columns:
+CRUD passes the names to the repository unrenamed. `?filter=`, `?or=` and
+`?s=` become the `where` of List, Read and a write's pre-read, joined with
+the route's params and default filter. `?sort=` is used on List only (Read
+and the pre-read pass no order), and `?select=` on List and Read only.
+
+A field naming no column is a `400` before the repository decides:
+`?filter=`, `?or=` and `?s=` on every route that reads, `?select=` on List
+and Read, and `?sort=` on List (Read ignores it). So is a route default
+filter, or a default sort on List, naming none. Column names are public in
+the route's OpenAPI document; a relation-tagged field is left to the
+repository. Registered as the `requestPolicy`, `AccessControlCrudPolicy`
+runs before these checks on every route a grant checked, Read included,
+and checks `filter`, `or`, `sort` and `s`. When access
+control's own grants allow `read` only on named fields, with no authority
+deciding the resource, an unknown field there is a `403` with refusal
+`field` instead. Under an authority access control shares, CRUD's `400`
+applies.
+
+List and Read narrow alike: a `?select=` is passed as `select`, and without
+one the route's columns are passed as `within`. On an entity an
+[authority](../nestjs-repository/README.md#object-authority) governs, a
+List or Read without `?select=` returns the route's columns, plus the
+primary key and `persist` columns, less the caller's hidden ones. A
+`?select=` naming a hidden column is refused (`403`). This holds whether or
+not access control shares the authority. A `?select=` is refused too when
+the route's primary or `persist` columns are hidden, since every
+`?select=` adds them, and so is a `?filter=`, `?or=` or `?s=`, the route's
+default filter, or on List a `?sort=` or default sort, naming a hidden
+column. Without `?select=`, a `persist` entry naming no column is a `400`
+for every caller the authority lets read, checked before their column
+limits; with one, it is checked with the selected columns, so a caller
+limited to some columns gets a `403`. A caller who may
+read none of the route's columns is refused, not given an empty result.
+The pre-read of a write passes neither `select` nor `within`, so it holds
+every column the caller may read (every column when no authority limits
+them; see the operation mapping above).
 
 ## Controller Build Modes
 
@@ -1019,6 +1086,10 @@ Serialization is fail-closed:
   leak into responses.
 - If the payload does not satisfy the schema, parsing throws instead of
   returning a partially-valid response.
+- A response may hold fewer fields than the entity: `?select=`,
+  `allow`/`exclude`, and an authority hiding columns all leave fields out.
+  Mark every field that can be left out `.optional()` in the response
+  schema; a missing required field fails serialization with a `500`.
 - If no response schema resolves at all, the interceptor throws a
   `CrudException` rather than returning unserialized data.
 
@@ -1109,17 +1180,11 @@ adapter.
 | `CrudOperationResolver` | Resolves handler via `ModuleRef` | Custom handler logic without CQRS |
 | `CrudCqrsResolver` | Dispatches via `QueryBus` / `CommandBus` | Full CQRS with sagas and events |
 
-### Setting the Default Resolver
+### Choosing a Resolver
 
-Globally:
-
-```ts
-CrudModule.forRoot({
-  defaultResolver: CrudOperationResolver,
-})
-```
-
-Per-controller:
+A controller dispatches through `CrudAdapterResolver` unless it names
+another, in its controller options or with `@CrudResolver()` on the class
+or a method:
 
 ```ts
 @CrudController({
@@ -1129,6 +1194,55 @@ Per-controller:
   ...
 })
 ```
+
+A hand-written controller injects the resolver it names, so provide it in
+that controller's module. `CrudModule` already provides
+`CrudAdapterResolver` and `CrudOperationResolver`. A controller built by
+`ConfigurableCrudBuilder` needs nothing more: the resolver it names is in
+the builder's `providers`.
+
+## Request Policy
+
+A request policy decides whether a CRUD request may run. Its `check()`
+gets a `CrudRequestInterface`: the CRUD context (the operation, the parsed
+query, the route parameters) and, for a write, the validated body. Throw to
+refuse. Every built-in resolver asks it before dispatching, for every
+operation, however the controller was built.
+
+```ts
+import { Operation } from '@concepta/nestjs-core';
+import {
+  type CrudRequestInterface,
+  type CrudRequestPolicyInterface,
+} from '@concepta/nestjs-crud';
+
+class BatchLimitPolicy implements CrudRequestPolicyInterface {
+  check({ ctx, body }: CrudRequestInterface) {
+    if (ctx.operation === Operation.CreateBatch) {
+      // throw to refuse when `body` ({ bulk }) holds too many rows
+    }
+  }
+}
+
+CrudModule.forRoot({ requestPolicy: new BatchLimitPolicy() });
+```
+
+| Where you give `requestPolicy` | Policy a module's requests run |
+| --- | --- |
+| `forRoot` (or `forRootAsync`) | The root one, in every module importing `CrudModule.register()` without its own |
+| A module's own `CrudModule.register()` | That module's, instead of the root's, not added to it; to keep both, compose them into one policy |
+| Neither | `CrudAllowAllPolicy`: every request goes through |
+
+What it checks for is yours; CRUD knows nothing of who is asking. For
+grants, use `AccessControlCrudPolicy` from
+`@concepta/nestjs-access-control/optional/crud`: it checks each request's
+`filter`, `or`, `sort` and `s`, and its body, against the caller's grant;
+`select` is left to the response filter and the repository. A module with
+its own `requestPolicy` runs only that one, so to keep
+`AccessControlCrudPolicy`'s checks there, compose it into that policy.
+
+In a custom resolver, inject `CRUD_REQUEST_POLICY_TOKEN` and ask the policy
+the same way; otherwise no policy runs for it.
 
 ## CQRS Integration
 
@@ -1144,17 +1258,24 @@ yarn add @nestjs/cqrs
 ```ts
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
-import { CrudModule, CrudCqrsResolver } from '@concepta/nestjs-crud';
+import { CrudModule } from '@concepta/nestjs-crud';
 
 @Module({
-  imports: [
-    CqrsModule.forRoot(),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
-  ],
+  imports: [CqrsModule.forRoot(), CrudModule.forRoot({})],
 })
 export class AppModule {}
+```
+
+Then name the resolver on each controller that dispatches through the
+buses:
+
+```ts
+import { CrudCqrsResolver } from '@concepta/nestjs-crud/optional/cqrs';
+
+new ConfigurableCrudBuilder<PhotoEntity>({
+  controller: { path: 'photos', entity: 'photo', resolver: CrudCqrsResolver },
+  operations: [{ operation: Operation.List }],
+});
 ```
 
 ### Built-in Queries and Commands
@@ -1201,11 +1322,11 @@ current `CrudContextInterface`.
 | Method | Description |
 | --- | --- |
 | `CrudSpec.operation(op)` | Match a specific operation |
-| `CrudSpec.action(action)` | Match an action category |
-| `CrudSpec.isCreate()` | CREATE action |
-| `CrudSpec.isRead()` | READ action |
-| `CrudSpec.isUpdate()` | UPDATE action |
-| `CrudSpec.isDelete()` | DELETE action |
+| `CrudSpec.action(action)` | Match a category: CREATE, READ, UPDATE or DELETE |
+| `CrudSpec.isCreate()` | CREATE category |
+| `CrudSpec.isRead()` | READ category |
+| `CrudSpec.isUpdate()` | UPDATE category, restore included |
+| `CrudSpec.isDelete()` | DELETE category, soft delete included |
 | `CrudSpec.isQuery()` | List + Read operations |
 | `CrudSpec.isWrite()` | Create + CreateBatch + Update + Replace |
 | `CrudSpec.isMutation()` | All state-changing operations |
@@ -1214,6 +1335,11 @@ current `CrudContextInterface`.
 | `CrudSpec.not(spec)` | Negate a specification |
 | `CrudSpec.always()` | Always matches (default) |
 | `CrudSpec.never()` | Never matches |
+
+The categories group operations for hooks (`ctx.action`, typed
+`CrudActionCategory`). They are not what an authority decides: soft delete
+and restore are actions of their own there. Match `operation` to tell them
+apart, and never authorize by the category.
 
 ### Defining a Hook
 
@@ -1425,4 +1551,5 @@ Hook method decorators from `@concepta/nestjs-repository`:
 
 | Import Path | Contents |
 | --- | --- |
-| `@concepta/nestjs-crud` | Module, adapter, decorators, resolvers, CQRS queries/commands/handlers, schema factories (`paginatedSchema`, `createBatchSchema`), specifications, exceptions |
+| `@concepta/nestjs-crud` | Module, adapter, decorators, the adapter and operation resolvers, queries/commands/handlers, request policy, schema factories (`paginatedSchema`, `createBatchSchema`), specifications, exceptions |
+| `@concepta/nestjs-crud/optional/cqrs` | `CrudCqrsResolver`. Requires `@nestjs/cqrs` |

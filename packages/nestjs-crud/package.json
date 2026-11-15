@@ -73,6 +73,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./optional/cqrs": {
+      "types": "./dist/optional-cqrs.d.ts",
+      "default": "./dist/optional-cqrs.js"
     }
   }
 }

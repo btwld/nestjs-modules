@@ -1,28 +1,64 @@
-import { SetMetadata } from '@nestjs/common';
-
-import { AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN } from '../../../authentication.constants.js';
+import {
+  AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+  AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+} from '../../../authentication.constants.js';
 import { AuthPublic } from '../auth-public.decorator.js';
 
-vi.mock('@nestjs/common', () => {
-  return {
-    SetMetadata: vi.fn().mockImplementation(() => 'mocked SetMetadata'), // Mock SetMetadata
-  };
-});
-
 describe(AuthPublic.name, () => {
+  class TestController {
+    @AuthPublic()
+    plain() {
+      return null;
+    }
+
+    @AuthPublic({ optional: true })
+    optional() {
+      return null;
+    }
+  }
+
+  @AuthPublic({ classLevel: true })
+  class PublicController {}
+
+  const controller = new TestController();
+
   it('should set metadata to disable guards (method-level)', () => {
-    AuthPublic();
-    expect(SetMetadata).toHaveBeenCalledWith(
-      AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
-      true,
-    );
+    expect(
+      Reflect.getMetadata(
+        AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+        controller.plain,
+      ),
+    ).toEqual(true);
+    // Set to false, so it overrides a controller's optional.
+    expect(
+      Reflect.getMetadata(
+        AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+        controller.plain,
+      ),
+    ).toEqual(false);
   });
 
   it('should set metadata with classLevel marker', () => {
-    AuthPublic({ classLevel: true });
-    expect(SetMetadata).toHaveBeenCalledWith(
-      AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
-      'classLevel',
-    );
+    expect(
+      Reflect.getMetadata(
+        AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+        PublicController,
+      ),
+    ).toEqual('classLevel');
+  });
+
+  it('should mark optional authentication', () => {
+    expect(
+      Reflect.getMetadata(
+        AUTHENTICATION_MODULE_DISABLE_GUARDS_TOKEN,
+        controller.optional,
+      ),
+    ).toEqual(true);
+    expect(
+      Reflect.getMetadata(
+        AUTHENTICATION_MODULE_OPTIONAL_AUTH_TOKEN,
+        controller.optional,
+      ),
+    ).toEqual(true);
   });
 });

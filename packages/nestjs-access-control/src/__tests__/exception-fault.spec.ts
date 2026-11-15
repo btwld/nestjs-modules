@@ -6,7 +6,9 @@ import {
 } from '@concepta/nestjs-core';
 import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
 
-import { AccessControllerException } from '../domain/exceptions/access-controller.exception.js';
+import { AccessControlException } from '../domain/exceptions/access-control.exception.js';
+import { AccessRefusedException } from '../domain/exceptions/access-refused.exception.js';
+import { AccessRulesInvalidException } from '../domain/exceptions/access-rules-invalid.exception.js';
 
 /**
  * Anti-drift check: every `RuntimeException` subclass in this package states
@@ -16,10 +18,29 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
-    name: 'AccessControllerException',
-    build: () => new AccessControllerException('failure'),
+    name: 'AccessControlException',
+    errorCode: 'ACCESS_CONTROL_ERROR',
+    build: () => new AccessControlException(),
+    fault: 'internal',
+  },
+  {
+    name: 'AccessRefusedException',
+    errorCode: 'ACCESS_REFUSED_ERROR',
+    build: () =>
+      new AccessRefusedException({
+        action: 'read',
+        resource: 'user',
+        refusal: 'no-grant',
+      }),
+    fault: 'client',
+  },
+  {
+    name: 'AccessRulesInvalidException',
+    errorCode: 'ACCESS_RULES_INVALID_ERROR',
+    build: () => new AccessRulesInvalidException(['problem']),
     fault: 'usage',
   },
 ];
@@ -31,6 +52,10 @@ describe('exception fault classification', () => {
     expect(build().fault).toEqual(fault);
   });
 
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
+  });
+
   it('every RuntimeException subclass in this package is listed above', async () => {
     const discovered = await collectRuntimeExceptionClassNames(
       SRC_DIR,
@@ -39,5 +64,15 @@ describe('exception fault classification', () => {
     const expected = new Set(CASES.map((c) => c.build().constructor.name));
     const missing = discovered.filter((name) => !expected.has(name));
     expect(missing).toEqual([]);
+  });
+
+  it('refuses with 403', () => {
+    expect(
+      new AccessRefusedException({
+        action: 'read',
+        resource: 'user',
+        refusal: 'denied',
+      }).getStatus(),
+    ).toEqual(403);
   });
 });

@@ -13,11 +13,11 @@ export interface RowScopeScopedRegistration {
 /**
  * An entity whose rows are deliberately not scoped.
  *
- * `reason` is required so that "public" has to be written down rather than
+ * `reason` is required so that "open" has to be written down rather than
  * defaulted into. Nothing reads it.
  */
-export interface RowScopePublicRegistration {
-  readonly access: 'public';
+export interface RowScopeOpenRegistration {
+  readonly access: 'open';
   readonly reason: string;
 }
 
@@ -26,7 +26,7 @@ export interface RowScopePublicRegistration {
  * array.
  */
 export type RowScopeRegistration =
-  RowScopeScopedRegistration | RowScopePublicRegistration;
+  RowScopeScopedRegistration | RowScopeOpenRegistration;
 
 /**
  * Narrow a declaration to the scoped variant.

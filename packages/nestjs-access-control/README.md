@@ -1,6 +1,13 @@
-# Rockets NestJS Access Control
+# @concepta/nestjs-access-control
 
-Advanced access control guard for NestJS with optional per-request filtering.
+Decide who may do what to which resource, by role and by system (such as
+an integration or a scheduled job).
+You write rules, say who is acting, and mark the routes that need a grant;
+the module refuses everything else, filters responses down to the fields the
+caller may see, and answers the same question inside your command handlers.
+Rules are plain JSON, decided by [CASL](https://casl.js.org), so they can
+live in your code or in your database, and they are written the same way as
+the rules of `@concepta/nestjs-repository`'s authority.
 
 ## Project
 
@@ -10,1034 +17,908 @@ Advanced access control guard for NestJS with optional per-request filtering.
 [![GH Contrib](https://img.shields.io/github/contributors/btwld/nestjs-modules?logo=github)](https://github.com/btwld/nestjs-modules/graphs/contributors)
 [![NestJS Dep](https://img.shields.io/github/package-json/dependency-version/btwld/nestjs-modules/peer/@nestjs/common/feature/version-8?label=NestJS&logo=nestjs&filename=packages%2Fnestjs-access-control%2Fpackage.json)](https://www.npmjs.com/package/@nestjs/common)
 
-# Table of Contents
+## Table of Contents
 
-1. [Tutorials](#tutorials)
-   - [Getting Started with Access Control](#getting-started-with-access-control)
-     - [Installation](#installation)
-   - [Basic Setup](#basic-setup)
-   - [Example](#example)
-     - [Simple User Entity](#simple-user-entity)
-     - [Your custom ACL rules](#your-custom-acl-rules)
-     - [Your custom AccessControlService](#your-custom-accesscontrolservice)
-     - [Implement on your controller (Passport guard example)](#implement-on-your-controller-passport-guard-example)
-     - [Import the module into your app](#import-the-module-into-your-app)
-2. [How-To Guides](#how-to-guides)
-   - [Creating a Custom Access Query Service](#creating-a-custom-access-query-service)
-   - [Example of Importing Dependencies in `AccessControlModule`](#example-of-importing-dependencies-in-accesscontrolmodule)
-   - [Using Dependency in Access Query Service](#using-dependency-in-access-query-service)
-   - [Disable AccessControlGuard](#disable-accesscontrolguard)
-   - [Create a custom AccessControlGuard](#create-a-custom-accesscontrolguard)
-   - [Filtering response attributes](#filtering-response-attributes)
-   - [Override the access-check / filter / role-resolution via the port](#override-the-access-check--filter--role-resolution-via-the-port)
-   - [Using `@AccessControlCreateOne` Decorator](#using-accesscontrolcreateone-decorator)
-     - [Setting Permissions](#setting-create-one-permissions)
-     - [Using in a Controller](#using-create-one-in-a-controller)
-   - [Using `@AccessControlUpdateOne` Decorator](#using-accesscontrolupdateone-decorator)
-     - [Setting Permissions](#setting-update-one-permissions)
-     - [Using in a Controller](#using-update-one-in-a-controller)
-   - [Using `@AccessControlReadOne` Decorator](#using-accesscontrolreadone-decorator)
-     - [Setting Permissions](#setting-read-one-permissions)
-     - [Using in a Controller](#using-read-one-in-a-controller)
-     - [Using in a Controller to get own information only](#using-in-a-controller-to-get-own-information-only)
-   - [Using `@AccessControlDeleteOne` Decorator](#using-accesscontroldeleteone-decorator)
-     - [Setting Permissions](#setting-delete-one-permissions)
-     - [Using in a Controller](#using-delete-one-in-a-controller)
-   - [Using `@AccessControlCreateMany` Decorator](#using-accesscontrolcreatemany-decorator)
-     - [Setting Permissions](#setting-create-many-permissions)
-     - [Using in a Controller](#using-create-many-in-a-controller)
-   - [Using `@AccessControlReadMany` Decorator](#using-accesscontrolreadmany-decorator)
-     - [Setting Permissions](#setting-read-many-permissions)
-     - [Using in a Controller](#using-read-many-in-a-controller)
-3. [Reference](#reference)
-   - [NestJS AuthGuard Pattern](#nestjs-authguard-pattern)
-   - [ACL Module](#acl-module)
-4. [Explanation](#explanation)
-   - [IMPORTANT](#important)
-   - [What is Access Control?](#what-is-access-control)
-   - [How AccessControlService Works](#how-accesscontrolservice-works)
-     - [Key Responsibilities](#key-responsibilities)
-   - [How Access Query Service Works](#how-access-query-service-works)
-     - [Overview](#overview)
-     - [Custom Logic in the Service](#custom-logic-in-the-service)
-   - [How AccessControlGuard Works](#how-accesscontrolguard-works)
-   - [Practical Examples](#practical-examples)
-   - [Benefits](#benefits)
-   - [Why Use Access Control?](#why-use-access-control)
-     - [Synchronous vs Asynchronous Registration](#synchronous-vs-asynchronous-registration)
-     - [Global vs Feature-Specific Registration](#global-vs-feature-specific-registration)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Examples](#examples)
+- [Writing Rules](#writing-rules)
+- [How Rules Combine](#how-rules-combine)
+- [Sharing Rules with the Repository](#sharing-rules-with-the-repository)
+- [Who Is Acting](#who-is-acting)
+- [Rules at Runtime](#rules-at-runtime)
+- [Protecting Routes](#protecting-routes)
+- [Response Filtering](#response-filtering)
+- [Record Checks](#record-checks)
+- [Checking in Handlers](#checking-in-handlers)
+- [CRUD Routes](#crud-routes)
+- [Showing Permissions in a UI](#showing-permissions-in-a-ui)
+- [Options](#options)
+- [Exceptions](#exceptions)
 
-# Tutorials
-
-## Getting Started with Access Control
-
-### Installation
-
-Install the `@concepta/nestjs-access-control` package using yarn or npm:
+## Installation
 
 ```sh
-yarn add @concepta/nestjs-access-control @nestjs/common @nestjs/config @nestjs/core
+yarn add @concepta/nestjs-access-control \
+  @nestjs/common @nestjs/config @nestjs/core
 ```
 
-```sh
-npm install @concepta/nestjs-access-control @nestjs/common @nestjs/config @nestjs/core
-```
+This package is ESM-only and requires Node.js >= 22.12 and NestJS 12. It
+brings `@concepta/nestjs-core`, `@casl/ability` and `rxjs` with it.
 
-Requirements: the package is **ESM-only** (no CommonJS build), targets
-**Node.js >= 22.12**, and runs on **NestJS 12**.
+## Quick Start
 
-Peer dependencies: `@nestjs/common`, `@nestjs/config`, and `@nestjs/core`
-(^12) must be installed by your app. `@nestjs/cqrs` (^12) is an optional
-peer but is required in practice — the guard and filter dispatch
-`CheckAccessQuery` / `FilterResponseAttributesQuery` / `ResolveUserRolesQuery`
-through it.
-
-## Basic Setup
-
-To set up the `@concepta/nestjs-access-control` module, you need to
-define your access control rules, create a custom access query service,
-and import the `AccessControlModule` into your app module. This ensures
-that your application can enforce access control policies based on the
-defined rules and services.
-
-## Example
-
-These are very rough examples. We intend to improve them ASAP.
-
-### Simple User Entity
-
-Define a simple User entity using TypeORM.
-
-```typescript
-import { Entity, Column, ManyToMany, Unique } from 'typeorm';
-import { Role } from '../auth/role.entity';
-
-@Entity()
-@Unique(['username'])
-export class User {
-  @Column()
-  username!: string;
-
-  @Column()
-  password!: string;
-
-  @Column()
-  salt!: string;
-
-  @ManyToMany(() => Role, (role) => role.users, {
-    eager: true,
-    onDelete: 'CASCADE',
-  })
-  roles!: Role[];
-}
-```
-
-> Entities are plain classes — in the v8 stack, response shaping is
-> schema-based at the controller layer (Zod/Standard Schema response
-> serialization), not entity-decorator-based. Keep sensitive fields such as
-> `password` and `salt` out of your response schemas instead of decorating
-> the entity.
-
-### Your custom ACL rules
-
-Define custom ACL rules as documented by the
-[accesscontrol](https://www.npmjs.com/package/accesscontrol) library.
-
-Here we are defining a custom `AccessControl` to contains the rules of
-our authorization system. The `acRules` will be used to grant specific
-permissions of a resource, to a defined role.
-
-Please make sure to review a [Important](#important) section to understand
-important concepts of Access Control.
-
-```typescript
-// app.acl.ts
-import { AccessControl } from 'accesscontrol';
-
-/**
- * All the possible roles of the system.
- */
-export enum AppRole {
-  SuperAdmin = 'SuperAdmin',
-  User = 'User',
-}
-
-/**
- * All the possible resources of the system.
- */
-export enum AppResource {
-  User = 'user',
-  UserList = 'user-list',
-}
-
-const allResources = Object.values(AppResource);
-const allRoles = Object.values(AppRole);
-
-export const acRules: AccessControl = new AccessControl();
-
-// admins can do whatever they want
-acRules
-  .grant([AppRole.SuperAdmin])
-  .resource(allResources)
-  .createOwn()
-  .createAny()
-  .readOwn()
-  .readAny()
-  .updateOwn()
-  .updateAny()
-  .deleteOwn()
-  .deleteAny();
-
-// regular users can read self
-acRules.grant(AppRole.User).resource([AppResource.User]).readOwn();
-
-// make sure nobody can delete themselves
-acRules.deny(allRoles).resource(AppResource.User).deleteOwn();
-```
-
-### Your custom AccessControlService
-
-The access control service is not required in the settings, since we already
-have a default `AccessControlService` in the module. However, let's create a
-new one for the purposes of this tutorial. `AccessControlService` is responsible
-for getting the user and its roles.
-
-In the following example, we are assuming that our request as a user property
-with the roles specified on it, the method `getUserRoles` will be used internally
-on our default `AccessControlGuard` to check if the combination of the resource,
-roles and permissions are valid.
-
-The `ACService` is a provider, and you can be inject any other provider you may
-need to get the correct user and its roles.
-
-```typescript
-import { AccessControlServiceInterface } from '@concepta/nestjs-access-control';
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
-
-function hasRoles(user: unknown): user is { roles: { name: string }[] } {
-  return (
-    typeof user === 'object' &&
-    user !== null &&
-    'roles' in user &&
-    Array.isArray((user as { roles: unknown }).roles)
-  );
-}
-
-export class ACService implements AccessControlServiceInterface {
-  async getUser(context: ExecutionContext): Promise<unknown> {
-    const request = context.switchToHttp().getRequest();
-    // request.user should be something like this
-    // { id: '1', username: 'john', roles: [{ id: '1', name: 'User' }] }
-    return request.user;
-  }
-  async getUserRoles(context: ExecutionContext): Promise<string | string[]> {
-    const user = await this.getUser(context);
-    if (!hasRoles(user)) throw new UnauthorizedException();
-    return user.roles.map((role) => role.name);
-  }
-}
-```
-
-### Implement on your controller (Passport guard example)
-
-The guard decorators, will be used to apply the specified actions for that endpoint.
-for example:
+Give each role its rules, keyed `role:<name>`:
 
 ```ts
- @AccessControlReadMany(AppResource.UserList)
-  async getMany(@Query() query: unknown) {
-    // ...
-  }
-```
-
-For this code, we are applying the `AccessControlReadMany`
-decorator to the `getMany` endpoint. This means that only users
-with a role that has been granted the `read` permission for the
-`AppResource.UserList` resource can get the list of users.
-
-For example, you need to grant the `read` permission to the
-`User` role for the `UserList` resource:
-
-```ts
-acRules.grant(AppRole.User).resource([AppResource.User]).readOwn();
-// or
-acRules.grant(AppRole.User).resource([AppResource.User]).readAny();
-```
-
-Check [Important](#important) section to understand the
-difference between `own` and `any`.
-
-Let's create our controller.
-
-```typescript
-import { ApiTags } from '@nestjs/swagger';
-import { Controller, Body, Query, Param } from '@nestjs/common';
-import {
-  AccessControlCreateMany,
-  AccessControlCreateOne,
-  AccessControlDeleteOne,
-  AccessControlReadMany,
-  AccessControlReadOne,
-  AccessControlRecoverOne,
-  AccessControlUpdateOne,
-} from '@concepta/nestjs-access-control';
-
-import { UserResource } from './user.types';
-import { UserCreatableInterface } from './interfaces/user-creatable.interface';
-import { UserUpdatableInterface } from './interfaces/user-updatable.interface';
-
-/**
- * User controller.
- */
-@Controller('user')
-@ApiTags('user')
-export class UserController {
-  /**
-   * Get many
-   */
-  @AccessControlReadMany(AppResource.UserList)
-  async getMany(@Query() query: unknown) {
-    // ...
-  }
-
-  /**
-   * Get one
-   */
-  @AccessControlReadOne(AppResource.User)
-  async getOne(@Param('id') id: string) {
-    // ...
-  }
-
-  /**
-   * Create many
-   */
-  @AccessControlCreateMany(AppResource.UserList)
-  async createMany(@Body() users: UserCreatableInterface[]) {
-    // ...
-  }
-
-  /**
-   * Create one
-   */
-  @AccessControlCreateOne(AppResource.User)
-  async createOne(@Body() user: UserCreatableInterface) {
-    // ...
-  }
-
-  /**
-   * Update one
-   */
-  @AccessControlUpdateOne(AppResource.User)
-  async updateOne(
-    @Param('id') userId: string,
-    @Body() user: UserUpdatableInterface,
-  ) {
-    // ...
-  }
-
-  /**
-   * Delete one
-   */
-  @AccessControlDeleteOne(AppResource.User)
-  async deleteOne(@Param('id') id: string) {
-    // ...
-  }
-
-  /**
-   * Recover one
-   */
-  @AccessControlRecoverOne(AppResource.User)
-  async recoverOne(@Param('id') id: string) {
-    // ...
-  }
-}
-```
-
-### Import the module into your app
-
-Import and register the `AccessControlModule` in your app module.
-`settings.rules` is the only property mandatory.
-
-```typescript
-//...
-@Module({
-  imports: [
-    // ...
-    AccessControlModule.forRoot({
-      settings: { rules: acRules },
-      service: new ACService(),
-    }),
-    // ...
-  ],
-  controllers: [UserController],
-  providers: [],
-})
-export class AppModule {}
-```
-
-# How-To Guides
-
-## Creating a Custom Access Query Service
-
-AccessQueryService is a service that will be used to check
-if the user can access the resource. Any custom validation
-for a specific endpoint or a controller should be done by creating a
-custom query service. The query service created should be added to
-the `queryServices` settings on module definition to make sure it will
-become a provider to be injected in any other service. Once this is
-done, we can go ahead and add the query for any endpoint of the
-controller with `@AccessControlQuery` decorator.
-
-To create a custom query service, follow these steps:
-
-1. **Define the Service**: Create a new service class that
-   implements `CanAccess` from `@concepta/nestjs-access-control`.
-   The `canAccess` method will provide you all information
-   you need to manage your access.
-   In the following example, we check if a password update for
-   the User resource is being performed by the user that is trying
-   to update it.
-
-```typescript
-// Action is the enum from the accesscontrol library itself
-import { Action } from 'accesscontrol';
-//...
-function getId(value: unknown): string | undefined {
-  return typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    typeof value.id === 'string'
-    ? value.id
-    : undefined;
-}
-
-function hasPassword(value: unknown): boolean {
-  return typeof value === 'object' && value !== null && 'password' in value;
-}
-
-export class MyUserAccessQueryService implements CanAccess {
-  async canAccess(context: AccessControlContext): Promise<boolean> {
-    const { resource, action } = context.getQuery();
-
-    if (resource === AppResource.User && action === Action.UPDATE) {
-      const authorizedUserId = getId(context.getUser());
-      const paramsId = getId(context.getRequest('params'));
-
-      if (paramsId && hasPassword(context.getRequest('body'))) {
-        return paramsId === authorizedUserId;
-      }
-    }
-
-    // does not apply
-    return true;
-  }
-}
-```
-
-1. **Register the Service**: Register the custom service in your module.
-
-```typescript
-//...
-AccessControlModule.forRoot({
-  settings: { rules: acRules },
-  queryServices: [MyUserAccessQueryService],
-}),
-//...
-```
-
-1. **Set AccessControlQuery**: Set `AccessControlQuery` to the controller.
-
-```typescript
-@Controller('user')
-@ApiTags('user')
-export class UserController {
-  //...
-  @AccessControlUpdateOne(AppResource.User)
-  @AccessControlQuery({
-    service: MyUserAccessQueryService,
-  })
-  async updateOne(
-    @Param('id') userId: string,
-    @Body() user: UserUpdatableInterface,
-  ) {
-    // ...
-  }
-  //...
-}
-```
-
-### Example of Importing Dependencies in `AccessControlModule`
-
-When creating access query services that depend on other modules,
-you need to ensure that these dependencies are imported into the
-`AccessControlModule`. Here's an example of how to set this up:
-
-```typescript
-import { Module } from '@nestjs/common';
 import { AccessControlModule } from '@concepta/nestjs-access-control';
-import { SomeModule } from './some.module';
-import { AnotherModule } from './another.module';
-import { SomeAccessQueryService } from './some-access-query.service';
-import { AnotherAccessQueryService } from './another-access-query.service';
 
 @Module({
   imports: [
-    SomeModule,
-    AnotherModule,
     AccessControlModule.forRoot({
-      settings: { rules: acRules },
-      imports: [SomeModule, AnotherModule],
-      queryServices: [SomeAccessQueryService, AnotherAccessQueryService],
+      settings: {
+        grants: {
+          'role:admin': [{ action: ['read', 'update'], subject: 'user' }],
+          'role:member': [
+            { action: 'read', subject: 'user', fields: ['id', 'name'] },
+          ],
+        },
+      },
     }),
   ],
 })
 export class AppModule {}
 ```
 
-### Using Dependency in Access Query Service
+Tell it who is acting with an `actorResolver` that reads the authenticated
+user (see [Who Is Acting](#who-is-acting)), then mark the routes:
 
-Here's an example of how to use a dependency in an access query service:
+```ts
+import { AccessControlReadOne } from '@concepta/nestjs-access-control';
 
-```typescript
-import { Injectable } from '@nestjs/common';
-import {
-  CanAccess,
-  AccessControlContext,
-} from '@concepta/nestjs-access-control';
-import { SomeService } from './some.service';
-
-@Injectable()
-export class SomeAccessQueryService implements CanAccess {
-  constructor(private readonly someService: SomeService) {}
-
-  async canAccess(context: AccessControlContext): Promise<boolean> {
-    const user = context.getUser();
-    // Use someService to check if the user can access the resource
-    return this.someService.canUserAccessResource(user);
+@Controller('users')
+export class UserController {
+  @Get(':id')
+  @AccessControlReadOne('user')
+  getOne(@Param('id') id: string) {
+    // ...
   }
 }
 ```
 
-## Disable AccessControlGuard
+An admin reads any user. A member reads them too, but the response holds
+only `id` and `name`. A signed-in caller with no grant gets a `403` (its
+`refusal`, in the exception's context for your logs, is `no-grant`). A call
+that reaches the check with nobody acting gets a `403` too (`no-actor`);
+with `@concepta/nestjs-authentication`, an unauthenticated call is answered
+`401` before that. The response body never names the refusal.
 
-You can disable all access control guards globally if needed.
-This can be useful for development or testing purposes.
-To disable the guards, set the `appGuard` option to `false`
-in the `AccessControlModule` configuration:
+## Examples
 
-```typescript
-AccessControlModule.forRoot({
-  settings: { rules: acRules },
-  appGuard: false,
-}),
+Complete, runnable applications, each with a spec that makes real requests
+against it:
+
+- [Role-based API](./examples/role-based-api): grants per role, hiding a
+  field from one role, refusing a field on write.
+- [Ownership](./examples/ownership): members limited to their own
+  records, checked by an access query service.
+- [Per-user grants from storage](./examples/per-user-grants): role
+  templates plus per-user rules an admin edits at runtime, and a "my
+  permissions" endpoint.
+- [System integrations](./examples/system-integrations): partner systems
+  calling with API keys, and a queue consumer acting as a system.
+- [Multi-tenant access levels](./examples/multi-tenant-levels): roles
+  described as access levels, with a different role in each tenant.
+- [Shared rules](./examples/shared-rules): one rule set deciding both the
+  routes and the repository's data, narrowed for one API.
+- [CRUD routes](./examples/crud-routes): generated CRUD routes, with field
+  denies holding on query input and write bodies.
+
+See [the examples' README](./examples) for how to run them.
+
+## Writing Rules
+
+A rule names an action, a resource, and optionally the fields it covers:
+
+```ts
+{ action: 'update', subject: 'invoice', fields: ['notes', 'dueDate'] }
 ```
 
-## Create a custom AccessControlGuard
+- **`action`** is a verb: `create`, `read`, `update`, `delete`,
+  `softDelete`, `restore`, or one of your own, such as `approve`.
+- **`subject`** is the resource, matching what your routes declare.
+- **`fields`** limits the rule to those field paths. A path covers
+  everything beneath it (`address` covers `address.city`), and positions in
+  arrays are ignored (`items.amount` covers every item). Leave it out to
+  cover every field.
+- **`inverted: true`** makes the rule a deny. Add **`pending`** to a deny
+  that waits on a decision, naming the gate that closes it; a refusal only
+  pending denies take part in reports it as `gate`. See core's
+  [Actor and Authority](../nestjs-core/README.md#actor-and-authority).
 
-This module contains a default `AccessControlGuard` that can
-be used to protect endpoints with one of the many `@AccessControl`
-decorators. This guard will use the logic at
-`AccessControlService` and `AccessQueryService` to check permissions.
+Rules are `AuthorityRuleInterface` from `@concepta/nestjs-core`, the shape
+`@concepta/nestjs-repository`'s authority reads too. Actions and subjects
+can be lists.
 
-However, you can create a custom guard if you need to. By creating a
-class that extends `CanActivate` from `@nestjs/common`, you can create
-a custom guard that will be used to protect your endpoints.
+Type your rules as `AuthorityRuleInterface`: it defaults to the six
+actions (`create` to `restore` above), so a mistyped verb fails to compile.
+To add verbs of your own, widen it:
+``AuthorityRuleInterface<`${ActionEnum}` | 'approve'>``. To narrow, list
+only the verbs you allow: `AuthorityRuleInterface<'read' | 'update'>`.
+`settings.grants` and a grants provider's `rulesFor` accept any verb, since
+your routes may declare their own, so a typo there fails silently: a
+mistyped allow grants nothing, and a mistyped deny denies nothing. Type the
+rules you write as `AuthorityRuleInterface` before passing them in.
 
-Please keep in mind that the guard will be set globally for all endpoints.
+A rule set is refused, at startup or when it is loaded, for any problem
+`authorityRuleProblems` lists: see
+[core's rules](../nestjs-core/README.md#actor-and-authority) for the full
+list. `settings.grants` is refused at startup, too, when a key is not
+`role:<name>` or `system:<name>`.
 
-```typescript
-@Injectable()
-export class MyAccessControlGuard implements CanActivate {
-  public async canActivate(context: ExecutionContext): Promise<boolean> {
-    // your custom logic here
-    return true;
-  }
-}
+`authorityRuleProblems(rules, source)` from `@concepta/nestjs-core` lists
+every problem with a rule set, and `accessGrantsProblems(grants)` from this
+package every problem with grants keyed by actor, keys included, so a
+screen that edits rules can check them before saving.
+
+To hide a field, allow the resource and deny the field:
+
+```ts
+'role:support': [
+  { action: 'read', subject: 'user' },
+  { action: 'read', subject: 'user', fields: ['password'], inverted: true },
+],
 ```
 
-```typescript
-AccessControlModule.forRoot({
-      settings: { rules: acRules },
-      appGuard: new MyAccessControlGuard(),
-    }),
-```
+A denied field is also protected from writes to its parents: with
+`profile.ssn` denied on `update`, a write to `profile` as a whole, such as
+`{ profile: null }`, is refused too.
 
-## Filtering response attributes
+## How Rules Combine
 
-The module ships an `AccessControlFilter` interceptor that is registered
-globally as `APP_INTERCEPTOR` by default. After a response is produced it
-inspects the same `@AccessControl*` grant metadata that the guard checked,
-queries the user's roles (via `ResolveUserRolesQuery`), and strips any fields
-the user is not permitted to see using the `accesscontrol` library's
-`permission.filter(data)` utility.
+A caller's rules are the rules of every role they hold, plus any rules a
+[grants provider](#rules-at-runtime) adds for them alone. Then:
 
-The filter applies the attributes of the first grant on the route that the
-user's roles satisfy, trying `any` before `own` — the same grant the guard
-matched. Attributes apply to `any` grants too: `readAny('user', ['*',
-'!password'])` still strips `password`.
+- **nothing is allowed without a rule allowing it;**
+- **a deny always wins**, whichever role or source it came from and wherever
+  it sits in the list;
+- **fields combine the same way**: a field denied by one of the caller's
+  roles is hidden even if another role allows it.
 
-The filter is enabled by default. To disable it:
+| Caller's rules | Result |
+| --- | --- |
+| none | refused |
+| an allow | allowed |
+| an allow and a deny, from any roles | refused |
+| allow `user`, deny `user.password` | allowed, without `password` |
 
-```typescript
-AccessControlModule.forRoot({
-  settings: { rules: acRules },
-  appFilter: false,
-}),
-```
+With a [shared authority](#sharing-rules-with-the-repository), the authority
+allows instead, outside `except`: there your rules can only take access
+away, by denying it, never by leaving it out.
 
-You can also supply a custom interceptor class in place of the default:
+## Sharing Rules with the Repository
 
-```typescript
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
-import { Observable } from 'rxjs';
+When the data behind your routes lives in
+[`@concepta/nestjs-repository`](../nestjs-repository/README.md#object-authority)
+with an authority, hand access control the same authority, and you write
+your data rules once:
 
-@Injectable()
-export class MyAccessControlFilter implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    // your custom filtering logic
-    return next.handle();
-  }
-}
-```
-
-```typescript
-AccessControlModule.forRoot({
-  settings: { rules: acRules },
-  appFilter: new MyAccessControlFilter(),
-}),
-```
-
-## Override the access-check / filter / role-resolution via the port
-
-Internally the module dispatches three CQRS queries:
-
-| Query | Default handler | What it does |
-|---|---|---|
-| `CheckAccessQuery` | `CheckAccessHandler` | Evaluates `@AccessControlGrant` + `@AccessControlQuery` metadata against the rules |
-| `FilterResponseAttributesQuery` | `FilterResponseAttributesHandler` | Masks response attributes based on grants |
-| `ResolveUserRolesQuery` | `ResolveUserRolesHandler` | Resolves roles from `AccessControlService.getUserRoles` |
-
-Consumers can replace any subset of these by providing custom query
-classes through `ports.accessControl`. The defaults shipped via
-`DEFAULT_ACCESS_CONTROL_PORT_SETTINGS` fill any slot left unset.
-
-```typescript
-import {
-  AccessControlModule,
-  CheckAccessQueryInterface,
-} from '@concepta/nestjs-access-control';
-import { Query } from '@nestjs/cqrs';
-
-// Define your own query — interface marker keeps it compatible with the port
-export class MyCheckAccessQuery
-  extends Query<boolean>
-  implements CheckAccessQueryInterface
-{
-  constructor(public readonly executionContext: ExecutionContext) {
-    super();
-  }
-}
-
-// Register a @QueryHandler(MyCheckAccessQuery) for it (not shown).
-
-AccessControlModule.forRoot({
-  settings: { rules: acRules },
-  ports: {
-    accessControl: {
-      checkAccessQuery: MyCheckAccessQuery,
-      // filterResponseAttributesQuery + resolveUserRolesQuery keep their defaults
-    },
-  },
+```ts
+AccessControlModule.forRootAsync({
+  imports: [AuthorityModule],
+  inject: [CaslAuthority],
+  useFactory: (authority: CaslAuthority) => ({
+    authority: { authority, except: ['report'] },
+    actorResolver,
+  }),
 });
 ```
 
-The guard and filter both inject `AccessControlPort` (resolved under
-`ACCESS_CONTROL_PORT_TOKEN`), so any swap takes effect without further
-wiring.
+- **The authority decides each route first.** A route's resource is read
+  as the authority's subject and its action as the verb, so
+  `@AccessControlDeleteOne('invoice')` asks whether the actor may `delete`
+  an `invoice`. A refusal is a `403` with refusal `authority`, before the
+  handler runs. Name a route's resource as the entity is keyed in
+  `RepositoryModule.forRoot()`: a misspelled one is refused by the
+  authority, so the mistake shows. Which rows the caller reaches is row
+  scope's job; the repository then decides each read and write by the same
+  rules, columns included.
+- **Write your routes' own verbs in the authority's rules too.** A
+  repository asks only `create`, `read`, `update`, `delete`, `softDelete`
+  and `restore`, but the shared authority is also asked each route's own
+  verbs (such as `approve`) on every resource not in `except`. A
+  `CaslAuthority` refuses rules naming a verb, or a resource that isn't an
+  entity it governs, until you declare it
+  ([Rules with CASL](../nestjs-repository/README.md#rules-with-casl)).
+- **Access control asks about the action only.** Its route checks, `can`
+  and `assert` ask with no columns: the action, and also `read` when the
+  action isn't `read`, since a write's response shows what a read would. A
+  custom authority answers them by the action. Under a shared
+  `CaslAuthority`, unusable authority rules fail these checks with
+  `CaslAuthorityRulesInvalidException`
+  (`CASL_AUTHORITY_RULES_INVALID_ERROR`); access control's own unusable
+  rules still fail with `AccessRulesInvalidException`. Columns are enforced
+  where data passes through a governed repository: a handler that returns
+  data from elsewhere, such as a cache or another service, is not filtered
+  by the authority's column rules.
+- **`except` names the routes that are yours alone.** A route on a resource
+  no entity stands behind, such as `@AccessControlGrant({ resource:
+  'report', action: 'export' })`, is decided by your rules as if there
+  were no authority, once its resource is in `except`: nothing is allowed
+  without a rule allowing it. Until then, the authority refuses it. A
+  subject the authority governs, an entity it is attached to or a subject
+  you declared on it, is decided by the authority even if `except` names
+  it, and the entry fails startup with `AccessRulesInvalidException`, once
+  every module is built.
+- **Elsewhere, your own rules only narrow, by denying.**
+  `settings.grants` and a grants provider still apply, but can never allow
+  what the authority refuses:
+  their denies count, their allows don't. Deny a field to hide it from one
+  API's responses, or to refuse it in `assertFields`.
+- `can` and `assert` in handlers decide the same way, asking about the
+  action only. Their `fields` are checked against access control's own
+  denies only; the authority's column rules hold where data passes through
+  a governed repository.
 
-## Using `@AccessControlCreateOne` Decorator
+The two rule sets are written the same way but name different things. The
+authority's rules name your storage: an entity and its columns, exactly as
+stored. Access control's rules name your API: a route's resource and the
+fields of its request and response bodies, which a mapper may rename or
+nest (`total_cents` stored, `pricing.total` sent). So:
 
-The `@AccessControlCreateOne` decorator is used to grant create
-permissions for a single resource. This decorator is a shortcut for
-defining access control grants for creating one resource.
+- **data rules go in the authority**, once: who may read or write which
+  entity and which columns. They hold for every caller of the repository,
+  routes or not;
+- **access control's field rules are for the API alone**: a computed field,
+  a response that is not an entity, a nested shape the storage doesn't have.
+  One exception: on generated CRUD routes, CRUD passes query fields
+  (`select`, `filter`, `or`, `sort` and `s`) to the repository unrenamed,
+  so they name stored columns (see [CRUD Routes](#crud-routes)).
 
-### Setting Create One Permissions
+Without an authority, your rules decide alone, as everywhere else in this
+README. See the [Shared rules](./examples/shared-rules) example.
 
-First, define your access control rules using the AccessControl
-library. This example shows how to set permissions for different roles.
+## Who Is Acting
 
-```typescript
-//...
-ac.grant(AppRole.User)
-  .createOwn(AppResource.User);
-//...
+The actor is a person acting through their roles, or a system acting on
+its own authority, such as an integration or a scheduled job:
+
+```ts
+{ kind: 'role', roles: ['admin'], userId: 'u-42' }
+{ kind: 'system', name: 'billing' }
 ```
 
-### Using Create One in a Controller
+For HTTP, pass an `actorResolver` (`AccessActorResolverInterface`) that
+reads the authenticated user from the request. Returning `undefined` means
+nobody is acting. It is asked whenever the module needs an actor and the
+call carries no `ActorCtx`: on HTTP by `AccessContextOverlay` and by a
+grant's guard, with the call's execution context as `context`; with
+`context` undefined by a grant's guard on other transports, and by `can`,
+`assert` and `effectiveRules` everywhere:
 
-Next, use the `@AccessControlCreateOne` decorator in your controller
-to protect the route that handles the creation of a single resource.
+```ts
+AccessControlModule.forRootAsync({
+  imports: [UserRolesModule],
+  inject: [UserRolesService],
+  useFactory: (userRoles: UserRolesService) => ({
+    settings: { grants },
+    actorResolver: {
+      actorFor: async (_ctx, context) => {
+        const user = context?.switchToHttp().getRequest().user;
 
-```typescript
-  @Post()
-  @AccessControlCreateOne(AppResource.User)
-  create(@Body() user: UserCreatableInterface) {
-    return this.userService.create(user);
+        return user
+          ? {
+              kind: 'role',
+              roles: await userRoles.namesFor(user.id),
+              userId: user.id,
+            }
+          : undefined;
+      },
+    },
+  }),
+});
+```
+
+The check runs after every global guard, so a global authentication guard
+has already put the user on the request. With
+`@concepta/nestjs-authentication`, the resolver can read `AuthUserCtx` from
+the call's context instead of `request.user`. A guard built with
+`AuthGuard()` that authenticates the call defines it. When none did (a
+public route, or a guard of yours that set only `request.user`), a
+resolver asked before `AuthUserContextOverlay` runs, from a grant's guard
+or from `AccessContextOverlay`, finds `AuthUserCtx` not yet defined (see
+authentication's
+[Context Overlay](../nestjs-authentication/README.md#context-overlay)), so
+check `supports(AuthUserCtx)` first:
+
+```ts
+actorFor: async (ctx) => {
+  const host = AppContextHost.from(ctx);
+  const user = host.supports(AuthUserCtx)
+    ? host.with(AuthUserCtx).user
+    : undefined;
+  // ...
+},
+```
+
+Authentication must run before the check, or the resolver finds nobody and
+every caller is refused with `no-actor`, signed in or not:
+
+- keep the authentication guard global (the default);
+- or put its `@UseGuards` *below* the access decorator at the same level,
+  both on the controller or both on the method: the lower decorator's guard
+  runs first. A guard on the controller runs before one on a method.
+
+```ts
+@Get()
+@AccessControlReadMany('invoice')
+@UseGuards(JwtGuard)
+list() {
+  // ...
+}
+```
+
+`@AuthPublic()` turns off the JWT guard and any guard built with
+`canDisable: true`. With only the JWT guard, a public route has no
+signed-in user, so a grant on it refuses every caller with `no-actor`. A
+guard that can't be turned off, such as `LocalGuard` or `RefreshGuard`,
+still authenticates there, and a global guard of your own that defines
+`ActorCtx`, such as an API-key guard, still gets its system through. For a
+public route that still recognises signed-in callers, use
+`@AuthPublic({ optional: true })`: a valid token signs the caller in, and a
+`401` from the guard leaves the call anonymous.
+
+With the global JWT guard, a caller without a token, such as a system
+sending only an API key, is refused (`401`) by that guard, whether your
+API-key guard runs before it or after: mark the routes your API-key guard
+serves
+`@AuthPublic({ optional: true })`, or turn the global guard off
+(`appGuard: false`).
+
+Refuse inactive users in the guard that signs them in: the authentication
+module's own sign-ins do, and a guard of your own must (see
+authentication's
+[Context Overlay](../nestjs-authentication/README.md#context-overlay)).
+A resolver that returns no actor for them refuses only routes with a
+grant, `assert` (and `can` answers `false`) and governed repository calls:
+the user is still signed in everywhere else, and `@AuthUser()` sees them.
+On a refresh route, the user is whoever holds the refresh token; keep
+grants off routes that do anything but issue tokens.
+
+With a resolver, the module defines `ActorCtx` (from
+`@concepta/nestjs-core`) on the context of every HTTP call the resolver
+finds an actor for, routes without a grant included. A route handler, and
+anything it calls, checks with that actor, repositories governed by an
+[authority](../nestjs-repository/README.md#object-authority) included.
+Without an actor, `ActorCtx` stays undefined, and a governed repository
+call refuses with refusal `no-actor` (`403`). When the resolver finds no
+actor, the next check asks it again, so one request may ask it more than
+once; cache in it if it reads a database.
+
+Don't define `ActorCtx` in an HTTP interceptor of your own: redefining it
+fails. On a checked route the module has already defined it, and elsewhere
+it may have. On a route without a
+grant, the module defines it in a global interceptor,
+`AccessContextOverlay`, so your own guards and earlier interceptors don't
+see it there yet.
+
+The resolver is given a request only over HTTP: on other transports the
+"request" is the message payload, which the sender controls. There, define
+`ActorCtx` yourself, once per call, immutably, with `frozenActor(actor)`
+(the immutable overlay freezes the top level, `frozenActor` freezes
+`roles`). On RPC, define it in a guard that runs before a grant's guard (an
+overlay is too late, since guards run before interceptors), or let the
+resolver work the actor out from `ctx` alone; see core's
+[RPC (preview)](../nestjs-core/README.md#rpc-preview). In a queue
+consumer or a job, define it on the context it opens. An integration
+consumer acting for another system defines
+`{ kind: 'system', name: 'billing' }` on the context it opens for each
+message:
+
+```ts
+import { ActorCtx, AppContextHost, frozenActor } from '@concepta/nestjs-core';
+
+const ctx = new AppContextHost();
+ctx.defineOverlay(
+  ActorCtx,
+  frozenActor({ kind: 'system', name: 'billing' }),
+  { immutable: true },
+);
+```
+
+A call carrying `ActorCtx` uses it, on HTTP too, where a guard of yours
+that runs first, such as an API-key guard, may define it; the resolver is
+asked only when it is absent. A system is checked against
+`system:billing` rules only, never against the roles of whatever account
+it runs under:
+
+```ts
+grants: {
+  'system:billing': [{ action: 'update', subject: 'invoice' }],
+}
+```
+
+## Rules at Runtime
+
+To keep rules in your database, so an admin screen can edit them, pass a
+`grantsProvider` (`AccessGrantsProviderInterface`). It is asked for the
+actor's rules on every check, so an edit applies to the next call:
+
+```ts
+AccessControlModule.forRootAsync({
+  imports: [PermissionsModule],
+  inject: [PermissionsService],
+  useFactory: (permissions: PermissionsService) => ({
+    grantsProvider: {
+      rulesFor: async (ctx, actor) =>
+        actor.kind === 'role'
+          ? [
+              ...(await permissions.forRoles(actor.roles)),
+              ...(await permissions.forUser(actor.userId)),
+            ]
+          : permissions.forSystem(actor.name),
+    },
+  }),
+});
+```
+
+Per-user rules sit on top of the role template: a user rule can allow what
+the template leaves out, and deny what it allows, but cannot undo a deny in
+the template. Under a [shared authority](#sharing-rules-with-the-repository),
+outside `except`, only the denies count: a per-user grid takes access away
+by denying it, and leaving a rule out of it changes nothing.
+
+Every rule set the provider returns is checked before use; a set that
+breaks the rules in [Writing Rules](#writing-rules) fails the call with
+`AccessRulesInvalidException`, a `500`. `rulesFor` returns the rules
+or a promise of them. It is asked on every check, so cache in it; telling
+other instances about an edit is up to the provider too.
+
+## Protecting Routes
+
+Each decorator declares the grant a route needs, and applies the check to
+that route:
+
+| Decorator | Action |
+| --- | --- |
+| `@AccessControlReadOne(resource)`, `@AccessControlReadMany(resource)` | `read` |
+| `@AccessControlCreateOne(resource)`, `@AccessControlCreateMany(resource)` | `create` |
+| `@AccessControlUpdateOne(resource)`, `@AccessControlReplaceOne(resource)` | `update` |
+| `@AccessControlDeleteOne(resource)` | `delete` |
+| `@AccessControlSoftDeleteOne(resource)` | `softDelete` |
+| `@AccessControlRestoreOne(resource)` | `restore` |
+| `@AccessControlGrant({ resource, action }, ...)` | yours |
+
+```ts
+@Post(':id/approve')
+@AccessControlGrant({ resource: 'invoice', action: 'approve' })
+approve(@Param('id') id: string) {
+  // ...
+}
+```
+
+With several grants, the first one the caller holds lets them through. On a
+controller, a decorator applies to every route in it, unless a route
+declares its own.
+A route with neither is not checked. To catch one at startup, turn on core's
+[route audit](../nestjs-core/README.md#route-audit): this module adds the
+`requireAcl` rule, which fails startup for a route that has no grant and
+isn't marked public with core's `@PublicRoute()`, which every
+`@AuthPublic()` form sets, `{ optional: true }` included. A public route is
+exempt, so a missing grant there is not caught at startup. Exempt a
+signed-in route every caller may call with the audit's
+`allow: { requireAcl: ['GET /me'] }`.
+
+The module also adds `requireWriteGrants`, which fails startup for a route
+that may write, on any method but `GET`, `HEAD`, `OPTIONS`, `SEARCH`,
+`PROPFIND` or `QUERY`, yet lets a caller in on a `read` grant. Since any one
+grant lets a caller in, a `POST` granting `read` beside `create` lets every
+reader write. Grant the write's own action, `create`, `update` or one of your
+own such as `approve`; exempt a write-method route that only reads, such as a
+search, with `allow: { requireWriteGrants: ['POST /invoices/search'] }`.
+
+Nothing, such as a cached response, lets a caller through a checked route
+without the check: it runs after every global guard and before every
+interceptor.
+
+## Response Filtering
+
+A checked route's response holds only the fields the caller may read,
+under their `read` rules, whatever the route does. An update's response
+shows what a read of the same record would, not what the caller may write.
+A caller who may write but not read gets an empty response. On generated
+CRUD routes over an entity an authority governs, though, most writes first
+read the row as the caller, so the caller also needs `read` there (see
+CRUD's
+[Operation-to-Repository Mapping](../nestjs-crud/README.md#operation-to-repository-mapping)).
+This filter applies access control's rules only: an
+[authority's](#sharing-rules-with-the-repository) column rules hold where
+data passes through a governed repository, so data a handler returns from
+elsewhere, such as a cache, isn't filtered by them.
+
+- each item of an array is filtered;
+- a response is a page when its `data` is an array and its `count`,
+  `total`, `page` and `pageCount` are numbers: each item of `data` is
+  filtered, the counters are kept, and the page's other fields filtered.
+  Otherwise `data` is filtered as an ordinary field;
+- objects are filtered as they go over the wire, after `toJSON`. An
+  instance with `toJSON` becomes the filtered plain result. An instance of
+  your class without `toJSON` stays an instance of it, so a class
+  serializer that runs after the filter still applies its own rules. On
+  that instance, getters and methods the caller may not read are blanked: a
+  serializer cannot send them, and later code cannot call them;
+- a response with no fields, such as a string, cannot be filtered: it is
+  sent only to a caller who may read the resource.
+
+Register a class serializer, such as `ClassSerializerInterceptor`,
+globally, in your root module's `providers`. It then runs after the filter,
+on the filtered instance, so rule fields name the paths your handler
+returns: a class's property names. With
+`@Expose({ name: 'socialSecurity' }) ssn`, deny `ssn`. A serializer on a
+route or controller (`@UseInterceptors`) runs before the filter on the way
+out, so there rule fields must name the serialized names: deny
+`socialSecurity`.
+
+A client that needs the id of what it created, but may not read the
+record, can be granted just that field:
+
+```ts
+'system:billing': [
+  { action: 'create', subject: 'invoice' },
+  { action: 'read', subject: 'invoice', fields: ['id'] },
+],
+```
+
+That also lets it through read routes on invoices, showing only `id`.
+
+Pass `appFilter: false` to turn filtering off, or your own interceptor to
+replace it.
+
+### Caching responses
+
+Register a response cache on the route with `@UseInterceptors`, or in a
+module imported after `AccessControlModule`, never in the root module's
+`providers`. It then runs after the filter, stores unfiltered responses,
+and each caller's copy is filtered on the way out.
+
+A cache that runs before the filter answers the call itself and sends what
+it stored unfiltered: the first caller's view of a record would reach
+every later caller. The filter is a global interceptor, and global
+interceptors run in the order they are registered:
+
+- your root module's providers are registered first;
+- a module is registered where it is first imported, so a cache module
+  also reached through a module imported earlier runs before the filter.
+
+A cache that keeps a separate entry per caller may run anywhere, but must
+drop a caller's entries when their rules change, or a field taken away
+stays visible until the entry expires.
+
+## Record Checks
+
+A grant says what a caller may do to a resource, not which of its records.
+Which records a caller reaches, their own or their tenant's, is a question
+about the data:
+
+- **On data in `@concepta/nestjs-repository`, it is row scope's.** A row
+  scope resolver limits every read and write, through any route or none: a
+  clerk to their own rows, a manager to their tenant, with values from the
+  `RowScopeCtx` overlay you set from the signed-in user. See
+  [Row Scope](../nestjs-repository/README.md#row-scope).
+- **On any other route, add an access query service.** It runs after a grant
+  lets the call in, and decides from the call's context:
+
+```ts
+import {
+  type AccessControlContextInterface,
+  AccessControlQuery,
+  type CanAccess,
+} from '@concepta/nestjs-access-control';
+
+@Injectable()
+export class OwnProfileQuery implements CanAccess {
+  async canAccess(context: AccessControlContextInterface): Promise<boolean> {
+    const actor = context.getActor();
+    const params = context.getRequest('params');
+
+    return (
+      actor.kind === 'role' &&
+      typeof params === 'object' &&
+      params !== null &&
+      Reflect.get(params, 'id') === actor.userId
+    );
   }
+}
+
+@Get(':id')
+@AccessControlReadOne('profile')
+@AccessControlQuery({ service: OwnProfileQuery })
+getOne(@Param('id') id: string) {
+  // ...
+}
 ```
 
-## Using `@AccessControlUpdateOne` Decorator
+Register the service with the module's `queryServices`. When it injects
+your own providers, such as the store that knows who owns a record,
+register it in your own module instead: the check finds it in any module.
 
-The `@AccessControlUpdateOne` decorator is used to grant update
-permissions for a single resource. This decorator is a shortcut for
-defining access control grants for updating one resource.
+- A route with access query services proceeds when one of them allows it,
+  and is refused with refusal `access-query` otherwise.
+- On a controller, `@AccessControlQuery` applies to every route, unless a
+  route declares its own, which replace the controller's.
+- Give the route a grant too. Access query services run only after one: on
+  a route without a grant, each call fails, at request time, with
+  `AccessControlException`, a `500`, rather than skip them.
 
-### Setting Update One Permissions
+Each one receives:
 
-First, define your access control rules using the `AccessControl`
-library. This example shows how to set permissions for different roles.
+| Method | Returns |
+| --- | --- |
+| `getQuery()` | the grant the call got through on (`AccessQueryInterface`): actor, action, resource |
+| `getActor()` | who is acting |
+| `getContext()` | the call's context, as handlers receive it |
+| `getAbility()` | the caller's CASL ability (`AccessAbility`), for further checks |
+| `getRequest(property?)` | the request, or one of its properties; `undefined` outside HTTP |
+| `getExecutionContext()` | the route's execution context |
 
-```typescript
-ac.grant(AppRole.User)
-  .updateOwn(AppResource.User)
-//...
+In a handler, `AccessControlService.decision(ctx)` returns the same grant,
+an `AccessQueryInterface`: who is acting and the action and resource the
+call was let through on, or `undefined` on a call no route checked.
+
+The two answer a caller differently. A record an access query service
+refuses is a `403`, which can tell the caller the record exists, unless the
+service refuses a missing record the same way, as the
+[Ownership](./examples/ownership) example's does. Row scope
+leaves a row outside the caller's reach out of every read, so the route
+answers as it would for a missing record, a `404`. Where even a record's
+existence is private, use row scope.
+
+## Checking in Handlers
+
+The route guard checks the resource, not the body. In a checked route's
+handler, pass the fields a write touches to `assertFields`. It checks access
+control's own rules; an
+[authority's](#sharing-rules-with-the-repository) column rules are checked
+when the write reaches a governed repository:
+
+```ts
+@Patch(':id')
+@AccessControlUpdateOne('document')
+async update(
+  @Ctx() ctx: AppContextHost,
+  @Param('id') id: string,
+  @Body() changes: DocumentUpdatableDto,
+) {
+  await this.accessControl.assertFields(ctx, accessFieldPaths(changes));
+  // ...
+}
 ```
 
-### Using Update One in a Controller
+It checks each field under the grant that let the caller in. On a route
+with several grants, write field denies for each action the route grants.
+It doesn't fetch the caller's rules again. Called outside a checked route,
+it throws `AccessControlException`.
 
-Next, use the `@AccessControlUpdateOne` decorator in your controller
-to protect the route that handles the updating of a single resource.
+`accessFieldPaths` lists the fields a body sets, which is what a merging
+update touches. A handler that replaces a nested object whole, such as a
+JSON column, also touches the fields the body leaves out: pass the parent
+too, `[...accessFieldPaths(changes), 'profile']`, so a denied
+`profile.ssn` refuses the write.
 
-```typescript
-  @Put(':id')
-  @AccessControlUpdateOne(AppResource.User)
-  update(@Param('id') id: string, @Body() user: UserUpdatableInterface) {
-    return this.userService.update(id, user);
+Outside a checked route, in a command handler or in a message consumer
+acting for a system, inject `AccessControlService` and name the action:
+
+```ts
+import {
+  AccessControlService,
+  accessFieldPaths,
+} from '@concepta/nestjs-access-control';
+
+@CommandHandler(UpdateInvoiceCommand)
+export class UpdateInvoiceHandler {
+  constructor(private readonly accessControl: AccessControlService) {}
+
+  async execute({ ctx, id, changes }: UpdateInvoiceCommand) {
+    await this.accessControl.assert(ctx, 'update', 'invoice', {
+      fields: accessFieldPaths(changes),
+    });
+    // ...
   }
+}
 ```
 
-## Using `@AccessControlReadOne` Decorator
+`assert` throws `AccessRefusedException` unless the actor may take the
+action on the resource **and on every field in `fields`**. Without `fields`
+only the resource is checked, so always pass the fields a write touches.
+Under an [authority](#sharing-rules-with-the-repository), `fields` are
+checked against access control's own denies only; the authority's column
+rules hold where data passes through a governed repository.
+`can` answers the same question with a boolean. Both take their options as
+`AccessCheckOptionsInterface`.
 
-The `@AccessControlReadOne` decorator grants read permissions for a single
-resource. It is a shortcut for defining access control grants for reading one resource.
+## CRUD Routes
 
-### Setting Read One Permissions
+On routes generated by `@concepta/nestjs-crud`, declare each operation's
+grant through `extraDecorators`, and register `AccessControlCrudPolicy` as
+CRUD's request policy, so field denies hold there as on routes you write.
+`@concepta/nestjs-crud` is an optional peer dependency: install it in your
+application.
 
-First, define your access control rules using the `AccessControl` library.
-This example shows how to set permissions for different roles.
+```ts
+import { AccessControlCrudPolicy } from '@concepta/nestjs-access-control/optional/crud';
 
-Please refer to the [Important Notes Section](#important) for better
-understanding of the permissions.
-
-```typescript
-//...
-// User can only read their own information
-ac.grant(AppRole.User)
-  .readOwn(AppResource.User)
-
-// Admin can read any information of resource User
-// (however you still need to specify this authorization on AccessControlReadOne)
-ac.grant(AppRole.Admin)
-  .readAny(AppResource.User)
-// ...
+CrudModule.forRootAsync({
+  inject: [AccessControlService],
+  useFactory: (accessControl: AccessControlService) => ({
+    requestPolicy: new AccessControlCrudPolicy(accessControl),
+  }),
+});
 ```
 
-### Using Read One in a Controller
+A module's own `requestPolicy` replaces the root's for that module: to keep
+`AccessControlCrudPolicy`'s checks there, compose it into that policy.
 
-Next, use the `@AccessControlReadOne` decorator in your controller
-to protect the route that handles the reading of a single resource.
-
-```typescript
-//...
-  @Get(':id')
-  @AccessControlReadOne(AppResource.User)
-  getOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
-  }
-//...
+```ts
+{
+  operation: Operation.List,
+  extraDecorators: [AccessControlReadMany('invoice')],
+}
 ```
 
-### Using in a Controller to get own information only
+Give each operation the decorator for the action its repository call takes:
+`AccessControlSoftDeleteOne` on `Operation.SoftDelete` and
+`AccessControlRestoreOne` on `Operation.Restore`, so a role allowed to soft
+delete but never to delete is let through the one route and not the other.
 
-User that contains Role `User` can only get their own information.
-User that contains Role `Admin` can get any information of resource `User`.
+Before each request runs, under the grant its route let the caller in on:
 
-```typescript
-//...
-  @Get(':id')
-  @AccessControlReadOne(AppResource.User)
-  getOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
-  }
-//...
+- **Query input.** A `filter`, `or`, `sort` or `s` (search) naming a
+  field the caller may not read is refused, on every operation: matching
+  or ordering by `salary` tells its value without showing it. `select` is
+  left to the response filter and the repository. CRUD passes query fields
+  (`select`, `filter`, `or`, `sort` and `s`) to the repository unrenamed,
+  so they name stored columns: when your response schema sends
+  `total_cents` as `total`, deny both. The deny on `total` hides it from
+  responses; the one on `total_cents` stops filtering and sorting by it.
+  This policy runs before CRUD's own checks: when your own grants allow
+  `read` only on named fields, with no authority deciding the resource, a
+  `filter`, `or`, `sort` or `s` field naming no column is a `403` with
+  refusal `field`. Otherwise CRUD checks the names itself (see CRUD's
+  [Query Fields](../nestjs-crud/README.md#query-fields)). A column refused
+  in the repository's authority is refused in every query, routes or not.
+- **Write bodies.** A create, an update and each item of a batch create may
+  touch only fields the caller may write, as `assertFields` checks them. A
+  create and a batch create also write the route's params into the row, so
+  those are checked as written fields too. Under the repository's
+  authority, a create, batch create, update and replace all write the
+  route's params, and those must be writable, except the primary key; a
+  replace needs every column but the primary key writable (see CRUD's
+  [Operation-to-Repository Mapping](../nestjs-crud/README.md#operation-to-repository-mapping)).
+- **Replace.** A replace erases what its body leaves out, so it is refused
+  whenever a field is denied to the caller for the action, or when the
+  caller's only allows for it name fields.
+
+What a request selects is not narrowed by these rules: the response filter
+leaves out what the caller may not read. On an entity an authority
+governs, the repository narrows a list or a read without `?select=` to the
+caller's columns and refuses (`403`) a `?select=` naming a hidden one, and
+most writes read the row first, as the caller (see CRUD's
+[Query Fields](../nestjs-crud/README.md#query-fields)).
+
+So a response may hold fewer fields than the entity: mark every field
+that can be left out `.optional()` in the response schema (see CRUD's
+[Serialization](../nestjs-crud/README.md#serialization)). Fields access
+control's own rules deny are removed after serialization, so they need not
+be optional.
+
+Which rows a generated route reaches is row scope's job, on the entity's
+repository. See the [CRUD routes](./examples/crud-routes) example.
+
+## Showing Permissions in a UI
+
+`AccessControlService.effectiveRules` returns the rules the actor is
+decided by, denies last, so a UI can grey out what they cannot do. It needs
+no grant of its own:
+
+```ts
+@Get('me/permissions')
+permissions(@Ctx() ctx: AppContextHost) {
+  return this.accessControl.effectiveRules(ctx);
+}
 ```
 
-## Using `@AccessControlDeleteOne` Decorator
-
-The `@AccessControlDeleteOne` decorator is used to grant delete
-permissions for a single resource. This decorator is a shortcut
-for defining access control grants for deleting one resource.
-
-### Setting Delete One Permissions
-
-First, define your access control rules using the `AccessControl`
-library. This example shows how to set permissions for different roles.
-
-```typescript
-//...
-ac.grant(AppRole.User)
-  .deleteOwn(AppResource.User)
-//...
-```
-
-### Using Delete One in a Controller
-
-Next, use the `@AccessControlDeleteOne` decorator in your controller
-to protect the route that handles the deletion of a single resource.
-
-```typescript
-//...
-  @Delete(':id')
-  @AccessControlDeleteOne(AppResource.User)
-  deleteOne(@Param('id') id: string) {
-    return this.userService.delete(id);
-  }
-//...
-```
-
-## Using `@AccessControlCreateMany` Decorator
-
-The `@AccessControlCreateMany` decorator is used to grant creat
- permissions for multiple resources. This decorator is a shortcut
- for defining access control grants for creating many resources.
-
-### Setting Create Many Permissions
-
-First, define your access control rules using the `AccessControl`
-library. This example shows how to set permissions for different roles.
-
-```typescript
-//...
-ac.grant(AppRole.User)
-  .createAny(AppResource.User)
-//...
-```
-
-### Using Create Many in a Controller
-
-Next, use the `@AccessControlCreateMany` decorator in your controller
-to protect the route that handles the creation of multiple resources.
-
-```typescript
-//...
-  @Post('bulk')
-  @AccessControlCreateMany(AppResource.User)
-  createMany(@Body() users: UserCreatableInterface[]) {
-    return this.userService.createMany(users);
-  }
-//...
-```
-
-## Using `@AccessControlReadMany` Decorator
-
-The `@AccessControlReadMany` decorator is used to grant read
-permissions for multiple resources. This decorator is a shortcut for
-defining access control grants for reading multiple resources.
-
-### Setting Read Many Permissions
-
-First, define your access control rules using the `AccessControl` library.
-This example shows how to set permissions for different roles.
-
-```typescript
-//...
-ac.grant(AppRole.User)
-  .readAny(AppResource.Article)
-// ...
-```
-
-### Using Read Many in a Controller
-
-Next, use the `@AccessControlReadMany` decorator in your controller to
-protect the route that handles the reading of multiple resources.
-
-```typescript
-//...
-  @Get(':id')
-  @AccessControlReadMany(AppResource.Article)
-  getMany() {
-    return this.articleService.getMany();
-  }
-//...
-```
-
-## Other Grant Decorators
-
-Two more grant shortcut decorators are exported:
-
-- `@AccessControlReplaceOne(resource)` — for full-replace (PUT) endpoints;
-  a shortcut that delegates to `@AccessControlUpdateOne`, so it checks the
-  `update` grant.
-- `@AccessControlRecoverOne(resource)` — for soft-delete recovery endpoints
-  (see the `recoverOne` handler in the tutorial controller example); a
-  shortcut that delegates to `@AccessControlCreateOne`, so it checks the
-  `create` grant.
-
-## Reference
-
-### NestJS AuthGuard Pattern
-
-For more details on the AuthGuard pattern,
-check the [official NestJS documentation](https://docs.nestjs.com/guards#access-control).
-
-### ACL Module
-
-For more details on the `accesscontrol` module,
-check the [official accesscontrol documentation](https://www.npmjs.com/package/accesscontrol).
-
-### Deprecated Exports
-
-- `AccessControllerException` — deprecated shim kept for v7 consumer
-  compatibility; it will be removed once external callers migrate off it.
-
-## Explanation
-
-### IMPORTANT
-
-When building your ACL, you need to remember these!
-
-> This module only helps you apply a pattern. There is no magic;
-> you are ultimately responsible for
-> checking that your ACL works in all contexts.
-
-Here is the pattern:
-
-- Giving `any` access implies that the role IS NOT restricted by ownership,
-  or other rules, to that action/resource combination.
-- Giving `own` access implies that the role IS restricted by ownership to
-  that action/resource combination (it is often required to enforce this
-  rule with a filter to check the data layer when not all information
-  required to check ownership exists in the parameters or query string.)
-
-!!! Important !!!
-
-> Roles given `any` access still pass through your access query services.
-> Each `canAccess` receives the matched grant through `context.getQuery()`;
-> allow when its `possession` is `'any'` if `any` should skip your
-> ownership check.
-
-### What is Access Control?
-
-Access control in a software context refers to the selective restriction
-of access to resources. It ensures that only authorized users can access
-or modify data within an application.
-
-### How AccessControlService Works
-
-The `AccessControlService` is a crucial component in the access control system.
-It is responsible for retrieving user information and their associated roles,
-which are then used by the `AccessControlGuard` to enforce access control rules.
-Here’s a detailed breakdown of its functionality:
-
-#### Key Responsibilities
-
-1. **User Retrieval**:
-   - The `AccessControlService` provides a method to retrieve the current user
-     from the execution context. This is typically done by extracting the user
-     information from the request object.
-
-2. **Role Retrieval**:
-   - It also provides a method to retrieve the roles associated with the current
-     user. This is essential for determining what actions the user is permitted
-     to perform.
-
-### How Access Query Service Works
-
-The Query Services are services that should be used to define authorization
-logic for a specific endpoint or controller. we can either have a query service
-that runs for all endpoints, or we can create one for each endpoint or
-controller that we want to protect.
-
-#### Overview
-
-The `MyUserAccessQueryService` is designed to manage and control user access
-permissions within your application. The service should be added to the
-`@AccessControlQuery` decorator to protect the route that handles the access
-of a single or multiple resource. Once the service is defined, the
-`AccessControlGuard` will use this logic internally to check if the user is
-authorized to access the resource.
-
-#### Custom Logic in the Service
-
-1. **canAccess Method**:
-
-- `canAccess(context)` is the **only** method declared by the `CanAccess`
-  interface — all custom authorization logic goes inside it.
-- You can add custom logic to check the user's role and the action
-  they want to perform, using `context.getQuery()`, `context.getUser()`,
-  and `context.getRequest()`.
-- For example, you might allow users with a 'manager' role to read
-  and update data, but restrict 'employee' roles to only read data — or,
-  as in the [custom query service example](#creating-a-custom-access-query-service),
-  ensure a user can only update their own password by comparing the route
-  parameter id with the authenticated user's id.
-
-### How AccessControlGuard Works
-
-When a request reaches a protected route, the `AccessControlGuard` checks it
-in three steps:
-
-1. **Grants**: the guard reads the `@AccessControl*` grants on the route
-   handler. A handler with no grants is allowed.
-2. **Roles**: it gets the user's roles from your `AccessControlService`'s
-   `getUserRoles`, then checks each grant in order, trying `any` before
-   `own`. The first grant the roles satisfy is the match; if none matches,
-   the request is denied.
-3. **Access queries**: if the controller or handler declares
-   `@AccessControlQuery` services, each one's `canAccess` is called with the
-   matched grant. The request is allowed as soon as one returns `true`, and
-   denied if none does. With no query services, the match alone allows it.
-
-### Practical Examples
-
-- **Role-Based Access**:
-- Managers can view and edit all employee records.
-- Employees can only view their own records and cannot edit them.
-
-- **Password Management**:
-- Users can change their own passwords but cannot change the passwords
-  of other users.
-- Administrators might have the ability to reset passwords for any user.
-
-### Benefits
-
-- **Enhanced Security**: By implementing custom access control logic,
-  you can ensure that sensitive data is only accessible to authorized users.
-- **Flexibility**: The service allows you to define complex access rules
-  that can be tailored to your application's specific needs.
-- **Compliance**: Proper access control helps in meeting regulatory
-  requirements by ensuring that only authorized users can access or
-  modify data.
-
-### Why Use Access Control?
-
-Implementing access control ensures that your application maintains
-data integrity and security by allowing only authorized users to
-perform specific actions.
-
-#### Synchronous vs Asynchronous Registration
-
-- **Synchronous Registration**: Use when configuration options are
-  static and available at startup.
-- **Asynchronous Registration**: Use when configuration options need
-  to be retrieved from external sources at runtime.
-
-#### Global vs Feature-Specific Registration
-
-- **Global Registration**: Makes the module available throughout the
-  entire application (`forRoot()` / `forRootAsync()`).
-- **Feature-Specific Registration**: Allows the module to be registered
-  only for specific features or modules within the application
-  (`register()` / `registerAsync()`). A `forFeature()` static method also
-  exists — it creates a standalone set of access control providers
-  (imports, providers, exports) for use in sub-modules.
+Each rule holds only what decides, `action`, `subject`, `fields` and
+`inverted`: a gate (`pending`) or a `reason` stays out of the response.
+CASL's frontend packages read the result, but match fields their own way:
+here a field covers everything beneath it (a deny on `address` refuses
+`address.city`), and a write of a field is refused when a field beneath it
+is denied, which no rule spells out. Give the frontend's ability a field
+matcher that does the same, or treat its answer for nested fields as a
+hint the API may still refuse.
+
+With an [authority](#sharing-rules-with-the-repository) that gives its
+rules, as `CaslAuthority` does, they are combined the way they decide: on
+resources in `except`, the actor's own rules; elsewhere, the authority's
+allows, less its denies and the actor's. The authority's rules name stored
+columns in `fields`, matched by exact name, and yours name API fields, so
+where a mapper renames a field the UI sees both names, and the response
+shows the caller those stored column names. A custom authority gives its rules by
+implementing `rulesFor(ctx, actor)` from `AuthorityInterface`; without it,
+these are only the actor's own rules, and what the caller may do outside
+`except` is the authority's allows less these denies, which the UI has to
+build from both.
+
+## Options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `settings.grants` | `{}` | `AccessGrants`: rules keyed `role:<name>` or `system:<name>`. Used, and checked at startup, only without a `grantsProvider`. |
+| `actorResolver` | none | `AccessActorResolverInterface`: works out who is acting when a call carries no `ActorCtx`. |
+| `grantsProvider` | `StaticAccessGrantsProvider`, over `settings.grants` | `AccessGrantsProviderInterface`: supplies an actor's rules on every check. |
+| `authority` | none | `AccessControlAuthorityInterface`, `{ authority, except? }`: decides each route first, except on resources in `except` it doesn't govern; the actor's rules then only narrow. See [Sharing Rules with the Repository](#sharing-rules-with-the-repository). |
+| `appFilter` | `AccessControlFilter`, the response filter | Replace it, or `false` for none. |
+| `queryServices` | `[]` | Access query services to register. |
+
+`AccessControlModule` offers `forRoot` and `forRootAsync`, which make it
+available everywhere, plus `register`, `registerAsync` and `forFeature`.
+With `register`, register it once and import that module into every module
+whose controllers use the decorators: their guard needs
+`AccessControlService`. `forFeature` overrides options for one module and
+needs `forRoot` or `forRootAsync` beside it; it adds no response filter or
+actor overlay of its own.
+
+### Constructing by hand
+
+To build `AccessControlService` yourself, pass it:
+
+- your resolver, wrapped in `ActorCtxResolver`, so a call's `ActorCtx`
+  wins over it;
+- a grants provider;
+- an `AccessCtxDecisionSource`, which finds the grant the route guard
+  recorded (`AccessDecisionSourceInterface`, returning an
+  `AccessDecisionInterface`: the grant and the caller's ability).
+
+`AccessControlCrudPolicy` takes the service and, optionally, the same
+decision source. Register `AccessContextOverlay` as a global interceptor to
+define `ActorCtx` from your resolver on every HTTP call.
+
+A guard of your own can decide a call with the service's methods, in this
+order. It can refuse, but it records no grant: the response filter,
+`AccessControlCrudPolicy`, `assertFields` and `decision(ctx)` act only
+behind the route guard the grant decorators add, so keep those decorators
+on any route whose responses or fields must be checked.
+
+| Method | Returns |
+| --- | --- |
+| `resolve(ctx, context?)` | the actor, their checked rules and ability (`AccessResolutionInterface`), or `undefined` when nobody is acting |
+| `authorize(ctx, resolution, action, resource)` | what the authority allows (`AccessAuthorization`): the resolution to check, or the refusal |
+| `refusal(resolution, action, resource, options?)` | why the actor may not (`AccessRefusedDetailsInterface`), or `undefined` |
+
+## Exceptions
+
+| Exception | Status | Fault | `errorCode` | When |
+| --- | --- | --- | --- | --- |
+| `AccessControlException` | 500 | `usage` | `ACCESS_CONTROL_ERROR` | The base of the others; thrown itself for a route with access query services but no grant, or `assertFields` outside a checked route |
+| `AccessRefusedException` | 403 | `client` | `ACCESS_REFUSED_ERROR` | A call is refused |
+| `AccessRulesInvalidException` | 500 | `usage` | `ACCESS_RULES_INVALID_ERROR` | Access control's own rule set cannot be used. Under a shared `CaslAuthority`, unusable authority rules fail the route with `CaslAuthorityRulesInvalidException` (`CASL_AUTHORITY_RULES_INVALID_ERROR`) instead |
+
+`AccessRefusedException`'s message names only the action and the resource,
+such as `Not allowed to delete invoice`. The response body holds only
+`statusCode`, `message`, `errorCode` and `error` (the status text). Its
+context is for your logs and
+never in the response: an `AccessRefusedDetailsInterface` naming the
+`action`, the `resource`, the
+`actor` (who they are only: their kind, and their roles and user id or
+their name), and a `refusal`, one of `ACCESS_REFUSALS` (`AccessRefusal`):
+
+| Refusal | Meaning |
+| --- | --- |
+| `no-actor` | Nobody is acting |
+| `no-grant` | No rule allows it |
+| `denied` | A deny refuses it (also names the first one's gate as `gate` when every deny of the whole resource that refused is `pending`) |
+| `field` | A field it touches is refused (also names the first refused field in `fields`, when one field is to blame, and its `gate` when every deny refusing it is `pending`) |
+| `access-query` | The route's access query service refused it |
+| `authority` | The module's authority refuses it (also names any pending decision as `gate`) |
+
+`AccessRulesInvalidException` lists every problem found, so one fix pass
+covers them all.

@@ -1,12 +1,14 @@
-import { type ActionEnum, CompositeSpecification } from '@concepta/nestjs-core';
+import { CompositeSpecification } from '@concepta/nestjs-core';
 
+import { type CrudActionCategory } from './interfaces/crud-action-category.type.js';
 import { type CrudSpecContextInterface } from './interfaces/crud-spec-context.interface.js';
 
 /**
  * Specification that matches specific actions.
  *
  * Actions are high-level categories (CREATE, READ, UPDATE, DELETE)
- * that group related CRUD operations.
+ * that group related CRUD operations: soft delete counts as DELETE and
+ * restore as UPDATE. Match `operation` to tell them apart.
  *
  * @example
  * ```typescript
@@ -24,7 +26,7 @@ import { type CrudSpecContextInterface } from './interfaces/crud-spec-context.in
  * ```
  */
 export class ActionSpecification extends CompositeSpecification<CrudSpecContextInterface> {
-  constructor(private readonly actions: ActionEnum[]) {
+  constructor(private readonly actions: CrudActionCategory[]) {
     super();
   }
 

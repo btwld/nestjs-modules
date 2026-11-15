@@ -1,40 +1,62 @@
-import { AccessControl } from 'accesscontrol';
+import { Injectable, Module, type Provider } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { Test, type TestingModule } from '@nestjs/testing';
 
-import { Module } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-
+import { ACCESS_CONTROL_MODULE_SETTINGS_TOKEN } from '../access-control.constants.js';
 import {
-  ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
-  ACCESS_CONTROL_PORT_TOKEN,
-} from '../access-control.constants.js';
+  type AccessControlOptions,
+  createAccessControlAppFilterProvider,
+  createAccessControlProviders,
+} from '../access-control.module-definition.js';
 import { AccessControlModule } from '../access-control.module.js';
-import { AccessControlPort } from '../application/ports/access-control.port.js';
-import { CheckAccessHandler } from '../application/queries/handlers/check-access.handler.js';
-import { FilterResponseAttributesHandler } from '../application/queries/handlers/filter-response-attributes.handler.js';
-import { ResolveUserRolesHandler } from '../application/queries/handlers/resolve-user-roles.handler.js';
-import { AccessControlServiceInterface } from '../domain/ports/access-control-service.interface.js';
-import { AccessControlSettingsInterface } from '../infrastructure/config/interfaces/access-control-settings.interface.js';
-import { AccessControlService } from '../infrastructure/services/access-control.service.js';
+import { type AccessActorResolverInterface } from '../domain/interfaces/access-actor-resolver.interface.js';
+import { type AccessGrants } from '../domain/interfaces/access-grants.type.js';
+import { type CanAccess } from '../domain/interfaces/can-access.interface.js';
+import { AccessControlService } from '../domain/services/access-control.service.js';
+import { AccessControlFilter } from '../gateways/http/access-control.filter.js';
+import { AccessControlGuard } from '../gateways/http/access-control.guard.js';
+import { type AccessControlSettingsInterface } from '../infrastructure/config/interfaces/access-control-settings.interface.js';
 
 describe('AccessControlModule', () => {
-  let accessControlModule: AccessControlModule;
-  let accessControlSettings: AccessControlSettingsInterface;
-  let accessControlService: AccessControlServiceInterface;
-  let accessControlPort: AccessControlPort;
-  let checkAccessHandler: CheckAccessHandler;
-  let filterResponseAttributesHandler: FilterResponseAttributesHandler;
-  let resolveUserRolesHandler: ResolveUserRolesHandler;
+  const grants: AccessGrants = {
+    'role:clerk': [{ action: 'read', subject: 'user' }],
+  };
 
-  const rules = new AccessControl();
+  let settings: AccessControlSettingsInterface;
+  let service: AccessControlService;
+
+  function setVars(testModule: TestingModule) {
+    settings = testModule.get<AccessControlSettingsInterface>(
+      ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
+    );
+    service = testModule.get(AccessControlService);
+  }
+
+  function commonTests() {
+    it('registers the service', async () => {
+      expect(service).toBeInstanceOf(AccessControlService);
+    });
+
+    it('settings should be correct', async () => {
+      expect(settings).toEqual({ grants });
+    });
+  }
+
+  const resolveProviders = async (testModule: TestingModule) => {
+    expect(testModule.get(AccessControlGuard)).toBeInstanceOf(
+      AccessControlGuard,
+    );
+    expect(testModule.get(AccessControlFilter)).toBeInstanceOf(
+      AccessControlFilter,
+    );
+  };
 
   describe(AccessControlModule.register, () => {
+    let testModule: TestingModule;
+
     beforeAll(async () => {
-      const testModule = await Test.createTestingModule({
-        imports: [
-          AccessControlModule.register({
-            settings: { rules },
-          }),
-        ],
+      testModule = await Test.createTestingModule({
+        imports: [AccessControlModule.register({ settings: { grants } })],
       }).compile();
 
       setVars(testModule);
@@ -42,37 +64,27 @@ describe('AccessControlModule', () => {
 
     commonTests();
 
-    it('settings should be correct', async () => {
-      expect(accessControlSettings).toEqual({
-        rules,
-      });
-    });
+    it('resolves its providers', () => resolveProviders(testModule));
   });
 
   describe(AccessControlModule.forRoot, () => {
     beforeAll(async () => {
       const testModule = await Test.createTestingModule({
-        imports: [AccessControlModule.forRoot({ settings: { rules } })],
+        imports: [AccessControlModule.forRoot({ settings: { grants } })],
       }).compile();
 
       setVars(testModule);
     });
 
     commonTests();
-
-    it('settings should be correct', async () => {
-      expect(accessControlSettings).toEqual({
-        rules,
-      });
-    });
   });
 
   describe(AccessControlModule.registerAsync, () => {
-    beforeEach(async () => {
+    beforeAll(async () => {
       const testModule = await Test.createTestingModule({
         imports: [
           AccessControlModule.registerAsync({
-            useFactory: () => ({ settings: { rules } }),
+            useFactory: () => ({ settings: { grants } }),
           }),
         ],
       }).compile();
@@ -81,20 +93,14 @@ describe('AccessControlModule', () => {
     });
 
     commonTests();
-
-    it('settings should be correct', async () => {
-      expect(accessControlSettings).toEqual({
-        rules,
-      });
-    });
   });
 
   describe(AccessControlModule.forRootAsync, () => {
-    beforeEach(async () => {
+    beforeAll(async () => {
       const testModule = await Test.createTestingModule({
         imports: [
           AccessControlModule.forRootAsync({
-            useFactory: () => ({ settings: { rules } }),
+            useFactory: () => ({ settings: { grants } }),
           }),
         ],
       }).compile();
@@ -103,21 +109,18 @@ describe('AccessControlModule', () => {
     });
 
     commonTests();
-
-    it('settings should be correct', async () => {
-      expect(accessControlSettings).toEqual({
-        rules,
-      });
-    });
   });
 
   describe(AccessControlModule.forFeature, () => {
-    const featureRules = new AccessControl();
-
-    class TestService extends AccessControlService {}
+    const featureGrants: AccessGrants = {
+      'system:agile': [{ action: 'approve', subject: 'contract' }],
+    };
+    const actorResolver: AccessActorResolverInterface = {
+      actorFor: async () => ({ kind: 'system', name: 'agile' }),
+    };
 
     @Module({
-      imports: [AccessControlModule.forRoot({ settings: { rules } })],
+      imports: [AccessControlModule.forRoot({ settings: { grants } })],
     })
     class AppGlobalTest {}
 
@@ -125,8 +128,8 @@ describe('AccessControlModule', () => {
       imports: [
         AppGlobalTest,
         AccessControlModule.forFeature({
-          service: new TestService(),
-          settings: { rules: featureRules },
+          settings: { grants: featureGrants },
+          actorResolver,
         }),
       ],
     })
@@ -140,56 +143,158 @@ describe('AccessControlModule', () => {
       setVars(testModule);
     });
 
-    commonTests();
-
-    it('providers should be overriden', async () => {
-      expect(accessControlService).toBeInstanceOf(TestService);
+    it('overrides the settings', () => {
+      expect(settings).toEqual({ grants: featureGrants });
     });
 
-    it('settings should be overriden', async () => {
-      expect(accessControlSettings).toEqual({
-        rules: featureRules,
-      });
+    it('uses the feature actor resolver and grants', async () => {
+      expect(await service.can({}, 'approve', 'contract')).toEqual(true);
     });
   });
 
-  function setVars(testModule: TestingModule) {
-    accessControlModule =
-      testModule.get<AccessControlModule>(AccessControlModule);
-    accessControlSettings = testModule.get<AccessControlSettingsInterface>(
-      ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
-    );
-    accessControlService =
-      testModule.get<AccessControlServiceInterface>(AccessControlService);
-    accessControlPort = testModule.get<AccessControlPort>(
-      ACCESS_CONTROL_PORT_TOKEN,
-    );
-    checkAccessHandler = testModule.get<CheckAccessHandler>(CheckAccessHandler);
-    filterResponseAttributesHandler =
-      testModule.get<FilterResponseAttributesHandler>(
-        FilterResponseAttributesHandler,
-      );
-    resolveUserRolesHandler = testModule.get<ResolveUserRolesHandler>(
-      ResolveUserRolesHandler,
-    );
-  }
+  it('registers no application-wide filter or actor overlay for a feature', () => {
+    const actorResolver = { actorFor: async () => undefined };
+    const appWide = (providers: Provider[] = []) =>
+      providers.filter(
+        (provider) =>
+          typeof provider === 'object' &&
+          'provide' in provider &&
+          provider.provide === APP_INTERCEPTOR,
+      ).length;
 
-  function commonTests() {
-    it('providers should be loaded', async () => {
-      expect(accessControlModule).toBeInstanceOf(AccessControlModule);
-      expect(accessControlService).toBeInstanceOf(AccessControlService);
+    expect(
+      appWide(createAccessControlProviders({ overrides: { actorResolver } })),
+    ).toEqual(2);
+    expect(
+      appWide(AccessControlModule.forFeature({ actorResolver }).providers),
+    ).toEqual(0);
+  });
+
+  it('registers the access query services given to forFeature', async () => {
+    @Injectable()
+    class FeatureQuery implements CanAccess {
+      async canAccess(): Promise<boolean> {
+        return true;
+      }
+    }
+
+    const testModule = await Test.createTestingModule({
+      imports: [
+        AccessControlModule.forRoot({ settings: { grants } }),
+        AccessControlModule.forFeature({
+          settings: { grants },
+          queryServices: [FeatureQuery],
+        }),
+      ],
+    }).compile();
+
+    expect(testModule.get(FeatureQuery, { strict: false })).toBeInstanceOf(
+      FeatureQuery,
+    );
+  });
+
+  it('is global from forRoot and forRootAsync only', () => {
+    const options = { settings: { grants } };
+    const asyncOptions = { useFactory: () => options };
+
+    expect(AccessControlModule.register(options).global).toBe(false);
+    expect(AccessControlModule.registerAsync(asyncOptions).global).toBe(false);
+    expect(AccessControlModule.forRoot(options).global).toBe(true);
+    expect(AccessControlModule.forRootAsync(asyncOptions).global).toBe(true);
+  });
+
+  it('adds the imports it is given', () => {
+    @Module({})
+    class ExtraModule {}
+
+    // toContain passes on undefined, so the whole list is matched.
+    expect(
+      AccessControlModule.register({ imports: [ExtraModule] }).imports,
+    ).toEqual([expect.anything(), ExtraModule]);
+    expect(
+      AccessControlModule.forFeature({ imports: [ExtraModule] }).imports,
+    ).toEqual([expect.anything(), ExtraModule]);
+  });
+
+  it('injects into an async factory from the imports it is given', async () => {
+    @Injectable()
+    class GrantsSource {
+      readonly grants = grants;
+    }
+
+    @Module({ providers: [GrantsSource], exports: [GrantsSource] })
+    class GrantsSourceModule {}
+
+    const testModule = await Test.createTestingModule({
+      imports: [
+        AccessControlModule.forRootAsync({
+          imports: [GrantsSourceModule],
+          inject: [GrantsSource],
+          useFactory: (source: GrantsSource) => ({
+            settings: { grants: source.grants },
+          }),
+        }),
+      ],
+    }).compile();
+
+    expect(
+      testModule.get<AccessControlSettingsInterface>(
+        ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
+      ),
+    ).toEqual({ grants });
+  });
+
+  describe('app filter', () => {
+    @Injectable()
+    class CustomFilter extends AccessControlFilter {}
+
+    const defaultFilter = new AccessControlFilter();
+
+    const appFilterFor = (
+      options: AccessControlOptions,
+      overrides?: AccessControlOptions,
+    ): unknown => {
+      const provider = createAccessControlAppFilterProvider(overrides);
+
+      if (typeof provider !== 'object' || !('useFactory' in provider)) {
+        throw new Error('expected a factory provider');
+      }
+
+      return provider.useFactory(options, defaultFilter);
+    };
+
+    it('is the module filter by default', () => {
+      expect(appFilterFor({})).toBe(defaultFilter);
     });
 
-    it('port should be loaded under ACCESS_CONTROL_PORT_TOKEN', async () => {
-      expect(accessControlPort).toBeInstanceOf(AccessControlPort);
+    it('is left out when the options turn it off', () => {
+      expect(appFilterFor({ appFilter: false })).toBeNull();
     });
 
-    it('query handlers should be registered', async () => {
-      expect(checkAccessHandler).toBeInstanceOf(CheckAccessHandler);
-      expect(filterResponseAttributesHandler).toBeInstanceOf(
-        FilterResponseAttributesHandler,
-      );
-      expect(resolveUserRolesHandler).toBeInstanceOf(ResolveUserRolesHandler);
+    it('is the filter the options give', () => {
+      const custom = new CustomFilter();
+
+      expect(appFilterFor({ appFilter: custom })).toBe(custom);
     });
-  }
+
+    it('follows overrides before the options', () => {
+      expect(appFilterFor({}, { appFilter: false })).toBeNull();
+    });
+  });
+
+  it('fails startup on grants keyed by no actor kind', async () => {
+    await expect(
+      Test.createTestingModule({
+        imports: [
+          AccessControlModule.register({
+            settings: {
+              grants: { clerk: [{ action: 'read', subject: 'user' }] },
+            },
+          }),
+        ],
+      }).compile(),
+    ).rejects.toThrow(
+      'grants key "clerk": must be role:<name> or system:<name>',
+    );
+  });
 });

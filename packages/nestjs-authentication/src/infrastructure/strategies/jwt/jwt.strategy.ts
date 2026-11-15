@@ -45,10 +45,12 @@ export class JwtStrategy extends PassportStrategyFactory<JwtPassportStrategy>(
       payload.sub,
     );
 
-    if (user) {
-      return user;
-    } else {
+    // An inactive user is refused like a missing one, so the token stops
+    // working as soon as the user is turned off.
+    if (user?.active !== true) {
       throw new JwtUnauthorizedException();
     }
+
+    return user;
   }
 }

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'url';
 
+import { AuthorityActionRefusedException } from '../domain/authority/exceptions/authority-action-refused.exception.js';
 import { type RuntimeExceptionFault } from '../domain/exceptions/exception.types.js';
 import { RuntimeException } from '../domain/exceptions/runtime.exception.js';
 import { CurrencyConfigurationException } from '../domain/value-objects/money/exceptions/currency-configuration.exception.js';
@@ -13,6 +14,7 @@ import { OverlayImmutableException } from '../infrastructure/context/exceptions/
 import { OverlayNotDefinedException } from '../infrastructure/context/exceptions/overlay-not-defined.exception.js';
 import { HookNotDecoratedException } from '../infrastructure/hook/exceptions/hook-not-decorated.exception.js';
 import { HookProviderNotFoundException } from '../infrastructure/hook/exceptions/hook-provider-not-found.exception.js';
+import { RouteAuditFailedException } from '../infrastructure/route-audit/exceptions/route-audit-failed.exception.js';
 import { collectRuntimeExceptionClassNames } from '../testing/collect-runtime-exception-class-names.js';
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
@@ -27,46 +29,70 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'RuntimeException (default)',
+    errorCode: 'RUNTIME_EXCEPTION',
     build: () => new RuntimeException(),
     fault: 'internal',
   },
   {
     name: 'OverlayNotDefinedException',
+    errorCode: 'OVERLAY_NOT_DEFINED',
     build: () => new OverlayNotDefinedException('SomeOverlay'),
     fault: 'usage',
   },
   {
     name: 'OverlayImmutableException',
+    errorCode: 'OVERLAY_IMMUTABLE',
     build: () => new OverlayImmutableException('SomeOverlay'),
     fault: 'usage',
   },
   {
     name: 'OverlayAlreadyDefinedException',
+    errorCode: 'OVERLAY_ALREADY_DEFINED',
     build: () => new OverlayAlreadyDefinedException('SomeOverlay'),
     fault: 'usage',
   },
   {
     name: 'AppContextUnavailableException',
+    errorCode: 'APP_CONTEXT_UNAVAILABLE',
     build: () => new AppContextUnavailableException('ws'),
     fault: 'usage',
   },
   {
     name: 'HookNotDecoratedException',
+    errorCode: 'HOOK_NOT_DECORATED',
     build: () => new HookNotDecoratedException('SomeHook'),
     fault: 'usage',
   },
   {
     name: 'HookProviderNotFoundException',
+    errorCode: 'HOOK_PROVIDER_NOT_FOUND',
     build: () => new HookProviderNotFoundException('SomeHook'),
+    fault: 'usage',
+  },
+  {
+    name: 'AuthorityActionRefusedException',
+    errorCode: 'AUTHORITY_ACTION_REFUSED_ERROR',
+    build: () =>
+      new AuthorityActionRefusedException('invoice', 'void', {
+        refusal: 'authority',
+      }),
+    fault: 'client',
+  },
+  {
+    name: 'RouteAuditFailedException',
+    errorCode: 'ROUTE_AUDIT_FAILED_ERROR',
+    build: () => new RouteAuditFailedException(['[rule] GET /x: wrong']),
     fault: 'usage',
   },
   {
     // A bad currency code is data-shaped — it most plausibly arrives in a
     // request body, so it is the caller's to fix.
     name: 'CurrencyUnknownException',
+    errorCode: 'CURRENCY_UNKNOWN',
     build: () => new CurrencyUnknownException('ZZZ'),
     fault: 'client',
   },
@@ -74,6 +100,7 @@ const CASES: {
     // Configuring currencies twice, late, or with a bad table is a startup
     // mistake in the application, not something a request caused.
     name: 'CurrencyConfigurationException',
+    errorCode: 'CURRENCY_CONFIGURATION',
     build: () => new CurrencyConfigurationException('test'),
     fault: 'usage',
   },
@@ -81,11 +108,13 @@ const CASES: {
     // Adding USD to EUR is never valid input; it is a logic error in the
     // code doing the adding.
     name: 'CurrencyMismatchException',
+    errorCode: 'CURRENCY_MISMATCH',
     build: () => new CurrencyMismatchException('add', 'USD', 'EUR'),
     fault: 'usage',
   },
   {
     name: 'MoneyInvalidAmountException',
+    errorCode: 'MONEY_INVALID_AMOUNT',
     build: () => new MoneyInvalidAmountException(1.5, 'test'),
     fault: 'usage',
   },
@@ -93,6 +122,7 @@ const CASES: {
     // No request caused this and no retry fixes it: the column is declared
     // with a type that has already discarded precision.
     name: 'MoneyColumnTypeException',
+    errorCode: 'MONEY_COLUMN_TYPE',
     build: () => new MoneyColumnTypeException(1.5),
     fault: 'internal',
   },
@@ -101,6 +131,10 @@ const CASES: {
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {

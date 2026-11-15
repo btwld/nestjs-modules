@@ -1,6 +1,30 @@
+import { fileURLToPath } from 'url';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      // Package examples import their package by name, as an application
+      // would. Point the name at its source, so they run against the code
+      // under test rather than the last build.
+      {
+        find: /^@concepta\/nestjs-access-control$/,
+        replacement: fileURLToPath(
+          new URL('./packages/nestjs-access-control/src/index.ts', import.meta.url),
+        ),
+      },
+      {
+        find: /^@concepta\/nestjs-access-control\/optional\/crud$/,
+        replacement: fileURLToPath(
+          new URL(
+            './packages/nestjs-access-control/src/optional-crud.ts',
+            import.meta.url,
+          ),
+        ),
+      },
+    ],
+  },
   test: {
     globals: true,
     environment: 'node',

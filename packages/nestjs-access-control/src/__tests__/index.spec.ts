@@ -1,30 +1,33 @@
 import {
-  ACCESS_CONTROL_PORT_TOKEN,
+  ACCESS_CONTROL_MODULE_SETTINGS_TOKEN,
+  ACCESS_REFUSALS,
   AccessControlContext,
   AccessControlCreateMany,
   AccessControlCreateOne,
   AccessControlDeleteOne,
+  AccessControlException,
   AccessControlFilter,
   AccessControlGrant,
   AccessControlGuard,
   AccessControlModule,
-  AccessControlPort,
+  accessGrantsProblems,
   AccessControlQuery,
   AccessControlReadMany,
   AccessControlReadOne,
-  AccessControlRecoverOne,
+  AccessControlRestoreOne,
   AccessControlReplaceOne,
+  AccessControlSoftDeleteOne,
   AccessControlService,
   AccessControlUpdateOne,
-  CheckAccessHandler,
-  CheckAccessQuery,
-  DEFAULT_ACCESS_CONTROL_PORT_SETTINGS,
-  FilterResponseAttributesHandler,
-  FilterResponseAttributesQuery,
-  PossessionEnum,
-  ResolveUserRolesHandler,
-  ResolveUserRolesQuery,
+  ActorCtxResolver,
+  AccessCtxDecisionSource,
+  AccessRefusedException,
+  AccessRulesInvalidException,
+  accessFieldPaths,
+  AccessContextOverlay,
+  StaticAccessGrantsProvider,
 } from '../index.js';
+import * as index from '../index.js';
 
 describe('Index', () => {
   it('exports module and runtime classes', () => {
@@ -33,25 +36,35 @@ describe('Index', () => {
     expect(AccessControlFilter).toEqual(expect.any(Function));
     expect(AccessControlContext).toEqual(expect.any(Function));
     expect(AccessControlService).toEqual(expect.any(Function));
+    expect(accessGrantsProblems).toEqual(expect.any(Function));
+    expect(ActorCtxResolver).toEqual(expect.any(Function));
+    expect(AccessCtxDecisionSource).toEqual(expect.any(Function));
+    expect(StaticAccessGrantsProvider).toEqual(expect.any(Function));
+    expect(typeof ACCESS_CONTROL_MODULE_SETTINGS_TOKEN).toEqual('string');
   });
 
-  it('exports the access-control port surface', () => {
-    expect(AccessControlPort).toEqual(expect.any(Function));
-    expect(typeof ACCESS_CONTROL_PORT_TOKEN).toEqual('symbol');
-    expect(DEFAULT_ACCESS_CONTROL_PORT_SETTINGS).toEqual({
-      checkAccessQuery: CheckAccessQuery,
-      filterResponseAttributesQuery: FilterResponseAttributesQuery,
-      resolveUserRolesQuery: ResolveUserRolesQuery,
-    });
+  it('exports the field path helper, and keeps its own internals private', () => {
+    expect(accessFieldPaths).toEqual(expect.any(Function));
+    expect(index).not.toHaveProperty('normalizeAccessFieldPath');
+    expect(index).not.toHaveProperty('createAccessAbility');
   });
 
-  it('exports all CQRS queries and handlers', () => {
-    expect(CheckAccessQuery).toEqual(expect.any(Function));
-    expect(CheckAccessHandler).toEqual(expect.any(Function));
-    expect(FilterResponseAttributesQuery).toEqual(expect.any(Function));
-    expect(FilterResponseAttributesHandler).toEqual(expect.any(Function));
-    expect(ResolveUserRolesQuery).toEqual(expect.any(Function));
-    expect(ResolveUserRolesHandler).toEqual(expect.any(Function));
+  it('exports the exceptions and refusals', () => {
+    expect(AccessControlException).toEqual(expect.any(Function));
+    expect(AccessRefusedException).toEqual(expect.any(Function));
+    expect(AccessRulesInvalidException).toEqual(expect.any(Function));
+    expect(ACCESS_REFUSALS).toEqual([
+      'no-actor',
+      'no-grant',
+      'denied',
+      'field',
+      'access-query',
+      'authority',
+    ]);
+  });
+
+  it('exports the actor overlay interceptor', () => {
+    expect(AccessContextOverlay).toEqual(expect.any(Function));
   });
 
   it('exports all grant decorators', () => {
@@ -63,11 +76,8 @@ describe('Index', () => {
     expect(AccessControlReadMany).toEqual(expect.any(Function));
     expect(AccessControlReadOne).toEqual(expect.any(Function));
     expect(AccessControlUpdateOne).toEqual(expect.any(Function));
-    expect(AccessControlRecoverOne).toEqual(expect.any(Function));
+    expect(AccessControlRestoreOne).toEqual(expect.any(Function));
     expect(AccessControlReplaceOne).toEqual(expect.any(Function));
-  });
-
-  it('exports the possession enum', () => {
-    expect(PossessionEnum).toEqual(expect.any(Object));
+    expect(AccessControlSoftDeleteOne).toEqual(expect.any(Function));
   });
 });

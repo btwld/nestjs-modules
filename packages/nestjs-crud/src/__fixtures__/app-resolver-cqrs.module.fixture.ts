@@ -9,7 +9,17 @@ import { CrudCqrsResolver } from '../infrastructure/resolvers/crud-cqrs.resolver
 
 import { CRUD_TEST_PHOTO_CCB_ENTITY_NAME } from './crud-test.constants.js';
 import { PhotoFixture } from './photo/photo.entity.fixture.js';
-import { PhotoCcbModuleFixture } from './photo-ccb/photo-ccb.module.fixture.js';
+import { buildPhotoCcbFixture } from './photo-ccb/photo-ccb.controller.fixture.js';
+
+// The controller names its resolver; the builder provides it.
+const { controllers, providers } = buildPhotoCcbFixture(CrudCqrsResolver);
+
+@Module({
+  imports: [RepositoryModule.forFeature([CRUD_TEST_PHOTO_CCB_ENTITY_NAME])],
+  providers,
+  controllers: [controllers.PhotoCcbController],
+})
+class PhotoCcbCqrsModuleFixture {}
 
 @Module({
   imports: [
@@ -24,10 +34,8 @@ import { PhotoCcbModuleFixture } from './photo-ccb/photo-ccb.module.fixture.js';
       ],
     }),
     CqrsModule.forRoot(),
-    CrudModule.forRoot({
-      defaultResolver: CrudCqrsResolver,
-    }),
-    PhotoCcbModuleFixture,
+    CrudModule.forRoot({}),
+    PhotoCcbCqrsModuleFixture,
   ],
 })
 export class AppResolverCqrsModuleFixture {}

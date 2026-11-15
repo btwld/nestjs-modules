@@ -8,6 +8,7 @@ import {
 import { JwtPort } from '../../../domain/ports/jwt.port.js';
 import { UserPort } from '../../../domain/ports/user.port.js';
 import { AuthenticationRefreshTokenException } from '../../exceptions/authentication-refresh-token.exception.js';
+import { AuthenticationUserPortRequiredException } from '../../exceptions/authentication-user-port-required.exception.js';
 import { ValidateAndVerifyRefreshTokenQuery } from '../impl/validate-and-verify-refresh-token.query.js';
 
 @QueryHandler(ValidateAndVerifyRefreshTokenQuery)
@@ -26,16 +27,19 @@ export class ValidateAndVerifyRefreshTokenHandler implements IQueryHandler<
   async execute(
     query: ValidateAndVerifyRefreshTokenQuery,
   ): Promise<PlainLiteralObject> {
+    if (!this.userPort) {
+      throw new AuthenticationUserPortRequiredException();
+    }
+
     const { ctx, token } = query;
 
     const payload = await this.jwtPort.verifyRefreshToken(ctx, token);
 
-    if (this.userPort) {
-      const { sub } = payload;
-      const user = await this.userPort.getBySubject(ctx, sub);
-      if (!user) {
-        throw new AuthenticationRefreshTokenException();
-      }
+    const { sub } = payload;
+    const user = await this.userPort.getBySubject(ctx, sub);
+    // An inactive user is refused like a missing one.
+    if (user?.active !== true) {
+      throw new AuthenticationRefreshTokenException();
     }
 
     return payload;

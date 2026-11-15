@@ -19,24 +19,29 @@ const CASES: {
   name: string;
   build: () => RuntimeException;
   fault: RuntimeExceptionFault;
+  errorCode: string;
 }[] = [
   {
     name: 'TypeOrmEntityNameException',
+    errorCode: 'TYPEORM_ENTITY_NAME_RESOLUTION',
     build: () => new TypeOrmEntityNameException(),
     fault: 'usage',
   },
   {
     name: 'TypeOrmQueryCacheException',
+    errorCode: 'TYPEORM_QUERY_CACHE',
     build: () => new TypeOrmQueryCacheException('Post'),
     fault: 'usage',
   },
   {
     name: 'TypeOrmRelationMetadataException',
+    errorCode: 'TYPEORM_RELATION_METADATA',
     build: () => new TypeOrmRelationMetadataException('posts', 'PostEntity'),
     fault: 'usage',
   },
   {
     name: 'TypeOrmUnsupportedDatabaseException',
+    errorCode: 'TYPEORM_UNSUPPORTED_DATABASE',
     build: () =>
       new TypeOrmUnsupportedDatabaseException('Post', 'mongodb', 'postgres'),
     fault: 'usage',
@@ -48,6 +53,10 @@ const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 describe('exception fault classification', () => {
   it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
     expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
   });
 
   it('every RuntimeException subclass in this package is listed above', async () => {
