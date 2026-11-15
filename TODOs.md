@@ -72,6 +72,15 @@ done — see git history for what shipped. Reference notes that are not work liv
       - Should a guard that authenticates on its own (sign-in, refresh) be a distinct,
         named kind of route rather than public plus an `allow` entry?
       - Should the `disable` callback have to mark what it opens?
+  6. **Field-scoped allows on calls that name no fields** (S, security) — an allow
+      naming `fields` allows the whole call when that call names no columns (user,
+      2026-11-15). CASL counts a field-scoped allow on a check without a field, so
+      `{ action: 'delete', subject: 'order', fields: ['status'] }` allows the whole
+      delete, and the same goes for `softDelete`, `restore` and a domain operation
+      asserted with `assertAuthority`. Decide whether `authorityRuleProblems` should
+      refuse `fields` on actions that ask no columns, whether such an allow should count
+      only when the call names one of its fields, or whether today's behaviour stays and
+      is documented as the rule.
 
 # Parked
 
