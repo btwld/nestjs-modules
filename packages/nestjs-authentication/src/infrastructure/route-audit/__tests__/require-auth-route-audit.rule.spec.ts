@@ -50,7 +50,14 @@ function route(
   guards: AuditedRouteInterface['guards'] = [],
   open = false,
 ): AuditedRouteInterface {
-  return { id, controller: class {}, handler: () => {}, guards, public: open };
+  return {
+    id,
+    method: id.slice(0, id.indexOf(' ')),
+    controller: class {},
+    handler: () => {},
+    guards,
+    public: open,
+  };
 }
 
 const rule = new RequireAuthRouteAuditRule(new GuardsPolicy(), false);

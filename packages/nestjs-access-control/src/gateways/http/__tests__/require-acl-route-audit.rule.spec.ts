@@ -43,6 +43,7 @@ function routesOf(
 ): AuditedRouteInterface[] {
   return entries.map(([id, handler, open = false]) => ({
     id,
+    method: id.slice(0, id.indexOf(' ')),
     controller,
     handler: Reflect.get(controller.prototype, handler),
     guards: [],
