@@ -6,6 +6,7 @@ import {
   type UserPort,
 } from '../../../../domain/ports/user.port.js';
 import { AuthenticationRefreshTokenException } from '../../../exceptions/authentication-refresh-token.exception.js';
+import { AuthenticationUserPortRequiredException } from '../../../exceptions/authentication-user-port-required.exception.js';
 import { ValidateAndVerifyRefreshTokenQuery } from '../../impl/validate-and-verify-refresh-token.query.js';
 import { ValidateAndVerifyRefreshTokenHandler } from '../validate-and-verify-refresh-token.handler.js';
 
@@ -83,10 +84,11 @@ describe(ValidateAndVerifyRefreshTokenHandler.name, () => {
       handler = new ValidateAndVerifyRefreshTokenHandler(jwtPort, null);
     });
 
-    it('should return payload without user validation', async () => {
+    it('refuses to validate, rather than accepting every signed token', async () => {
       const query = new ValidateAndVerifyRefreshTokenQuery({}, token);
-      const result = await handler.execute(query);
-      expect(result).toEqual(payload);
+      await expect(handler.execute(query)).rejects.toThrow(
+        AuthenticationUserPortRequiredException,
+      );
     });
   });
 });

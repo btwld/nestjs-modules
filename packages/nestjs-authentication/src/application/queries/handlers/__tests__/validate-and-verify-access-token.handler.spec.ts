@@ -6,6 +6,7 @@ import {
   type UserPort,
 } from '../../../../domain/ports/user.port.js';
 import { AuthenticationAccessTokenException } from '../../../exceptions/authentication-access-token.exception.js';
+import { AuthenticationUserPortRequiredException } from '../../../exceptions/authentication-user-port-required.exception.js';
 import { ValidateAndVerifyAccessTokenQuery } from '../../impl/validate-and-verify-access-token.query.js';
 import { ValidateAndVerifyAccessTokenHandler } from '../validate-and-verify-access-token.handler.js';
 
@@ -83,10 +84,11 @@ describe(ValidateAndVerifyAccessTokenHandler.name, () => {
       handler = new ValidateAndVerifyAccessTokenHandler(jwtPort, null);
     });
 
-    it('should return payload without user validation', async () => {
+    it('refuses to validate, rather than accepting every signed token', async () => {
       const query = new ValidateAndVerifyAccessTokenQuery({}, token);
-      const result = await handler.execute(query);
-      expect(result).toEqual(payload);
+      await expect(handler.execute(query)).rejects.toThrow(
+        AuthenticationUserPortRequiredException,
+      );
     });
   });
 });

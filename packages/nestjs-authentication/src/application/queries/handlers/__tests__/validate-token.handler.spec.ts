@@ -1,6 +1,5 @@
 import { mock } from 'vitest-mock-extended';
 
-import { JwtStrategyPolicy } from '../../../../domain/policies/jwt-strategy.policy.js';
 import {
   type AuthenticationUserResult,
   type UserPort,
@@ -24,7 +23,7 @@ describe(ValidateTokenHandler.name, () => {
 
     beforeEach(() => {
       userPort = mock<UserPort>();
-      handler = new ValidateTokenHandler(new JwtStrategyPolicy({}), userPort);
+      handler = new ValidateTokenHandler(userPort);
     });
 
     it('should return true when user is found', async () => {
@@ -63,28 +62,8 @@ describe(ValidateTokenHandler.name, () => {
   });
 
   describe('without UserPort', () => {
-    it('should return true (fail-open) when requireUserValidation is not set', async () => {
-      const handler = new ValidateTokenHandler(new JwtStrategyPolicy({}), null);
-      const query = new ValidateTokenQuery({}, payload);
-      const result = await handler.execute(query);
-      expect(result).toBe(true);
-    });
-
-    it('should return true (fail-open) when requireUserValidation is false', async () => {
-      const handler = new ValidateTokenHandler(
-        new JwtStrategyPolicy({ requireUserValidation: false }),
-        null,
-      );
-      const query = new ValidateTokenQuery({}, payload);
-      const result = await handler.execute(query);
-      expect(result).toBe(true);
-    });
-
-    it('should throw AuthenticationUserPortRequiredException when requireUserValidation is true', async () => {
-      const handler = new ValidateTokenHandler(
-        new JwtStrategyPolicy({ requireUserValidation: true }),
-        null,
-      );
+    it('refuses to validate, rather than accepting every signed token', async () => {
+      const handler = new ValidateTokenHandler(null);
       const query = new ValidateTokenQuery({}, payload);
       await expect(handler.execute(query)).rejects.toThrow(
         AuthenticationUserPortRequiredException,
