@@ -641,7 +641,10 @@ subclasses included. A subclass that lets anonymous callers through still
 counts, so mark its routes `@AuthPublic({ optional: true })`: each route
 then declares that it is open. Marking a route public, `{ optional: true }`
 included, also exempts it from access control's `requireAcl` audit rule,
-so a missing grant there is not caught at startup.
+so a missing grant there is not caught at startup. A public route that
+writes, such as a sign-in route marked `@AuthPublic()`, is caught by core's
+`requirePrivateWrites` until
+you allow it (see core's [Route Audit](../nestjs-core/README.md#route-audit)).
 
 When more than one route is non-public and no authentication guard runs on
 any of them, globally or on the route, the rule reports one violation for

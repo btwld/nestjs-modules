@@ -59,6 +59,7 @@ class RequestGlobalGuard implements CanActivate {
 @UseGuards(ClassGuard)
 class InvoiceController {
   @Get()
+  @PublicRoute()
   list(): void {}
 
   @Get(':id')
@@ -66,7 +67,6 @@ class InvoiceController {
   one(): void {}
 
   @Post(['', 'bulk'])
-  @PublicRoute()
   create(): void {}
 
   @Put('/:id/')
@@ -194,14 +194,24 @@ describe('RouteAuditService', () => {
       'GET /health',
     ]);
     expect(
-      seen?.routes.map((route) => [route.id, route.guards, route.public]),
+      seen?.routes.map((route) => [
+        route.id,
+        route.method,
+        route.guards,
+        route.public,
+      ]),
     ).toEqual([
-      ['GET /invoices', [ClassGuard], false],
-      ['GET /invoices/:id', [ClassGuard, RouteGuard, GlobalGuard], false],
-      ['POST /invoices', [ClassGuard], true],
-      ['POST /invoices/bulk', [ClassGuard], true],
-      ['PUT /invoices/:id v2', [ClassGuard], false],
-      ['GET /health', [], true],
+      ['GET /invoices', 'GET', [ClassGuard], true],
+      [
+        'GET /invoices/:id',
+        'GET',
+        [ClassGuard, RouteGuard, GlobalGuard],
+        false,
+      ],
+      ['POST /invoices', 'POST', [ClassGuard], false],
+      ['POST /invoices/bulk', 'POST', [ClassGuard], false],
+      ['PUT /invoices/:id v2', 'PUT', [ClassGuard], false],
+      ['GET /health', 'GET', [], true],
     ]);
     expect(seen?.routes[0]?.controller).toBe(InvoiceController);
     expect(seen?.routes[0]?.handler).toBe(InvoiceController.prototype.list);

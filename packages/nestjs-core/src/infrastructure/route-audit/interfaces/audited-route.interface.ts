@@ -9,6 +9,11 @@ export interface AuditedRouteInterface {
    * different ids. `allow` entries name routes by this id.
    */
   readonly id: string;
+  /**
+   * The request method, as the id names it, for example `POST`; `ALL` for a
+   * route that takes every method.
+   */
+  readonly method: string;
   /** The controller class. */
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   readonly controller: Function;

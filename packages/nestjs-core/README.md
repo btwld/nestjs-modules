@@ -650,13 +650,28 @@ route:
 
 | Rule | Added by | Passes when |
 | --- | --- | --- |
+| `requirePrivateWrites` | core | the route is not public, or only reads: `GET`, `HEAD`, `OPTIONS`, `SEARCH`, `PROPFIND` or `QUERY` |
 | `requireAuth` | `@concepta/nestjs-authentication` | an authentication guard runs on the route, or it is public |
 | `requireAcl` | `@concepta/nestjs-access-control` | the route has a grant decorator, or it is public |
 
 A route is public when it carries core's `@PublicRoute()`, which every
 `@AuthPublic()` form sets, `{ optional: true }` included. So a public route
 is also exempt from `requireAcl`: a missing grant there is not caught at
-startup.
+startup. A public route that writes is caught, by `requirePrivateWrites`:
+list the ones open on purpose, such as sign-in and sign-up, in its `allow`.
+Public means marked, so a marked route that a guard of its own still
+authenticates, such as token refresh, is listed too. A write is open
+without being listed when it isn't marked and nothing authenticates it:
+exempted from `requireAuth`, let through by a guard's `disable` callback,
+or in an application without an authentication module:
+
+```ts
+CoreModule.forRoot({
+  routeAudit: {
+    allow: { requirePrivateWrites: ['POST /auth/login', 'POST /signup'] },
+  },
+});
+```
 
 `requireAuth` reports one violation for the whole application instead, with
 no route and not exemptable by `allow`, when more than one route is
@@ -1366,7 +1381,7 @@ exercise correlation behavior directly.
 | `@RouteAuditRuleProvider()` | Registers a provider as a route audit rule. |
 | `RouteAuditRuleInterface` | A rule: its `name` and `audit(subject)`. |
 | `RouteAuditSubjectInterface` | What a rule checks: `routes` and `globalGuards`. |
-| `AuditedRouteInterface` | One route: `id`, `controller`, `handler`, `guards`, `public`. |
+| `AuditedRouteInterface` | One route: `id`, `method`, `controller`, `handler`, `guards`, `public`. |
 | `RouteAuditViolationInterface` | One finding: `route` (left out for the whole application) and `message`. |
 | `@PublicRoute()` | Marks a route or controller as open on purpose. Opens nothing by itself. |
 | `isPublicRoute(...targets)` | Whether a handler or controller carries `@PublicRoute()`. |

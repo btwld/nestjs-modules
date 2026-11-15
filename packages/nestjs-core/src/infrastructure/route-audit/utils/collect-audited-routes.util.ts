@@ -75,6 +75,7 @@ function routesOf(
           `${RequestMethod[method]} ${joinPath(modulePath, prefix, path)}`,
           ...qualifiers,
         ].join(' '),
+        method: RequestMethod[method],
         controller,
         handler,
         guards,
