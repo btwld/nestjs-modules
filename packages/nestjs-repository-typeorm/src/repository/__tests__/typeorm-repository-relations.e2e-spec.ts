@@ -23,7 +23,7 @@ import { RelationAppModuleFixture } from '../../__fixtures__/repository/module/r
 import { type TypeOrmRepository } from '../typeorm-repository.js';
 
 /**
- * How the TypeORM driver reports and writes relations beyond the driver
+ * How the TypeORM adapter reports and writes relations beyond the adapter
  * contract, which `typeorm-conformance.e2e-spec.ts` covers.
  */
 describe('TypeOrmRepository (relations)', () => {

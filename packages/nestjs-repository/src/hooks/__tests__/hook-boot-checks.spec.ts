@@ -36,8 +36,8 @@ class ForeignHook {
 }
 
 /**
- * A full adapter would drag a driver and a metadata fixture into a test about
- * startup validation.
+ * A full repository would drag an adapter and a metadata fixture into a test
+ * about startup validation.
  */
 const adapterStub = (over: {
   entityKey?: string;

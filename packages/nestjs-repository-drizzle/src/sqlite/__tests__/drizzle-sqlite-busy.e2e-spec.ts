@@ -75,9 +75,9 @@ describe('DrizzleSqliteRepository on a database another connection holds', () =>
             },
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: DrizzleSqliteRepositoryModule,
+                adapter: DrizzleSqliteRepositoryModule,
                 entities: [
                   {
                     key: 'note',

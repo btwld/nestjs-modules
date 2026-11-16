@@ -1,6 +1,6 @@
 # @concepta/nestjs-repository
 
-Repository abstraction module for NestJS. Provides a driver-agnostic
+Repository abstraction module for NestJS. Provides a database-agnostic
 `RepositoryAdapter` base class, transaction management with automatic
 nesting, and a two-level repository hook system.
 
@@ -73,10 +73,10 @@ Then import `forFeature()` with the keys each feature module injects.
 
 ### forRoot
 
-`forRoot()` registers every entity, grouped by the driver that serves it, and
+`forRoot()` registers every entity, grouped by the adapter that serves it, and
 sets up the transaction infrastructure (factory registry, scope, runner,
-interceptor). Import it once. `YourDriverModule` in the examples stands for
-your driver's module, such as one of
+interceptor). Import it once. `YourAdapterModule` in the examples stands for
+your adapter's module, such as one of
 [nestjs-repository-typeorm's adapters](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
 ```ts
@@ -86,9 +86,9 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
   imports: [
     RepositoryModule.forRoot({
       defaultTimeout: 30000, // transaction timeout in ms (default)
-      drivers: [
+      adapters: [
         {
-          driver: YourDriverModule,
+          adapter: YourAdapterModule,
           entities: [
             { key: 'order', entity: Order },
             { key: 'customer', entity: Customer },
@@ -102,8 +102,8 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
 export class AppModule {}
 ```
 
-Each entry is checked against its driver's options, so a misspelled option,
-or one only another driver understands, does not compile.
+Each entry is checked against its adapter's options, so a misspelled option,
+or one only another adapter understands, does not compile.
 
 Every repository is checked while the application is created: a
 misconfigured entity stops `NestFactory.create()` (or `Test.compile()`) with an
@@ -120,15 +120,15 @@ Further options for scoped, governed, append-only or recorded entities:
 | `entities[].authority` | Declares the entity `{ access: 'governed', authority }` or `{ access: 'open', reason }` (`AuthorityRegistration`) — see [Object Authority](#object-authority) |
 | `entities[].writePolicy` | Declares the entity `{ access: 'append-only', reason }` or `{ access: 'mutable' }` — see [Write Policy](#write-policy) |
 | `entities[].activity` | Records the entity's writes in a store, `{ store, values?, omit? }` — see [Activity Log](#activity-log) |
-| `options` | The driver's own options, such as per-transaction settings; type-checked against the driver |
+| `options` | The adapter's own options, such as per-transaction settings; type-checked against the adapter |
 | `imports` | Modules exporting the row scope resolvers and authorities your entities declare |
 
 ```ts
 RepositoryModule.forRoot({
   imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         {
           key: 'order',
@@ -149,9 +149,9 @@ Entities stay static; only the settings come from the factory.
 @Module({
   imports: [
     RepositoryModule.forRootAsync({
-      drivers: [
+      adapters: [
         {
-          driver: YourDriverModule,
+          adapter: YourAdapterModule,
           entities: [{ key: 'order', entity: Order }],
         },
       ],
@@ -211,7 +211,7 @@ interface RepositoryModuleOptionsInterface {
 }
 ```
 
-`forRoot()` takes these beside `drivers`; `forRootAsync()`'s `useFactory`
+`forRoot()` takes these beside `adapters`; `forRootAsync()`'s `useFactory`
 returns them.
 
 `requireRowScopeDeclaration` turns "nobody declared this entity" into a
@@ -230,8 +230,8 @@ Application Code
   |
 RepositoryModule (forRoot registers / forFeature exposes)
   |
-  +-- RepositoryAdapter (abstract, driver-agnostic)
-  |     Concrete implementations: one per driver
+  +-- RepositoryAdapter (abstract, database-agnostic)
+  |     Concrete adapters: one per ORM and database
   |
   +-- Transaction Layer
   |     TransactionScope -> TransactionManager -> TransactionFactory
@@ -249,7 +249,7 @@ RepositoryModule (forRoot registers / forFeature exposes)
 - **Transaction Layer** -- `TransactionScope` orchestrates transaction
   lifecycle with automatic nesting; `TransactionManager` manages active
   transactions for one scope, shared by every participant via a refcount;
-  factories are registered per driver/datasource
+  factories are registered per adapter/datasource
 - **Hook System** -- two-level decorators (high-level semantic + fine-grained)
   for cross-cutting concerns like auditing, tenant filtering, and validation
 - **Registry** -- every repository `forRoot()` registered, checked so that no
@@ -257,11 +257,11 @@ RepositoryModule (forRoot registers / forFeature exposes)
 
 ## Repository Adapter
 
-`RepositoryAdapter` is the abstract base class that all driver-specific
-repository implementations extend. It implements `RepositoryInterface` with
+`RepositoryAdapter` is the abstract base class that every adapter's
+repository implementation extends. It implements `RepositoryInterface` with
 a template-method design: the public operations (`find`, `create`, `update`,
 etc.) are concrete wrappers that run the hook pipeline, each delegating to a
-protected abstract `do*` method that the driver implements.
+protected abstract `do*` method that the adapter implements.
 
 ### Abstract Members
 
@@ -287,7 +287,7 @@ the `metadata` property:
 
 Override `describeDatabaseError(error)` to report an error your database raised
 as `{ database, code?, message }`; the caller then receives a
-`RepositoryDatabaseException` carrying them. Every driver overrides it, so
+`RepositoryDatabaseException` carrying them. Every adapter overrides it, so
 that an error its store raised, such as a duplicate key, says which store
 and what failed. Return `undefined` for any error that isn't the store's; it
 then arrives as a plain `RepositoryQueryException`, as it does from the
@@ -299,8 +299,8 @@ default.
 is an error (`EntityAlreadyExistsException`), not an instruction to overwrite
 it — use `upsert` for insert-or-update.
 
-This is enforced in `RepositoryAdapter` rather than left to each driver:
-`assertNotExisting` runs immediately before `doCreate`, so a driver may still
+This is enforced in `RepositoryAdapter` rather than left to each adapter:
+`assertNotExisting` runs immediately before `doCreate`, so an adapter may still
 implement `doCreate` with an insert-or-update primitive. The guard reads
 through the protected `doFindOne`, which bypasses both hooks and row scope —
 deliberately, because the question is whether the key is taken, not whether
@@ -318,10 +318,10 @@ is present; leaving it out is the ordinary generated-key create and is
 untouched.
 
 **This is a check-then-write with a real race.** A row inserted between the
-check and the write is *overwritten* rather than rejected, because a driver
+check and the write is *overwritten* rather than rejected, because an adapter
 implementing create as a write-by-key re-reads and updates — so no uniqueness
 constraint catches it. A transaction narrows the window but does not close it
-at READ COMMITTED, where the driver's own re-read sees the committed row.
+at READ COMMITTED, where the adapter's own re-read sees the committed row.
 Losing the race requires a concurrent insert of the *same* primary key:
 unreachable for generated keys, narrow for caller-supplied ones.
 
@@ -341,14 +341,14 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 | `endsTransaction(error)` | protected | Whether the database ended the caller's transaction after `error` (a deadlock); `true` fails the scope (subclass-author API) |
 | `distinctKeys(keys)` | protected | `keys` without repeats, compared as the repository compares keys (dates by time, binary keys by bytes) — what a `deleteMany` that may name a row twice is checked against (subclass-author API) |
 | `runHooks(methodKey, payload, ctx, filter?)` | protected | Execute repository hooks for a lifecycle event; `filter` selects by hook metadata, which is how `{ replace: true }` routing works (subclass-author API) |
-| `allowsEagerRelations` | public | Whether the entity set `allowEagerRelations`, so a driver knows whether to load eager relations |
+| `allowsEagerRelations` | public | Whether the entity set `allowEagerRelations`, so an adapter knows whether to load eager relations |
 
 ### Implementing a Repository
 
 ```ts
 import { RepositoryAdapter } from '@concepta/nestjs-repository';
 
-class MyDriverRepository<Entity extends PlainLiteralObject>
+class MyAdapterRepository<Entity extends PlainLiteralObject>
   extends RepositoryAdapter<Entity> {
   readonly metadata = { /* ... */ };
 
@@ -364,37 +364,37 @@ class MyDriverRepository<Entity extends PlainLiteralObject>
 }
 ```
 
-**Override `do*` methods only.** A driver must never override a public
+**Override `do*` methods only.** An adapter must never override a public
 operation method (`find`, `create`, `update`, …): those are where row scope,
 authority, hooks, and the soft-delete guards are invoked, so an override
-bypasses all of them for every entity that driver serves, silently. Nothing
-enforces this — it is a contract a driver author has to keep.
+bypasses all of them for every entity that adapter serves, silently. Nothing
+enforces this — it is a contract an adapter author has to keep.
 
 Each entry in `metadata.columns` must supply `name`, `isPrimary`,
 `isRemoveDate`, and `isVersion`. Set `isVersion: true` on the
-optimistic-locking version column, if the driver has one — `getVersionColumn()`
+optimistic-locking version column, if the adapter has one — `getVersionColumn()`
 reads it. Adapters that leave it `false` everywhere simply get no
 optimistic-locking support.
 
-Setting `isRemoveDate: true` on a column declares that your driver supports soft
+Setting `isRemoveDate: true` on a column declares that your adapter supports soft
 delete for that entity. The column holds a `Date` once set and `null` until
 then. `softDelete` and `restore` set and clear it, and a read without
 `withDeleted` leaves out rows where it is set, both on the entity and on every
 relation the read joins. Restoring a row that isn't soft-deleted leaves it as
-it is. A driver that cannot do all of that must refuse, at startup, an entity
+it is. An adapter that cannot do all of that must refuse, at startup, an entity
 that declares a remove date. On an
 entity without the column, `softDelete` and `restore` throw, and
 `withDeleted` changes nothing.
 
 `metadata.urn` names the rows an entity reads, and each relation's `targetUrn`
 (and `through.urn` for a many-to-many junction) names the rows it reaches.
-Derive them from your entity definitions as `urn:<driver>:…`, so that two
+Derive them from your entity definitions as `urn:<adapter>:…`, so that two
 entities reading the same rows report the same URN whatever their class names.
 The repository only compares them; row scope uses them to find relations into
 scoped rows.
 
-Your driver's module class is what applications list in `forRoot()`'s
-`drivers`. It implements `RepositoryDriverInterface`: a static
+Your adapter's module class is what applications list in `forRoot()`'s
+`adapters`. It implements `RepositoryAdapterInterface`: a static
 `register(entities)` that returns one provider per entity, under
 `getDynamicRepositoryToken(key)`, the `imports` those providers need, and any
 `transactionFactories`. Keep those providers and everything your transaction
@@ -405,27 +405,27 @@ only. Row scope, authority, hooks, write policy and the eager opt-in are not
 yours to pass: `forRoot()` binds them to every repository you return, from the
 application's entry, and a repository that was never bound refuses every call
 (`RepositoryUnboundException`). Applications never call `register`. Extend
-`RepositoryProviderOptions` with your driver's own entity options, and
-`forRoot()` type-checks each entry against them. Take options for the driver
+`RepositoryProviderOptions` with your adapter's own entity options, and
+`forRoot()` type-checks each entry against them. Take options for the adapter
 as a whole as `register`'s second parameter, `register(entities, options?)`:
 applications pass them as the registration's `options`, type-checked the
 same way.
 
-### Testing Your Driver
+### Testing Your Adapter
 
-`@concepta/nestjs-repository/conformance` is the driver contract as a test
-suite: what your driver reports, how it translates every read, what each
+`@concepta/nestjs-repository/conformance/adapter` is the adapter contract as a test
+suite: what your adapter reports, how it translates every read, what each
 write persists, and which database errors it reports. Run it once per
-database your driver supports. You give it a harness, and it registers its
+database your adapter supports. You give it a harness, and it registers its
 own cases with your test runner:
 
 ```ts
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 runRepositoryConformance(
   {
-    name: 'my-driver/postgres',
-    driver: MyDriverModule,
+    name: 'my-adapter/postgres',
+    adapter: MyAdapterModule,
     imports: [MyConnectionModule.forRoot({ url: process.env.DATABASE_URL })],
     fixtures: {
       item: { key: 'conformance-item', entity: ItemEntity },
@@ -457,7 +457,7 @@ runRepositoryConformance(
   key to your own entity of that shape, with your own entity options;
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
-  driver's own options go in `driverOptions`.
+  adapter's own options go in `adapterOptions`.
 - **Capabilities.** Seven are optional, each `'supported'` or `'refused'`:
   `transactions`, `concurrentTransactions` (needs `transactions`; your
   store runs transactions at the same time, so one commits while another
@@ -468,14 +468,14 @@ runRepositoryConformance(
   `transactions`; your store checks `award.authorId` at commit, so a run
   may write an award naming no author and its commit is refused), and
   `softDelete`. A refused
-  one runs its refusal cases, if it has any, instead. A driver that refuses
+  one runs its refusal cases, if it has any, instead. An adapter that refuses
   `relations` reports none, so the repository refuses every read that joins,
-  filters on or sorts by one. A driver that refuses `softDelete` must refuse
+  filters on or sorts by one. An adapter that refuses `softDelete` must refuse
   at startup an entity that declares a remove date; its harness binds the
   fixtures to entities whose `removedAt` is an ordinary column.
-  Every other case is required, including that your driver describes the
+  Every other case is required, including that your adapter describes the
   errors its store raises.
-- **Versions.** Every driver is checked for changing the version on each
+- **Versions.** Every adapter is checked for changing the version on each
   write that changes a stored row, and for keeping it on a write that
   changes nothing. Refusing a stale row is checked inside a transaction
   only.
@@ -499,15 +499,15 @@ runRepositoryConformance(
   it's needed only when you support `relations`.
 
 The suite builds one application per harness and imports nothing from a
-test runner. Test your driver's own options and behaviour in your own specs,
+test runner. Test your adapter's own options and behaviour in your own specs,
 on top of it.
 
 ### Soft-Deleted Immutability
 
 A soft-deleted row is immutable: `update`, `replace`, and `upsert` all reject
-it with `SoftDeletedImmutableException` (409 Conflict), for every driver —
+it with `SoftDeletedImmutableException` (409 Conflict), for every adapter —
 the guard lives in `RepositoryAdapter` itself, above the `do*` methods, so no
-driver implementation can forget it or diverge from it. `restore()` is the
+adapter implementation can forget it or diverge from it. `restore()` is the
 sanctioned way back, and `delete` and `deleteMany` still remove it for good.
 
 The guard reads the delete date from the row you pass, so `update`,
@@ -540,7 +540,7 @@ re-read before writing both pass it, since each compares against its own
 fresh value. `expectedVersion` closes that gap: pass the version the caller
 last read, and `update`, `replace`, `delete`, `softDelete`, and `restore`
 all reject a mismatch with `OptimisticLockException` (409 Conflict) —
-enforced once in `RepositoryAdapter`, for every driver. Inside a
+enforced once in `RepositoryAdapter`, for every adapter. Inside a
 transaction that is certain; outside one, two writers holding the same
 version can both pass (see the end of this section). Every write that
 changes a stored row bumps its version, `upsert` included, so a version read
@@ -568,18 +568,18 @@ version included.
 `upsert()` and `deleteMany()` don't accept it: neither has a single
 caller-held row whose version the client could have read.
 
-Drivers never decide any of this — `RepositoryAdapter` resolves a
+Adapters never decide any of this — `RepositoryAdapter` resolves a
 `RepositoryVersionGuardInterface` descriptor (`{ column, value }`) and
-passes it down via `options.versionGuard`; a driver's only job is to
+passes it down via `options.versionGuard`; an adapter's only job is to
 check `column === value` as it writes, in the caller's transaction when
 there is one. It never opens a transaction of its own to do so.
-`versionGuard` is not a caller option: it is added to the options a driver's
+`versionGuard` is not a caller option: it is added to the options an adapter's
 `do*` methods receive (`RepositoryVersionGuardOptions`), and a value a caller
 passes anyway is overwritten.
 
 The `expectedVersion` check itself is always certain: the repository makes
-it. The driver's compare-and-swap is certain inside a transaction; outside
-one, it is the driver's best effort, and your driver's README says what it
+it. The adapter's compare-and-swap is certain inside a transaction; outside
+one, it is the adapter's best effort, and your adapter's README says what it
 does.
 
 ## Relations and Joins
@@ -694,14 +694,14 @@ a `400`.
 
 ### Relation Metadata
 
-Your driver reports each entity's relations from its entity definitions. You
+Your adapter reports each entity's relations from its entity definitions. You
 can also configure per-relation behavior on its `forRoot()` entry:
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [{
         key: 'user',
         entity: UserEntity,
@@ -723,7 +723,7 @@ repository instead of a join. See [Federation](#federation). A relation marked
 ### Writing relations
 
 A write changes only the entity's own table, and only its columns reach the
-driver:
+adapter:
 
 | In the payload | Result |
 | --- | --- |
@@ -745,9 +745,9 @@ scope, write policy and hooks run, or mark the relation `cascade: true` and let
 the entity's writes do it. Otherwise, what happens to related rows on delete is
 your database's foreign key action.
 
-Behaviour you declare on an entity for your driver to run on its own, such as
+Behaviour you declare on an entity for your adapter to run on its own, such as
 code that runs whenever a row is written, runs outside these guarantees, at
-your own risk. Your driver's README lists what it runs.
+your own risk. Your adapter's README lists what it runs.
 
 A `join` still returns related rows as objects.
 
@@ -866,8 +866,8 @@ A read reaches another table only through a relation it names in `join`:
 
 | In the read options | Result |
 | --- | --- |
-| an own column in `select`, `where` or `order` | passed to the driver |
-| a relation in `join`, a `Where.rel()` filter on a joined relation, and a relation sort on a joined to-one relation | passed to the driver |
+| an own column in `select`, `where` or `order` | passed to the adapter |
+| a relation in `join`, a `Where.rel()` filter on a joined relation, and a relation sort on a joined to-one relation | passed to the adapter |
 | a relation name, or any other non-column, as a `select`, `where` or `order` field | refused with `UnknownColumnException` (`400`); on a governed entity, for an actor limited to some columns, with `AuthorityRefusedException` (`403`), as for a hidden column |
 | a relation that is not declared | refused (`400`) |
 | a relation into rows that have a row scope, in `join` | refused (`400`), unless both resolvers are `joinable`, this one holds the caller to every scope column the other does, and the join matches them; see [Relations and row scope](#relations-and-row-scope) |
@@ -921,7 +921,7 @@ related row its `where` keeps.
 
 A row comes back holding its own columns and the relations its read joined,
 each of those holding the related entity's own columns. That holds for the
-rows a write returns too. If the driver hands back anything else, the call
+rows a write returns too. If the adapter hands back anything else, the call
 throws `RepositoryQueryException` instead of returning it.
 
 Every own column is there, `null` where the row holds no value. A write that
@@ -942,9 +942,9 @@ An entity whose relations load on their own, eagerly, opts in with
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'comment', entity: CommentEntity, allowEagerRelations: true },
       ],
@@ -964,9 +964,9 @@ rows (or through a junction) an authority governs, nor one with a
 
 ## Where Clause Builder
 
-The `Where` helper builds driver-neutral
+The `Where` helper builds adapter-neutral
 `WhereClause` AST objects that `RepositoryAdapter` implementations translate
-into driver-specific queries.
+into adapter-specific queries.
 
 ### How Translation Works
 
@@ -974,8 +974,8 @@ into driver-specific queries.
    compound operators)
 2. `RepositoryAdapter.toDnf()` flattens the AST into Disjunctive Normal Form
    (an OR of ANDs)
-3. The driver translates each AND-branch
-   into a driver-specific query object
+3. The adapter translates each AND-branch
+   into an adapter-specific query object
 4. Same-field conditions within a branch are merged (e.g., `gt` + `lt` on the
    same field become a combined range)
 
@@ -1144,7 +1144,7 @@ const orders = await orderRepo.findAndCount({
 The text operators (`contains` through `notEnds`) take a string and match it
 as written: no character in it is a wildcard, so `contains('sku', '50%')`
 finds SKUs containing `50%`. Whether case matters depends on your database;
-your driver's README says which.
+your adapter's README says which.
 
 No operator but `isNull` matches a null value. `ne('rank', 2)` and
 `notIn('rank', [1, 3])` leave out rows whose `rank` is null, as do the negated
@@ -1172,9 +1172,9 @@ nothing out.
 
 ## Order Clause Builder
 
-The `OrderBy` helper builds driver-neutral
+The `OrderBy` helper builds adapter-neutral
 `OrderClause` arrays that `RepositoryAdapter` implementations translate
-into driver-specific sort options.
+into adapter-specific sort options.
 
 ### Static OrderBy API
 
@@ -1473,7 +1473,7 @@ cancellation signal.
 | `onRollback(fn)` | Register post-rollback callback; a `readOnly` scope always rolls back, so these run whether or not its operation succeeded; throws `TransactionClosedException` once the scope has closed |
 | `signal` | `AbortSignal` that aborts once the scope is doomed (an operation threw, or the final commit failed), carrying that failure as `signal.reason`. Stays unaborted for a scope that settles cleanly — it signals "doomed", not "settled" |
 
-`getOrStart(key)` also exists but is used by repository/driver internals —
+`getOrStart(key)` also exists but is used by repository/adapter internals —
 application code doesn't call it directly.
 
 `onCommit`/`onRollback` callbacks flush one at a time, in registration
@@ -1526,7 +1526,7 @@ via `onCommit(() => agg.commit())` are treated as not-yet-safe-to-publish.
 
 ### TransactionFactory
 
-Each driver/datasource provides a `TransactionFactoryInterface`:
+Each adapter/datasource provides a `TransactionFactoryInterface`:
 
 ```ts
 interface TransactionFactoryInterface {
@@ -1539,26 +1539,26 @@ interface TransactionFactoryInterface {
 ```
 
 Factories are registered automatically by `RepositoryModule.forRoot()` from
-each driver that returns `transactionFactories` in its
+each adapter that returns `transactionFactories` in its
 `DynamicRepositoryModule`.
 
 `create` is called once per scope and data source, with the context the
 scope runs under. Read the caller's overlays from it, row scope included, to
 prepare the transaction; never define overlays on it.
 
-Every read and write a driver makes with a scope's `ctx` takes part in that
+Every read and write an adapter makes with a scope's `ctx` takes part in that
 scope's transaction, and a call made without it takes part in none, even
 while a run is open; on a store with one connection, it waits for the run
 to end. A `commit()` the database refuses ends the transaction before it
 rejects, keeping none of its writes; report the database's error from the
 factory's `describeDatabaseError(error)` and the run rejects with
-`TransactionCommitException`. A driver that registers no factory has none to join:
+`TransactionCommitException`. An adapter that registers no factory has none to join:
 `run()` then works without a transaction, and the writes made before a throw
 stay.
 
 `supportsConcurrentTransactions` defaults to `true` when omitted — the normal
 case for a pooled/multi-connection backend, where each transaction gets its
-own connection. A driver whose connections are shared (one connection per
+own connection. An adapter whose connections are shared (one connection per
 data source, not per transaction) should declare `false`: `TransactionManager`
 then queues transactions for that factory's key, so a second transaction on
 the same connection waits for the first to commit or roll back instead of
@@ -1755,9 +1755,9 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
   imports: [
     CoreModule.forRoot(), // 1. required for any hook to run
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: YourDriverModule,
+          adapter: YourAdapterModule,
           entities: [
             { key: 'order', entity: Order, hooks: [OrderDefaultsHook] },
           ],
@@ -1882,7 +1882,7 @@ changes and when to use it; every other decorator's signature is unaffected.
 
 Hook execution is orchestrated by `RepoPermeatorFactory`, built on
 `@tsyche/membrane` (`Permeator`/`Membrane`). Each public repository
-operation runs before-hooks on its input, calls the driver's `do*` method,
+operation runs before-hooks on its input, calls the adapter's `do*` method,
 then runs after-hooks on the result, with one of two merge semantics for
 single-entity payloads and options objects (`Membrane.object` /
 `Membrane.objectReplace`), and a separate strategy for array payloads
@@ -1920,7 +1920,7 @@ single-entity payloads and options objects (`Membrane.object` /
   like `{ replace: true }` unconditionally — there's no merge-vs-replace
   choice to make for it.
 
-Any error thrown inside the pipeline (a hook or the driver call) is wrapped
+Any error thrown inside the pipeline (a hook or the adapter call) is wrapped
 in `RepositoryQueryException`. `RuntimeException` subclasses — `OptimisticLockException`,
 `FederationException`, the transaction exceptions, and any already-wrapped
 `RepositoryQueryException` — pass through unchanged, so callers can catch
@@ -1948,7 +1948,7 @@ repository calls, not only to calls that pass through a controller.
 owns all enforcement: the read predicate, stamping a write, refusing one, any
 visibility read. The framework owns exactly one guarantee — that your callback
 is invoked at every repository entry point, with that operation's real input,
-before the driver sees it. It never inspects or second-guesses what you
+before the adapter sees it. It never inspects or second-guesses what you
 return. There is deliberately no read-side guard: if your resolver returns an
 unscoped query, it runs.
 
@@ -2249,7 +2249,7 @@ from it and declare the relation on the scoped entity's side only.
 A [federated](#federation) relation is allowed and joinable in every case: it
 is read through the related entity's own repository, so that entity's resolver
 runs. The one exception is `allowEagerRelations`: an entity with any relation
-into scoped rows, or any federated relation, cannot set it, since the driver
+into scoped rows, or any federated relation, cannot set it, since the adapter
 would load those rows on its own.
 
 The check follows rows, not entity names. A relation is refused when it reaches
@@ -2279,7 +2279,7 @@ const lines = await orderLines.find({ join: [{ relation: 'order' }], ctx });
 
 The joined rows carry the caller's `tenantId` already, so the related
 resolver's check is satisfied by construction. How to declare the foreign key
-is your driver's business; see its README.
+is your adapter's business; see its README.
 
 The check is made per caller, on the columns each resolver holds that caller
 to after [`relax`](#reading-more-broadly-than-you-write). With projects scoped
@@ -2373,7 +2373,7 @@ value it enforces is missing: on a read, each column it doesn't relax; on
 a write, every scope column. Set `RowScopeCtx` from the signed-in user,
 such as a clerk's `ownerId` to limit them to their own rows.
 
-`params.ctx` is plumbing: the context the driver will run under, after hooks.
+`params.ctx` is plumbing: the context the adapter will run under, after hooks.
 Pass it through unchanged on any read your resolver makes, so that read joins
 the caller's transaction. Building a fresh context instead silently drops it.
 
@@ -2436,7 +2436,7 @@ caller's entity cannot decide which row is written.
 Check the right object for the operation:
 
 - `update`/`replace` — `target` is the row; `value` is the data being written.
-- `delete`/`deleteMany`/`softDelete`/`restore` — the driver acts on the *value*
+- `delete`/`deleteMany`/`softDelete`/`restore` — the adapter acts on the *value*
   the resolver returns, so that is the one to check.
 - `upsert` — the key comes from `value`, and `target` is the stored row that
   key names, or `undefined` when it names none. That lookup is by primary key
@@ -2476,7 +2476,7 @@ Structural only — nothing probes what a resolver decides:
 
 Row scope protects every repository call. To have the database hide other
 tenants' rows too, even from SQL that bypasses the repository, add row-level
-security behind it. This needs a driver and database that support it, such
+security behind it. This needs an adapter and database that support it, such
 as `nestjs-repository-typeorm` on Postgres, Oracle or SQL Server, which sets
 the caller's tenant on every transaction from the same `RowScopeCtx` overlay.
 See its [adapter sections](../nestjs-repository-typeorm/README.md#choose-your-adapter).
@@ -2501,9 +2501,9 @@ Every entity is governed, open, or undeclared:
 ```ts
 RepositoryModule.forRoot({
   imports: [AuthorityModule],
-  drivers: [
+  adapters: [
     {
-      driver: MyDriverModule,
+      adapter: MyAdapterModule,
       entities: [
         {
           key: 'order',
@@ -2530,7 +2530,7 @@ other, or startup fails:
 ```ts
 RepositoryModule.forRoot({
   authority: { required: true },
-  drivers: [...],
+  adapters: [...],
 });
 ```
 
@@ -2882,7 +2882,7 @@ to write. You cannot make a call skip authority. Everything else is decided
 as its caller, including cascade writes and hooks calling other
 repositories, even with the options object they were handed.
 
-As with row scope, the driver's own client used directly, or SQL that
+As with row scope, the adapter's own client used directly, or SQL that
 bypasses the repository, is outside it.
 
 ### Refusals
@@ -2926,9 +2926,9 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         {
           key: 'statement-item',
@@ -2984,7 +2984,7 @@ by querying for one whose `correctedId` matches it.
 The policy does not keep the chain well formed: `create` is not checked, so
 two rows can share a `correctedId` or name a missing row. If each record may
 be corrected only once, add a unique index on `correctedId` and a
-self-referencing foreign key; your driver's README shows how. The database then
+self-referencing foreign key; your adapter's README shows how. The database then
 refuses a second correction of one record, or a correction of a missing one,
 and the call throws `RepositoryDatabaseException` (`500`) carrying the
 database's own error.
@@ -3018,7 +3018,7 @@ routes bypass it:
 
 | Check | Always on | What it catches |
 | --- | --- | --- |
-| No soft-delete column on an append-only entity | yes | The entity has a soft-delete column, e.g. it extends an audited base entity. Use your driver's append-only base instead |
+| No soft-delete column on an append-only entity | yes | The entity has a soft-delete column, e.g. it extends an audited base entity. Use your adapter's append-only base instead |
 | Every entity declares a policy | `requireWritePolicyDeclaration` | An entity nobody decided about |
 
 ## Activity Log
@@ -3027,13 +3027,13 @@ Add `activity` to an entity to record who changed which of its rows, when, and
 which columns:
 
 ```ts
-// Extend your driver's activity base entity.
-export class Activity extends YourDriverActivityEntity {}
+// Extend your adapter's activity base entity.
+export class Activity extends YourAdapterActivityEntity {}
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'invoice', entity: Invoice, activity: { store: 'activity' } },
         {
@@ -3056,7 +3056,7 @@ RepositoryModule.forRoot({
 Every write then adds one record per row it writes, even when that changes
 nothing: an `update` naming no column of its own, only cascaded relations or
 nothing at all, is recorded with `changed: []`. The store is an
-append-only entity extending your driver's activity base entity; several
+append-only entity extending your adapter's activity base entity; several
 entities can share one.
 
 | `activity` option | Description |
@@ -3180,7 +3180,7 @@ a scheduled job outside the repository.
 | Unrecorded store | The store declares `activity` too |
 | Append-only store | The store isn't `{ access: 'append-only' }` |
 | Scoped entity, declared store | The entity is scoped and its store declares no `rowScope` |
-| Store columns | The store lacks an `ActivityInterface` column. Extend your driver's activity base entity |
+| Store columns | The store lacks an `ActivityInterface` column. Extend your adapter's activity base entity |
 | `omit` | `omit` without `values`, or a column the entity doesn't have |
 
 ## Durable Messaging
@@ -3324,9 +3324,9 @@ the registrations that conflict.
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'user', entity: UserEntity },
         { key: 'user', entity: AdminEntity }, // duplicate key!
@@ -3348,15 +3348,15 @@ and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'user', entity: UserEntity, relations: { posts: { federated: true } } },
       ],
     },
     {
-      driver: YourOtherDriverModule, // posts live in another database
+      adapter: YourOtherAdapterModule, // posts live in another database
       entities: [{ key: 'post', entity: PostEntity }],
     },
   ],
@@ -3412,7 +3412,7 @@ Every federated query carries at most `federation.maxKeys` keys (default
 `1000`):
 
 ```ts
-RepositoryModule.forRoot({ federation: { maxKeys: 5000 }, drivers: [/* … */] });
+RepositoryModule.forRoot({ federation: { maxKeys: 5000 }, adapters: [/* … */] });
 ```
 
 - **A join** attaches its relation to rows holding up to `maxKeys` distinct
@@ -3492,7 +3492,7 @@ also exported for manual provider wiring.
 
 | Exception | Description |
 | --- | --- |
-| `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline, and is thrown when a driver returns a property the call did not ask for — see [What a result holds](#what-a-result-holds) — or a `createMany`/`deleteMany` result without one row per input. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
+| `RepositoryQueryException` | Wraps any opaque error thrown by a repository operation or its hook pipeline, and is thrown when an adapter returns a property the call did not ask for — see [What a result holds](#what-a-result-holds) — or a `createMany`/`deleteMany` result without one row per input. `RuntimeException` subclasses (e.g. `OptimisticLockException`) pass through unwrapped |
 | `RepositoryDatabaseException` | A `RepositoryQueryException` for an error the database raised, such as a foreign key or unique constraint it refused. `context.database` and `context.code` name the database and its own error code, for logs and diagnosis |
 | `OptimisticLockException` | An `update`, `replace`, `delete`, `softDelete` or `restore` targeted a stale version — the row was modified, or deleted, by another request since it was read |
 | `RepositoryDuplicateKeyException` | Two `forRoot()` entries share a key |
@@ -3533,7 +3533,7 @@ also exported for manual provider wiring.
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
-| `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
+| `@concepta/nestjs-repository/conformance/adapter` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Adapter](#testing-your-adapter) |
 | `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityOptionsInterface`, `CaslAuthorityRulesInterface`, `CaslAuthorityRulesInvalidException`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

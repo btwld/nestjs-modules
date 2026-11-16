@@ -520,9 +520,9 @@ describe(CaslAuthority.name, () => {
         CoreModule.forRoot({}),
         RepositoryModule.forRoot({
           imports: [AuthorityModule],
-          drivers: [
+          adapters: [
             {
-              driver: MemoryRepositoryModuleFixture,
+              adapter: MemoryRepositoryModuleFixture,
               entities: [
                 {
                   key: ORDER_TOKEN,

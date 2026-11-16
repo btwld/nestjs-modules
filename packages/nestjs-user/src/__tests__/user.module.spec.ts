@@ -52,9 +52,9 @@ describe('UserModule repositories', () => {
       imports: [
         TypeOrmModule.forRoot(ormConfig),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: 'user', entity: UserEntityFixture },
                 {

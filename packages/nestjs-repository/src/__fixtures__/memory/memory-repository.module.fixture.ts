@@ -137,9 +137,9 @@ const ADAPTERS = new Map<
 ]);
 
 /**
- * A driver over `MemoryRepositoryFixture`, for registering through
- * `RepositoryModule.forRoot()`. Like a real driver, it hands each adapter the
- * optional hook resolver, and binds nothing itself.
+ * An adapter over `MemoryRepositoryFixture`, for registering through
+ * `RepositoryModule.forRoot()`. Like a real adapter, it hands each repository
+ * the optional hook resolver, and binds nothing itself.
  */
 @Module({})
 export class MemoryRepositoryModuleFixture {

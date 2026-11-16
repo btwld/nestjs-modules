@@ -108,7 +108,7 @@ export function activityBindingOf(
   if (missing.length) {
     failures.push(
       `${label} names store "${registration.store}", which lacks columns: ` +
-        `${missing.join(', ')}. Extend your driver's activity base entity.`,
+        `${missing.join(', ')}. Extend your adapter's activity base entity.`,
     );
   }
 

@@ -20,7 +20,7 @@ import {
 import { type DrizzleMysqlClient } from './drizzle-mysql.types.js';
 
 /**
- * The Drizzle repository driver for MySQL, registered through
+ * The Drizzle repository adapter for MySQL, registered through
  * `RepositoryModule.forRoot()`. Reads each connection's database from
  * `@nestjs/drizzle`, and refuses a connection that is not a mysql2 one.
  *
@@ -30,9 +30,9 @@ import { type DrizzleMysqlClient } from './drizzle-mysql.types.js';
  *   imports: [
  *     DrizzleModule.forRoot({ drizzle, connection }),
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
- *           driver: DrizzleMysqlRepositoryModule,
+ *           adapter: DrizzleMysqlRepositoryModule,
  *           entities: [
  *             { key: 'books', entity: Book, table: books, removeDate: 'removedAt' },
  *           ],

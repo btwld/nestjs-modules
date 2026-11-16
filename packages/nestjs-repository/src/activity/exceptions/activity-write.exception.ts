@@ -6,7 +6,7 @@ import {
 /**
  * Exception thrown when a write's activity records could not be stored.
  *
- * The write itself reached the driver first. Inside a transaction the caller
+ * The write itself reached the adapter first. Inside a transaction the caller
  * opened, this error rolls both back; without one, the write stays stored.
  * Carries the status and fault of a store refusal, such as its row scope's.
  */

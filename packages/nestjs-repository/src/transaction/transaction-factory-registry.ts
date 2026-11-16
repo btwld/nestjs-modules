@@ -10,7 +10,7 @@ export const TRANSACTION_FACTORY_REGISTRY = Symbol(
 
 /**
  * Registry for transaction factories.
- * Each repository module registers its factory keyed by "driver:datasource".
+ * Each repository module registers its factory keyed by "adapter:datasource".
  *
  * Also the app-wide home for the per-key {@link TransactionQueue}s that
  * back `supportsConcurrentTransactions: false` factories — one shared

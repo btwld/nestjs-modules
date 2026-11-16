@@ -18,9 +18,9 @@ import { UserOtpEntityFixture } from './entities/user-otp-entity.fixture.js';
       entities: [UserEntityFixture, UserOtpEntityFixture],
     }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: 'userOtp',

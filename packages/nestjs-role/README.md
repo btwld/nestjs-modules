@@ -52,7 +52,7 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 | `@nestjs/common` | Yes | NestJS core — install explicitly, no longer bundled |
 | `@nestjs/core` | Yes | Module reference and reflection — install explicitly |
 | `@nestjs/cqrs` | No | Optional peer — required in practice for the CQRS buses |
-| `typeorm` | No | Only when using TypeORM repository driver |
+| `typeorm` | No | Only when using a TypeORM repository adapter |
 | `@concepta/nestjs-crud` | No | Only for the `optional/crud` entry (CRUD gateway, paginated and batch schemas) |
 | `@concepta/typeorm-seeding` | No | Only when using database seeding |
 | `@faker-js/faker` | No | Only when using the seed factory |
@@ -113,9 +113,9 @@ import { RoleModule } from '@concepta/nestjs-role';
 
     // Register the repository entities
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'role', entity: RoleEntity },
             { key: 'user-role', entity: UserRoleEntity },
@@ -325,7 +325,7 @@ inject other providers.
 └────────────────────┬─────────────────────┘
                      │
                      ▼
-              Database Driver
+            Repository Adapter
 ```
 
 **Layers:**

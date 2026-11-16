@@ -18,9 +18,9 @@ import { UserEntityFixture } from './entities/user-entity.fixture.js';
       entities: [UserEntityFixture, UserCacheEntityFixture],
     }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [{ key: 'userCache', entity: UserCacheEntityFixture }],
         },
       ],

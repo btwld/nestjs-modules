@@ -470,9 +470,9 @@ describe('RowScopeBase', () => {
       RowScopeOperation.SOFT_DELETE,
       RowScopeOperation.RESTORE,
     ])(
-      '%s pre-checks the value, which is what the driver acts on',
+      '%s pre-checks the value, which is what the adapter acts on',
       async (operation) => {
-        // The value is the row the driver removes, so a value naming a foreign
+        // The value is the row the adapter removes, so a value naming a foreign
         // row must refuse even when the target looks fine.
         expect(
           await statusOf(() =>

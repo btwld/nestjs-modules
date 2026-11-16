@@ -148,7 +148,7 @@ export abstract class RowScopeBase<
       case RowScopeOperation.DELETE_MANY:
       case RowScopeOperation.SOFT_DELETE:
       case RowScopeOperation.RESTORE:
-        // `value`, not `target`: `value` is what the driver acts on.
+        // `value`, not `target`: `value` is what the adapter acts on.
         await this.precheck(
           params,
           this.resolveKey(params, params.value),

@@ -1,12 +1,12 @@
 /**
  * `@concepta/nestjs-repository-typeorm/oracle`
  *
- * The TypeORM repository driver for Oracle: its module, repository,
+ * The TypeORM repository adapter for Oracle: its module, repository,
  * transactions and base entities.
  */
 
 export { TypeOrmOracleRepositoryModule } from './oracle/typeorm-oracle-repository.module.js';
-export { TypeOrmOracleDriverOptionsInterface } from './oracle/typeorm-oracle-driver-options.interface.js';
+export { TypeOrmOracleAdapterOptionsInterface } from './oracle/typeorm-oracle-adapter-options.interface.js';
 export { TypeOrmOracleApplicationContextInterface } from './oracle/typeorm-oracle-application-context.interface.js';
 export { TypeOrmOracleApplicationContextResolver } from './oracle/typeorm-oracle-application-context-resolver.type.js';
 export { TypeOrmOracleRepository } from './oracle/typeorm-oracle-repository.js';

@@ -33,9 +33,9 @@ export interface MemoryRepositoryOptionsFixture {
  * A repository that keeps its rows in memory, so the abstraction's rules can
  * be tested against real reads and writes without a database.
  *
- * It is not a conforming driver, nor a reference for how one behaves: the
- * conformance suite, run against a real driver, is. Where it does something
- * the driver contract covers, it does it the contract's way.
+ * It is not a conforming adapter, nor a reference for how one behaves: the
+ * conformance suite, run against a real adapter, is. Where it does something
+ * the adapter contract covers, it does it the contract's way.
  *
  * - Queries understand `eq`, `ne`, `in`, `isNull`, `notNull`, `and`, `or` and
  *   `never`, plus `select`, `order`, `skip` and `take`. Anything else throws,
@@ -58,7 +58,7 @@ export class MemoryRepositoryFixture<
   private readonly rows: Entity[] = [];
   private generated = 0;
 
-  /** Every read query the adapter handed this driver, in order. */
+  /** Every read query the abstraction handed this adapter, in order. */
   readonly queries: RepositoryFindOptions<Entity>[] = [];
 
   constructor(

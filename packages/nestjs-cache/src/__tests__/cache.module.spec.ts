@@ -99,9 +99,9 @@ describe(CacheModule.name, () => {
             entities: [UserEntityFixture, UserCacheEntityFixture],
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: 'userCache', entity: UserCacheEntityFixture },
                 ],

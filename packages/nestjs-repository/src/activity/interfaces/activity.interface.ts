@@ -20,7 +20,7 @@ export interface ActivityInterface {
   /** The `forRoot()` key of the entity written. */
   entityKey: string;
 
-  /** The written entity's storage identity, as its driver reports it. */
+  /** The written entity's storage identity, as its adapter reports it. */
   urn: string;
 
   operation: ActivityOperation;

@@ -1,6 +1,6 @@
 # @concepta/nestjs-repository-typeorm
 
-TypeORM driver for `@concepta/nestjs-repository`. Import the adapter for your
+TypeORM adapters for `@concepta/nestjs-repository`. Import the adapter for your
 database (`/postgres`, `/mysql`, `/mariadb`, `/oracle`, `/sqlserver` or
 `/sqlite`): it gives you a module to register your entities with,
 repositories that run on your data source's transactions, and base entities
@@ -201,8 +201,8 @@ Use the `better-sqlite3` driver; a `sqlite` data source stops startup with
 
 ## Module Registration
 
-List your adapter's module as a driver in `RepositoryModule.forRoot()`, with
-the entities it serves:
+List your adapter's module under `adapters` in `RepositoryModule.forRoot()`,
+with the entities it serves:
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -218,9 +218,9 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
       entities: [OrderEntity, CustomerEntity],
     }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'order', entity: OrderEntity },
             { key: 'customer', entity: CustomerEntity, dataSource: 'secondary' },
@@ -268,7 +268,7 @@ interface TypeOrmProviderOptionsInterface<Entity extends PlainLiteralObject>
   what your custom repository changes doesn't apply there
 - **`relations`**, **`rowScope`**, **`authority`**, **`writePolicy`**,
   **`activity`**, **`allowEagerRelations`**, **`hooks`** -- the entity's
-  declarations, read by `RepositoryModule.forRoot()`. The driver reads only
+  declarations, read by `RepositoryModule.forRoot()`. The adapter reads only
   `allowEagerRelations`, to decide whether to load eager relations (see
   [Eager Relations](#eager-relations))
 
@@ -621,7 +621,7 @@ Put Postgres row-level security behind row scope, and the database itself
 hides other tenants' rows — even from raw SQL, reports, or a query someone
 forgot to scope. Row scope stays the enforcement; RLS is the backstop.
 
-You add one option, and the driver sets the caller's tenant at the start of
+You add one option, and the adapter sets the caller's tenant at the start of
 every transaction. The policies are a few lines of SQL in your migrations.
 
 ### Setting the tenant
@@ -635,9 +635,9 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      adapter: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
       options: {
         transactionSettings: (ctx) => ({
@@ -718,7 +718,7 @@ alter default privileges for role app_admin in schema nest_outbox
   still applies when `relax` lifts the tenant: such a caller reads only the
   tenant in their setting, or nothing without one.
 - **Leave the outbox tables without a tenant policy.** The `@nestjs/outbox`
-  relay and its migrations run outside the driver's transactions, so they
+  relay and its migrations run outside the adapter's transactions, so they
   never have a tenant. `app_user` can't create the tables at startup, so run
   `nest-outbox migrate` as `app_admin` in every environment, and grant
   `app_user` the tables as above.
@@ -726,7 +726,7 @@ alter default privileges for role app_admin in schema nest_outbox
   without the policies, so otherwise a row can point into another tenant.
 - **Create views with `security_invoker = true`.** Otherwise they run as
   their owner and skip the policies. `security definer` functions always do.
-- **Code on the raw `DataSource`** runs outside the driver's transactions and
+- **Code on the raw `DataSource`** runs outside the adapter's transactions and
   has no tenant.
 
 ## Virtual Private Database (Oracle)
@@ -751,9 +751,9 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { TypeOrmOracleRepositoryModule } from '@concepta/nestjs-repository-typeorm/oracle';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: TypeOrmOracleRepositoryModule,
+      adapter: TypeOrmOracleRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
       options: {
         applicationContext: {
@@ -778,7 +778,7 @@ What you get: each transaction a run opens on the data source calls
 `procedure(name, value)` for each value before any of your queries run, from
 the same places as on Postgres. An application context outlives the
 transaction on a pooled connection, so before the connection goes back to
-the pool the driver calls `procedure(name, NULL)` for each value it set, and
+the pool the adapter calls `procedure(name, NULL)` for each value it set, and
 the next request starts with none. If setting a value fails, the transaction
 is rolled back, what was set is cleared, and you get the error.
 
@@ -848,11 +848,11 @@ The application reaches the owner's table through a synonym
 - **Include `tenant_id` in foreign keys.** Oracle checks constraints without
   the policies, so otherwise a row can point into another tenant.
 - **Keep the context package working.** If clearing a value fails, the
-  driver logs the error and returns the connection to the pool anyway. Until
+  adapter logs the error and returns the connection to the pool anyway. Until
   the next transaction on it sets its own values, a read outside a
   transaction on that connection can see the last caller's tenant. Running
   every request in a transaction closes that gap.
-- **Code on the raw `DataSource`** runs outside the driver's transactions and
+- **Code on the raw `DataSource`** runs outside the adapter's transactions and
   has no tenant.
 
 Views and definer's-rights code need nothing extra: VPD polices the tables
@@ -876,9 +876,9 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { TypeOrmSqlServerRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlserver';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
-      driver: TypeOrmSqlServerRepositoryModule,
+      adapter: TypeOrmSqlServerRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
       options: {
         sessionContext: (ctx) => ({
@@ -953,7 +953,7 @@ the pool hands to the next request still carries the last caller's tenant.
   Postgres, it still applies when `relax` lifts the tenant.
 - **Include `tenant_id` in foreign keys.** SQL Server checks constraints
   without the policy, so otherwise a row can point into another tenant.
-- **Code on the raw `DataSource`** runs outside the driver's transactions and
+- **Code on the raw `DataSource`** runs outside the adapter's transactions and
   has no tenant.
 
 ## Repository Hooks
@@ -1133,9 +1133,9 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
   imports: [
     TypeOrmModule.forRoot({ type: 'postgres' /* ... */ }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'order', entity: OrderEntity }],
         },
       ],
@@ -1248,10 +1248,10 @@ Requirements and limits:
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmUnsupportedDatabaseException` and `TypeOrmQueryCacheException` |
-| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmPostgresTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
+| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresAdapterOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmPostgresTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
-| `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
-| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerDriverOptionsInterface`, `TypeOrmSqlServerSessionContextResolver`, `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
+| `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleAdapterOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
+| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerAdapterOptionsInterface`, `TypeOrmSqlServerSessionContextResolver`, `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

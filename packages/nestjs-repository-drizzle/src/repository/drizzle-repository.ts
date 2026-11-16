@@ -71,7 +71,7 @@ import { asStored } from './drizzle-rows.util.js';
  * to a versioned row, read the row first (locked in the caller's
  * transaction, a plain read outside one), so an upsert updates only the
  * columns its payload holds and a version moves on only when the row
- * changes. The driver reports no
+ * changes. The adapter reports no
  * relations, so no read it is given joins one.
  */
 export abstract class DrizzleRepository<
@@ -236,13 +236,13 @@ export abstract class DrizzleRepository<
   }
 
   /**
-   * A read's join, `where` and order hold only own columns: the driver
+   * A read's join, `where` and order hold only own columns: the adapter
    * reports no relations, so the repository refuses a read naming one before
    * it gets here.
    */
   private unjoinable(relation: string): RuntimeException {
     return new RuntimeException({
-      message: 'Relation "%s" of "%s" reached the Drizzle driver',
+      message: 'Relation "%s" of "%s" reached the Drizzle adapter',
       messageParams: [relation, this.metadata.name],
       fault: 'internal',
     });
@@ -494,7 +494,7 @@ export abstract class DrizzleRepository<
   /**
    * A `SET` of `keys` and every `$onUpdate` column, each to its own stored
    * value: Drizzle adds every `$onUpdate` column to an update it builds, and
-   * an update the driver adds must write nothing the caller did not.
+   * an update the adapter adds must write nothing the caller did not.
    */
   private keptAsStored(keys: string[]): PlainLiteralObject {
     return Object.fromEntries(
@@ -620,7 +620,7 @@ export abstract class DrizzleRepository<
     return this.write(entity, this.withoutVersion(data), 'replace', options);
   }
 
-  /** `data` without the version column, which only the driver writes. */
+  /** `data` without the version column, which only the adapter writes. */
   private withoutVersion(data: DeepPartial<Entity>): PlainLiteralObject {
     const values: PlainLiteralObject = { ...data };
     const version = this.getVersionColumn();

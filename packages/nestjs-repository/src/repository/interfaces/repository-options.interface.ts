@@ -60,9 +60,9 @@ export interface RepositoryFindOptions<
 }
 
 /**
- * What a driver counts by: which rows match. `RepositoryAdapter.count` takes
- * find options and hands its driver only these, since how rows are selected,
- * sorted or paged does not change how many match.
+ * What an adapter counts by: which rows match. `RepositoryAdapter.count`
+ * takes find options and hands its adapter only these, since how rows are
+ * selected, sorted or paged does not change how many match.
  */
 export interface RepositoryCountOptions extends RepositoryBaseOptions {
   where?: WhereClause;
@@ -137,12 +137,14 @@ export interface RepositoryRestoreOptions extends RepositoryWriteOptions {
 }
 
 /**
- * Added by `RepositoryAdapter` to the options it hands a driver for a write
+ * Added by `RepositoryAdapter` to the options it hands an adapter for a write
  * against a stored row. Never part of a caller's options.
  */
 export interface RepositoryVersionGuardOptions<
   Entity extends PlainLiteralObject = PlainLiteralObject,
 > {
-  /** The compare-and-swap the driver must execute; absent when none applies. */
+  /**
+   * The compare-and-swap the adapter must execute; absent when none applies.
+   */
   versionGuard?: RepositoryVersionGuardInterface<Entity>;
 }

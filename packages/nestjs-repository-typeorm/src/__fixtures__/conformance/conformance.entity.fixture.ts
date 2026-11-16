@@ -24,7 +24,7 @@ import {
   type ConformanceTenantOrderInterface,
   type ConformanceTenantOrderLineInterface,
   type ConformanceUniqueItemInterface,
-} from '@concepta/nestjs-repository/conformance';
+} from '@concepta/nestjs-repository/conformance/adapter';
 
 /** The conformance suite's fixtures as TypeORM entities. */
 
@@ -113,7 +113,7 @@ export class ConformanceAwardEntity implements ConformanceAwardInterface {
 
 /**
  * `author` is eager, but `book` is registered without
- * `allowEagerRelations`, so the driver must not load it.
+ * `allowEagerRelations`, so the adapter must not load it.
  */
 @Entity('conformance_book')
 export class ConformanceBookEntity implements ConformanceBookInterface {

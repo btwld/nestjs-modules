@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 
 import { CoreModule } from '@concepta/nestjs-core';
 
-import { type RepositoryDriverInterface } from '../interfaces/repository-module.interface.js';
+import { type RepositoryAdapterInterface } from '../interfaces/repository-module.interface.js';
 import { RepositoryModule } from '../repository.module.js';
 
 import { ConformanceContext } from './conformance-context.js';
@@ -18,8 +18,8 @@ import { transactionsSection } from './sections/transactions.section.js';
 import { writesSection } from './sections/writes.section.js';
 
 /**
- * Every section of the driver contract. All of them run for every harness;
- * a driver cannot pick.
+ * Every section of the adapter contract. All of them run for every harness;
+ * an adapter cannot pick.
  */
 const SECTIONS: Record<string, (ctx: ConformanceContext) => void> = {
   metadata: metadataSection,
@@ -32,7 +32,7 @@ const SECTIONS: Record<string, (ctx: ConformanceContext) => void> = {
 };
 
 /**
- * Register the repository driver contract with a test runner, run against
+ * Register the repository adapter contract with a test runner, run against
  * one harness: one database, with every fixture the suite defines.
  *
  * @example
@@ -43,9 +43,9 @@ const SECTIONS: Record<string, (ctx: ConformanceContext) => void> = {
  * ```
  */
 export function runRepositoryConformance<
-  Driver extends RepositoryDriverInterface,
+  Adapter extends RepositoryAdapterInterface,
 >(
-  harness: ConformanceHarnessInterface<Driver>,
+  harness: ConformanceHarnessInterface<Adapter>,
   test: ConformanceTestApiInterface,
 ): void {
   const { fixtures } = harness;
@@ -74,9 +74,9 @@ export function runRepositoryConformance<
               CoreModule.forRoot(),
               ...(harness.imports ?? []),
               RepositoryModule.forRoot({
-                drivers: [
+                adapters: [
                   {
-                    driver: harness.driver,
+                    adapter: harness.adapter,
                     entities: [
                       fixtures.item,
                       fixtures.plainItem,
@@ -89,7 +89,7 @@ export function runRepositoryConformance<
                       fixtures.tenantOrder,
                       fixtures.tenantOrderLine,
                     ],
-                    options: harness.driverOptions,
+                    options: harness.adapterOptions,
                   },
                 ],
               }),

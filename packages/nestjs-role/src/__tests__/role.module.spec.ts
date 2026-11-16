@@ -36,9 +36,9 @@ describe(RoleModule.name, () => {
           ],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: 'role', entity: RoleEntityFixture },
                 { key: 'userRole', entity: UserRoleEntityFixture },

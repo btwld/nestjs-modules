@@ -40,6 +40,6 @@ export interface DrizzleAdapterDefinitionInterface<
   createTransactionFactory(
     db: Client,
     connection: string,
-    driverOptions?: Options,
+    adapterOptions?: Options,
   ): TransactionFactoryInterface;
 }

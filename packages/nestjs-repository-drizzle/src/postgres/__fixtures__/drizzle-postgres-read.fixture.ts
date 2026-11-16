@@ -72,9 +72,9 @@ export function describeDrizzlePostgresReads(
               },
             }),
             RepositoryModule.forRoot({
-              drivers: [
+              adapters: [
                 {
-                  driver: DrizzlePostgresRepositoryModule,
+                  adapter: DrizzlePostgresRepositoryModule,
                   entities: [
                     { key: 'note', entity: NoteEntity, table: noteTable },
                   ],

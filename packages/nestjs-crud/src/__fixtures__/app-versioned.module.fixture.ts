@@ -12,9 +12,9 @@ import { VersionedModuleFixture } from './versioned/versioned.module.fixture.js'
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CRUD_TEST_VERSIONED_ENTITY_NAME, entity: VersionedFixture },
           ],

@@ -107,7 +107,7 @@ describe('relations in write payloads', () => {
   });
 
   // TypeORM reads an object in a join column as the related row and writes
-  // its key, so the checks above the driver would read a different value.
+  // its key, so the checks above the adapter would read a different value.
   const objectKeys: [string, PlainLiteralObject, string][] = [
     ['a foreign key', { id: 'e1', departmentId: { id: 'd2' } }, 'departmentId'],
     ['a primary key', { id: { id: 'e9' } }, 'id'],
@@ -195,7 +195,7 @@ describe('relations in write payloads', () => {
         (repo: RecordingRepositoryFixture) =>
           repo.replace(employee, { department: { id: 'd1' } }),
       ],
-    ])('refuses on %s before the driver is reached', async (_op, write) => {
+    ])('refuses on %s before the adapter is reached', async (_op, write) => {
       const repo = new RecordingRepositoryFixture('employees');
       repo.bind({});
 
@@ -204,9 +204,9 @@ describe('relations in write payloads', () => {
     });
   });
 
-  describe('only the entity’s own columns reach the driver', () => {
+  describe('only the entity’s own columns reach the adapter', () => {
     /**
-     * A driver may read a relation from a key other than its name (TypeORM
+     * An adapter may read a relation from a key other than its name (TypeORM
      * reads a lazy relation from `__reports__`), so anything that is not a
      * column is refused rather than passed on.
      */
@@ -229,7 +229,7 @@ describe('relations in write payloads', () => {
     });
 
     /**
-     * A driver may emit a function value as raw SQL, so a column only ever
+     * An adapter may emit a function value as raw SQL, so a column only ever
      * takes a value.
      */
     it('refuses a function in place of a column value', async () => {
@@ -290,8 +290,8 @@ describe('relations in write payloads', () => {
     });
 
     /**
-     * The target goes to the driver as given: nothing the entity class
-     * initializes is added to it, whether a relation a driver would read as
+     * The target goes to the adapter as given: nothing the entity class
+     * initializes is added to it, whether a relation an adapter would read as
      * "unlink" or a column it would write over the stored value.
      */
     it('adds nothing an entity class initializes to the target', async () => {
@@ -360,7 +360,7 @@ describe('relations in write payloads', () => {
   });
 
   /**
-   * A resolver's returned value goes to the driver, so the guard runs on it
+   * A resolver's returned value goes to the adapter, so the guard runs on it
    * too: a custom `scopeWrite` cannot put a relation back.
    */
   describe('a relation a row-scope resolver adds', () => {
@@ -403,8 +403,8 @@ describe('relations in write payloads', () => {
     });
 
     /**
-     * A driver can cascade a delete, soft delete or restore to the rows a
-     * relation holds, so it never reaches the driver on these either.
+     * An adapter can cascade a delete, soft delete or restore to the rows a
+     * relation holds, so it never reaches the adapter on these either.
      */
     it.each([
       ['delete', (repo: RecordingRepositoryFixture) => repo.delete(employee)],
@@ -418,7 +418,7 @@ describe('relations in write payloads', () => {
           repo.softDelete({ ...employee, dateDeleted: null }),
       ],
       ['restore', (repo: RecordingRepositoryFixture) => repo.restore(employee)],
-    ])('is removed before %s reaches the driver', async (_op, remove) => {
+    ])('is removed before %s reaches the adapter', async (_op, remove) => {
       const repo = scopedRepository();
 
       await remove(repo);

@@ -107,7 +107,7 @@ export class TransactionScope implements OnApplicationBootstrap {
       'No transaction factory is registered. TransactionScope.run() will ' +
         'execute without a transaction: writes are not atomic, and when an ' +
         'operation throws, the writes made before it stay although ' +
-        'onRollback callbacks run. Register entities with a driver that ' +
+        'onRollback callbacks run. Register entities with an adapter that ' +
         'provides one in RepositoryModule.forRoot().',
       TransactionScope.name,
     );

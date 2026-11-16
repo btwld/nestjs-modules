@@ -9,7 +9,7 @@ import {
  * Exception thrown when a write names a row that is no longer stored, such as
  * an `update` of a row another caller deleted after it was read.
  *
- * Thrown by a repository driver, which is the one to find the row missing.
+ * Thrown by a repository adapter, which is the one to find the row missing.
  */
 export class EntityNotFoundException extends RuntimeException {
   declare context: RuntimeException['context'] & {

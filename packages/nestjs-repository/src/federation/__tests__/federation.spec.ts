@@ -158,9 +158,9 @@ async function compile({
       RepositoryModule.forRoot({
         imports: scoped ? [ResolverModule] : [],
         federation: maxKeys === undefined ? undefined : { maxKeys },
-        drivers: [
+        adapters: [
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: entities.filter(({ key }) => !omit.includes(key)),
           },
         ],
@@ -416,12 +416,12 @@ describe('federated relations', () => {
       expect(find).not.toHaveBeenCalled();
     });
 
-    it('hands the driver its ordinary joins and keeps the federated ones', async () => {
+    it('hands the adapter its ordinary joins and keeps the federated ones', async () => {
       const { authors } = await seeded({
         relations: { posts: { federated: true } },
       });
 
-      // The memory driver refuses every join, after recording the query.
+      // The memory adapter refuses every join, after recording the query.
       await expect(
         authors.find({
           join: [{ relation: 'profile' }, { relation: 'posts' }],

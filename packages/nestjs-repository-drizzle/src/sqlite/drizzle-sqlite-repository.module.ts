@@ -19,13 +19,13 @@ import {
 import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
 
 /**
- * The Drizzle repository driver for SQLite, registered through
+ * The Drizzle repository adapter for SQLite, registered through
  * `RepositoryModule.forRoot()`. Reads each connection's database from
  * `@nestjs/drizzle`, and refuses a connection that is not a better-sqlite3
  * one.
  *
  * SQLite enforces foreign keys only on a connection that turns them on, and
- * the driver changes nothing about the connection: turn them on where the
+ * the adapter changes nothing about the connection: turn them on where the
  * connection is opened. Every call made while a run is open must carry the
  * run's context; see `DrizzleSqliteRepository`.
  *
@@ -41,9 +41,9 @@ import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
  *       },
  *     }),
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
- *           driver: DrizzleSqliteRepositoryModule,
+ *           adapter: DrizzleSqliteRepositoryModule,
  *           entities: [
  *             { key: 'books', entity: Book, table: books, removeDate: 'removedAt' },
  *           ],

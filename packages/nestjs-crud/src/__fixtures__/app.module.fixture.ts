@@ -10,9 +10,9 @@ import { PhotoModuleFixture } from './photo/photo.module.fixture.js';
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CRUD_TEST_PHOTO_ENTITY_NAME, entity: PhotoFixture },
           ],

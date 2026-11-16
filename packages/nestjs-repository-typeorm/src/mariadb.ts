@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-typeorm/mariadb`
  *
- * The TypeORM repository driver for MariaDB: its module, repository and
+ * The TypeORM repository adapter for MariaDB: its module, repository and
  * base entities. Transactions are MySQL's, which MariaDB shares.
  */
 

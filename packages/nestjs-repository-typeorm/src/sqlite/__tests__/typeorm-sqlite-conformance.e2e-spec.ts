@@ -1,4 +1,4 @@
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 import { typeOrmConformanceHarness } from '../../__fixtures__/conformance/conformance-harness.fixture.js';
 import { TypeOrmSqliteRepositoryModule } from '../typeorm-sqlite-repository.module.js';

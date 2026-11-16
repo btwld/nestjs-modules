@@ -13,8 +13,8 @@ import { type TransactionFactoryInterface } from './transaction-factory.interfac
  */
 export interface TransactionFactoryDescriptor {
   /**
-   * Transaction key, unique per driver and data source (e.g.,
-   * '<driver>:default').
+   * Transaction key, unique per adapter and data source (e.g.,
+   * '<adapter>:default').
    */
   key: string;
 
@@ -31,8 +31,8 @@ export interface TransactionFactoryDescriptor {
 }
 
 /**
- * Result returned by a driver's `register` method: its repository providers,
- * the modules they need, and its transaction factories.
+ * Result returned by an adapter's `register` method: its repository
+ * providers, the modules they need, and its transaction factories.
  * `RepositoryModule.forRoot()` exports the repositories itself.
  */
 export interface DynamicRepositoryModule extends Pick<
@@ -46,30 +46,30 @@ export interface DynamicRepositoryModule extends Pick<
 }
 
 /**
- * A repository driver: the static side of the driver's module class.
+ * A repository adapter: the static side of the adapter's module class.
  *
  * `RepositoryModule.forRoot()` calls `register` with the entities listed under
- * the driver, then binds and checks every repository it returns. Applications
+ * the adapter, then binds and checks every repository it returns. Applications
  * do not call `register` themselves.
  */
-export interface RepositoryDriverInterface<
+export interface RepositoryAdapterInterface<
   Options extends RepositoryProviderOptions = RepositoryProviderOptions,
-  DriverOptions extends PlainLiteralObject = PlainLiteralObject,
+  AdapterOptions extends PlainLiteralObject = PlainLiteralObject,
 > {
   /**
-   * The class name of the driver's module (inherited from
-   * Function.prototype.name). Two drivers in one application must have
+   * The class name of the adapter's module (inherited from
+   * Function.prototype.name). Two adapters in one application must have
    * different names.
    */
   readonly name: string;
 
   /**
    * Build one repository provider per entity, each under
-   * `getDynamicRepositoryToken(key)`. `options` are the driver's own, as
+   * `getDynamicRepositoryToken(key)`. `options` are the adapter's own, as
    * given on its registration.
    */
   register(
     entities: Options[],
-    options?: DriverOptions,
+    options?: AdapterOptions,
   ): DynamicRepositoryModule;
 }

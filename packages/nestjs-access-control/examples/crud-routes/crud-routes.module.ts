@@ -41,9 +41,9 @@ class InvoiceCrudModule {}
       entities: [InvoiceEntity],
     }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [{ key: INVOICE, entity: InvoiceEntity }],
         },
       ],

@@ -43,9 +43,9 @@ export class StoredAuthorityModule {}
     RepositoryModule.forRoot({
       imports: [StoredAuthorityModule],
       authority: { required: true },
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: DOCUMENT, entity: DocumentEntity, authority: GOVERNED },
             { key: RULE, entity: StoredRuleEntity, authority: GOVERNED },

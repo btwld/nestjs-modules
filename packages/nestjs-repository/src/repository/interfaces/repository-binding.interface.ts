@@ -48,7 +48,7 @@ export interface RepositoryBindingInterface {
   /**
    * The relations whose rows, or whose junction rows, an authority governs,
    * each with the repositories of those rows. A join reads them through this
-   * entity's driver, so each is decided as the caller.
+   * entity's adapter, so each is decided as the caller.
    */
   readonly relationsIntoGoverned?: ReadonlyMap<
     string,

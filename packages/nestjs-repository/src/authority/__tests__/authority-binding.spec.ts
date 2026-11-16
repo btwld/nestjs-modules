@@ -77,7 +77,7 @@ async function compile(
       RepositoryModule.forRoot({
         ...moduleOptions,
         imports: [authorityModule(authority)],
-        drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
   }).compile();
@@ -382,9 +382,9 @@ describe('authority binding', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [OrderColumnsModule],
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     ...GOVERNED,
@@ -487,9 +487,9 @@ describe('authority binding', () => {
             CoreModule.forRoot({}),
             RepositoryModule.forRootAsync({
               imports: [authorityModule(new AuthorityFixture())],
-              drivers: [
+              adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [{ key: ORDER_TOKEN, entity: OrderEntityFixture }],
                 },
               ],
@@ -543,9 +543,9 @@ describe('authority binding', () => {
             CoreModule.forRoot({}),
             RepositoryModule.forRoot({
               imports: [RequestAuthorityModule],
-              drivers: [
+              adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [
                     {
                       key: ORDER_TOKEN,
@@ -587,9 +587,9 @@ describe('authority binding', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [DependentAuthorityModule],
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: ORDER_TOKEN,

@@ -19,8 +19,8 @@ class ConformanceRollback extends Error {
 }
 
 /**
- * How a driver takes part in the caller's transaction, and, inside one, how
- * it guards versioned writes. A driver that refuses transactions runs
+ * How an adapter takes part in the caller's transaction, and, inside one,
+ * how it guards versioned writes. An adapter that refuses transactions runs
  * without one: writes made before a throw stay.
  */
 export function transactionsSection(ctx: ConformanceContext): void {
@@ -106,7 +106,7 @@ function supported(ctx: ConformanceContext): void {
     assert.deepStrictEqual(await names(ctx), ['outside']);
   });
 
-  // Outside a run each write stands alone: a driver that leaves a
+  // Outside a run each write stands alone: an adapter that leaves a
   // transaction of its own on the caller's context would take the other
   // write down with the failing one.
   it('transactions: outside a run, a failing write leaves another made at once with the same context', async () => {
@@ -326,7 +326,7 @@ function supported(ctx: ConformanceContext): void {
 /**
  * Write once through the repository, then write again with the row as it
  * was before: the stored version has moved on, so the second write must be
- * refused by the driver, not just by the version the caller states. Each
+ * refused by the adapter, not just by the version the caller states. Each
  * write runs in its own transaction, since a refused one fails its run.
  */
 function versionGuard(ctx: ConformanceContext): void {

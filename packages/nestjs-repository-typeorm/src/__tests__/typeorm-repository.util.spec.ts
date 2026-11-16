@@ -499,7 +499,7 @@ describe('typeorm-repository.util', () => {
       expect(factory).toBeInstanceOf(TypeOrmSqliteTransactionFactory);
     });
 
-    it('useFactory should hand the driver options and data source name to the factory', () => {
+    it('useFactory should hand the adapter options and data source name to the factory', () => {
       const transactionSettings = vi.fn().mockReturnValue({});
       const descriptor = createTransactionFactoryDescriptor(
         TYPEORM_POSTGRES_ADAPTER,

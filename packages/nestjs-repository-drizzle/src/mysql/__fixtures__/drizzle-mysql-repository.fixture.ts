@@ -28,7 +28,7 @@ import { type DrizzleMysqlClient } from '../drizzle-mysql.types.js';
 
 import { type DrizzleMysqlAdapterModule } from './drizzle-mysql-adapter-module.type.js';
 
-/** A key the driver generates before the insert. */
+/** A key the adapter generates before the insert. */
 const tokenTable = mysqlTable('mysql_token', {
   id: varchar({ length: 36 })
     .primaryKey()
@@ -144,7 +144,7 @@ class MysqlRootModule {}
  */
 export function describeDrizzleMysqlRepository(
   name: string,
-  driver: DrizzleMysqlAdapterModule,
+  adapter: DrizzleMysqlAdapterModule,
   url: string,
 ): void {
   describe(name, () => {
@@ -225,9 +225,9 @@ export function describeDrizzleMysqlRepository(
               },
             }),
             RepositoryModule.forRoot({
-              drivers: [
+              adapters: [
                 {
-                  driver,
+                  adapter,
                   entities: [
                     {
                       key: 'token',

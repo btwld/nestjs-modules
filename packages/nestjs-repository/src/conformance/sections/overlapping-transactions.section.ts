@@ -229,7 +229,7 @@ export function overlappingTransactions(ctx: ConformanceContext): void {
 
     // Each run writes a trace row and its own row, then the other's: the
     // store fails one of them. That run carries on and writes a marker row.
-    // The crossing write is an upsert, so only the driver's report of the
+    // The crossing write is an upsert, so only the adapter's report of the
     // ended transaction can fail the run.
     const crossing = (own: typeof a, other: typeof a, name: string) =>
       settle(

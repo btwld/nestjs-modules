@@ -12,9 +12,9 @@ import { TestEntityFixture } from '../entity/test.entity.fixture.js';
   imports: [
     TypeOrmModule.forRoot(ormConfig),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [{ key: TEST_ENTITY_TOKEN, entity: TestEntityFixture }],
         },
       ],

@@ -81,14 +81,14 @@ describe('sessionContext on SQL Server', () => {
           pool: { min: 1, max: 1 },
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqlServerRepositoryModule,
+              adapter: TypeOrmSqlServerRepositoryModule,
               entities: [
                 { key: ORDERS_KEY, entity: SessionContextOrderEntityFixture },
               ],
               options: {
-                // Nothing without a tenant: the driver still clears the
+                // Nothing without a tenant: the adapter still clears the
                 // tenant an earlier transaction left on the connection.
                 sessionContext: (ctx) =>
                   ctx.supports(RowScopeCtx)

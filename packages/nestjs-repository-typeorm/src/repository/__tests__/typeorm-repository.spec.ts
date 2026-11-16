@@ -51,8 +51,8 @@ const compileRegistration = (
     imports: [
       TypeOrmModule.forRoot(ormConfig),
       RepositoryModule.forRoot({
-        drivers: [
-          { driver: TypeOrmSqliteRepositoryModule, entities: [entity] },
+        adapters: [
+          { adapter: TypeOrmSqliteRepositoryModule, entities: [entity] },
         ],
       }),
     ],

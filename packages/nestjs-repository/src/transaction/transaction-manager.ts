@@ -13,7 +13,7 @@ import { type TransactionInterface } from './interfaces/transaction.interface.js
 import { type TransactionFactoryRegistry } from './transaction-factory-registry.js';
 
 /**
- * Runtime manager holding the transactions (one per driver:datasource key)
+ * Runtime manager holding the transactions (one per adapter:datasource key)
  * for a single {@link TransactionScope.run} scope, lazy transaction
  * creation via factory registry, and post-commit/rollback callbacks.
  *
@@ -198,7 +198,7 @@ export class TransactionManager implements TransactionManagerInterface {
    * failure. Whichever transactions haven't committed yet when that
    * happens — the failed one and everything after it — are rolled back
    * instead of left dangling. Throws the commit's error when nothing had
-   * committed yet — a {@link TransactionCommitException} when the driver
+   * committed yet — a {@link TransactionCommitException} when the adapter
    * describes it as the database's — rolling everything back is then a clean, atomic
    * outcome, whether one datasource was involved or several — or
    * {@link TransactionHeuristicCommitException} once at least one

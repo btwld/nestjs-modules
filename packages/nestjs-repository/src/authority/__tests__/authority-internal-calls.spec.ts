@@ -83,7 +83,7 @@ async function compile(
       CoreModule.forRoot({}),
       RepositoryModule.forRoot({
         imports: [DecidersModule],
-        drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
   }).compile();

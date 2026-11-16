@@ -13,9 +13,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./conformance": {
-      "types": "./dist/conformance.d.ts",
-      "default": "./dist/conformance.js"
+    "./conformance/adapter": {
+      "types": "./dist/conformance-adapter.d.ts",
+      "default": "./dist/conformance-adapter.js"
     },
     "./optional/casl": {
       "types": "./dist/optional-casl.d.ts",

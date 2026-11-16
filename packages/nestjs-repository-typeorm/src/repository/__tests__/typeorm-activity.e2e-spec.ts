@@ -17,9 +17,9 @@ const ITEM_TOKEN = 'statement-item';
 const ACTIVITY_TOKEN = 'activity';
 
 /**
- * Activity records written through the driver: what the store persists. What
- * a record holds, and that it is written with the caller's ctx, is tested in
- * nestjs-repository.
+ * Activity records written through the adapter: what the store persists.
+ * What a record holds, and that it is written with the caller's ctx, is
+ * tested in nestjs-repository.
  */
 describe('TypeOrmRepository activity (e2e)', () => {
   let moduleFixture: TestingModule;
@@ -36,9 +36,9 @@ describe('TypeOrmRepository activity (e2e)', () => {
           entities: [AuditedStatementItemEntityFixture, ActivityEntityFixture],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: ITEM_TOKEN,

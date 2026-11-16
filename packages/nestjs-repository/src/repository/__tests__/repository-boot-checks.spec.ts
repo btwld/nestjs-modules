@@ -22,7 +22,7 @@ import {
 
 /**
  * Lowercases its columns on assignment, into fields that are not columns:
- * the driver writes another value, and a row it builds holds the fields.
+ * the adapter writes another value, and a row it builds holds the fields.
  */
 class AccountEntity {
   [key: string]: unknown;
@@ -234,7 +234,7 @@ describe(checkColumnsAreNotRelations, () => {
       ]),
     ).toEqual([
       '"accounts" relation "owner" is also reported as a column. The ' +
-        'repository driver must report a relation only as a relation.',
+        'repository adapter must report a relation only as a relation.',
     ]);
   });
 
@@ -276,10 +276,10 @@ describe('repository startup checks', () => {
     ],
   ])('refuse to start with %s', async (_case, adapter) => {
     @Module({})
-    class AccountsDriver {
+    class AccountsAdapter {
       static register(): DynamicModule {
         return {
-          module: AccountsDriver,
+          module: AccountsAdapter,
           providers: [
             {
               provide: getDynamicRepositoryToken('accounts'),
@@ -294,9 +294,9 @@ describe('repository startup checks', () => {
       Test.createTestingModule({
         imports: [
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: AccountsDriver,
+                adapter: AccountsAdapter,
                 entities: [{ key: 'accounts', entity: PlainAccountEntity }],
               },
             ],

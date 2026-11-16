@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { type INestApplicationContext } from '@nestjs/common';
 import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
-import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
+import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance/adapter';
 
 import {
   ConformanceAuthorEntity,
@@ -55,7 +55,7 @@ export function drizzleSqliteConformanceHarness(): ConformanceHarnessInterface<
 > {
   return {
     name: 'drizzle-sqlite/better-sqlite3',
-    driver: DrizzleSqliteRepositoryModule,
+    adapter: DrizzleSqliteRepositoryModule,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: () => {

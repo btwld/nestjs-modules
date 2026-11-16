@@ -5,7 +5,7 @@ import { type TransactionInterface } from '../transaction/interfaces/transaction
 
 /**
  * Factory for creating transactions.
- * Each driver/datasource provides its own factory implementation.
+ * Each adapter/datasource provides its own factory implementation.
  */
 export interface TransactionFactoryInterface {
   /**

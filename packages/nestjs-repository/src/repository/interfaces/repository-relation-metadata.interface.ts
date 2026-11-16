@@ -1,7 +1,7 @@
 import { type RepositoryColumnMetadataInterface } from './repository-column-metadata.interface.js';
 
 /**
- * A relation the driver reports for an entity.
+ * A relation the adapter reports for an entity.
  *
  * `on.from` is always "my column", `on.to` is always "their column".
  */
@@ -13,8 +13,8 @@ export interface RepositoryRelationMetadataInterface {
   /** URN of the rows the target reads, as the target reports its own `urn`. */
   targetUrn: string;
   /**
-   * The target entity's own columns, derived by the driver from the target's
-   * entity definition the same way it derives `columns` for the root.
+   * The target entity's own columns, derived by the adapter from the
+   * target's entity definition the same way it derives `columns` for the root.
    */
   targetColumns: RepositoryColumnMetadataInterface[];
   /** 'one' for 1:1/N:1, 'many' for 1:N/M:N */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 /**
- * A copy of `value` made of plain objects, so rows a driver returns as class
+ * A copy of `value` made of plain objects, so rows an adapter returns as class
  * instances compare equal to plain expectations. Dates are kept. A property
  * holding `undefined` is left out: it carries nothing, as the repository
  * treats it.

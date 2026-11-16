@@ -12,9 +12,9 @@ import { PhotoCcbModuleFixture } from './photo-ccb/photo-ccb.module.fixture.js';
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CRUD_TEST_PHOTO_CCB_ENTITY_NAME, entity: PhotoFixture },
           ],

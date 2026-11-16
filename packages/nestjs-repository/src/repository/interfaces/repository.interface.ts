@@ -17,7 +17,7 @@ import {
 export interface RepositoryInterface<Entity extends PlainLiteralObject> {
   /**
    * Repository metadata for entity introspection.
-   * Provides schema information without exposing the driver's internals.
+   * Provides schema information without exposing the adapter's internals.
    */
   readonly metadata: RepositoryMetadataInterface<Entity>;
 
@@ -71,7 +71,7 @@ export interface RepositoryInterface<Entity extends PlainLiteralObject> {
    * **An insert, never an update.** A primary key that already names a row
    * throws `EntityAlreadyExistsException` rather than overwriting it — use
    * `upsert` for insert-or-update. Enforced by `RepositoryAdapter` before the
-   * driver is called, because a save-by-primary-key implementation would
+   * adapter is called, because a save-by-primary-key implementation would
    * otherwise let a caller supplying someone else's key overwrite that row,
    * and no permission check above this layer could see it happen.
    *

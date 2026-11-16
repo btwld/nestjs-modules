@@ -1,7 +1,7 @@
 import { Module, DynamicModule, Provider } from '@nestjs/common';
 
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
-import { RepositoryDriverInterface } from './interfaces/repository-module.interface.js';
+import { RepositoryAdapterInterface } from './interfaces/repository-module.interface.js';
 import {
   RepositoryRootAsyncOptions,
   RepositoryRootOptions,
@@ -23,9 +23,9 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  * @Module({
  *   imports: [
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
- *           driver: YourDriverModule,
+ *           adapter: YourAdapterModule,
  *           entities: [
  *             { key: 'orders', entity: Order },
  *             { key: 'customers', entity: Customer },
@@ -49,19 +49,19 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
 @Module({})
 export class RepositoryModule {
   /**
-   * Register every entity in the application, grouped by driver.
+   * Register every entity in the application, grouped by adapter.
    *
    * Binds each repository to its declarations and runs the startup checks
    * while the application is created; a failure stops it there.
    */
-  static forRoot<const Drivers extends readonly RepositoryDriverInterface[]>(
-    options: RepositoryRootOptions<Drivers>,
+  static forRoot<const Adapters extends readonly RepositoryAdapterInterface[]>(
+    options: RepositoryRootOptions<Adapters>,
   ): DynamicModule {
-    const { drivers = [], imports = [], ...moduleOptions } = options;
+    const { adapters = [], imports = [], ...moduleOptions } = options;
 
     return createRepositoryRootModule({
       module: RepositoryModule,
-      drivers,
+      adapters,
       imports,
       optionsProvider: {
         provide: REPOSITORY_MODULE_OPTIONS,
@@ -75,13 +75,13 @@ export class RepositoryModule {
    * factory. Entities stay static.
    */
   static forRootAsync<
-    const Drivers extends readonly RepositoryDriverInterface[],
-  >(options: RepositoryRootAsyncOptions<Drivers>): DynamicModule {
-    const { drivers = [], imports = [], inject = [], useFactory } = options;
+    const Adapters extends readonly RepositoryAdapterInterface[],
+  >(options: RepositoryRootAsyncOptions<Adapters>): DynamicModule {
+    const { adapters = [], imports = [], inject = [], useFactory } = options;
 
     return createRepositoryRootModule({
       module: RepositoryModule,
-      drivers,
+      adapters,
       imports,
       optionsProvider: {
         provide: REPOSITORY_MODULE_OPTIONS,

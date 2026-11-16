@@ -105,7 +105,7 @@ export interface WhereCompound {
  * An always-false clause — matches zero rows, unconditionally and
  * unambiguously. Deliberately has no `field`: requiring one would invite a
  * misspelled or relation-tagged column into what's meant to be a
- * driver-agnostic, unmistakable "nothing matches" node. Distinct from an
+ * adapter-agnostic, unmistakable "nothing matches" node. Distinct from an
  * _absent_ where clause (no constraint at all) — see `Where.never()`.
  */
 export interface WhereNever {

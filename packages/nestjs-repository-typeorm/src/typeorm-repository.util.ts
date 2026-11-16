@@ -239,7 +239,7 @@ export function getTypeOrmImports(
  *
  * @param definition - The adapter whose factory to build
  * @param dataSource - Optional data source name
- * @param options - The driver's options
+ * @param options - The adapter's options
  * @returns Transaction factory descriptor
  */
 export function createTransactionFactoryDescriptor<Options>(
@@ -265,7 +265,7 @@ export function createTransactionFactoryDescriptor<Options>(
  *
  * @param definition - The adapter
  * @param entities - Entity options
- * @param options - The driver's options
+ * @param options - The adapter's options
  */
 export function registerTypeOrmAdapter<Options>(
   definition: TypeOrmAdapterDefinitionInterface<Options>,

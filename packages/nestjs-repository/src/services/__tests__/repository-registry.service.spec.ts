@@ -33,7 +33,7 @@ class UserEntity {}
 class OrderEntity {}
 class DuplicateUserEntity {}
 
-// Mock driver: an in-memory repository per entry, each reading its own rows
+// Mock adapter: an in-memory repository per entry, each reading its own rows
 @Module({})
 class MockRepositoryModule {
   static register(entities: RepositoryProviderOptions[]): DynamicModule {
@@ -64,14 +64,14 @@ const mockRoot = (
   entities: RepositoryProviderOptions[],
 ): ReturnType<typeof RepositoryModule.forRoot> =>
   RepositoryModule.forRoot({
-    drivers: [{ driver: MockRepositoryModule, entities }],
+    adapters: [{ adapter: MockRepositoryModule, entities }],
   });
 
 const memoryRoot = (
   entities: RepositoryProviderOptions[],
 ): ReturnType<typeof RepositoryModule.forRoot> =>
   RepositoryModule.forRoot({
-    drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+    adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
   });
 
 describe('RepositoryRegistryService', () => {
@@ -147,13 +147,13 @@ describe('RepositoryRegistryService', () => {
       Test.createTestingModule({
         imports: [
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [{ key: 'pets', entity: PetEntityFixture }],
               },
               {
-                driver: SharedRowsModule,
+                adapter: SharedRowsModule,
                 entities: [{ key: 'pet-views', entity: PetViewEntity }],
               },
             ],
@@ -236,12 +236,12 @@ describe('RepositoryRegistryService', () => {
     await moduleRef.close();
   });
 
-  it('should throw when a driver registers something other than an adapter', async () => {
+  it('should throw when an adapter registers something other than a RepositoryAdapter', async () => {
     @Module({})
-    class RawDriver {
+    class RawAdapter {
       static register(entities: RepositoryProviderOptions[]): DynamicModule {
         return {
-          module: RawDriver,
+          module: RawAdapter,
           providers: entities.map(({ key }) => ({
             provide: getDynamicRepositoryToken(key),
             useValue: { find: async () => [] },
@@ -254,9 +254,9 @@ describe('RepositoryRegistryService', () => {
       Test.createTestingModule({
         imports: [
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: RawDriver,
+                adapter: RawAdapter,
                 entities: [{ key: 'users', entity: UserEntity }],
               },
             ],
@@ -265,28 +265,28 @@ describe('RepositoryRegistryService', () => {
       }).compile(),
     ).rejects.toThrow(
       new RepositoryBootException([
-        'Driver "RawDriver" registered "users" with a repository that does ' +
+        'Adapter "RawAdapter" registered "users" with a repository that does ' +
           'not extend RepositoryAdapter.',
       ]),
     );
   });
 
-  it('should throw when one driver is listed twice', () => {
+  it('should throw when one adapter is listed twice', () => {
     expect(() =>
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [{ key: 'pets', entity: PetEntityFixture }],
           },
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [{ key: 'notes', entity: NoteEntityFixture }],
           },
         ],
       }),
     ).toThrow(
-      'Driver "MemoryRepositoryModuleFixture" is listed more than once',
+      'Adapter "MemoryRepositoryModuleFixture" is listed more than once',
     );
   });
 
@@ -294,8 +294,8 @@ describe('RepositoryRegistryService', () => {
     @Injectable({ scope: Scope.REQUEST })
     class PerRequestConnection {}
 
-    const driver = {
-      name: 'PerRequestTxDriver',
+    const adapter = {
+      name: 'PerRequestTxAdapter',
       register: (
         entities: RepositoryProviderOptions[],
       ): DynamicRepositoryModule => {
@@ -321,8 +321,8 @@ describe('RepositoryRegistryService', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         RepositoryModule.forRoot({
-          drivers: [
-            { driver, entities: [{ key: 'users', entity: UserEntity }] },
+          adapters: [
+            { adapter, entities: [{ key: 'users', entity: UserEntity }] },
           ],
         }),
       ],
@@ -333,8 +333,8 @@ describe('RepositoryRegistryService', () => {
     );
   });
 
-  it('should throw when two drivers register one transaction key', () => {
-    const sharedKeyDriver = (name: string) => ({
+  it('should throw when two adapters register one transaction key', () => {
+    const sharedKeyAdapter = (name: string) => ({
       name,
       register: (): DynamicRepositoryModule => ({
         module: MockRepositoryModule,
@@ -354,19 +354,19 @@ describe('RepositoryRegistryService', () => {
 
     expect(() =>
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
-            driver: sharedKeyDriver('FirstDriver'),
+            adapter: sharedKeyAdapter('FirstAdapter'),
             entities: [{ key: 'users', entity: UserEntity }],
           },
           {
-            driver: sharedKeyDriver('SecondDriver'),
+            adapter: sharedKeyAdapter('SecondAdapter'),
             entities: [{ key: 'orders', entity: OrderEntity }],
           },
         ],
       }),
     ).toThrow(
-      'Transaction key "shared:default" is registered by more than one driver',
+      'Transaction key "shared:default" is registered by more than one adapter',
     );
   });
 
@@ -392,55 +392,55 @@ describe('RepositoryModule.forRoot entity options', () => {
     collection?: string;
   }
 
-  interface CollectionDriverOptions {
+  interface CollectionAdapterOptions {
     shard?: string;
   }
 
   @Module({})
-  class CollectionDriver {
-    static received?: CollectionDriverOptions;
+  class CollectionAdapter {
+    static received?: CollectionAdapterOptions;
 
     static register(
       _entities: CollectionOptions[],
-      options?: CollectionDriverOptions,
+      options?: CollectionAdapterOptions,
     ): DynamicModule {
-      CollectionDriver.received = options;
-      return { module: CollectionDriver };
+      CollectionAdapter.received = options;
+      return { module: CollectionAdapter };
     }
   }
 
-  it('hands the driver its own options', () => {
+  it('hands the adapter its own options', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: CollectionDriver,
+          adapter: CollectionAdapter,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
           options: { shard: 'a' },
         },
       ],
     });
 
-    expect(CollectionDriver.received).toEqual({ shard: 'a' });
+    expect(CollectionAdapter.received).toEqual({ shard: 'a' });
   });
 
-  it('refuses a misspelled driver option at compile time', () => {
+  it('refuses a misspelled adapter option at compile time', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: CollectionDriver,
+          adapter: CollectionAdapter,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
-          // @ts-expect-error `shrd` is not a CollectionDriver option
+          // @ts-expect-error `shrd` is not a CollectionAdapter option
           options: { shrd: 'a' },
         },
       ],
     });
   });
 
-  it('refuses options for a driver that takes none at compile time', () => {
+  it('refuses options for an adapter that takes none at compile time', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: MemoryRepositoryModuleFixture,
+          adapter: MemoryRepositoryModuleFixture,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
           // @ts-expect-error MemoryRepositoryModuleFixture takes no options
           options: { shard: 'a' },
@@ -449,18 +449,18 @@ describe('RepositoryModule.forRoot entity options', () => {
     });
   });
 
-  it("accepts each driver's own options", () => {
+  it("accepts each adapter's own options", () => {
     expect(() =>
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
-            driver: CollectionDriver,
+            adapter: CollectionAdapter,
             entities: [
               { key: 'pets', entity: PetEntityFixture, collection: 'p' },
             ],
           },
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [{ key: 'notes', entity: NoteEntityFixture }],
           },
         ],
@@ -470,9 +470,9 @@ describe('RepositoryModule.forRoot entity options', () => {
 
   it('refuses a misspelled option at compile time', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: MemoryRepositoryModuleFixture,
+          adapter: MemoryRepositoryModuleFixture,
           entities: [
             {
               key: 'pets',
@@ -486,17 +486,17 @@ describe('RepositoryModule.forRoot entity options', () => {
     });
   });
 
-  it("refuses another driver's option at compile time", () => {
+  it("refuses another adapter's option at compile time", () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: CollectionDriver,
+          adapter: CollectionAdapter,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
         },
         {
-          driver: MemoryRepositoryModuleFixture,
+          adapter: MemoryRepositoryModuleFixture,
           entities: [
-            // @ts-expect-error `collection` belongs to CollectionDriver
+            // @ts-expect-error `collection` belongs to CollectionAdapter
             { key: 'notes', entity: NoteEntityFixture, collection: 'n' },
           ],
         },
@@ -566,7 +566,7 @@ describe('RepositoryModule.forFeature', () => {
     );
   });
 
-  it("binds every driver's repositories", async () => {
+  it("binds every adapter's repositories", async () => {
     @Injectable()
     class BothService {
       constructor(
@@ -580,13 +580,13 @@ describe('RepositoryModule.forFeature', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: MemoryRepositoryModuleFixture,
+              adapter: MemoryRepositoryModuleFixture,
               entities: [{ key: 'pets', entity: PetEntityFixture }],
             },
             {
-              driver: MockRepositoryModule,
+              adapter: MockRepositoryModule,
               entities: [{ key: 'users', entity: UserEntity }],
             },
           ],

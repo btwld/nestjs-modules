@@ -91,9 +91,9 @@ describe('#federated-crud', () => {
       imports: [
         TypeOrmModule.forRoot(ormSqliteConfig),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: CRUD_TEST_COMPANY_ENTITY_NAME,

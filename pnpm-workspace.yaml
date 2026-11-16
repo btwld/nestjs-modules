@@ -1,4 +1,4 @@
-# The 14 v8 packages. The 13 legacy v7 dirs under packages/ are added below in a
+# The 15 v8 packages. The 13 legacy v7 dirs under packages/ are added below in a
 # separate block — they are install-only members and are never built, tested,
 # linted, or published. See TODOs.md for the port checklist.
 packages:

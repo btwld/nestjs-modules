@@ -3,6 +3,7 @@
     "packages/nestjs-core",
     "packages/nestjs-repository",
     "packages/nestjs-repository-typeorm",
+    "packages/nestjs-repository-drizzle",
     "packages/nestjs-crud",
     "packages/nestjs-cache",
     "packages/nestjs-otp",
@@ -12,7 +13,8 @@
     "packages/nestjs-invitation",
     "packages/nestjs-federated",
     "packages/nestjs-authentication",
-    "packages/nestjs-access-control"
+    "packages/nestjs-access-control",
+    "packages/nestjs-file"
   ],
   "plugin": ["typedoc-plugin-coverage"],
   "name": "Rockets Core Documentation",

@@ -52,9 +52,9 @@ export class InvoiceAuthorityModule {}
     RepositoryModule.forRoot({
       imports: [InvoiceAuthorityModule],
       authority: { required: true },
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CUSTOMER, entity: CustomerEntity, authority: GOVERNED },
             {

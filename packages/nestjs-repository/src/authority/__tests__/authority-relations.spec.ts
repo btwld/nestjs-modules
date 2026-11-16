@@ -108,7 +108,7 @@ describe('authority over related rows', () => {
 
     /**
      * Answers every read with `rows`, holding the relations it joins, as a
-     * driver that joins would.
+     * adapter that joins would.
      */
     class EmployeesFixture extends RecordingRepositoryFixture {
       override readonly metadata = ROOT_METADATA;
@@ -551,9 +551,9 @@ describe('authority over related rows', () => {
             CoreModule.forRoot({}),
             RepositoryModule.forRoot({
               imports: [deciders(new AuthorityFixture())],
-              drivers: [
+              adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [
                     {
                       key: ORDER_TOKEN,
@@ -593,9 +593,9 @@ describe('authority over related rows', () => {
             imports: [
               deciders(new AuthorityFixture(table), [ReadsAsAdminHook]),
             ],
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: ORDER_TOKEN,
@@ -680,9 +680,9 @@ describe('authority over related rows', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [deciders(new AuthorityFixture())],
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: AUTHOR_TOKEN,
@@ -791,7 +791,7 @@ describe('authority over related rows', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [deciders(authority, lineHooks)],
-            drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+            adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
           }),
         ],
       }).compile();
@@ -1193,9 +1193,9 @@ describe('authority over related rows', () => {
             CoreModule.forRoot({}),
             RepositoryModule.forRoot({
               imports: [deciders(authority)],
-              drivers: [
+              adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [
                     {
                       key: INVOICE_TOKEN,
@@ -1572,9 +1572,9 @@ describe('authority over related rows', () => {
                 }),
               ),
             ],
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: AUTHOR_TOKEN,

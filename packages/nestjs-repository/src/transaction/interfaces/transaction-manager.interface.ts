@@ -1,7 +1,7 @@
 import { type TransactionInterface } from './transaction.interface.js';
 
 /**
- * Manages the transactions (one per driver:datasource key) that belong to
+ * Manages the transactions (one per adapter:datasource key) that belong to
  * a single {@link TransactionScope.run} scope, plus that scope's own
  * lifecycle (entry/exit refcount, settled state).
  */

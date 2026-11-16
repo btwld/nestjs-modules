@@ -6,9 +6,9 @@ import {
 } from '@concepta/nestjs-core';
 
 /**
- * Exception thrown when a write payload gives a column a value a driver could
- * act on rather than store: a function, which it may run as raw SQL, or an
- * object in a key column, which it may read as the related row.
+ * Exception thrown when a write payload gives a column a value an adapter
+ * could act on rather than store: a function, which it may run as raw SQL, or
+ * an object in a key column, which it may read as the related row.
  */
 export class InvalidColumnValueException extends RuntimeException {
   declare context: RuntimeException['context'] & {

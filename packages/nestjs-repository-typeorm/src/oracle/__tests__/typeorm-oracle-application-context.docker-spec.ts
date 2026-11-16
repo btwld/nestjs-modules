@@ -89,9 +89,9 @@ describe('applicationContext on Oracle', () => {
           poolSize: 1,
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmOracleRepositoryModule,
+              adapter: TypeOrmOracleRepositoryModule,
               entities: [{ key: ORDERS_KEY, entity: VpdOrderEntityFixture }],
               options: {
                 applicationContext: {

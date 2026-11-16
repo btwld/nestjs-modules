@@ -6,7 +6,7 @@ import { RepositoryAdapter } from '../../repository/repository-adapter.js';
 import { EMPLOYEE_METADATA, type EmployeeFixture } from './employee.fixture.js';
 
 /**
- * Records what each write hands the driver: `written` holds the payloads,
+ * Records what each write hands the adapter: `written` holds the payloads,
  * `targets` the rows an update was aimed at, and `removed` the rows a delete,
  * soft delete or restore acted on.
  */

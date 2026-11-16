@@ -7,7 +7,7 @@ export interface ActivityEntity {
 
   readonly name: string;
 
-  /** The entity's storage identity, as its driver reports it. */
+  /** The entity's storage identity, as its adapter reports it. */
   readonly urn: string;
 
   /** The entity's own columns. */

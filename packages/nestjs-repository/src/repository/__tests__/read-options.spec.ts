@@ -20,7 +20,7 @@ import { type WhereClause } from '../interfaces/where-clause.interface.js';
 import { SortOrder } from '../repository.types.js';
 import { Where } from '../where.helpers.js';
 
-/** Records the options each read hands the driver. */
+/** Records the options each read hands the adapter. */
 class ReadRecordingFixture extends RecordingRepositoryFixture {
   readonly reads: RepositoryFindOptions<EmployeeFixture>[] = [];
 
@@ -76,7 +76,7 @@ async function refusal(read: Promise<unknown>): Promise<unknown> {
 
 describe('what a read may name', () => {
   describe.each(ROW_READS)('%s', (_name, read) => {
-    it('passes own columns and joined relations to the driver', async () => {
+    it('passes own columns and joined relations to the adapter', async () => {
       const repo = new ReadRecordingFixture('employees');
       repo.bind({});
       const options: RepositoryFindOptions<EmployeeFixture> = {
@@ -230,7 +230,7 @@ describe('what a count may take', () => {
     withDeleted: true,
   };
 
-  it('hands the driver only which rows match', async () => {
+  it('hands the adapter only which rows match', async () => {
     const repo = new ReadRecordingFixture('employees');
     repo.bind({});
 
@@ -245,7 +245,7 @@ describe('what a count may take', () => {
     expect(repo.reads).toEqual([MATCHING]);
   });
 
-  it('hands the driver only which rows match when a row scope resolver pages', async () => {
+  it('hands the adapter only which rows match when a row scope resolver pages', async () => {
     const repo = new ReadRecordingFixture('employees');
     class Pages implements RowScopeInterface {
       scopeQuery<Options extends { where?: WhereClause }>(

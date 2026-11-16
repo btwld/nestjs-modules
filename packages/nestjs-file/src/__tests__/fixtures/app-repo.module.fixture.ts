@@ -51,9 +51,9 @@ export class AppRepoModuleFixture {
         CoreModule.forRoot(),
         TypeOrmModule.forRoot(ormConfig),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [{ key: FILE_ENTITY_KEY, entity: FileEntityFixture }],
             },
           ],

@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/mysql2';
 import { type INestApplicationContext } from '@nestjs/common';
 import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
-import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
+import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance/adapter';
 
 import {
   ConformanceAuthorEntity,
@@ -50,12 +50,12 @@ function database(app: INestApplicationContext): DrizzleMysqlClient {
  */
 export function drizzleMysqlConformanceHarness(
   name: string,
-  driver: DrizzleMysqlAdapterModule,
+  adapter: DrizzleMysqlAdapterModule,
   url: string,
 ): ConformanceHarnessInterface<DrizzleMysqlAdapterModule> {
   return {
     name,
-    driver,
+    adapter,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: async () => {

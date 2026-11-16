@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-drizzle/sqlite`
  *
- * The Drizzle repository driver for SQLite, through better-sqlite3: its
+ * The Drizzle repository adapter for SQLite, through better-sqlite3: its
  * module, repository and transactions.
  */
 

@@ -158,9 +158,9 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],
@@ -239,9 +239,9 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],
@@ -508,9 +508,9 @@ describe('#crud-typeorm', () => {
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
           TypeOrmModule.forFeature([ProjectEntity, UserEntity]),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                   { key: CRUD_TEST_DEVICE_ENTITY_NAME, entity: DeviceEntity },
@@ -1043,9 +1043,9 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],

@@ -25,7 +25,7 @@ export function seedItems(
 /**
  * Three authors (cat has no books), four books (delta has no author), two
  * tags (tech on alpha and beta, news on alpha only, linked only when the
- * driver supports relations), and four awards (copper and silver to ann,
+ * adapter supports relations), and four awards (copper and silver to ann,
  * bronze and gold to bob).
  */
 export async function seedLibrary(

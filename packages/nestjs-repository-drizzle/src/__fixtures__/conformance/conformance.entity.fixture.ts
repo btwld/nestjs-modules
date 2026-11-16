@@ -9,7 +9,7 @@ import {
   type ConformanceTenantOrderInterface,
   type ConformanceTenantOrderLineInterface,
   type ConformanceUniqueItemInterface,
-} from '@concepta/nestjs-repository/conformance';
+} from '@concepta/nestjs-repository/conformance/adapter';
 
 // The conformance suite's fixtures as entity classes, shared by every
 // database's tables.

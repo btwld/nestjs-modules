@@ -60,9 +60,9 @@ describe('DrizzlePostgresRepository with an $onUpdate column', () => {
             },
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
-                driver: DrizzlePostgresRepositoryModule,
+                adapter: DrizzlePostgresRepositoryModule,
                 entities: [
                   {
                     key: 'note',

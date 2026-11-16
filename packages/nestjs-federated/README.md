@@ -134,9 +134,9 @@ import { CreateUserCommand } from './user/commands/create-user.command';
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'identity', entity: IdentityEntity }],
         },
       ],

@@ -109,8 +109,8 @@ async function ordersWith(
       CoreModule.forRoot({}),
       RepositoryModule.forRoot({
         imports: [DecidersModule],
-        drivers: [
-          { driver: MemoryRepositoryModuleFixture, entities: [entity] },
+        adapters: [
+          { adapter: MemoryRepositoryModuleFixture, entities: [entity] },
         ],
       }),
     ],
@@ -176,7 +176,7 @@ describe('authority over columns', () => {
       expect(orders.queries.map(({ select }) => select)).toEqual([undefined]);
     });
 
-    it('should read an empty select as no select, which every driver reads as all', async () => {
+    it('should read an empty select as no select, which every adapter reads as all', async () => {
       const orders = await ordersWith(READS);
 
       await expect(
@@ -644,9 +644,9 @@ describe('authority over columns', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [DecidersModule],
-            drivers: [
+            adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: VERSIONED_ORDER_TOKEN,

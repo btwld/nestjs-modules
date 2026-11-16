@@ -9,8 +9,9 @@ import {
  * Exception thrown when a write payload, or a read's select, filter or sort,
  * names a property that is not one of the entity's own columns.
  *
- * Only the entity's own columns reach the driver, so nothing a driver might
- * make of another property can write or read past the repository's checks.
+ * Only the entity's own columns reach the adapter, so nothing an adapter
+ * might make of another property can write or read past the repository's
+ * checks.
  */
 export class UnknownColumnException extends RuntimeException {
   declare context: RuntimeException['context'] & {

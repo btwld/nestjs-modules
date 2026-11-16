@@ -7,7 +7,7 @@ import { type ConformanceContext } from '../conformance-context.js';
 import { seedItems, seedLibrary } from '../conformance-seed.js';
 
 /**
- * How a driver counts: by `where`, `join` and `withDeleted` only, and by
+ * How an adapter counts: by `where`, `join` and `withDeleted` only, and by
  * root rows, never by joined ones.
  */
 export function countsSection(ctx: ConformanceContext): void {

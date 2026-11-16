@@ -1,9 +1,9 @@
 import { type PlainLiteralObject } from '@nestjs/common';
 
 /**
- * A resolved instruction for a driver to compare-and-swap on a version
- * column. Produced by `RepositoryAdapter`; drivers consume it and never
- * decide whether one applies. Callers must not set it — the adapter
+ * A resolved instruction for an adapter to compare-and-swap on a version
+ * column. Produced by `RepositoryAdapter`; adapters consume it and never
+ * decide whether one applies. Callers must not set it — `RepositoryAdapter`
  * overwrites whatever it is handed.
  */
 export interface RepositoryVersionGuardInterface<

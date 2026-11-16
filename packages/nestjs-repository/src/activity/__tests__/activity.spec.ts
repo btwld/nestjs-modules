@@ -127,7 +127,7 @@ function compile(
       CoreModule.forRoot(),
       RepositoryModule.forRoot({
         imports: [ResolverModule],
-        drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
     providers,
@@ -644,7 +644,7 @@ describe('activity', () => {
   });
 });
 
-/** A driver that loses the last row of every batch write. */
+/** An adapter that loses the last row of every batch write. */
 class LossyWidgetRepository extends MemoryRepositoryFixture<WidgetFixture> {
   protected async doCreateMany(
     entities: DeepPartial<WidgetFixture>[],
@@ -660,10 +660,10 @@ class LossyWidgetRepository extends MemoryRepositoryFixture<WidgetFixture> {
 }
 
 @Module({})
-class LossyDriverModule {
+class LossyAdapterModule {
   static register(entities: { key: string }[]): DynamicModule {
     return {
-      module: LossyDriverModule,
+      module: LossyAdapterModule,
       providers: entities.map(({ key }) => ({
         provide: getDynamicRepositoryToken(key),
         useFactory: () => new LossyWidgetRepository(key, WIDGET_METADATA),
@@ -680,9 +680,9 @@ describe('batch writes', () => {
     moduleRef = await Test.createTestingModule({
       imports: [
         RepositoryModule.forRoot({
-          drivers: [
-            { driver: LossyDriverModule, entities: [widgets(activity)] },
-            { driver: MemoryRepositoryModuleFixture, entities: [STORE] },
+          adapters: [
+            { adapter: LossyAdapterModule, entities: [widgets(activity)] },
+            { adapter: MemoryRepositoryModuleFixture, entities: [STORE] },
           ],
         }),
       ],
@@ -699,7 +699,7 @@ describe('batch writes', () => {
     ['a recorded entity', { store: ACTIVITY_TOKEN }],
     ['an entity that is not recorded', undefined],
   ])(
-    'refuses a driver result without one row per input, for %s',
+    'refuses an adapter result without one row per input, for %s',
     async (_label, activity) => {
       await start(activity);
       const rows: PlainLiteralObject[] = [{ name: 'a' }, { name: 'b' }];

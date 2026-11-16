@@ -1,5 +1,5 @@
 /**
- * A single transaction - manages lifecycle for one driver/datasource/run scope
+ * A single transaction - manages lifecycle for one adapter/datasource/run scope
  */
 export interface TransactionInterface {
   readonly isActive: boolean;
@@ -12,7 +12,7 @@ export interface TransactionInterface {
   commit(): Promise<void>;
   rollback(): Promise<void>;
   /**
-   * The driver's client for this transaction. A driver's own transaction
+   * The adapter's client for this transaction. An adapter's own transaction
    * may declare its client type; callers holding this interface narrow it
    * to that transaction first.
    */

@@ -4,7 +4,7 @@ import { type ConformanceCapabilitiesInterface } from './conformance-capabilitie
 import { type ConformanceFixturesInterface } from './conformance-fixtures.interface.js';
 
 /**
- * What the conformance sections need from a harness, whatever its driver.
+ * What the conformance sections need from a harness, whatever its adapter.
  */
 export interface ConformanceContextOptionsInterface {
   name: string;

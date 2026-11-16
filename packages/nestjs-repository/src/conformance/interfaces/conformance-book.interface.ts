@@ -7,7 +7,7 @@ import { type ConformanceTagInterface } from './conformance-tag.interface.js';
  * `author` is a to-one relation whose foreign key is `authorId`, a reference
  * to an author; whether the store enforces it is the `referentialIntegrity`
  * capability. `tags` is one side of a many-to-many relation.
- * Where the driver lets an entity declare a relation eager, declare `author`
+ * Where the adapter lets an entity declare a relation eager, declare `author`
  * eager: `book` is registered without `allowEagerRelations`, so a read must
  * still leave it out.
  */

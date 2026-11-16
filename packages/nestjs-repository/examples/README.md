@@ -38,9 +38,9 @@ for what it shows.
   user; without one, you define it once per call, immutably, as this guard
   does;
   `frozenActor` freezes its roles for you.
-- **The driver** is `@concepta/nestjs-repository-typeorm` over an in-memory
-  SQLite database. Any driver works the same: authority is enforced by the
-  repository, never by the driver.
+- **The adapter** is `@concepta/nestjs-repository-typeorm` over an in-memory
+  SQLite database. Any adapter works the same: authority is enforced by the
+  repository, never by the adapter.
 - **Request validation** is left out; validate bodies as you normally would.
 
 The examples import `@concepta/nestjs-repository` exactly as your

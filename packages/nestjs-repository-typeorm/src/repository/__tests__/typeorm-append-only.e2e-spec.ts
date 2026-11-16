@@ -21,7 +21,7 @@ const AUDITED_STATEMENT_ITEM_TOKEN = 'audited-statement-item';
  * The README requires a unique index on `correctedId` and a self-referencing
  * foreign key for a single-valued correction chain, because append-only leaves
  * `create` unguarded. These cases show the schema refusing a malformed chain
- * through the driver.
+ * through the adapter.
  */
 describe('TypeOrmRepository append-only (e2e)', () => {
   let moduleFixture: TestingModule;
@@ -41,9 +41,9 @@ describe('TypeOrmRepository append-only (e2e)', () => {
           ],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: STATEMENT_ITEM_TOKEN,

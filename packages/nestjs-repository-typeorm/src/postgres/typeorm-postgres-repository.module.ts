@@ -6,22 +6,22 @@ import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-prov
 import { type TypeOrmAdapterDefinitionInterface } from '../typeorm-adapter-definition.interface.js';
 import { registerTypeOrmAdapter } from '../typeorm-repository.util.js';
 
-import { type TypeOrmPostgresDriverOptionsInterface } from './typeorm-postgres-driver-options.interface.js';
+import { type TypeOrmPostgresAdapterOptionsInterface } from './typeorm-postgres-adapter-options.interface.js';
 import { TypeOrmPostgresRepository } from './typeorm-postgres-repository.js';
 import { TypeOrmPostgresTransactionFactory } from './typeorm-postgres-transaction.factory.js';
 import { TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX } from './typeorm-postgres.constants.js';
 
 /**
- * The TypeORM repository driver for Postgres, registered through
+ * The TypeORM repository adapter for Postgres, registered through
  * `RepositoryModule.forRoot()`. Refuses a data source of any other
  * database.
  *
  * @example
  * ```typescript
  * RepositoryModule.forRoot({
- *   drivers: [
+ *   adapters: [
  *     {
- *       driver: TypeOrmPostgresRepositoryModule,
+ *       adapter: TypeOrmPostgresRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],
  *     },
  *   ],
@@ -36,13 +36,13 @@ export class TypeOrmPostgresRepositoryModule {
    */
   static register(
     entities: TypeOrmProviderOptionsInterface[],
-    options?: TypeOrmPostgresDriverOptionsInterface,
+    options?: TypeOrmPostgresAdapterOptionsInterface,
   ): DynamicRepositoryModule {
     return registerTypeOrmAdapter(TYPEORM_POSTGRES_ADAPTER, entities, options);
   }
 }
 
-export const TYPEORM_POSTGRES_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmPostgresDriverOptionsInterface> =
+export const TYPEORM_POSTGRES_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmPostgresAdapterOptionsInterface> =
   {
     module: TypeOrmPostgresRepositoryModule,
     transactionKeyPrefix: TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX,

@@ -20,8 +20,8 @@ import { ProfileEntityFixture } from '../entity/profile.entity.fixture.js';
 import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
 
 /**
- * The comment repositories are built by the driver alone, outside
- * `RepositoryModule.forRoot()`: the comment fixture pins how the driver
+ * The comment repositories are built by the adapter alone, outside
+ * `RepositoryModule.forRoot()`: the comment fixture pins how the adapter
  * reports shapes the repository refuses at startup, and one table is read
  * through two repositories. Neither is bound, so a spec binds both itself,
  * opting the eager one in.
@@ -30,9 +30,9 @@ import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
   imports: [
     TypeOrmModule.forRoot(relationOrmConfig),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: AUTHOR_ENTITY_TOKEN, entity: AuthorEntityFixture },
             { key: POST_ENTITY_TOKEN, entity: PostEntityFixture },
