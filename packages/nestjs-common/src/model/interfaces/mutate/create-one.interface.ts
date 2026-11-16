@@ -1,6 +1,6 @@
-import { PlainLiteralObject } from '@nestjs/common';
+import { type PlainLiteralObject } from '@nestjs/common';
 
-import { ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
+import { type ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
 
 export interface CreateOneInterface<
   T extends PlainLiteralObject,

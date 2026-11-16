@@ -1,4 +1,6 @@
-import { DynamicModule } from '@nestjs/common';
+import { type DynamicModule } from '@nestjs/common';
 
-export interface EmailOptionsExtrasInterface
-  extends Pick<DynamicModule, 'global'> {}
+export interface EmailOptionsExtrasInterface extends Pick<
+  DynamicModule,
+  'global'
+> {}

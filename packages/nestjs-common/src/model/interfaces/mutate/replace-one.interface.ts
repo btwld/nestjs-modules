@@ -1,4 +1,4 @@
-import { ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
+import { type ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
 
 export interface ReplaceOneInterface<
   T extends ReferenceIdInterface,

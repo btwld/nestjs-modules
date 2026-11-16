@@ -1,5 +1,5 @@
-import { ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
-import { ReferenceUsername } from '../../../reference/interfaces/reference.types';
+import { type ReferenceIdInterface } from '../../../reference/interfaces/reference-id.interface';
+import { type ReferenceUsername } from '../../../reference/interfaces/reference.types';
 
 export interface ByUsernameInterface<
   T = ReferenceUsername,

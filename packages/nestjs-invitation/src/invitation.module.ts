@@ -4,7 +4,7 @@ import {
   InvitationAsyncOptions,
   InvitationModuleClass,
   InvitationOptions,
-} from './invitation.module-definition';
+} from './invitation.module-definition.js';
 
 /**
  * Invitation module

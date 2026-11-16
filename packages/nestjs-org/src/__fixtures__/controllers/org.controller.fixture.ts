@@ -48,14 +48,11 @@ import { OrgCrudService } from '../org-crud.service';
   },
 })
 @ApiTags('org')
-export class OrgControllerFixture
-  implements
-    CrudControllerInterface<
-      OrgEntityInterface,
-      OrgCreatableInterface,
-      OrgUpdatableInterface
-    >
-{
+export class OrgControllerFixture implements CrudControllerInterface<
+  OrgEntityInterface,
+  OrgCreatableInterface,
+  OrgUpdatableInterface
+> {
   /**
    * Constructor.
    *

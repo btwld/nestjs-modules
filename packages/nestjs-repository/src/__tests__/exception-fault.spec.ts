@@ -1,0 +1,316 @@
+import { fileURLToPath } from 'url';
+
+import {
+  RuntimeException,
+  type RuntimeExceptionFault,
+} from '@concepta/nestjs-core';
+import { collectRuntimeExceptionClassNames } from '@concepta/nestjs-core/testing';
+
+import { ActivityBootException } from '../activity/exceptions/activity-boot.exception.js';
+import { ActivityWriteException } from '../activity/exceptions/activity-write.exception.js';
+import { AuthorityBootException } from '../authority/exceptions/authority-boot.exception.js';
+import { AuthorityRefusedException } from '../authority/exceptions/authority-refused.exception.js';
+import { AuthorityUnboundException } from '../authority/exceptions/authority-unbound.exception.js';
+import { CaslAuthorityRulesInvalidException } from '../casl/exceptions/casl-authority-rules-invalid.exception.js';
+import { UnsupportedDurableDriverException } from '../durable/exceptions/unsupported-durable-driver.exception.js';
+import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
+import { EntityAlreadyExistsException } from '../exceptions/entity-already-exists.exception.js';
+import { EntityNotFoundException } from '../exceptions/entity-not-found.exception.js';
+import { HookBootException } from '../exceptions/hook-boot.exception.js';
+import { InvalidColumnValueException } from '../exceptions/invalid-column-value.exception.js';
+import { OptimisticLockException } from '../exceptions/optimistic-lock.exception.js';
+import { PrimaryKeyImmutableException } from '../exceptions/primary-key-immutable.exception.js';
+import { RelationWriteException } from '../exceptions/relation-write.exception.js';
+import { RepositoryBootException } from '../exceptions/repository-boot.exception.js';
+import { RepositoryDatabaseException } from '../exceptions/repository-database.exception.js';
+import { RepositoryDuplicateKeyException } from '../exceptions/repository-duplicate-key.exception.js';
+import { RepositoryDuplicateUrnException } from '../exceptions/repository-duplicate-urn.exception.js';
+import { RepositoryQueryException } from '../exceptions/repository-query.exception.js';
+import { RepositoryUnboundException } from '../exceptions/repository-unbound.exception.js';
+import { SoftDeletedImmutableException } from '../exceptions/soft-deleted-immutable.exception.js';
+import { TransactionClosedException } from '../exceptions/transaction-closed.exception.js';
+import { TransactionCommitException } from '../exceptions/transaction-commit.exception.js';
+import { TransactionDoomedException } from '../exceptions/transaction-doomed.exception.js';
+import { TransactionHeuristicCommitException } from '../exceptions/transaction-heuristic-commit.exception.js';
+import { TransactionReadOnlyConflictException } from '../exceptions/transaction-read-only-conflict.exception.js';
+import { TransactionScopeFailedException } from '../exceptions/transaction-scope-failed.exception.js';
+import { TransactionTimeoutException } from '../exceptions/transaction-timeout.exception.js';
+import { UnknownColumnException } from '../exceptions/unknown-column.exception.js';
+import { FederationException } from '../federation/exceptions/federation.exception.js';
+import { RowScopeBootException } from '../row-scope/exceptions/row-scope-boot.exception.js';
+import { RowScopeUnboundException } from '../row-scope/exceptions/row-scope-unbound.exception.js';
+import { AppendOnlyViolationException } from '../write-policy/exceptions/append-only-violation.exception.js';
+import { CorrectionChainDepthException } from '../write-policy/exceptions/correction-chain-depth.exception.js';
+import { WritePolicyBootException } from '../write-policy/exceptions/write-policy-boot.exception.js';
+
+/**
+ * Anti-drift check: every `RuntimeException` subclass in this package states
+ * an expected `fault` here.
+ */
+const CASES: {
+  name: string;
+  build: () => RuntimeException;
+  fault: RuntimeExceptionFault;
+  errorCode: string;
+}[] = [
+  {
+    name: 'OptimisticLockException',
+    errorCode: 'OPTIMISTIC_LOCK_CONFLICT',
+    build: () => new OptimisticLockException('SomeEntity'),
+    fault: 'client',
+  },
+  {
+    name: 'RepositoryDuplicateKeyException',
+    errorCode: 'DUPLICATE_REPOSITORY_KEY',
+    build: () =>
+      new RepositoryDuplicateKeyException([
+        { key: 'k', existing: 'a', attempted: 'b' },
+      ]),
+    fault: 'usage',
+  },
+  {
+    name: 'RepositoryDuplicateUrnException',
+    errorCode: 'DUPLICATE_REPOSITORY_URN',
+    build: () =>
+      new RepositoryDuplicateUrnException([
+        { urn: 'urn:memory:a', existing: 'a', attempted: 'b' },
+      ]),
+    fault: 'usage',
+  },
+  {
+    name: 'RepositoryQueryException',
+    errorCode: 'REPOSITORY_QUERY_ERROR',
+    build: () => new RepositoryQueryException('SomeEntity'),
+    fault: 'internal',
+  },
+  {
+    name: 'RepositoryDatabaseException',
+    errorCode: 'REPOSITORY_DATABASE_ERROR',
+    build: () =>
+      new RepositoryDatabaseException('SomeEntity', {
+        database: 'testdb',
+        message: 'failed',
+      }),
+    fault: 'internal',
+  },
+  {
+    name: 'EntityAlreadyExistsException',
+    errorCode: 'ENTITY_ALREADY_EXISTS',
+    build: () => new EntityAlreadyExistsException('SomeEntity'),
+    fault: 'client',
+  },
+  {
+    name: 'EntityNotFoundException',
+    errorCode: 'ENTITY_NOT_FOUND',
+    build: () => new EntityNotFoundException('SomeEntity', 'update'),
+    fault: 'client',
+  },
+  {
+    name: 'PrimaryKeyImmutableException',
+    errorCode: 'PRIMARY_KEY_IMMUTABLE',
+    build: () => new PrimaryKeyImmutableException('SomeEntity', ['id']),
+    fault: 'client',
+  },
+  {
+    name: 'RelationWriteException',
+    errorCode: 'RELATION_WRITE_REFUSED',
+    build: () => new RelationWriteException('SomeEntity', 'children', []),
+    fault: 'client',
+  },
+  {
+    name: 'CascadeWriteException',
+    errorCode: 'CASCADE_WRITE_REFUSED',
+    build: () =>
+      new CascadeWriteException('SomeEntity', 'children', 'a list of objects'),
+    fault: 'client',
+  },
+  {
+    name: 'InvalidColumnValueException',
+    errorCode: 'INVALID_COLUMN_VALUE',
+    build: () => new InvalidColumnValueException('SomeEntity', ['name']),
+    fault: 'client',
+  },
+  {
+    name: 'UnknownColumnException',
+    errorCode: 'UNKNOWN_COLUMN',
+    build: () => new UnknownColumnException('SomeEntity', ['__children__']),
+    fault: 'client',
+  },
+  {
+    name: 'SoftDeletedImmutableException',
+    errorCode: 'SOFT_DELETED_IMMUTABLE',
+    build: () => new SoftDeletedImmutableException('SomeEntity'),
+    fault: 'client',
+  },
+  {
+    name: 'TransactionClosedException',
+    errorCode: 'TRANSACTION_CLOSED',
+    build: () => new TransactionClosedException(),
+    fault: 'usage',
+  },
+  {
+    name: 'TransactionDoomedException',
+    errorCode: 'TRANSACTION_DOOMED',
+    build: () => new TransactionDoomedException(),
+    fault: 'internal',
+  },
+  {
+    name: 'TransactionCommitException',
+    errorCode: 'TRANSACTION_COMMIT_REFUSED',
+    build: () =>
+      new TransactionCommitException({ database: 'testdb', message: 'failed' }),
+    fault: 'internal',
+  },
+  {
+    name: 'TransactionHeuristicCommitException',
+    errorCode: 'TRANSACTION_HEURISTIC_COMMIT',
+    build: () => new TransactionHeuristicCommitException(1, 1),
+    fault: 'internal',
+  },
+  {
+    name: 'TransactionReadOnlyConflictException',
+    errorCode: 'TRANSACTION_READ_ONLY_CONFLICT',
+    build: () => new TransactionReadOnlyConflictException(),
+    fault: 'usage',
+  },
+  {
+    name: 'TransactionScopeFailedException',
+    errorCode: 'TRANSACTION_SCOPE_FAILED',
+    build: () => new TransactionScopeFailedException(),
+    fault: 'internal',
+  },
+  {
+    name: 'TransactionTimeoutException',
+    errorCode: 'TRANSACTION_TIMEOUT',
+    build: () => new TransactionTimeoutException(1000),
+    fault: 'internal',
+  },
+  {
+    name: 'FederationException',
+    errorCode: 'FEDERATION_ERROR',
+    build: () => new FederationException(),
+    fault: 'internal',
+  },
+  {
+    name: 'HookBootException',
+    errorCode: 'HOOK_BOOT_CHECK_FAILED',
+    build: () => new HookBootException(['some failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'RowScopeBootException',
+    errorCode: 'ROW_SCOPE_BOOT_CHECK_FAILED',
+    build: () => new RowScopeBootException(['some failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'AuthorityBootException',
+    errorCode: 'AUTHORITY_BOOT_CHECK_FAILED_ERROR',
+    build: () => new AuthorityBootException(['some failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'AuthorityUnboundException',
+    errorCode: 'AUTHORITY_UNBOUND_ERROR',
+    build: () => new AuthorityUnboundException('orders'),
+    fault: 'usage',
+  },
+  {
+    name: 'AuthorityRefusedException',
+    errorCode: 'AUTHORITY_REFUSED_ERROR',
+    build: () =>
+      new AuthorityRefusedException('orders', 'read', {
+        refusal: 'authority',
+      }),
+    fault: 'client',
+  },
+  {
+    name: 'CaslAuthorityRulesInvalidException',
+    errorCode: 'CASL_AUTHORITY_RULES_INVALID_ERROR',
+    build: () => new CaslAuthorityRulesInvalidException(['problem']),
+    fault: 'usage',
+  },
+  {
+    name: 'RowScopeUnboundException',
+    errorCode: 'ROW_SCOPE_UNBOUND',
+    build: () => new RowScopeUnboundException('orders'),
+    fault: 'usage',
+  },
+  {
+    // The caller asked for an operation the entity's declaration forbids —
+    // a code error, not bad input.
+    name: 'AppendOnlyViolationException',
+    errorCode: 'APPEND_ONLY_VIOLATION',
+    build: () => new AppendOnlyViolationException('SomeEntity', 'update'),
+    fault: 'usage',
+  },
+  {
+    name: 'WritePolicyBootException',
+    errorCode: 'WRITE_POLICY_BOOT_CHECK_FAILED',
+    build: () => new WritePolicyBootException(['failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'ActivityBootException',
+    errorCode: 'ACTIVITY_BOOT_CHECK_FAILED',
+    build: () => new ActivityBootException(['failure']),
+    fault: 'usage',
+  },
+  {
+    // Without a store refusal to carry over, the record write failed on the
+    // server's side.
+    name: 'ActivityWriteException',
+    errorCode: 'ACTIVITY_WRITE_FAILED',
+    build: () => new ActivityWriteException('SomeEntity', 'Activity'),
+    fault: 'internal',
+  },
+  {
+    name: 'RepositoryBootException',
+    errorCode: 'REPOSITORY_BOOT_CHECK_FAILED',
+    build: () => new RepositoryBootException(['failure']),
+    fault: 'usage',
+  },
+  {
+    name: 'RepositoryUnboundException',
+    errorCode: 'REPOSITORY_UNBOUND',
+    build: () => new RepositoryUnboundException('orders'),
+    fault: 'usage',
+  },
+  {
+    // Stored data is longer than the walk allows; no request caused it and
+    // no retry fixes it.
+    name: 'CorrectionChainDepthException',
+    errorCode: 'CORRECTION_CHAIN_DEPTH',
+    build: () => new CorrectionChainDepthException('some-id', 100),
+    fault: 'internal',
+  },
+  {
+    name: 'UnsupportedDurableDriverException',
+    errorCode: 'DURABLE_DRIVER_UNSUPPORTED',
+    build: () =>
+      new UnsupportedDurableDriverException('orders', 'no transactions'),
+    fault: 'usage',
+  },
+];
+
+const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
+
+describe('exception fault classification', () => {
+  it.each(CASES)('$name has fault=$fault', ({ build, fault }) => {
+    expect(build().fault).toEqual(fault);
+  });
+
+  it.each(CASES)('$name has errorCode=$errorCode', ({ build, errorCode }) => {
+    expect(build().errorCode).toEqual(errorCode);
+  });
+
+  it('every RuntimeException subclass in this package is listed above', async () => {
+    const discovered = await collectRuntimeExceptionClassNames(
+      SRC_DIR,
+      RuntimeException,
+    );
+    const expected = new Set(CASES.map((c) => c.build().constructor.name));
+    const missing = discovered.filter((name) => !expected.has(name));
+    expect(missing).toEqual([]);
+  });
+});

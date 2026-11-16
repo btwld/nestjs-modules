@@ -1,9 +1,6 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 
-import {
-  INVITATION_MODULE_CATEGORY_ORG_KEY,
-  InvitationAcceptedEventPayloadInterface,
-} from '@concepta/nestjs-common';
+import { InvitationAcceptedEventPayloadInterface } from '@concepta/nestjs-common';
 import { EventAsyncInterface, EventListenerOn } from '@concepta/nestjs-event';
 
 import { OrgMemberException } from '../exceptions/org-member.exception';
@@ -39,9 +36,7 @@ export class InvitationAcceptedListener
     >,
   ) {
     // check only for invitation of type category
-    if (
-      event.payload.invitation.category === INVITATION_MODULE_CATEGORY_ORG_KEY
-    ) {
+    if (event.payload.invitation.category === 'org') {
       const userId = event.payload.invitation.userId;
       const { orgId } = event?.payload?.invitation?.constraints ?? {};
 

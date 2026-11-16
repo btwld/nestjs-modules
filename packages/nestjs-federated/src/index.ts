@@ -1,20 +1,71 @@
-export { FederatedModule } from './federated.module';
+// module
+export { FederatedModule } from './federated.module.js';
 
-export { FederatedService } from './services/federated.service';
-export { FederatedOAuthService } from './services/federated-oauth.service';
+// aggregate
+export { Identity } from './domain/aggregates/identity.js';
 
-export { FederatedCredentialsInterface } from './interfaces/federated-credentials.interface';
-export { FederatedUserModelServiceInterface } from './interfaces/federated-user-model-service.interface';
+// domain interfaces
+export { IdentityInterface } from './domain/interfaces/identity.interface.js';
+export { IdentityCreatableInterface } from './domain/interfaces/identity-creatable.interface.js';
 
-export { FederatedDto } from './dto/federated.dto';
-export { FederatedCreateDto } from './dto/federated-create.dto';
-export { FederatedUpdateDto } from './dto/federated-update.dto';
+// domain events
+export { IdentityCreatedEvent } from './domain/events/identity-created.event.js';
 
-// exceptions
-export { FederatedException } from './exceptions/federated.exception';
-export { FederatedCreateException } from './exceptions/federated-create.exception';
-export { FederatedQueryException } from './exceptions/federated-query.exception';
-export { FederatedCreateUserException } from './exceptions/federated-create-user.exception';
-export { FederatedUserRelationshipException } from './exceptions/federated-user-relationship.exception';
-export { FederatedFindUserException } from './exceptions/federated-find-user.exception';
-export { FederatedMissingEntitiesOptionsException } from './exceptions/federated-missing-entities-options.exception';
+// domain repositories
+export { IdentityRepositoryInterface } from './domain/repositories/identity-repository.interface.js';
+
+// domain ports
+export {
+  FederatedUserPort,
+  FederatedUserPortSettings,
+  FederatedUserResult,
+  GetUserByIdQueryInterface,
+  GetUserByEmailQueryInterface,
+  CreateUserCommandInterface,
+} from './domain/ports/federated-user.port.js';
+
+// domain services
+export { FederatedOAuthService } from './domain/services/federated-oauth.service.js';
+export { FederatedOAuthServiceInterface } from './domain/services/federated-oauth-service.interface.js';
+
+// commands
+export { CreateIdentityCommand } from './application/commands/impl/create-identity.command.js';
+
+// command handlers
+export { CreateIdentityHandler } from './application/commands/handlers/create-identity.handler.js';
+
+// queries
+export { FindIdentityByProviderQuery } from './application/queries/impl/find-identity-by-provider.query.js';
+
+// query handlers
+export { FindIdentityByProviderHandler } from './application/queries/handlers/find-identity-by-provider.handler.js';
+
+// public interfaces
+export { FederatedCredentialsInterface } from './interfaces/federated-credentials.interface.js';
+export { FederatedOptionsInterface } from './interfaces/federated-options.interface.js';
+export { FederatedOptionsExtrasInterface } from './interfaces/federated-options-extras.interface.js';
+
+// config interfaces
+export { FederatedSettingsInterface } from './infrastructure/config/interfaces/federated-settings.interface.js';
+
+// schemas (Zod / Standard Schema)
+export { identitySchema } from './infrastructure/schemas/identity.schema.js';
+export { identityCreateSchema } from './infrastructure/schemas/identity-create.schema.js';
+
+// persistence
+export { IdentityMapper } from './infrastructure/persistence/identity.mapper.js';
+export { IdentityRepository } from './infrastructure/persistence/identity.repository.js';
+export { IdentityEntityInterface } from './infrastructure/persistence/interfaces/identity-entity.interface.js';
+
+// domain exceptions
+export { FederatedException } from './domain/exceptions/federated.exception.js';
+export { IdentityCreateUserException } from './domain/exceptions/identity-create-user.exception.js';
+export { IdentityFindUserException } from './domain/exceptions/identity-find-user.exception.js';
+export { IdentityUserRelationshipException } from './domain/exceptions/identity-user-relationship.exception.js';
+
+// constants
+export {
+  FEDERATED_MODULE_SETTINGS_TOKEN,
+  FEDERATED_MODULE_DEFAULT_ENTITY_KEY,
+  FEDERATED_MODULE_IDENTITY_REPOSITORY_TOKEN,
+} from './federated.constants.js';

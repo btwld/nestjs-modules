@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 
-import { OrgSettingsInterface } from '../interfaces/org-settings.interface';
+import { type OrgSettingsInterface } from '../interfaces/org-settings.interface';
 import { ORG_MODULE_DEFAULT_SETTINGS_TOKEN } from '../org.constants';
 
 /**

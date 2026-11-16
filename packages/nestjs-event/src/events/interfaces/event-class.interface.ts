@@ -1,6 +1,6 @@
-import { EventInstance } from '../../event-types';
+import { type EventInstance } from '../../event-types';
 
-import { EventKeyInterface } from './event-key.interface';
+import { type EventKeyInterface } from './event-key.interface';
 
 /**
  * Interface defining static signature of newable events.

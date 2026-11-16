@@ -1,8 +1,8 @@
-import { Logger, LogLevel } from '@nestjs/common';
+import { Logger, type LogLevel } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { LOGGER_MODULE_SETTINGS_TOKEN } from './config/logger.config';
-import { LoggerTransportInterface } from './interfaces/logger-transport.interface';
+import { type LoggerTransportInterface } from './interfaces/logger-transport.interface';
 import { LoggerTransportService } from './logger-transport.service';
 
 class TestTransport implements LoggerTransportInterface {

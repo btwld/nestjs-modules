@@ -1,0 +1,57 @@
+import { Module } from '@nestjs/common';
+
+import { type DynamicRepositoryModule } from '@concepta/nestjs-repository';
+
+import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-provider-options.interface.js';
+import { type TypeOrmAdapterDefinitionInterface } from '../typeorm-adapter-definition.interface.js';
+import { registerTypeOrmAdapter } from '../typeorm-repository.util.js';
+
+import { type TypeOrmPostgresAdapterOptionsInterface } from './typeorm-postgres-adapter-options.interface.js';
+import { TypeOrmPostgresRepository } from './typeorm-postgres-repository.js';
+import { TypeOrmPostgresTransactionFactory } from './typeorm-postgres-transaction.factory.js';
+import { TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX } from './typeorm-postgres.constants.js';
+
+/**
+ * The TypeORM repository adapter for Postgres, registered through
+ * `RepositoryModule.forRoot()`. Refuses a data source of any other
+ * database.
+ *
+ * @example
+ * ```typescript
+ * RepositoryModule.forRoot({
+ *   adapters: [
+ *     {
+ *       adapter: TypeOrmPostgresRepositoryModule,
+ *       entities: [{ key: 'orders', entity: Order }],
+ *     },
+ *   ],
+ * });
+ * ```
+ */
+@Module({})
+export class TypeOrmPostgresRepositoryModule {
+  /**
+   * Build the repository providers for TypeORM entities. Called by
+   * `RepositoryModule.forRoot()`, which binds and checks what it returns.
+   */
+  static register(
+    entities: TypeOrmProviderOptionsInterface[],
+    options?: TypeOrmPostgresAdapterOptionsInterface,
+  ): DynamicRepositoryModule {
+    return registerTypeOrmAdapter(TYPEORM_POSTGRES_ADAPTER, entities, options);
+  }
+}
+
+export const TYPEORM_POSTGRES_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmPostgresAdapterOptionsInterface> =
+  {
+    module: TypeOrmPostgresRepositoryModule,
+    transactionKeyPrefix: TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX,
+    createRepository: (repo, options) =>
+      new TypeOrmPostgresRepository(repo, options),
+    createTransactionFactory: (dataSource, dataSourceKey, options) =>
+      new TypeOrmPostgresTransactionFactory(
+        dataSource,
+        dataSourceKey,
+        options?.transactionSettings,
+      ),
+  };

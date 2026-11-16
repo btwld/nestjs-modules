@@ -1,8 +1,8 @@
 import { JwksClient } from 'jwks-rsa';
 
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
-import { JwtVerifyServiceInterface } from '@concepta/nestjs-jwt';
+import { type JwtVerifyServiceInterface } from '@concepta/nestjs-jwt';
 
 import {
   AUTH_APPLE_JWT_SERVICE_TOKEN,
@@ -17,7 +17,7 @@ import { AuthAppleInvalidAudienceException } from './exceptions/auth-apple-inval
 import { AuthAppleInvalidIssuerException } from './exceptions/auth-apple-invalid-issuer.exception';
 import { AuthApplePublicKeyException } from './exceptions/auth-apple-public-key.exception';
 import { AuthAppleTokenExpiredException } from './exceptions/auth-apple-token-expired.exception';
-import { AuthAppleProfileInterface } from './interfaces/auth-apple-profile.interface';
+import { type AuthAppleProfileInterface } from './interfaces/auth-apple-profile.interface';
 
 // Mock jwks-rsa
 jest.mock('jwks-rsa');

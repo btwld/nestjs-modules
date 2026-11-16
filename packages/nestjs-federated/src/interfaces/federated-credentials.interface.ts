@@ -1,13 +1,14 @@
 import {
-  ReferenceEmailInterface,
-  ReferenceIdInterface,
-  ReferenceUsernameInterface,
-} from '@concepta/nestjs-common';
+  type ReferenceEmailInterface,
+  type ReferenceIdInterface,
+  type ReferenceUsernameInterface,
+} from '@concepta/nestjs-core';
 
 /**
  * Credentials Interface
  */
 export interface FederatedCredentialsInterface
-  extends ReferenceIdInterface,
+  extends
+    ReferenceIdInterface,
     ReferenceUsernameInterface,
     ReferenceEmailInterface {}

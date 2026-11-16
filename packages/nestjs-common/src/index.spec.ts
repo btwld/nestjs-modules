@@ -2,7 +2,6 @@ import {
   ReferenceIdDto,
   AuditDto,
   CommonEntityDto,
-  AuthUser,
   createSettingsProvider,
 } from './index';
 
@@ -17,11 +16,6 @@ describe('Module Exports', () => {
 
   it('CommonEntityDto should be a class', () => {
     expect(CommonEntityDto).toBeInstanceOf(Function);
-  });
-
-  // Decorators are functions
-  it('AuthUser decorator should be a function', () => {
-    expect(AuthUser).toBeInstanceOf(Function);
   });
 
   // Utility functions

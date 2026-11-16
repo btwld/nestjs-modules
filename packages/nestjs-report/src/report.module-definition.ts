@@ -1,16 +1,16 @@
 import {
   ConfigurableModuleBuilder,
-  DynamicModule,
-  Provider,
+  type DynamicModule,
+  type Provider,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { createSettingsProvider } from '@concepta/nestjs-common';
 
 import { reportDefaultConfig } from './config/report-default.config';
-import { ReportOptionsExtrasInterface } from './interfaces/report-options-extras.interface';
-import { ReportOptionsInterface } from './interfaces/report-options.interface';
-import { ReportSettingsInterface } from './interfaces/report-settings.interface';
+import { type ReportOptionsExtrasInterface } from './interfaces/report-options-extras.interface';
+import { type ReportOptionsInterface } from './interfaces/report-options.interface';
+import { type ReportSettingsInterface } from './interfaces/report-settings.interface';
 import {
   REPORT_MODULE_SETTINGS_TOKEN,
   REPORT_STRATEGY_SERVICE_KEY,

@@ -7,7 +7,7 @@ import {
   createPasswordImports,
   createPasswordProviders,
   createPasswordExports,
-} from './password.module-definition';
+} from './password.module-definition.js';
 
 @Module({})
 export class PasswordModule extends PasswordModuleClass {

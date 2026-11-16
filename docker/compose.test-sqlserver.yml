@@ -1,0 +1,25 @@
+# SQL Server for `pnpm test:docker:sqlserver`. Local only; not used by CI.
+name: rockets-test-sqlserver
+
+services:
+  sqlserver:
+    # amd64 only: on Apple Silicon it runs under Docker Desktop's Rosetta.
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: Rockets-Test-1
+    ports:
+      - '51433:1433'
+    healthcheck:
+      # Healthy once the server answers and the test database exists.
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa
+          -P "$$MSSQL_SA_PASSWORD"
+          -Q "IF DB_ID('rockets_test') IS NULL CREATE DATABASE rockets_test"
+      interval: 2s
+      timeout: 10s
+      retries: 90

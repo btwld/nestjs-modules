@@ -1,10 +1,9 @@
-import { IssueTokenServiceInterface } from '@concepta/nestjs-authentication';
-import { ModuleOptionsSettingsInterface } from '@concepta/nestjs-common';
+import { type IssueTokenServiceInterface } from '@concepta/nestjs-authentication';
+import { type ModuleOptionsSettingsInterface } from '@concepta/nestjs-common';
 
-import { AuthGithubSettingsInterface } from './auth-github-settings.interface';
+import { type AuthGithubSettingsInterface } from './auth-github-settings.interface';
 
-export interface AuthGithubOptionsInterface
-  extends ModuleOptionsSettingsInterface<AuthGithubSettingsInterface> {
+export interface AuthGithubOptionsInterface extends ModuleOptionsSettingsInterface<AuthGithubSettingsInterface> {
   /**
    * Implementation of a class to issue tokens, which is used as injection
    * in the controller to generate the response payload, with access token

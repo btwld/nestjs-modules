@@ -1,0 +1,44 @@
+import { Column } from 'typeorm';
+
+import { CommonPostgresEntity } from '@concepta/nestjs-repository-typeorm/postgres';
+
+import { FileStatus } from '../../../domain/interfaces/file-status.type.js';
+import { type FileEntityInterface } from '../interfaces/file-entity.interface.js';
+
+/**
+ * File Entity
+ */
+export abstract class FilePostgresEntity
+  extends CommonPostgresEntity
+  implements FileEntityInterface
+{
+  /**
+   * Storage service key
+   */
+  @Column()
+  serviceKey!: string;
+
+  /**
+   * Sanitized display name
+   */
+  @Column()
+  fileName!: string;
+
+  /**
+   * Content type
+   */
+  @Column()
+  contentType!: string;
+
+  /**
+   * Size in bytes
+   */
+  @Column({ type: 'bigint' })
+  size!: number;
+
+  /**
+   * Lifecycle status
+   */
+  @Column({ type: 'varchar' })
+  status!: FileStatus;
+}

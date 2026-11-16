@@ -1,0 +1,3 @@
+export const CORE_MODULE_RAW_OPTIONS_TOKEN = Symbol(
+  '__CORE_MODULE_RAW_OPTIONS_TOKEN__',
+);

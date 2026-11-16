@@ -1,0 +1,606 @@
+import { type INestApplication } from '@nestjs/common';
+import { CommandBus, EventBus, type IEvent, QueryBus } from '@nestjs/cqrs';
+import { Test } from '@nestjs/testing';
+
+import {
+  OptimisticLockException,
+  TransactionScope,
+} from '@concepta/nestjs-repository';
+
+import { AppRepoModuleFixture } from '../../../../__tests__/fixtures/app-repo.module.fixture.js';
+import {
+  FakeStorageService,
+  STORAGE_KEY,
+} from '../../../../__tests__/helpers/mock.helpers.js';
+import { FileCreatedEvent } from '../../../../domain/events/file-created.event.js';
+import { FileRemoveFailedEvent } from '../../../../domain/events/file-remove-failed.event.js';
+import { FileRemovedEvent } from '../../../../domain/events/file-removed.event.js';
+import { FileRestoredEvent } from '../../../../domain/events/file-restored.event.js';
+import { FileSoftDeletedEvent } from '../../../../domain/events/file-soft-deleted.event.js';
+import { FileUploadConfirmedEvent } from '../../../../domain/events/file-upload-confirmed.event.js';
+import { FileDownloadUrlException } from '../../../../domain/exceptions/file-download-url.exception.js';
+import { FileNameInvalidException } from '../../../../domain/exceptions/file-name-invalid.exception.js';
+import { FileStatusException } from '../../../../domain/exceptions/file-status.exception.js';
+import { FileStorageDeleteException } from '../../../../domain/exceptions/file-storage-delete.exception.js';
+import { FileUploadPolicyException } from '../../../../domain/exceptions/file-upload-policy.exception.js';
+import { FileUploadTargetException } from '../../../../domain/exceptions/file-upload-target.exception.js';
+import { type FileRepositoryInterface } from '../../../../domain/repositories/file-repository.interface.js';
+import { FILE_REPOSITORY_TOKEN } from '../../../../file.constants.js';
+import { FileNotFoundException } from '../../../exceptions/file-not-found.exception.js';
+import { FileRemoveInTransactionException } from '../../../exceptions/file-remove-in-transaction.exception.js';
+import { FileRemoveException } from '../../../exceptions/file-remove.exception.js';
+import { GetFileDownloadQuery } from '../../../queries/impl/get-file-download.query.js';
+import { GetFileQuery } from '../../../queries/impl/get-file.query.js';
+import { ConfirmFileUploadCommand } from '../../impl/confirm-file-upload.command.js';
+import { CreateFileCommand } from '../../impl/create-file.command.js';
+import { RemoveFileCommand } from '../../impl/remove-file.command.js';
+import { RestoreFileCommand } from '../../impl/restore-file.command.js';
+import { SoftDeleteFileCommand } from '../../impl/soft-delete-file.command.js';
+
+describe('file lifecycle (e2e)', () => {
+  const dto = {
+    serviceKey: STORAGE_KEY,
+    fileName: 'docs/a.pdf',
+    contentType: 'application/pdf',
+    size: 1024,
+  };
+
+  let app: INestApplication;
+  let storage: FakeStorageService;
+  let commandBus: CommandBus;
+  let queryBus: QueryBus;
+  let fileRepository: FileRepositoryInterface;
+
+  beforeEach(async () => {
+    storage = new FakeStorageService();
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppRepoModuleFixture.register(storage)],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    commandBus = app.get(CommandBus);
+    queryBus = app.get(QueryBus);
+    fileRepository = app.get<FileRepositoryInterface>(FILE_REPOSITORY_TOKEN);
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  async function createFile() {
+    const { file } = await commandBus.execute(new CreateFileCommand({}, dto));
+    return file;
+  }
+
+  it('creates, confirms, reads and removes a file', async () => {
+    const created = await commandBus.execute(new CreateFileCommand({}, dto));
+    expect(created.file.status).toEqual('pending');
+    expect(created.file.fileName).toEqual('a.pdf');
+    expect(created.file.size).toEqual(1024);
+    expect(created.upload).toEqual({
+      url: `https://upload.test/${created.file.id}`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf', 'Content-Length': '1024' },
+    });
+
+    const confirmed = await commandBus.execute(
+      new ConfirmFileUploadCommand({}, created.file.id),
+    );
+    expect(confirmed.file.status).toEqual('active');
+
+    const read = await queryBus.execute(
+      new GetFileDownloadQuery({}, created.file.id, { status: ['active'] }),
+    );
+    expect(read.file.toPlain()).toEqual(confirmed.file.toPlain());
+    expect(read.signedDownloadUrl).toEqual(
+      `https://download.test/${created.file.id}`,
+    );
+    // Only create asked for an upload target.
+    expect(storage.getUploadTarget).toHaveBeenCalledTimes(1);
+
+    await commandBus.execute(new RemoveFileCommand({}, created.file.id));
+
+    expect(storage.delete).toHaveBeenCalledTimes(1);
+    expect(
+      await fileRepository.get({}, created.file.id, { withDeleted: true }),
+    ).toBeNull();
+  });
+
+  it('filters reads by status', async () => {
+    const file = await createFile();
+
+    await expect(
+      queryBus.execute(new GetFileQuery({}, file.id, { status: ['active'] })),
+    ).rejects.toThrow(FileNotFoundException);
+    const read = await queryBus.execute(
+      new GetFileQuery({}, file.id, { status: ['pending'] }),
+    );
+    expect(read.id).toEqual(file.id);
+  });
+
+  it('reads an active file without asking storage for anything', async () => {
+    const file = await createFile();
+    await commandBus.execute(new ConfirmFileUploadCommand({}, file.id));
+    storage.getSignedDownloadUrl.mockClear();
+
+    const read = await queryBus.execute(
+      new GetFileQuery({}, file.id, { status: ['active'] }),
+    );
+
+    expect(read.status).toEqual('active');
+    expect(storage.getSignedDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it('issues no download url until the upload is confirmed', async () => {
+    const created = await commandBus.execute(new CreateFileCommand({}, dto));
+    expect(created).not.toHaveProperty('signedDownloadUrl');
+
+    const pending = await queryBus.execute(
+      new GetFileDownloadQuery({}, created.file.id),
+    );
+    expect(pending).toEqual({ file: expect.any(Object) });
+    expect(pending.file.status).toEqual('pending');
+    expect(storage.getSignedDownloadUrl).not.toHaveBeenCalled();
+
+    const confirmed = await commandBus.execute(
+      new ConfirmFileUploadCommand({}, created.file.id),
+    );
+    expect(confirmed.signedDownloadUrl).toEqual(
+      `https://download.test/${created.file.id}`,
+    );
+  });
+
+  it('stores files that share a name as separate objects', async () => {
+    const first = await commandBus.execute(new CreateFileCommand({}, dto));
+    const second = await commandBus.execute(new CreateFileCommand({}, dto));
+
+    expect(second.file.id).not.toEqual(first.file.id);
+    expect(second.file.fileName).toEqual(first.file.fileName);
+    expect(second.upload.url).not.toEqual(first.upload.url);
+  });
+
+  it('refuses a name with nothing left once sanitized, writing nothing', async () => {
+    const create = vi.spyOn(fileRepository, 'create');
+
+    await expect(
+      commandBus.execute(
+        new CreateFileCommand({}, { ...dto, fileName: 'uploads/..' }),
+      ),
+    ).rejects.toThrow(FileNameInvalidException);
+    expect(create).not.toHaveBeenCalled();
+    expect(storage.getUploadTarget).not.toHaveBeenCalled();
+  });
+
+  it('leaves remove-failed when storage fails, and a retry finishes', async () => {
+    const file = await createFile();
+    const storageError = new Error('denied');
+    storage.delete?.mockRejectedValueOnce(storageError);
+
+    const error = await commandBus
+      .execute(new RemoveFileCommand({}, file.id))
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(FileRemoveException);
+    expect(error).toHaveProperty(
+      'cause',
+      expect.any(FileStorageDeleteException),
+    );
+    expect(error).toHaveProperty('cause.cause', storageError);
+
+    const failed = await fileRepository.get({}, file.id);
+    expect(failed?.status).toEqual('remove-failed');
+
+    await commandBus.execute(new RemoveFileCommand({}, file.id));
+
+    expect(await fileRepository.get({}, file.id)).toBeNull();
+  });
+
+  it('soft delete returns the file as stored', async () => {
+    const file = await createFile();
+
+    const deleted = await commandBus.execute(
+      new SoftDeleteFileCommand({}, file.id),
+    );
+
+    const stored = await fileRepository.get({}, file.id, {
+      withDeleted: true,
+    });
+    expect(deleted.isSoftDeleted).toEqual(true);
+    expect(deleted.toPlain()).toEqual(stored?.toPlain());
+  });
+
+  it('restore brings a soft-deleted file back into reads', async () => {
+    const file = await createFile();
+    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
+
+    const restored = await commandBus.execute(
+      new RestoreFileCommand({}, file.id),
+    );
+
+    const read = await queryBus.execute(new GetFileQuery({}, file.id));
+    expect(restored.isSoftDeleted).toEqual(false);
+    expect(read.toPlain()).toEqual(restored.toPlain());
+  });
+
+  it('refuses to soft-delete a file whose removal failed', async () => {
+    const file = await createFile();
+    storage.delete?.mockRejectedValueOnce(new Error('denied'));
+    await expect(
+      commandBus.execute(new RemoveFileCommand({}, file.id)),
+    ).rejects.toThrow(FileRemoveException);
+
+    await expect(
+      commandBus.execute(new SoftDeleteFileCommand({}, file.id)),
+    ).rejects.toThrow(FileStatusException);
+  });
+
+  it('leaves a soft-deleted file untouched when its removal fails, and a retry finishes', async () => {
+    const file = await createFile();
+    const deleted = await commandBus.execute(
+      new SoftDeleteFileCommand({}, file.id),
+    );
+    storage.delete?.mockRejectedValueOnce(new Error('denied'));
+
+    await expect(
+      commandBus.execute(new RemoveFileCommand({}, file.id)),
+    ).rejects.toThrow(FileRemoveException);
+
+    const stored = await fileRepository.get({}, file.id, {
+      withDeleted: true,
+    });
+    expect(stored?.toPlain()).toEqual(deleted.toPlain());
+
+    await commandBus.execute(new RemoveFileCommand({}, file.id));
+
+    expect(
+      await fileRepository.get({}, file.id, { withDeleted: true }),
+    ).toBeNull();
+  });
+
+  it('deletes a soft-deleted file once when two removals race', async () => {
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+    const file = await createFile();
+    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
+
+    // The first removal's storage delete hangs until released; a second
+    // removal runs to the end meanwhile.
+    let releaseFirst: (() => void) | undefined;
+    storage.delete?.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+
+    const first = commandBus
+      .execute(new RemoveFileCommand({}, file.id))
+      .catch((e: unknown) => e);
+    await vi.waitFor(() => expect(releaseFirst).toBeDefined());
+
+    await commandBus.execute(new RemoveFileCommand({}, file.id));
+    releaseFirst?.();
+
+    expect(await first).toBeInstanceOf(OptimisticLockException);
+    expect(
+      events.filter((event) => event instanceof FileRemovedEvent),
+    ).toHaveLength(1);
+  });
+
+  it('marks a file restored during its removal remove-failed, and a retry finishes', async () => {
+    const file = await createFile();
+    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
+
+    // The removal's storage delete hangs until released; the file is
+    // restored meanwhile, so its object is deleted under a live row.
+    let release: (() => void) | undefined;
+    storage.delete?.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const removal = commandBus
+      .execute(new RemoveFileCommand({}, file.id))
+      .catch((e: unknown) => e);
+    await vi.waitFor(() => expect(release).toBeDefined());
+
+    await commandBus.execute(new RestoreFileCommand({}, file.id));
+    release?.();
+
+    expect(await removal).toBeInstanceOf(OptimisticLockException);
+    const stored = await fileRepository.get({}, file.id);
+    expect(stored?.status).toEqual('remove-failed');
+
+    await commandBus.execute(new RemoveFileCommand({}, file.id));
+
+    expect(
+      await fileRepository.get({}, file.id, { withDeleted: true }),
+    ).toBeNull();
+  });
+
+  it('leaves nothing behind when create cannot get an upload target', async () => {
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+    storage.getUploadTarget.mockRejectedValueOnce(new Error('s3 down'));
+    const create = vi.spyOn(fileRepository, 'create');
+
+    await expect(
+      commandBus.execute(new CreateFileCommand({}, dto)),
+    ).rejects.toThrow(FileUploadTargetException);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    const [[, written]] = create.mock.calls;
+    expect(
+      await fileRepository.get({}, written.id, { withDeleted: true }),
+    ).toBeNull();
+    expect(events).toEqual([]);
+  });
+
+  it('leaves the file pending when confirm cannot get a signed url', async () => {
+    const file = await createFile();
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+    storage.getSignedDownloadUrl.mockRejectedValueOnce(new Error('s3 down'));
+
+    await expect(
+      commandBus.execute(new ConfirmFileUploadCommand({}, file.id)),
+    ).rejects.toThrow(FileDownloadUrlException);
+
+    const stored = await fileRepository.get({}, file.id);
+    expect(stored?.status).toEqual('pending');
+    expect(stored?.version).toEqual(1);
+    expect(events).toEqual([]);
+  });
+
+  it('publishes each event once its command commits', async () => {
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+
+    const file = await createFile();
+    await commandBus.execute(new ConfirmFileUploadCommand({}, file.id));
+    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
+    await commandBus.execute(new RestoreFileCommand({}, file.id));
+    await commandBus.execute(new RemoveFileCommand({}, file.id));
+
+    expect(events.map((event) => event.constructor)).toEqual([
+      FileCreatedEvent,
+      FileUploadConfirmedEvent,
+      FileSoftDeletedEvent,
+      FileRestoredEvent,
+      FileRemovedEvent,
+    ]);
+    // Each event carries the file as stored by its command.
+    expect(events[1]).toHaveProperty('file.version', 2);
+  });
+
+  it('publishes FileRemoveFailedEvent, not FileRemovedEvent, when storage fails', async () => {
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+    const file = await createFile();
+    storage.delete?.mockRejectedValueOnce(new Error('denied'));
+
+    await expect(
+      commandBus.execute(new RemoveFileCommand({}, file.id)),
+    ).rejects.toThrow(FileRemoveException);
+
+    expect(events.map((event) => event.constructor)).toEqual([
+      FileCreatedEvent,
+      FileRemoveFailedEvent,
+    ]);
+    expect(events[1]).toHaveProperty('file.status', 'remove-failed');
+  });
+
+  it('publishes FileRemoveFailedEvent for a file restored during its removal', async () => {
+    const file = await createFile();
+    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+
+    let release: (() => void) | undefined;
+    storage.delete?.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const removal = commandBus
+      .execute(new RemoveFileCommand({}, file.id))
+      .catch((e: unknown) => e);
+    await vi.waitFor(() => expect(release).toBeDefined());
+
+    await commandBus.execute(new RestoreFileCommand({}, file.id));
+    release?.();
+    await removal;
+
+    expect(events.map((event) => event.constructor)).toEqual([
+      FileRestoredEvent,
+      FileRemoveFailedEvent,
+    ]);
+  });
+
+  it('publishes nothing for a soft-deleted file whose removal fails', async () => {
+    const file = await createFile();
+    await commandBus.execute(new SoftDeleteFileCommand({}, file.id));
+    const events: IEvent[] = [];
+    app.get(EventBus).subscribe((event) => events.push(event));
+    storage.delete?.mockRejectedValueOnce(new Error('denied'));
+
+    const error = await commandBus
+      .execute(new RemoveFileCommand({}, file.id))
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(FileRemoveException);
+    // Skipped on purpose, not refused: no status write was attempted.
+    expect(error).not.toHaveProperty('context.statusError');
+    expect(events).toEqual([]);
+  });
+
+  it('refuses removal inside a transaction', async () => {
+    const file = await createFile();
+    const txScope = app.get(TransactionScope);
+
+    await expect(
+      txScope.run({}, (txCtx) =>
+        commandBus.execute(new RemoveFileCommand(txCtx, file.id)),
+      ),
+    ).rejects.toThrow(FileRemoveInTransactionException);
+    expect(storage.delete).not.toHaveBeenCalled();
+  });
+
+  describe('version guard', () => {
+    it('refuses a status write from a stale read', async () => {
+      const file = await createFile();
+      const first = await fileRepository.get({}, file.id);
+      const second = await fileRepository.get({}, file.id);
+      if (!first || !second) throw new Error('file not found');
+
+      first.markRemoving();
+      await fileRepository.updateStatus({}, first);
+
+      second.markRemoving();
+      await expect(fileRepository.updateStatus({}, second)).rejects.toThrow(
+        OptimisticLockException,
+      );
+    });
+
+    it('refuses a row delete from a stale read', async () => {
+      const file = await createFile();
+      const stale = await fileRepository.get({}, file.id);
+      const current = await fileRepository.get({}, file.id);
+      if (!stale || !current) throw new Error('file not found');
+
+      current.markRemoving();
+      await fileRepository.updateStatus({}, current);
+
+      await expect(fileRepository.remove({}, stale)).rejects.toThrow(
+        OptimisticLockException,
+      );
+    });
+
+    it('refuses a soft delete from a stale read', async () => {
+      const file = await createFile();
+      const stale = await fileRepository.get({}, file.id);
+      const current = await fileRepository.get({}, file.id);
+      if (!stale || !current) throw new Error('file not found');
+
+      current.markRemoving();
+      await fileRepository.updateStatus({}, current);
+
+      await expect(fileRepository.softDelete({}, stale)).rejects.toThrow(
+        OptimisticLockException,
+      );
+    });
+
+    it('refuses a restore from a stale read', async () => {
+      const file = await createFile();
+      const deleted = await fileRepository.softDelete({}, file);
+      const stale = await fileRepository.get({}, file.id, {
+        withDeleted: true,
+      });
+      if (!stale) throw new Error('file not found');
+
+      await fileRepository.restore({}, deleted);
+
+      // `stale` is soft-deleted at the version the restore advanced past.
+      await expect(fileRepository.restore({}, stale)).rejects.toThrow(
+        OptimisticLockException,
+      );
+    });
+  });
+});
+
+describe('file upload policy (e2e)', () => {
+  const dto = {
+    serviceKey: STORAGE_KEY,
+    fileName: 'insurance.PDF',
+    contentType: 'Application/PDF',
+    size: 1024,
+  };
+
+  let app: INestApplication;
+  let storage: FakeStorageService;
+  let commandBus: CommandBus;
+  let fileRepository: FileRepositoryInterface;
+
+  beforeEach(async () => {
+    storage = new FakeStorageService();
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        AppRepoModuleFixture.register(storage, {
+          contentTypes: ['application/pdf'],
+          extensions: ['pdf'],
+          maxSize: 1024,
+        }),
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    commandBus = app.get(CommandBus);
+    fileRepository = app.get<FileRepositoryInterface>(FILE_REPOSITORY_TOKEN);
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  it('creates a file the policy allows, matching without regard to case', async () => {
+    const { file } = await commandBus.execute(new CreateFileCommand({}, dto));
+
+    expect(file.status).toEqual('pending');
+  });
+
+  it.each([
+    ['contentType', { contentType: 'image/svg+xml' }],
+    ['extension', { fileName: 'insurance.pdf.exe' }],
+    ['size', { size: 1025 }],
+  ])(
+    'refuses a disallowed %s before writing or issuing an upload target',
+    async (rule, override) => {
+      const create = vi.spyOn(fileRepository, 'create');
+
+      const error = await commandBus
+        .execute(new CreateFileCommand({}, { ...dto, ...override }))
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(FileUploadPolicyException);
+      expect(error).toHaveProperty('context.rule', rule);
+      expect(create).not.toHaveBeenCalled();
+      expect(storage.getUploadTarget).not.toHaveBeenCalled();
+    },
+  );
+
+  it('checks the extension of the sanitized name', async () => {
+    // As sent, the extension is `pdf.` and refused; sanitized to
+    // `insurance.pdf`, which the policy allows.
+    const { file } = await commandBus.execute(
+      new CreateFileCommand({}, { ...dto, fileName: 'insurance.pdf.' }),
+    );
+
+    expect(file.fileName).toEqual('insurance.pdf');
+  });
+
+  it('refuses an extension disguised by a right-to-left override', async () => {
+    const create = vi.spyOn(fileRepository, 'create');
+
+    // Displays as `insurance.exe.pdf`; sanitized to `insurance.pdfexe`.
+    const rightToLeftOverride = String.fromCodePoint(0x202e);
+    await expect(
+      commandBus.execute(
+        new CreateFileCommand(
+          {},
+          { ...dto, fileName: `insurance.pdf${rightToLeftOverride}exe` },
+        ),
+      ),
+    ).rejects.toThrow(FileUploadPolicyException);
+    expect(create).not.toHaveBeenCalled();
+  });
+});

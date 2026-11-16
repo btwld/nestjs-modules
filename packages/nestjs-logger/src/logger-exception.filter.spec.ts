@@ -1,8 +1,8 @@
 import { mock } from 'jest-mock-extended';
 
-import { ArgumentsHost, INestApplication } from '@nestjs/common';
+import { type ArgumentsHost, type INestApplication } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { TestingModule, Test } from '@nestjs/testing';
+import { type TestingModule, Test } from '@nestjs/testing';
 
 import { LoggerExceptionFilter } from './logger-exception.filter';
 import { LoggerTransportService } from './logger-transport.service';

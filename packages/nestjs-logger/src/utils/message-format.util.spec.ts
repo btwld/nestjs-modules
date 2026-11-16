@@ -1,6 +1,6 @@
 import {
-  FastifyRequest as Request,
-  LightMyRequestResponse as Response,
+  type FastifyRequest as Request,
+  type LightMyRequestResponse as Response,
 } from 'fastify';
 import { mock } from 'jest-mock-extended';
 

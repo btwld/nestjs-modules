@@ -22,6 +22,9 @@ lib-cov
 coverage
 *.lcov
 
+# Vitest junit reporter output (yarn test:ci)
+junit.xml
+
 # nyc test coverage
 .nyc_output
 
@@ -110,5 +113,4 @@ dist
 # generated docs
 /docs
 
-# .yarn meta
-.yarn
+.claude/settings.local.json

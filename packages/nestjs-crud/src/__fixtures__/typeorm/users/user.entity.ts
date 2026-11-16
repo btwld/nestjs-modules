@@ -1,16 +1,14 @@
-import { Entity, Column, DeleteDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  DeleteDateColumn,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
 
-import { BaseEntity } from '../base-entity';
-import { CompanyEntity } from '../company/company.entity';
-import { UserProfileEntity } from '../user-profile/user-profile.entity';
-
-export class NameEntity {
-  @Column({ type: 'varchar', nullable: true })
-  first!: string | null;
-
-  @Column({ type: 'varchar', nullable: true })
-  last!: string | null;
-}
+import { BaseEntity } from '../base-entity.js';
+import { CompanyEntity } from '../company/company.entity.js';
+import { UserProfileEntity } from '../user-profile/user-profile.entity.js';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -20,8 +18,11 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
-  @Column(() => NameEntity)
-  name!: NameEntity;
+  @Column({ type: 'varchar', nullable: true })
+  firstName!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  lastName!: string | null;
 
   @Column({ nullable: false })
   companyId?: number;
@@ -30,5 +31,10 @@ export class UserEntity extends BaseEntity {
   deletedAt?: Date;
 
   userProfile?: UserProfileEntity;
-  company?: CompanyEntity[];
+
+  @ManyToOne(() => CompanyEntity, (company) => company.users, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'companyId' })
+  company?: CompanyEntity;
 }

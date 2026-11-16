@@ -1,4 +1,4 @@
-import { ReferenceIdInterface } from '@concepta/nestjs-common';
+import { type ReferenceIdInterface } from '@concepta/nestjs-common';
 import { Factory } from '@concepta/typeorm-seeding';
 
 /**

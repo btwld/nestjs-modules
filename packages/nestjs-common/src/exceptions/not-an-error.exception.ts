@@ -1,4 +1,4 @@
-import { ExceptionInterface } from './interfaces/exception.interface';
+import { type ExceptionInterface } from './interfaces/exception.interface';
 
 export class NotAnErrorException extends Error implements ExceptionInterface {
   errorCode = 'NOT_AN_ERROR';

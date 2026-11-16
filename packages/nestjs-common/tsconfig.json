@@ -3,7 +3,7 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": "./src",
-    "outDir": "./dist",
+    "outDir": "./dist/cjs",
     "typeRoots": [
       "./node_modules/@types",
       "../../node_modules/@types"

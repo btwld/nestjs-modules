@@ -1,0 +1,392 @@
+import { HttpStatus, type PlainLiteralObject } from '@nestjs/common';
+
+import { ActionEnum, isObject } from '@concepta/nestjs-core';
+
+import { internalCall, linkedCall } from '../authority/internal-call.js';
+import { CascadeWriteException } from '../exceptions/cascade-write.exception.js';
+import { type RepositoryRelationMetadataInterface } from '../repository/interfaces/repository-relation-metadata.interface.js';
+import { type RepositoryInterface } from '../repository/interfaces/repository.interface.js';
+import { Where } from '../repository/where.helpers.js';
+
+import { type CascadeRelation } from './cascade-relation.interface.js';
+
+/** The cascade relations a payload carried, by name, with their values. */
+export type CascadeChildren = ReadonlyMap<string, unknown>;
+
+/**
+ * How a write treats the related rows it names: `merge` creates and updates
+ * them and leaves the rest; `replace` also deletes the related rows it leaves
+ * out.
+ */
+export type CascadeSync = 'merge' | 'replace';
+
+/** The lifecycle operations that pass on to related rows. */
+export type CascadeRemoval = 'delete' | 'softDelete' | 'restore';
+
+/** The action each removal takes on the related rows it passes on to. */
+const REMOVAL_ACTIONS: Record<CascadeRemoval, ActionEnum> = {
+  delete: ActionEnum.DELETE,
+  softDelete: ActionEnum.SOFT_DELETE,
+  restore: ActionEnum.RESTORE,
+};
+
+/**
+ * Writes an entity's cascade relations through each related entity's own
+ * repository, so its hooks, row scope and checks run on every related row.
+ * The related row's foreign key is always set to the parent's key.
+ */
+export class CascadeWriter {
+  constructor(
+    private readonly entityName: string,
+    private readonly relations: ReadonlyMap<string, CascadeRelation>,
+  ) {}
+
+  /** `payload` without its cascade relations, and their values. */
+  peel<T>(payload: T): { own: T; children: CascadeChildren } {
+    const children = new Map<string, unknown>();
+    if (!isObject(payload)) return { own: payload, children };
+
+    const own = { ...payload };
+    const values: PlainLiteralObject = own;
+    for (const name of this.relations.keys()) {
+      if (values[name] !== undefined) children.set(name, values[name]);
+      delete values[name];
+    }
+
+    return { own, children };
+  }
+
+  /**
+   * Decide, before the parent is written, every action a write of `children`
+   * could take on each related entity: the repository opens no transaction,
+   * so a refusal from a related repository after the parent was written
+   * would leave the parent changed without its related rows.
+   *
+   * `create` creates; `merge` updates and creates, and deletes a to-one set
+   * to `null`; `replace` also deletes the to-many rows it leaves out. Which
+   * of them a write takes depends on what is stored, so each one it could
+   * take is decided. The columns each related row writes, and its own
+   * related rows, are decided too, and where a related row may be deleted,
+   * that delete on everything it reaches.
+   */
+  async authorize(
+    children: CascadeChildren,
+    mode: 'create' | CascadeSync,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<void> {
+    for (const [name, { relation, target }] of this.relations) {
+      if (!children.has(name)) continue;
+
+      // A to-one payload keeps the one row there is, so only `null` deletes
+      // it; a to-many replace deletes the rows its payload leaves out.
+      const deletes =
+        relation.cardinality === 'one'
+          ? children.get(name) === null
+          : mode === 'replace';
+      const actions =
+        mode === 'create'
+          ? [ActionEnum.CREATE]
+          : [
+              ActionEnum.UPDATE,
+              ActionEnum.CREATE,
+              ...(deletes ? [ActionEnum.DELETE] : []),
+            ];
+      await target.authorizeCascade(
+        actions,
+        this.listOf(relation, children.get(name)),
+        mode,
+        ctx,
+        [relation.on.to],
+        // A to-one payload always names the one row there is.
+        relation.cardinality === 'many',
+      );
+      // A related row this write deletes is deleted with its own related
+      // rows, so that delete is decided on everything it reaches, too.
+      if (actions.includes(ActionEnum.DELETE)) {
+        await target.authorizeRemovalReach(
+          ActionEnum.DELETE,
+          'delete',
+          ctx,
+          new Set([target]),
+        );
+      }
+    }
+  }
+
+  /** Create the related rows of a new `row`, returning them by relation. */
+  async create(
+    row: PlainLiteralObject,
+    children: CascadeChildren,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<PlainLiteralObject> {
+    const written: PlainLiteralObject = {};
+
+    for (const [name, { relation, target }] of this.relations) {
+      if (!children.has(name)) continue;
+      const rows: PlainLiteralObject[] = [];
+      for (const child of this.listOf(relation, children.get(name))) {
+        rows.push(
+          await target.create(
+            this.linked(relation, child, row),
+            this.linkedOptions(relation, target, ctx),
+          ),
+        );
+      }
+      written[name] = this.shaped(relation, rows);
+    }
+
+    return written;
+  }
+
+  /**
+   * Write the related rows a stored `row` names: update each one that is
+   * already its related row (for a to-one relation, the one it has), create
+   * the rest, and on `replace` delete its related rows the payload leaves out.
+   * A to-one set to `null` deletes its row in either mode. Returns the rows
+   * written, by relation.
+   */
+  async sync(
+    row: PlainLiteralObject,
+    children: CascadeChildren,
+    mode: CascadeSync,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<PlainLiteralObject> {
+    const written: PlainLiteralObject = {};
+
+    for (const [name, { relation, target }] of this.relations) {
+      if (!children.has(name)) continue;
+      const list = this.listOf(relation, children.get(name));
+      // Finding the rows to write is the repository's own read; the writes
+      // themselves are decided.
+      const existing = new Map(
+        (
+          await target.find(
+            internalCall(
+              { where: this.childrenOf(relation, row), ctx },
+              target,
+            ),
+          )
+        )
+          .map((stored) => [this.keyOf(target, stored), stored] as const)
+          .filter(
+            (entry): entry is readonly [string, PlainLiteralObject] =>
+              entry[0] !== undefined,
+          ),
+      );
+
+      const toOne = relation.cardinality === 'one';
+      if (toOne && existing.size > 1) {
+        throw new CascadeWriteException(
+          this.entityName,
+          relation.name,
+          `one stored row, not ${existing.size}`,
+          { httpStatus: HttpStatus.CONFLICT },
+        );
+      }
+
+      // A to-one payload always names the one row there is; a different key
+      // is refused by that row's own repository.
+      const [only] = existing.keys();
+      const kept = new Set<string>();
+      const rows: PlainLiteralObject[] = [];
+      for (const child of list) {
+        const key = toOne ? only : this.keyOf(target, child);
+        const stored = key === undefined ? undefined : existing.get(key);
+        const data = this.linked(relation, child, row);
+
+        if (key !== undefined && stored) {
+          kept.add(key);
+          rows.push(
+            mode === 'replace'
+              ? await target.replace(
+                  stored,
+                  data,
+                  this.linkedOptions(relation, target, ctx),
+                )
+              : await target.update(
+                  stored,
+                  data,
+                  this.linkedOptions(relation, target, ctx),
+                ),
+          );
+        } else {
+          rows.push(
+            await target.create(
+              data,
+              this.linkedOptions(relation, target, ctx),
+            ),
+          );
+        }
+      }
+
+      // Rows left out are deleted on replace; a to-one set to null always is.
+      if (mode === 'replace' || (toOne && list.length === 0)) {
+        for (const [key, stored] of existing) {
+          if (!kept.has(key)) await target.delete(stored, { ctx });
+        }
+      }
+
+      written[name] = this.shaped(relation, rows);
+    }
+
+    return written;
+  }
+
+  /**
+   * Decide a delete, soft delete or restore on every entity it could reach
+   * through cascades, however deep, whether or not any of them has rows to
+   * write. Called when the operation starts, before anything about the rows
+   * is read, so the decision depends only on the call, never on what is
+   * stored. `decided` holds the entities already decided, the root among
+   * them, so each is asked once.
+   */
+  async authorizeRemoval(
+    operation: CascadeRemoval,
+    ctx: PlainLiteralObject | undefined,
+    decided: Set<object>,
+  ): Promise<void> {
+    for (const { target } of this.relations.values()) {
+      if (decided.has(target)) continue;
+      decided.add(target);
+      await target.authorizeRemovalReach(
+        REMOVAL_ACTIONS[operation],
+        operation,
+        ctx,
+        decided,
+      );
+    }
+  }
+
+  /**
+   * Pass a delete, soft delete or restore of `rows` on to their related rows,
+   * before the rows themselves are written. The operation has been decided
+   * on every entity it reaches already (`authorizeRemoval`).
+   *
+   * Every related row of every one of `rows` is found before any is written.
+   * Finding the rows is the repository's own read; the writes themselves
+   * are decided again, each through its own repository.
+   */
+  async remove(
+    rows: readonly PlainLiteralObject[],
+    operation: CascadeRemoval,
+    ctx: PlainLiteralObject | undefined,
+  ): Promise<void> {
+    const removals: {
+      target: CascadeRelation['target'];
+      children: PlainLiteralObject[];
+    }[] = [];
+
+    for (const row of rows) {
+      for (const { relation, target } of this.relations.values()) {
+        const where = this.childrenOf(relation, row);
+        const found = await target.find(
+          internalCall(
+            { where, withDeleted: operation !== 'softDelete', ctx },
+            target,
+          ),
+        );
+        const deleteDate = target.metadata.columns.find(
+          (column) => column.isRemoveDate,
+        )?.name;
+        const children =
+          operation === 'restore'
+            ? found.filter(
+                (child) =>
+                  deleteDate !== undefined && child[deleteDate] != null,
+              )
+            : found;
+        if (children.length > 0) removals.push({ target, children });
+      }
+    }
+
+    for (const { target, children } of removals) {
+      if (operation === 'delete') {
+        await target.deleteMany(children, { ctx });
+        continue;
+      }
+      for (const child of children) {
+        if (operation === 'softDelete') {
+          await target.softDelete(child, { ctx });
+        } else {
+          await target.restore(child, { ctx });
+        }
+      }
+    }
+  }
+
+  /** The related rows a payload value names, refusing anything else. */
+  private listOf(
+    relation: RepositoryRelationMetadataInterface,
+    value: unknown,
+  ): PlainLiteralObject[] {
+    if (relation.cardinality === 'many') {
+      if (Array.isArray(value) && value.every(isPlainRow)) return value;
+      throw new CascadeWriteException(
+        this.entityName,
+        relation.name,
+        'a list of objects',
+      );
+    }
+
+    if (value === null) return [];
+    if (isPlainRow(value)) return [value];
+    throw new CascadeWriteException(
+      this.entityName,
+      relation.name,
+      'an object or null',
+    );
+  }
+
+  /** `child` with its foreign key set to `row`'s key. */
+  private linked(
+    relation: RepositoryRelationMetadataInterface,
+    child: PlainLiteralObject,
+    row: PlainLiteralObject,
+  ): PlainLiteralObject {
+    return { ...child, [relation.on.to]: row[relation.on.from] };
+  }
+
+  /**
+   * The options of a write `linked` shaped: the related repository decides it
+   * as the caller, without counting the foreign key it sets.
+   */
+  private linkedOptions(
+    relation: RepositoryRelationMetadataInterface,
+    target: CascadeRelation['target'],
+    ctx: PlainLiteralObject | undefined,
+  ): { ctx: PlainLiteralObject | undefined } {
+    return linkedCall({ ctx }, target, [relation.on.to]);
+  }
+
+  private childrenOf(
+    relation: RepositoryRelationMetadataInterface,
+    row: PlainLiteralObject,
+  ) {
+    return Where.eq(relation.on.to, row[relation.on.from]);
+  }
+
+  private shaped(
+    relation: RepositoryRelationMetadataInterface,
+    rows: PlainLiteralObject[],
+  ): PlainLiteralObject[] | PlainLiteralObject | null {
+    return relation.cardinality === 'many' ? rows : (rows[0] ?? null);
+  }
+
+  /**
+   * `row`'s primary key, or `undefined` when it is missing. Startup refuses a
+   * cascade into rows without a primary key column.
+   */
+  private keyOf(
+    target: RepositoryInterface<PlainLiteralObject>,
+    row: PlainLiteralObject,
+  ): string | undefined {
+    const column = target.metadata.columns.find(({ isPrimary }) => isPrimary);
+    const value: unknown = column ? row[column.name] : undefined;
+
+    return value === undefined ? undefined : JSON.stringify(value);
+  }
+}
+
+function isPlainRow(value: unknown): value is PlainLiteralObject {
+  return isObject(value) && !Array.isArray(value);
+}

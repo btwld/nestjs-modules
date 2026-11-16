@@ -1,8 +1,8 @@
-import { NestInterceptor } from '@nestjs/common';
-import { BaseExceptionFilter } from '@nestjs/core';
+import { type NestInterceptor } from '@nestjs/common';
+import { type BaseExceptionFilter } from '@nestjs/core';
 
-import { LoggerSettingsInterface } from './logger-settings.interface';
-import { LoggerTransportInterface } from './logger-transport.interface';
+import { type LoggerSettingsInterface } from './logger-settings.interface';
+import { type LoggerTransportInterface } from './logger-transport.interface';
 
 /**
  * Logger options interface.
