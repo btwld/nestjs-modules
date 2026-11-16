@@ -275,3 +275,38 @@ scripts/smoke-test.mjs:57 (temp dir prefix rockets-smoke-)
   database client, and `RepositoryAdapter` is the one exception.
 - **This log** moved here with `mv -n`. Its pointers were updated in the handoff and in the
   memory `feedback-retired-framework-name.md`.
+
+## 10. Session 2b: finishing the rename
+
+The user weighed going back to "driver" and chose "adapter" for everything, keeping "driver" only
+for a database client (pg, mysql2, better-sqlite3, oracledb, mssql) or an ORM's own driver layer.
+
+- **`e1a28e5a` `refactor!`** (BREAKING CHANGE footer with migration steps):
+  - Each registration entry's `driver` key became `adapter`.
+  - `RepositoryDriverInterface`, `RepositoryDriverRegistration(s)`, `RepositoryDriverEntityOptions`
+    and `RepositoryDriverOptions` became `RepositoryAdapter…`.
+  - The conformance harness `driver` and `driverOptions` became `adapter` and `adapterOptions`.
+  - Internal names followed (`assertDistinctAdapters`, `adapterModules`, `adapterName`, type
+    parameters, fixture classes).
+  - The README heading "Testing Your Driver" became "Testing Your Adapter", and its one link was
+    updated. A check of every relative link and anchor in the tracked READMEs found none broken.
+  - `TypeOrm{Postgres,Oracle,SqlServer}DriverOptionsInterface` and
+    `DrizzlePostgresDriverOptionsInterface` became `…AdapterOptionsInterface` (files moved to
+    `*-adapter-options.interface.ts`). Each holds only adapter-level settings
+    (`transactionSettings`, `applicationContext`, `sessionContext`), none of the database
+    client's, so none keeps "Driver".
+- **`903cc76c` `docs:`**: prose, TSDoc, test titles and boot/warning messages say "adapter". The
+  specs asserting the messages are updated.
+- **Separate decisions, still "driver":**
+  - Durable messaging: `DurableDriverInterface`, `UnsupportedDurableDriverException` (and its
+    `DURABLE_DRIVER_UNSUPPORTED` code), `DurableMessagingModule.forRoot({ driver })`, the
+    `DurableDriverFixture`s and the durable prose in the repository, TypeORM and Drizzle READMEs.
+  - `packages/nestjs-repository/src/repository/repository-adapter.ts`, left untouched with the
+    class: its private `toDriverQuery`, about 40 TSDoc mentions, and three messages ("The driver
+    returned …") that `result-check.spec.ts` asserts.
+- **CLAUDE.md** (local): the repository rules' intro says "adapters report and translate"; rule 3
+  says "Adapters never decide" (already, from session 2); the docker-tests line says "the TypeORM
+  adapters"; the vocabulary line names `forRoot({ adapters: [{ adapter, entities }] })` and
+  `RepositoryAdapterInterface`. Rules 1, 2 and 4 still say "the driver" where they mean the
+  adapter. They weren't in the requested set.
+- **The handoff** marks sessions 1, 2 and 2b done.
