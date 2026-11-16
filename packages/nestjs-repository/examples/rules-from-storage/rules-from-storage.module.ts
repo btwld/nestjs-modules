@@ -45,7 +45,7 @@ export class StoredAuthorityModule {}
       authority: { required: true },
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: DOCUMENT, entity: DocumentEntity, authority: GOVERNED },
             { key: RULE, entity: StoredRuleEntity, authority: GOVERNED },

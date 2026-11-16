@@ -115,7 +115,7 @@ import { RoleModule } from '@concepta/nestjs-role';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'role', entity: RoleEntity },
             { key: 'user-role', entity: UserRoleEntity },

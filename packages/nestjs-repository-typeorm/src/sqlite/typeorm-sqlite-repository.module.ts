@@ -20,7 +20,7 @@ import { TYPEORM_SQLITE_TRANSACTION_KEY_PREFIX } from './typeorm-sqlite.constant
  * RepositoryModule.forRoot({
  *   adapters: [
  *     {
- *       driver: TypeOrmSqliteRepositoryModule,
+ *       adapter: TypeOrmSqliteRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],
  *     },
  *   ],

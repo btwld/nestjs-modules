@@ -127,7 +127,7 @@ function compile(
       CoreModule.forRoot(),
       RepositoryModule.forRoot({
         imports: [ResolverModule],
-        adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
     providers,
@@ -660,10 +660,10 @@ class LossyWidgetRepository extends MemoryRepositoryFixture<WidgetFixture> {
 }
 
 @Module({})
-class LossyDriverModule {
+class LossyAdapterModule {
   static register(entities: { key: string }[]): DynamicModule {
     return {
-      module: LossyDriverModule,
+      module: LossyAdapterModule,
       providers: entities.map(({ key }) => ({
         provide: getDynamicRepositoryToken(key),
         useFactory: () => new LossyWidgetRepository(key, WIDGET_METADATA),
@@ -681,8 +681,8 @@ describe('batch writes', () => {
       imports: [
         RepositoryModule.forRoot({
           adapters: [
-            { driver: LossyDriverModule, entities: [widgets(activity)] },
-            { driver: MemoryRepositoryModuleFixture, entities: [STORE] },
+            { adapter: LossyAdapterModule, entities: [widgets(activity)] },
+            { adapter: MemoryRepositoryModuleFixture, entities: [STORE] },
           ],
         }),
       ],

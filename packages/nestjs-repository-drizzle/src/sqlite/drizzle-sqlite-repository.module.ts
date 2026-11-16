@@ -43,7 +43,7 @@ import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
  *     RepositoryModule.forRoot({
  *       adapters: [
  *         {
- *           driver: DrizzleSqliteRepositoryModule,
+ *           adapter: DrizzleSqliteRepositoryModule,
  *           entities: [
  *             { key: 'books', entity: Book, table: books, removeDate: 'removedAt' },
  *           ],

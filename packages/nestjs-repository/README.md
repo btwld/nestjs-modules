@@ -75,7 +75,7 @@ Then import `forFeature()` with the keys each feature module injects.
 
 `forRoot()` registers every entity, grouped by the driver that serves it, and
 sets up the transaction infrastructure (factory registry, scope, runner,
-interceptor). Import it once. `YourDriverModule` in the examples stands for
+interceptor). Import it once. `YourAdapterModule` in the examples stands for
 your driver's module, such as one of
 [nestjs-repository-typeorm's adapters](../nestjs-repository-typeorm/README.md#choose-your-adapter).
 
@@ -88,7 +88,7 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
       defaultTimeout: 30000, // transaction timeout in ms (default)
       adapters: [
         {
-          driver: YourDriverModule,
+          adapter: YourAdapterModule,
           entities: [
             { key: 'order', entity: Order },
             { key: 'customer', entity: Customer },
@@ -128,7 +128,7 @@ RepositoryModule.forRoot({
   imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         {
           key: 'order',
@@ -151,7 +151,7 @@ Entities stay static; only the settings come from the factory.
     RepositoryModule.forRootAsync({
       adapters: [
         {
-          driver: YourDriverModule,
+          adapter: YourAdapterModule,
           entities: [{ key: 'order', entity: Order }],
         },
       ],
@@ -348,7 +348,7 @@ The public `find`, `findOne`, `count`, `findAndCount`, `create`,
 ```ts
 import { RepositoryAdapter } from '@concepta/nestjs-repository';
 
-class MyDriverRepository<Entity extends PlainLiteralObject>
+class MyAdapterRepository<Entity extends PlainLiteralObject>
   extends RepositoryAdapter<Entity> {
   readonly metadata = { /* ... */ };
 
@@ -394,7 +394,7 @@ The repository only compares them; row scope uses them to find relations into
 scoped rows.
 
 Your driver's module class is what applications list in `forRoot()`'s
-`adapters`. It implements `RepositoryDriverInterface`: a static
+`adapters`. It implements `RepositoryAdapterInterface`: a static
 `register(entities)` that returns one provider per entity, under
 `getDynamicRepositoryToken(key)`, the `imports` those providers need, and any
 `transactionFactories`. Keep those providers and everything your transaction
@@ -411,7 +411,7 @@ as a whole as `register`'s second parameter, `register(entities, options?)`:
 applications pass them as the registration's `options`, type-checked the
 same way.
 
-### Testing Your Driver
+### Testing Your Adapter
 
 `@concepta/nestjs-repository/conformance/adapter` is the driver contract as a test
 suite: what your driver reports, how it translates every read, what each
@@ -424,8 +424,8 @@ import { runRepositoryConformance } from '@concepta/nestjs-repository/conformanc
 
 runRepositoryConformance(
   {
-    name: 'my-driver/postgres',
-    driver: MyDriverModule,
+    name: 'my-adapter/postgres',
+    adapter: MyAdapterModule,
     imports: [MyConnectionModule.forRoot({ url: process.env.DATABASE_URL })],
     fixtures: {
       item: { key: 'conformance-item', entity: ItemEntity },
@@ -457,7 +457,7 @@ runRepositoryConformance(
   key to your own entity of that shape, with your own entity options;
   `bookWithEagerAuthor` must set `allowEagerRelations: true`. A missing key,
   an entity of the wrong shape, or a missing opt-in doesn't compile. Your
-  driver's own options go in `driverOptions`.
+  driver's own options go in `adapterOptions`.
 - **Capabilities.** Seven are optional, each `'supported'` or `'refused'`:
   `transactions`, `concurrentTransactions` (needs `transactions`; your
   store runs transactions at the same time, so one commits while another
@@ -701,7 +701,7 @@ can also configure per-relation behavior on its `forRoot()` entry:
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [{
         key: 'user',
         entity: UserEntity,
@@ -944,7 +944,7 @@ An entity whose relations load on their own, eagerly, opts in with
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'comment', entity: CommentEntity, allowEagerRelations: true },
       ],
@@ -1757,7 +1757,7 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: YourDriverModule,
+          adapter: YourAdapterModule,
           entities: [
             { key: 'order', entity: Order, hooks: [OrderDefaultsHook] },
           ],
@@ -2503,7 +2503,7 @@ RepositoryModule.forRoot({
   imports: [AuthorityModule],
   adapters: [
     {
-      driver: MyDriverModule,
+      adapter: MyAdapterModule,
       entities: [
         {
           key: 'order',
@@ -2928,7 +2928,7 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         {
           key: 'statement-item',
@@ -3027,13 +3027,13 @@ Add `activity` to an entity to record who changed which of its rows, when, and
 which columns:
 
 ```ts
-// Extend your driver's activity base entity.
-export class Activity extends YourDriverActivityEntity {}
+// Extend your adapter's activity base entity.
+export class Activity extends YourAdapterActivityEntity {}
 
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'invoice', entity: Invoice, activity: { store: 'activity' } },
         {
@@ -3326,7 +3326,7 @@ the registrations that conflict.
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'user', entity: UserEntity },
         { key: 'user', entity: AdminEntity }, // duplicate key!
@@ -3350,13 +3350,13 @@ and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: YourDriverModule,
+      adapter: YourAdapterModule,
       entities: [
         { key: 'user', entity: UserEntity, relations: { posts: { federated: true } } },
       ],
     },
     {
-      driver: YourOtherDriverModule, // posts live in another database
+      adapter: YourOtherAdapterModule, // posts live in another database
       entities: [{ key: 'post', entity: PostEntity }],
     },
   ],
@@ -3533,7 +3533,7 @@ also exported for manual provider wiring.
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
-| `@concepta/nestjs-repository/conformance/adapter` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
+| `@concepta/nestjs-repository/conformance/adapter` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Adapter](#testing-your-adapter) |
 | `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityOptionsInterface`, `CaslAuthorityRulesInterface`, `CaslAuthorityRulesInvalidException`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

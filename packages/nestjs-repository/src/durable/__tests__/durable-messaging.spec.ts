@@ -54,7 +54,7 @@ async function createApp(
       RepositoryModule.forRoot({
         adapters: [
           {
-            driver: DurableMemoryRepositoryModuleFixture,
+            adapter: DurableMemoryRepositoryModuleFixture,
             entities: [{ key: WIDGET_TOKEN, entity: WidgetEntityFixture }],
           },
         ],

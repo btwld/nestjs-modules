@@ -220,7 +220,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'order', entity: OrderEntity },
             { key: 'customer', entity: CustomerEntity, dataSource: 'secondary' },
@@ -637,7 +637,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      adapter: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
       options: {
         transactionSettings: (ctx) => ({
@@ -753,7 +753,7 @@ import { TypeOrmOracleRepositoryModule } from '@concepta/nestjs-repository-typeo
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: TypeOrmOracleRepositoryModule,
+      adapter: TypeOrmOracleRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
       options: {
         applicationContext: {
@@ -878,7 +878,7 @@ import { TypeOrmSqlServerRepositoryModule } from '@concepta/nestjs-repository-ty
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: TypeOrmSqlServerRepositoryModule,
+      adapter: TypeOrmSqlServerRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
       options: {
         sessionContext: (ctx) => ({
@@ -1135,7 +1135,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'order', entity: OrderEntity }],
         },
       ],
@@ -1248,10 +1248,10 @@ Requirements and limits:
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository-typeorm` | The abstract base every adapter extends: `TypeOrmRepository`, `TypeOrmTransaction`, `TypeOrmTransactionFactory`, plus `TypeOrmRepositoryOptions`, `TypeOrmProviderOptionsInterface`, `TypeOrmUnsupportedDatabaseException` and `TypeOrmQueryCacheException` |
-| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresDriverOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmPostgresTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
+| `@concepta/nestjs-repository-typeorm/postgres` | `TypeOrmPostgresRepositoryModule`, `TypeOrmPostgresAdapterOptionsInterface`, `TypeOrmPostgresRepository`, `TypeOrmRepositoryOptions`, `TypeOrmPostgresTransaction`, `TypeOrmPostgresTransactionFactory`, `TypeOrmPostgresTransactionSettingsResolver`, `AuditPostgresEntity`, `CommonPostgresEntity`, `AppendOnlyPostgresEntity`, `ActivityPostgresEntity` |
 | `@concepta/nestjs-repository-typeorm/mysql` | `TypeOrmMysqlRepositoryModule`, `TypeOrmMysqlRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMysqlEntity`, `CommonMysqlEntity`, `AppendOnlyMysqlEntity`, `ActivityMysqlEntity` |
 | `@concepta/nestjs-repository-typeorm/mariadb` | `TypeOrmMariadbRepositoryModule`, `TypeOrmMariadbRepository`, `TypeOrmRepositoryOptions`, `TypeOrmMysqlTransaction`, `TypeOrmMysqlTransactionFactory`, `AuditMariadbEntity`, `CommonMariadbEntity`, `AppendOnlyMariadbEntity`, `ActivityMariadbEntity` |
-| `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleDriverOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
-| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerDriverOptionsInterface`, `TypeOrmSqlServerSessionContextResolver`, `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
+| `@concepta/nestjs-repository-typeorm/oracle` | `TypeOrmOracleRepositoryModule`, `TypeOrmOracleAdapterOptionsInterface`, `TypeOrmOracleApplicationContextInterface`, `TypeOrmOracleApplicationContextResolver`, `TypeOrmOracleRepository`, `TypeOrmRepositoryOptions`, `TypeOrmOracleTransaction`, `TypeOrmOracleTransactionFactory`, `AuditOracleEntity`, `CommonOracleEntity`, `AppendOnlyOracleEntity`, `ActivityOracleEntity` |
+| `@concepta/nestjs-repository-typeorm/sqlserver` | `TypeOrmSqlServerRepositoryModule`, `TypeOrmSqlServerAdapterOptionsInterface`, `TypeOrmSqlServerSessionContextResolver`, `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`, `TypeOrmSqlServerRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqlServerTransaction`, `TypeOrmSqlServerTransactionFactory`, `AuditSqlServerEntity`, `CommonSqlServerEntity`, `AppendOnlySqlServerEntity`, `ActivitySqlServerEntity` |
 | `@concepta/nestjs-repository-typeorm/sqlite` | `TypeOrmSqliteRepositoryModule`, `TypeOrmSqliteRepository`, `TypeOrmRepositoryOptions`, `TypeOrmSqliteTransaction`, `TypeOrmSqliteTransactionFactory`, `AuditSqliteEntity`, `CommonSqliteEntity`, `AppendOnlySqliteEntity`, `ActivitySqliteEntity` |
 | `@concepta/nestjs-repository-typeorm/optional/outbox` | `TypeOrmDurable`. Requires `@nestjs/outbox` |

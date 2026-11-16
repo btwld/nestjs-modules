@@ -26,7 +26,7 @@ describe('TypeOrmRepository and entity listeners', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [{ key: 'listened', entity: ListenedEntityFixture }],
             },
           ],

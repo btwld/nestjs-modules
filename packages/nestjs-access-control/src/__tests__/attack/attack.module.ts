@@ -132,7 +132,7 @@ const TENANT = { access: 'scoped', resolver: AttackTenantRowScope } as const;
       authority: { required: true },
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: CUSTOMER,

@@ -38,7 +38,7 @@ describe('TypeOrmRepository activity (e2e)', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: ITEM_TOKEN,

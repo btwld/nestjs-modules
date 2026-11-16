@@ -14,7 +14,7 @@ import { PhotoCcbCustomModuleFixture } from './photo-ccb-custom/photo-ccb-custom
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: CRUD_TEST_PHOTO_CCB_CUSTOM_ENTITY_NAME,

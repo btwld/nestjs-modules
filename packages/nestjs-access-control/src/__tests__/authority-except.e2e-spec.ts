@@ -47,7 +47,7 @@ const startWith = async (except: string[]) => {
         imports: [ExceptAuthorityModule],
         adapters: [
           {
-            driver: TypeOrmSqliteRepositoryModule,
+            adapter: TypeOrmSqliteRepositoryModule,
             entities: [
               {
                 key: 'ledger',

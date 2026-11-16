@@ -59,7 +59,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -250,7 +250,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -416,7 +416,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -640,7 +640,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -791,7 +791,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -852,7 +852,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,
@@ -928,7 +928,7 @@ describe('CrudModule.forFeature', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   {
                     key: CRUD_TEST_COMPANY_ENTITY_NAME,

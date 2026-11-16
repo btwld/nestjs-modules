@@ -83,7 +83,7 @@ describe('sessionContext on SQL Server', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqlServerRepositoryModule,
+              adapter: TypeOrmSqlServerRepositoryModule,
               entities: [
                 { key: ORDERS_KEY, entity: SessionContextOrderEntityFixture },
               ],

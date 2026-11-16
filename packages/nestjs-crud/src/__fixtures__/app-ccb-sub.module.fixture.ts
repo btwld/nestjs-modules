@@ -14,7 +14,7 @@ import { PhotoCcbSubModuleFixture } from './photo-ccb-sub/photo-ccb-sub.module.f
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CRUD_TEST_PHOTO_CCB_SUB_ENTITY_NAME, entity: PhotoFixture },
           ],

@@ -46,10 +46,10 @@ class AppendableAdapter extends TestRepositoryAdapter {
  * ends up with can only have come from `RepositoryModule.forRoot()`.
  */
 @Module({})
-class PolicyUnawareDriverModule {
+class PolicyUnawareAdapterModule {
   static register(entities: RepositoryProviderOptions[]): DynamicModule {
     return {
-      module: PolicyUnawareDriverModule,
+      module: PolicyUnawareAdapterModule,
       providers: entities.map(({ key }) => ({
         provide: getDynamicRepositoryToken(key),
         useFactory: () =>
@@ -69,7 +69,7 @@ async function compile(
     imports: [
       RepositoryModule.forRoot({
         ...moduleOptions,
-        adapters: [{ driver: PolicyUnawareDriverModule, entities }],
+        adapters: [{ adapter: PolicyUnawareAdapterModule, entities }],
       }),
     ],
   }).compile();
@@ -145,7 +145,7 @@ describe('write policy binding', () => {
             }),
             adapters: [
               {
-                driver: PolicyUnawareDriverModule,
+                adapter: PolicyUnawareAdapterModule,
                 entities: [{ key: 'items', entity: TestEntityClass }],
               },
             ],

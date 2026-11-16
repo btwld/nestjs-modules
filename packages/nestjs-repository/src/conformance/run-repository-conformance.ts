@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 
 import { CoreModule } from '@concepta/nestjs-core';
 
-import { type RepositoryDriverInterface } from '../interfaces/repository-module.interface.js';
+import { type RepositoryAdapterInterface } from '../interfaces/repository-module.interface.js';
 import { RepositoryModule } from '../repository.module.js';
 
 import { ConformanceContext } from './conformance-context.js';
@@ -43,9 +43,9 @@ const SECTIONS: Record<string, (ctx: ConformanceContext) => void> = {
  * ```
  */
 export function runRepositoryConformance<
-  Driver extends RepositoryDriverInterface,
+  Adapter extends RepositoryAdapterInterface,
 >(
-  harness: ConformanceHarnessInterface<Driver>,
+  harness: ConformanceHarnessInterface<Adapter>,
   test: ConformanceTestApiInterface,
 ): void {
   const { fixtures } = harness;
@@ -76,7 +76,7 @@ export function runRepositoryConformance<
               RepositoryModule.forRoot({
                 adapters: [
                   {
-                    driver: harness.driver,
+                    adapter: harness.adapter,
                     entities: [
                       fixtures.item,
                       fixtures.plainItem,
@@ -89,7 +89,7 @@ export function runRepositoryConformance<
                       fixtures.tenantOrder,
                       fixtures.tenantOrderLine,
                     ],
-                    options: harness.driverOptions,
+                    options: harness.adapterOptions,
                   },
                 ],
               }),

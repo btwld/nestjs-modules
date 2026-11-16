@@ -6,7 +6,7 @@
  */
 
 export { TypeOrmPostgresRepositoryModule } from './postgres/typeorm-postgres-repository.module.js';
-export { TypeOrmPostgresDriverOptionsInterface } from './postgres/typeorm-postgres-driver-options.interface.js';
+export { TypeOrmPostgresAdapterOptionsInterface } from './postgres/typeorm-postgres-adapter-options.interface.js';
 export { TypeOrmPostgresRepository } from './postgres/typeorm-postgres-repository.js';
 export { TypeOrmRepositoryOptions } from './repository/typeorm-repository-options.interface.js';
 export { TypeOrmPostgresTransaction } from './postgres/typeorm-postgres-transaction.js';

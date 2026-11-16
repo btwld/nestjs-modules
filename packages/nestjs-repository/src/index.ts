@@ -25,14 +25,14 @@ export {
   RepositoryProviderOptions,
 } from './interfaces/repository-provider-options.interface.js';
 export {
-  RepositoryDriverInterface,
+  RepositoryAdapterInterface,
   DynamicRepositoryModule,
   TransactionFactoryDescriptor,
 } from './interfaces/repository-module.interface.js';
 export {
-  RepositoryDriverEntityOptions,
-  RepositoryDriverOptions,
-  RepositoryDriverRegistration,
+  RepositoryAdapterEntityOptions,
+  RepositoryAdapterOptions,
+  RepositoryAdapterRegistration,
   RepositoryRootAsyncOptions,
   RepositoryRootOptions,
 } from './interfaces/repository-root-options.interface.js';

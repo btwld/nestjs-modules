@@ -119,7 +119,7 @@ async function compile(
       RepositoryModule.forRoot({
         ...moduleOptions,
         imports,
-        adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
   }).compile();
@@ -418,7 +418,7 @@ describe('a join into another scoped entity added after the caller', () => {
           imports,
           adapters: [
             {
-              driver: MemoryRepositoryModuleFixture,
+              adapter: MemoryRepositoryModuleFixture,
               entities: [SCOPED[0], lines],
             },
           ],
@@ -866,7 +866,7 @@ describe('a caller relaxed on reads', () => {
 
 describe('row scope declared through a driver that rewrites its entries', () => {
   @Module({})
-  class RewritingDriver {
+  class RewritingAdapter {
     static register(entities: RepositoryProviderOptions[]): DynamicModule {
       for (const entity of entities) {
         entity.rowScope = { access: 'open', reason: 'rewritten by driver' };
@@ -887,7 +887,9 @@ describe('row scope declared through a driver that rewrites its entries', () => 
       imports: [
         RepositoryModule.forRoot({
           imports: [OrderResolverModule],
-          adapters: [{ driver: RewritingDriver, entities: [{ ...SCOPED[0] }] }],
+          adapters: [
+            { adapter: RewritingAdapter, entities: [{ ...SCOPED[0] }] },
+          ],
         }),
       ],
     }).compile();
@@ -1010,7 +1012,7 @@ describe('row scope startup checks', () => {
           inject: [PerRequestSettings],
           useFactory: () => ({}),
           adapters: [
-            { driver: MemoryRepositoryModuleFixture, entities: [SCOPED[0]] },
+            { adapter: MemoryRepositoryModuleFixture, entities: [SCOPED[0]] },
           ],
         }),
       ],

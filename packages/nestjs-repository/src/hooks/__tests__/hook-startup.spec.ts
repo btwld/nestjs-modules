@@ -31,7 +31,7 @@ const boot = async (providers: Type[], withCore = true): Promise<void> => {
       RepositoryModule.forRoot({
         adapters: [
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [
               { key: NOTE_TOKEN, entity: NoteEntityFixture, hooks: [NoteHook] },
             ],

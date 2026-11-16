@@ -553,7 +553,7 @@ describe('authority over related rows', () => {
               imports: [deciders(new AuthorityFixture())],
               adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [
                     {
                       key: ORDER_TOKEN,
@@ -595,7 +595,7 @@ describe('authority over related rows', () => {
             ],
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: ORDER_TOKEN,
@@ -682,7 +682,7 @@ describe('authority over related rows', () => {
             imports: [deciders(new AuthorityFixture())],
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: AUTHOR_TOKEN,
@@ -791,7 +791,7 @@ describe('authority over related rows', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [deciders(authority, lineHooks)],
-            adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
+            adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
           }),
         ],
       }).compile();
@@ -1195,7 +1195,7 @@ describe('authority over related rows', () => {
               imports: [deciders(authority)],
               adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [
                     {
                       key: INVOICE_TOKEN,
@@ -1574,7 +1574,7 @@ describe('authority over related rows', () => {
             ],
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: AUTHOR_TOKEN,

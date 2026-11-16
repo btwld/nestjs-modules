@@ -215,7 +215,7 @@ export class Book {
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: DrizzlePostgresRepositoryModule,
+          adapter: DrizzlePostgresRepositoryModule,
           entities: [
             {
               key: 'book',
@@ -433,7 +433,7 @@ import { DrizzlePostgresRepositoryModule } from '@concepta/nestjs-repository-dri
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: DrizzlePostgresRepositoryModule,
+      adapter: DrizzlePostgresRepositoryModule,
       entities: [{ key: 'order', entity: Order, table: orders }],
       options: {
         transactionSettings: (ctx) => ({
@@ -530,7 +530,7 @@ The repository's own exceptions are listed in the
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository-drizzle` | `DrizzleProviderOptionsInterface`, `DrizzleRepositoryOptions`, `DRIZZLE_DEFAULT_CONNECTION_NAME`, `DrizzleUnsupportedDatabaseException`, `DrizzleSingleConnectionException` |
-| `@concepta/nestjs-repository-drizzle/postgres` | `DrizzlePostgresRepositoryModule`, `DrizzlePostgresDriverOptionsInterface`, `DrizzlePostgresTransactionSettingsResolver`, `DrizzlePostgresTransactionSettings`, `DrizzlePostgresRepository`, `DrizzleRepositoryOptions`, `DrizzlePostgresTransaction`, `DrizzlePostgresTransactionFactory`, `DrizzlePostgresClient` |
+| `@concepta/nestjs-repository-drizzle/postgres` | `DrizzlePostgresRepositoryModule`, `DrizzlePostgresAdapterOptionsInterface`, `DrizzlePostgresTransactionSettingsResolver`, `DrizzlePostgresTransactionSettings`, `DrizzlePostgresRepository`, `DrizzleRepositoryOptions`, `DrizzlePostgresTransaction`, `DrizzlePostgresTransactionFactory`, `DrizzlePostgresClient` |
 | `@concepta/nestjs-repository-drizzle/mysql` | `DrizzleMysqlRepositoryModule`, `DrizzleMysqlRepository`, `DrizzleRepositoryOptions`, `DrizzleMysqlTransaction`, `DrizzleMysqlTransactionFactory`, `DrizzleMysqlClient` |
 | `@concepta/nestjs-repository-drizzle/mariadb` | `DrizzleMariadbRepositoryModule`, `DrizzleMariadbRepository`, `DrizzleRepositoryOptions`, `DrizzleMysqlTransaction`, `DrizzleMysqlTransactionFactory`, `DrizzleMysqlClient` |
 | `@concepta/nestjs-repository-drizzle/sqlite` | `DrizzleSqliteRepositoryModule`, `DrizzleSqliteRepository`, `DrizzleRepositoryOptions`, `DrizzleSqliteTransaction`, `DrizzleSqliteTransactionFactory`, `DrizzleSqliteClient` |

@@ -160,7 +160,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],
@@ -241,7 +241,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],
@@ -510,7 +510,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                   { key: CRUD_TEST_DEVICE_ENTITY_NAME, entity: DeviceEntity },
@@ -1045,7 +1045,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                 ],

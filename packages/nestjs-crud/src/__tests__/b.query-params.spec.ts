@@ -384,7 +384,7 @@ describe('#crud-typeorm', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [
                   { key: CRUD_TEST_COMPANY_ENTITY_NAME, entity: CompanyEntity },
                   { key: CRUD_TEST_PROJECT_ENTITY_NAME, entity: ProjectEntity },

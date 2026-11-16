@@ -64,7 +64,7 @@ export function drizzlePostgresConformanceHarness(
 ): ConformanceHarnessInterface<typeof DrizzlePostgresRepositoryModule> {
   return {
     name,
-    driver: DrizzlePostgresRepositoryModule,
+    adapter: DrizzlePostgresRepositoryModule,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: async () => {

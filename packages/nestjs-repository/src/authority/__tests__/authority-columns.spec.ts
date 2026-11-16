@@ -110,7 +110,7 @@ async function ordersWith(
       RepositoryModule.forRoot({
         imports: [DecidersModule],
         adapters: [
-          { driver: MemoryRepositoryModuleFixture, entities: [entity] },
+          { adapter: MemoryRepositoryModuleFixture, entities: [entity] },
         ],
       }),
     ],
@@ -646,7 +646,7 @@ describe('authority over columns', () => {
             imports: [DecidersModule],
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: VERSIONED_ORDER_TOKEN,

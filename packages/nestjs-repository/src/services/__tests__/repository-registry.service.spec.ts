@@ -64,14 +64,14 @@ const mockRoot = (
   entities: RepositoryProviderOptions[],
 ): ReturnType<typeof RepositoryModule.forRoot> =>
   RepositoryModule.forRoot({
-    adapters: [{ driver: MockRepositoryModule, entities }],
+    adapters: [{ adapter: MockRepositoryModule, entities }],
   });
 
 const memoryRoot = (
   entities: RepositoryProviderOptions[],
 ): ReturnType<typeof RepositoryModule.forRoot> =>
   RepositoryModule.forRoot({
-    adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
+    adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
   });
 
 describe('RepositoryRegistryService', () => {
@@ -149,11 +149,11 @@ describe('RepositoryRegistryService', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [{ key: 'pets', entity: PetEntityFixture }],
               },
               {
-                driver: SharedRowsModule,
+                adapter: SharedRowsModule,
                 entities: [{ key: 'pet-views', entity: PetViewEntity }],
               },
             ],
@@ -238,10 +238,10 @@ describe('RepositoryRegistryService', () => {
 
   it('should throw when a driver registers something other than an adapter', async () => {
     @Module({})
-    class RawDriver {
+    class RawAdapter {
       static register(entities: RepositoryProviderOptions[]): DynamicModule {
         return {
-          module: RawDriver,
+          module: RawAdapter,
           providers: entities.map(({ key }) => ({
             provide: getDynamicRepositoryToken(key),
             useValue: { find: async () => [] },
@@ -256,7 +256,7 @@ describe('RepositoryRegistryService', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: RawDriver,
+                adapter: RawAdapter,
                 entities: [{ key: 'users', entity: UserEntity }],
               },
             ],
@@ -265,7 +265,7 @@ describe('RepositoryRegistryService', () => {
       }).compile(),
     ).rejects.toThrow(
       new RepositoryBootException([
-        'Driver "RawDriver" registered "users" with a repository that does ' +
+        'Driver "RawAdapter" registered "users" with a repository that does ' +
           'not extend RepositoryAdapter.',
       ]),
     );
@@ -276,11 +276,11 @@ describe('RepositoryRegistryService', () => {
       RepositoryModule.forRoot({
         adapters: [
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [{ key: 'pets', entity: PetEntityFixture }],
           },
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [{ key: 'notes', entity: NoteEntityFixture }],
           },
         ],
@@ -294,8 +294,8 @@ describe('RepositoryRegistryService', () => {
     @Injectable({ scope: Scope.REQUEST })
     class PerRequestConnection {}
 
-    const driver = {
-      name: 'PerRequestTxDriver',
+    const adapter = {
+      name: 'PerRequestTxAdapter',
       register: (
         entities: RepositoryProviderOptions[],
       ): DynamicRepositoryModule => {
@@ -322,7 +322,7 @@ describe('RepositoryRegistryService', () => {
       imports: [
         RepositoryModule.forRoot({
           adapters: [
-            { driver, entities: [{ key: 'users', entity: UserEntity }] },
+            { adapter, entities: [{ key: 'users', entity: UserEntity }] },
           ],
         }),
       ],
@@ -334,7 +334,7 @@ describe('RepositoryRegistryService', () => {
   });
 
   it('should throw when two drivers register one transaction key', () => {
-    const sharedKeyDriver = (name: string) => ({
+    const sharedKeyAdapter = (name: string) => ({
       name,
       register: (): DynamicRepositoryModule => ({
         module: MockRepositoryModule,
@@ -356,11 +356,11 @@ describe('RepositoryRegistryService', () => {
       RepositoryModule.forRoot({
         adapters: [
           {
-            driver: sharedKeyDriver('FirstDriver'),
+            adapter: sharedKeyAdapter('FirstAdapter'),
             entities: [{ key: 'users', entity: UserEntity }],
           },
           {
-            driver: sharedKeyDriver('SecondDriver'),
+            adapter: sharedKeyAdapter('SecondAdapter'),
             entities: [{ key: 'orders', entity: OrderEntity }],
           },
         ],
@@ -392,20 +392,20 @@ describe('RepositoryModule.forRoot entity options', () => {
     collection?: string;
   }
 
-  interface CollectionDriverOptions {
+  interface CollectionAdapterOptions {
     shard?: string;
   }
 
   @Module({})
-  class CollectionDriver {
-    static received?: CollectionDriverOptions;
+  class CollectionAdapter {
+    static received?: CollectionAdapterOptions;
 
     static register(
       _entities: CollectionOptions[],
-      options?: CollectionDriverOptions,
+      options?: CollectionAdapterOptions,
     ): DynamicModule {
-      CollectionDriver.received = options;
-      return { module: CollectionDriver };
+      CollectionAdapter.received = options;
+      return { module: CollectionAdapter };
     }
   }
 
@@ -413,23 +413,23 @@ describe('RepositoryModule.forRoot entity options', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: CollectionDriver,
+          adapter: CollectionAdapter,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
           options: { shard: 'a' },
         },
       ],
     });
 
-    expect(CollectionDriver.received).toEqual({ shard: 'a' });
+    expect(CollectionAdapter.received).toEqual({ shard: 'a' });
   });
 
   it('refuses a misspelled driver option at compile time', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: CollectionDriver,
+          adapter: CollectionAdapter,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
-          // @ts-expect-error `shrd` is not a CollectionDriver option
+          // @ts-expect-error `shrd` is not a CollectionAdapter option
           options: { shrd: 'a' },
         },
       ],
@@ -440,7 +440,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: MemoryRepositoryModuleFixture,
+          adapter: MemoryRepositoryModuleFixture,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
           // @ts-expect-error MemoryRepositoryModuleFixture takes no options
           options: { shard: 'a' },
@@ -454,13 +454,13 @@ describe('RepositoryModule.forRoot entity options', () => {
       RepositoryModule.forRoot({
         adapters: [
           {
-            driver: CollectionDriver,
+            adapter: CollectionAdapter,
             entities: [
               { key: 'pets', entity: PetEntityFixture, collection: 'p' },
             ],
           },
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: [{ key: 'notes', entity: NoteEntityFixture }],
           },
         ],
@@ -472,7 +472,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: MemoryRepositoryModuleFixture,
+          adapter: MemoryRepositoryModuleFixture,
           entities: [
             {
               key: 'pets',
@@ -490,13 +490,13 @@ describe('RepositoryModule.forRoot entity options', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: CollectionDriver,
+          adapter: CollectionAdapter,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
         },
         {
-          driver: MemoryRepositoryModuleFixture,
+          adapter: MemoryRepositoryModuleFixture,
           entities: [
-            // @ts-expect-error `collection` belongs to CollectionDriver
+            // @ts-expect-error `collection` belongs to CollectionAdapter
             { key: 'notes', entity: NoteEntityFixture, collection: 'n' },
           ],
         },
@@ -582,11 +582,11 @@ describe('RepositoryModule.forFeature', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: MemoryRepositoryModuleFixture,
+              adapter: MemoryRepositoryModuleFixture,
               entities: [{ key: 'pets', entity: PetEntityFixture }],
             },
             {
-              driver: MockRepositoryModule,
+              adapter: MockRepositoryModule,
               entities: [{ key: 'users', entity: UserEntity }],
             },
           ],

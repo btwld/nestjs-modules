@@ -80,7 +80,7 @@ describe('DrizzlePostgresRepository on a database with snake_case casing', () =>
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: DrizzlePostgresRepositoryModule,
+                adapter: DrizzlePostgresRepositoryModule,
                 entities: [
                   { key: 'order', entity: OrderEntity, table: orderTable },
                   {

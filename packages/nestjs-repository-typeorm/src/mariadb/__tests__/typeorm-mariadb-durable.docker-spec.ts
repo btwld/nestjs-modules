@@ -51,7 +51,7 @@ describe('durable messaging on MariaDB', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmMariadbRepositoryModule,
+              adapter: TypeOrmMariadbRepositoryModule,
               entities: [{ key: NOTES_KEY, entity: DurableNoteEntityFixture }],
             },
           ],

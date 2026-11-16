@@ -63,7 +63,7 @@ function createDrizzleProvider<
 function createTransactionFactoryDescriptor<Client, Options>(
   definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   connection: string,
-  driverOptions?: Options,
+  adapterOptions?: Options,
 ): TransactionFactoryDescriptor {
   return {
     key: resolveTransactionKey(definition.transactionKeyPrefix, connection),
@@ -72,7 +72,7 @@ function createTransactionFactoryDescriptor<Client, Options>(
       definition.createTransactionFactory(
         definition.toClient(db, connection),
         connection,
-        driverOptions,
+        adapterOptions,
       ),
   };
 }
@@ -83,12 +83,12 @@ function createTransactionFactoryDescriptor<Client, Options>(
  *
  * @param definition - The adapter
  * @param entities - Its entities
- * @param driverOptions - The registration's `options`, for the adapter
+ * @param adapterOptions - The registration's `options`, for the adapter
  */
 export function registerDrizzleAdapter<Client, Options>(
   definition: DrizzleAdapterDefinitionInterface<Client, Options>,
   entities: DrizzleProviderOptionsInterface[],
-  driverOptions?: Options,
+  adapterOptions?: Options,
 ): DynamicRepositoryModule {
   const connections = new Set(
     entities.map(({ connection }) => resolveConnectionName(connection)),
@@ -100,7 +100,11 @@ export function registerDrizzleAdapter<Client, Options>(
       createDrizzleProvider(definition, entity),
     ),
     transactionFactories: Array.from(connections).map((connection) =>
-      createTransactionFactoryDescriptor(definition, connection, driverOptions),
+      createTransactionFactoryDescriptor(
+        definition,
+        connection,
+        adapterOptions,
+      ),
     ),
   };
 }

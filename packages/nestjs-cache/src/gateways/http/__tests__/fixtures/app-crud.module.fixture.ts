@@ -43,7 +43,7 @@ import { ReadCacheRequest } from '../../queries/impl/read-cache.request.js';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: CACHE_MODULE_CACHE_ENTITY_KEY,

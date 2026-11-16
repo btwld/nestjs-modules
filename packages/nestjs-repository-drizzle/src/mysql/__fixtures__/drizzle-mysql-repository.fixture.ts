@@ -144,7 +144,7 @@ class MysqlRootModule {}
  */
 export function describeDrizzleMysqlRepository(
   name: string,
-  driver: DrizzleMysqlAdapterModule,
+  adapter: DrizzleMysqlAdapterModule,
   url: string,
 ): void {
   describe(name, () => {
@@ -227,7 +227,7 @@ export function describeDrizzleMysqlRepository(
             RepositoryModule.forRoot({
               adapters: [
                 {
-                  driver,
+                  adapter,
                   entities: [
                     {
                       key: 'token',

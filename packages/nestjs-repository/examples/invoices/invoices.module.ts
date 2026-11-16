@@ -54,7 +54,7 @@ export class InvoiceAuthorityModule {}
       authority: { required: true },
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: CUSTOMER, entity: CustomerEntity, authority: GOVERNED },
             {

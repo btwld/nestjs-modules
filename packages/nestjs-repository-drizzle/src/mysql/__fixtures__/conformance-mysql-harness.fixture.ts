@@ -50,12 +50,12 @@ function database(app: INestApplicationContext): DrizzleMysqlClient {
  */
 export function drizzleMysqlConformanceHarness(
   name: string,
-  driver: DrizzleMysqlAdapterModule,
+  adapter: DrizzleMysqlAdapterModule,
   url: string,
 ): ConformanceHarnessInterface<DrizzleMysqlAdapterModule> {
   return {
     name,
-    driver,
+    adapter,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: async () => {

@@ -211,7 +211,7 @@ import { CrudModule } from '@concepta/nestjs-crud';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'photo', entity: PhotoEntity }],
         },
       ],
@@ -1437,7 +1437,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      adapter: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'photo', entity: Photo, hooks: [AuditHook] }],
     },
   ],

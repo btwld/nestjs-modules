@@ -20,7 +20,7 @@ import { TYPEORM_MYSQL_TRANSACTION_KEY_PREFIX } from './typeorm-mysql.constants.
  * RepositoryModule.forRoot({
  *   adapters: [
  *     {
- *       driver: TypeOrmMysqlRepositoryModule,
+ *       adapter: TypeOrmMysqlRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],
  *     },
  *   ],

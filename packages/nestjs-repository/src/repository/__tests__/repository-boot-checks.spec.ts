@@ -276,10 +276,10 @@ describe('repository startup checks', () => {
     ],
   ])('refuse to start with %s', async (_case, adapter) => {
     @Module({})
-    class AccountsDriver {
+    class AccountsAdapter {
       static register(): DynamicModule {
         return {
-          module: AccountsDriver,
+          module: AccountsAdapter,
           providers: [
             {
               provide: getDynamicRepositoryToken('accounts'),
@@ -296,7 +296,7 @@ describe('repository startup checks', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: AccountsDriver,
+                adapter: AccountsAdapter,
                 entities: [{ key: 'accounts', entity: PlainAccountEntity }],
               },
             ],

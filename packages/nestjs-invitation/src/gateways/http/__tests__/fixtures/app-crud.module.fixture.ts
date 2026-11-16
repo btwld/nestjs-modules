@@ -76,7 +76,7 @@ const USER_OTP_ENTITY_KEY = 'user-otp';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: INVITATION_MODULE_DEFAULT_ENTITY_KEY,

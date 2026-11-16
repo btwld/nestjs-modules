@@ -43,7 +43,7 @@ describe('TypeOrmRepository append-only (e2e)', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: STATEMENT_ITEM_TOKEN,

@@ -34,7 +34,7 @@ describe('TypeOrmRepository and eager relations', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: 'holders',

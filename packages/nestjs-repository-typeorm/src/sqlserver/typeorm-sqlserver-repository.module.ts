@@ -6,7 +6,7 @@ import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-prov
 import { type TypeOrmAdapterDefinitionInterface } from '../typeorm-adapter-definition.interface.js';
 import { registerTypeOrmAdapter } from '../typeorm-repository.util.js';
 
-import { type TypeOrmSqlServerDriverOptionsInterface } from './typeorm-sqlserver-driver-options.interface.js';
+import { type TypeOrmSqlServerAdapterOptionsInterface } from './typeorm-sqlserver-adapter-options.interface.js';
 import { TypeOrmSqlServerRepository } from './typeorm-sqlserver-repository.js';
 import { TypeOrmSqlServerTransactionFactory } from './typeorm-sqlserver-transaction.factory.js';
 import { TYPEORM_SQLSERVER_TRANSACTION_KEY_PREFIX } from './typeorm-sqlserver.constants.js';
@@ -20,7 +20,7 @@ import { TYPEORM_SQLSERVER_TRANSACTION_KEY_PREFIX } from './typeorm-sqlserver.co
  * RepositoryModule.forRoot({
  *   adapters: [
  *     {
- *       driver: TypeOrmSqlServerRepositoryModule,
+ *       adapter: TypeOrmSqlServerRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],
  *     },
  *   ],
@@ -35,13 +35,13 @@ export class TypeOrmSqlServerRepositoryModule {
    */
   static register(
     entities: TypeOrmProviderOptionsInterface[],
-    options?: TypeOrmSqlServerDriverOptionsInterface,
+    options?: TypeOrmSqlServerAdapterOptionsInterface,
   ): DynamicRepositoryModule {
     return registerTypeOrmAdapter(TYPEORM_SQLSERVER_ADAPTER, entities, options);
   }
 }
 
-export const TYPEORM_SQLSERVER_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmSqlServerDriverOptionsInterface> =
+export const TYPEORM_SQLSERVER_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmSqlServerAdapterOptionsInterface> =
   {
     module: TypeOrmSqlServerRepositoryModule,
     transactionKeyPrefix: TYPEORM_SQLSERVER_TRANSACTION_KEY_PREFIX,

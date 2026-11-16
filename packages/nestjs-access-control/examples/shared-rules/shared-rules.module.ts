@@ -35,7 +35,7 @@ import {
       authority: { required: true },
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: INVOICE,

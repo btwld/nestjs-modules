@@ -58,7 +58,7 @@ const USER_ROLE_ENTITY_KEY = 'userRole';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: ROLE_ENTITY_KEY, entity: RoleEntityFixture },
             { key: USER_ROLE_ENTITY_KEY, entity: UserRoleEntityFixture },

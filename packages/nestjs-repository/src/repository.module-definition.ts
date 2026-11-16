@@ -20,7 +20,7 @@ import {
 } from './federation/federation-reader.service.js';
 import { TransactionInterceptor } from './interceptors/transaction.interceptor.js';
 import { type RepositoryModuleOptionsInterface } from './interfaces/repository-module-options.interface.js';
-import { type RepositoryDriverRegistration } from './interfaces/repository-root-options.interface.js';
+import { type RepositoryAdapterRegistration } from './interfaces/repository-root-options.interface.js';
 import { RepositoryBindingCheck } from './repository-binding.check.js';
 import {
   bindRepositories,
@@ -54,18 +54,18 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  */
 export function createRepositoryRootModule(params: {
   module: Type;
-  drivers: RepositoryDriverRegistration[];
+  adapters: RepositoryAdapterRegistration[];
   imports: NonNullable<ModuleMetadata['imports']>;
   optionsProvider: Provider<RepositoryModuleOptionsInterface>;
 }): DynamicModule {
-  const { module, drivers, imports, optionsProvider } = params;
+  const { module, adapters, imports, optionsProvider } = params;
 
   // Copied before any driver sees the entries, so nothing a driver does to
   // them can change what is checked and bound.
-  const entries: RepositoryBindingEntry[] = drivers.flatMap(
-    ({ driver, entities }) =>
+  const entries: RepositoryBindingEntry[] = adapters.flatMap(
+    ({ adapter, entities }) =>
       entities.map((options) => ({
-        driverName: driver.name,
+        adapterName: adapter.name,
         options: {
           ...options,
           rowScope: options.rowScope && { ...options.rowScope },
@@ -80,14 +80,14 @@ export function createRepositoryRootModule(params: {
       })),
   );
 
-  assertDistinctDrivers(drivers);
+  assertDistinctAdapters(adapters);
   assertDistinctKeys(entries);
   assertResolversNotRequestScoped(entries);
 
-  const driverModules = drivers.map(({ driver, entities, options }) =>
-    driver.register(entities, options),
+  const adapterModules = adapters.map(({ adapter, entities, options }) =>
+    adapter.register(entities, options),
   );
-  const transactionFactories = driverModules.flatMap(
+  const transactionFactories = adapterModules.flatMap(
     ({ transactionFactories: factories = [] }) => factories,
   );
   assertDistinctTransactionKeys(transactionFactories.map(({ key }) => key));
@@ -108,7 +108,7 @@ export function createRepositoryRootModule(params: {
           transactionFactories.map(({ key }) => key),
         ),
     },
-    ...driverModules.flatMap(({ providers: driven = [] }) => driven),
+    ...adapterModules.flatMap(({ providers: registered = [] }) => registered),
     {
       provide: REPOSITORY_BINDING,
       inject: [
@@ -203,15 +203,17 @@ export function createRepositoryRootModule(params: {
     global: true,
     imports: [
       ...imports,
-      ...driverModules.flatMap(({ imports: driven = [] }) => driven),
+      ...adapterModules.flatMap(({ imports: registered = [] }) => registered),
     ],
     providers,
     exports: [...createRepositoryExports(), REPOSITORY_BINDING],
   };
 }
 
-function assertDistinctDrivers(drivers: RepositoryDriverRegistration[]): void {
-  const names = drivers.map(({ driver }) => driver.name);
+function assertDistinctAdapters(
+  adapters: RepositoryAdapterRegistration[],
+): void {
+  const names = adapters.map(({ adapter }) => adapter.name);
   const repeated = names.filter((name, i) => names.indexOf(name) !== i);
 
   if (repeated.length > 0) {

@@ -4,7 +4,7 @@ import { type TypeOrmPostgresTransactionSettingsResolver } from './typeorm-postg
  * Options for the Postgres adapter, given as `options` on its
  * `RepositoryModule.forRoot()` registration.
  */
-export interface TypeOrmPostgresDriverOptionsInterface {
+export interface TypeOrmPostgresAdapterOptionsInterface {
   /** Settings applied at the start of every transaction the driver opens. */
   transactionSettings?: TypeOrmPostgresTransactionSettingsResolver;
 }

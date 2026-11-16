@@ -58,7 +58,7 @@ type TypeOrmAdapterModule =
  * the connection, and the adapter's entity for each fixture.
  *
  * @param name - Names the run
- * @param driver - The adapter's module
+ * @param adapter - The adapter's module
  * @param connection - The data source the run uses
  * @param capabilities - What the database refuses or provides beyond the
  *   default: a database with a single connection refuses
@@ -67,7 +67,7 @@ type TypeOrmAdapterModule =
  */
 export function typeOrmConformanceHarness(
   name: string,
-  driver: TypeOrmAdapterModule,
+  adapter: TypeOrmAdapterModule,
   connection: DataSourceOptions,
   capabilities: Partial<
     Record<
@@ -81,7 +81,7 @@ export function typeOrmConformanceHarness(
 
   return {
     name,
-    driver,
+    adapter,
     imports: [
       TypeOrmModule.forRoot({
         ...connection,

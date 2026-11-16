@@ -11,7 +11,7 @@ import { DrizzleSingleConnectionException } from '../exceptions/drizzle-single-c
 import { DrizzleUnsupportedDatabaseException } from '../exceptions/drizzle-unsupported-database.exception.js';
 import { type DrizzleProviderOptionsInterface } from '../repository/drizzle-provider-options.interface.js';
 
-import { type DrizzlePostgresDriverOptionsInterface } from './drizzle-postgres-driver-options.interface.js';
+import { type DrizzlePostgresAdapterOptionsInterface } from './drizzle-postgres-adapter-options.interface.js';
 import { DrizzlePostgresRepository } from './drizzle-postgres-repository.js';
 import { DrizzlePostgresTransactionFactory } from './drizzle-postgres-transaction.factory.js';
 import {
@@ -33,7 +33,7 @@ import { type DrizzlePostgresClient } from './drizzle-postgres.types.js';
  *     RepositoryModule.forRoot({
  *       adapters: [
  *         {
- *           driver: DrizzlePostgresRepositoryModule,
+ *           adapter: DrizzlePostgresRepositoryModule,
  *           entities: [
  *             { key: 'books', entity: Book, table: books, removeDate: 'removedAt' },
  *           ],
@@ -53,7 +53,7 @@ export class DrizzlePostgresRepositoryModule {
    */
   static register(
     entities: DrizzleProviderOptionsInterface[],
-    options?: DrizzlePostgresDriverOptionsInterface,
+    options?: DrizzlePostgresAdapterOptionsInterface,
   ): DynamicRepositoryModule {
     return registerDrizzleAdapter(DRIZZLE_POSTGRES_ADAPTER, entities, options);
   }
@@ -127,16 +127,16 @@ function isObjectOrFunction(value: unknown): value is object {
 /** The Postgres adapter's definition, for the shared registration. */
 export const DRIZZLE_POSTGRES_ADAPTER: DrizzleAdapterDefinitionInterface<
   DrizzlePostgresClient,
-  DrizzlePostgresDriverOptionsInterface
+  DrizzlePostgresAdapterOptionsInterface
 > = {
   module: DrizzlePostgresRepositoryModule,
   transactionKeyPrefix: DRIZZLE_POSTGRES_TRANSACTION_KEY_PREFIX,
   toClient: toDrizzlePostgresClient,
   createRepository: (options) => new DrizzlePostgresRepository(options),
-  createTransactionFactory: (db, connection, driverOptions) =>
+  createTransactionFactory: (db, connection, adapterOptions) =>
     new DrizzlePostgresTransactionFactory(
       db,
       connection,
-      driverOptions?.transactionSettings,
+      adapterOptions?.transactionSettings,
     ),
 };

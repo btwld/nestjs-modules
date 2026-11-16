@@ -160,7 +160,7 @@ async function compile({
         federation: maxKeys === undefined ? undefined : { maxKeys },
         adapters: [
           {
-            driver: MemoryRepositoryModuleFixture,
+            adapter: MemoryRepositoryModuleFixture,
             entities: entities.filter(({ key }) => !omit.includes(key)),
           },
         ],

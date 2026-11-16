@@ -92,7 +92,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'file', entity: FileEntity }],
         },
       ],

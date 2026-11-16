@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppContextHost } from '@concepta/nestjs-core';
 import {
   getDynamicRepositoryToken,
-  type RepositoryDriverInterface,
+  type RepositoryAdapterInterface,
   RepositoryModule,
   TransactionScope,
 } from '@concepta/nestjs-repository';
@@ -19,13 +19,13 @@ import { ormConfig } from '../__fixtures__/repository/config/ormconfig.fixture.j
 import { TestEntityFixture } from '../__fixtures__/repository/entity/test.entity.fixture.js';
 
 /** An application with one entity, registered with `driver`, on SQLite. */
-function compile(driver: RepositoryDriverInterface & Type) {
+function compile(adapter: RepositoryAdapterInterface & Type) {
   return Test.createTestingModule({
     imports: [
       TypeOrmModule.forRoot(ormConfig),
       RepositoryModule.forRoot({
         adapters: [
-          { driver, entities: [{ key: 'test', entity: TestEntityFixture }] },
+          { adapter, entities: [{ key: 'test', entity: TestEntityFixture }] },
         ],
       }),
     ],

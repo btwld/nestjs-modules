@@ -84,7 +84,7 @@ describe('row scope and row-level security on Postgres', () => {
           imports: [RlsRowScopeModuleFixture],
           adapters: [
             {
-              driver: TypeOrmPostgresRepositoryModule,
+              adapter: TypeOrmPostgresRepositoryModule,
               entities: [
                 {
                   key: RLS_PROJECTS_KEY,

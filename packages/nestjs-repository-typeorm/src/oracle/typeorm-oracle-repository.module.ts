@@ -6,7 +6,7 @@ import { type TypeOrmProviderOptionsInterface } from '../repository/typeorm-prov
 import { type TypeOrmAdapterDefinitionInterface } from '../typeorm-adapter-definition.interface.js';
 import { registerTypeOrmAdapter } from '../typeorm-repository.util.js';
 
-import { type TypeOrmOracleDriverOptionsInterface } from './typeorm-oracle-driver-options.interface.js';
+import { type TypeOrmOracleAdapterOptionsInterface } from './typeorm-oracle-adapter-options.interface.js';
 import { TypeOrmOracleRepository } from './typeorm-oracle-repository.js';
 import { TypeOrmOracleTransactionFactory } from './typeorm-oracle-transaction.factory.js';
 import { TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX } from './typeorm-oracle.constants.js';
@@ -20,7 +20,7 @@ import { TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX } from './typeorm-oracle.constant
  * RepositoryModule.forRoot({
  *   adapters: [
  *     {
- *       driver: TypeOrmOracleRepositoryModule,
+ *       adapter: TypeOrmOracleRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],
  *     },
  *   ],
@@ -35,13 +35,13 @@ export class TypeOrmOracleRepositoryModule {
    */
   static register(
     entities: TypeOrmProviderOptionsInterface[],
-    options?: TypeOrmOracleDriverOptionsInterface,
+    options?: TypeOrmOracleAdapterOptionsInterface,
   ): DynamicRepositoryModule {
     return registerTypeOrmAdapter(TYPEORM_ORACLE_ADAPTER, entities, options);
   }
 }
 
-export const TYPEORM_ORACLE_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmOracleDriverOptionsInterface> =
+export const TYPEORM_ORACLE_ADAPTER: TypeOrmAdapterDefinitionInterface<TypeOrmOracleAdapterOptionsInterface> =
   {
     module: TypeOrmOracleRepositoryModule,
     transactionKeyPrefix: TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX,

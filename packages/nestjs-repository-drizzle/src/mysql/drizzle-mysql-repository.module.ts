@@ -32,7 +32,7 @@ import { type DrizzleMysqlClient } from './drizzle-mysql.types.js';
  *     RepositoryModule.forRoot({
  *       adapters: [
  *         {
- *           driver: DrizzleMysqlRepositoryModule,
+ *           adapter: DrizzleMysqlRepositoryModule,
  *           entities: [
  *             { key: 'books', entity: Book, table: books, removeDate: 'removedAt' },
  *           ],

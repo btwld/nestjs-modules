@@ -155,7 +155,7 @@ import { InvitationModule } from '@concepta/nestjs-invitation';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'invitation', entity: InvitationEntity }],
         },
       ],

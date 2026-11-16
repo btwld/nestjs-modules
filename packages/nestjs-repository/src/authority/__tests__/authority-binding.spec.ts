@@ -77,7 +77,7 @@ async function compile(
       RepositoryModule.forRoot({
         ...moduleOptions,
         imports: [authorityModule(authority)],
-        adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ adapter: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
   }).compile();
@@ -384,7 +384,7 @@ describe('authority binding', () => {
             imports: [OrderColumnsModule],
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     ...GOVERNED,
@@ -489,7 +489,7 @@ describe('authority binding', () => {
               imports: [authorityModule(new AuthorityFixture())],
               adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [{ key: ORDER_TOKEN, entity: OrderEntityFixture }],
                 },
               ],
@@ -545,7 +545,7 @@ describe('authority binding', () => {
               imports: [RequestAuthorityModule],
               adapters: [
                 {
-                  driver: MemoryRepositoryModuleFixture,
+                  adapter: MemoryRepositoryModuleFixture,
                   entities: [
                     {
                       key: ORDER_TOKEN,
@@ -589,7 +589,7 @@ describe('authority binding', () => {
             imports: [DependentAuthorityModule],
             adapters: [
               {
-                driver: MemoryRepositoryModuleFixture,
+                adapter: MemoryRepositoryModuleFixture,
                 entities: [
                   {
                     key: ORDER_TOKEN,

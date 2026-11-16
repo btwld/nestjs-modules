@@ -36,7 +36,7 @@ describe('TypeOrmRepository on a data source that loads relations by query', () 
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: AUTHOR_ENTITY_TOKEN, entity: AuthorEntityFixture },
                 { key: POST_ENTITY_TOKEN, entity: PostEntityFixture },

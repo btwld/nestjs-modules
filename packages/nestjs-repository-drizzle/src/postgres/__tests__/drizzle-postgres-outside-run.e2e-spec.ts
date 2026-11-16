@@ -72,7 +72,7 @@ describe('DrizzlePostgresRepository outside a run', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: DrizzlePostgresRepositoryModule,
+                adapter: DrizzlePostgresRepositoryModule,
                 entities: [
                   {
                     key: 'note',

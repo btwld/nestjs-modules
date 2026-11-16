@@ -120,10 +120,10 @@ class TestAdapter extends RepositoryAdapter<Row> {
   existing: Row | null = null;
 
   readonly findOneCalls: RepositoryFindOneOptions<Row>[] = [];
-  readonly driverCalls: { operation: string; payload: unknown }[] = [];
+  readonly adapterCalls: { operation: string; payload: unknown }[] = [];
 
   protected async doFind(options?: RepositoryFindOptions<Row>): Promise<Row[]> {
-    this.driverCalls.push({
+    this.adapterCalls.push({
       operation: RowScopeOperation.FIND,
       payload: options,
     });
@@ -154,7 +154,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
     entity: DeepPartial<Row>,
     _options?: RepositoryUpsertOptions,
   ): Promise<Row> {
-    this.driverCalls.push({
+    this.adapterCalls.push({
       operation: RowScopeOperation.UPSERT,
       payload: entity,
     });
@@ -179,7 +179,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
     entity: Row,
     _options?: RepositoryDeleteOneOptions,
   ): Promise<Row> {
-    this.driverCalls.push({
+    this.adapterCalls.push({
       operation: RowScopeOperation.SOFT_DELETE,
       payload: entity,
     });
@@ -234,7 +234,7 @@ describe('row scope ordering guarantees', () => {
       ]);
       // The idempotent early return means the driver is never reached — which
       // is exactly why the resolver has to be consulted before it.
-      expect(repo.driverCalls).toEqual([]);
+      expect(repo.adapterCalls).toEqual([]);
     });
 
     it('leaves relations out before the resolver sees the row', async () => {
@@ -276,7 +276,7 @@ describe('row scope ordering guarantees', () => {
       await expect(repo.upsert({ id: 'row-1', name: 'next' })).rejects.toThrow(
         SoftDeletedImmutableException,
       );
-      expect(repo.driverCalls).toEqual([]);
+      expect(repo.adapterCalls).toEqual([]);
     });
 
     it("lets the resolver refuse first, so it can't reveal a foreign row", async () => {
@@ -345,7 +345,7 @@ describe('row scope ordering guarantees', () => {
 
       // The framework does not touch the return — this is the resolver's
       // choice reaching the driver, not a framework override.
-      expect(substitutingRepo.driverCalls[0]?.payload).toEqual({
+      expect(substitutingRepo.adapterCalls[0]?.payload).toEqual({
         ctx: replacement,
       });
     });
@@ -438,7 +438,7 @@ describe('row scope ordering guarantees', () => {
       declared.bind({ rowScope: scopedTo(PassthroughRowScope) });
 
       await expect(declared.find({})).rejects.toThrow(RowScopeUnboundException);
-      expect(declared.driverCalls).toEqual([]);
+      expect(declared.adapterCalls).toEqual([]);
     });
 
     it('refuses writes rather than running them unscoped', async () => {
@@ -509,7 +509,7 @@ describe('row scope ordering guarantees', () => {
       await rewriting.find({ ctx: callerCtx('acme') });
 
       expect(rowScope.queries[0]?.ctx).toEqual(rewriting.foreignCtx);
-      expect(rewriting.driverCalls[0]?.payload).toEqual({
+      expect(rewriting.adapterCalls[0]?.payload).toEqual({
         ctx: rewriting.foreignCtx,
       });
     });

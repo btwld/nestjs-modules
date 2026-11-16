@@ -77,7 +77,7 @@ export type RepositoryBinding = ReadonlyMap<
  * One entity `RepositoryModule.forRoot()` registered, with its driver's name.
  */
 export interface RepositoryBindingEntry {
-  readonly driverName: string;
+  readonly adapterName: string;
   readonly options: RepositoryProviderOptions;
 }
 
@@ -125,8 +125,8 @@ export function bindRepositories(params: {
       entries
         .filter((_entry, index) => !(repos[index] instanceof RepositoryAdapter))
         .map(
-          ({ driverName, options }) =>
-            `Driver "${driverName}" registered "${options.key}" with a ` +
+          ({ adapterName, options }) =>
+            `Driver "${adapterName}" registered "${options.key}" with a ` +
             'repository that does not extend RepositoryAdapter.',
         ),
     );

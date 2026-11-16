@@ -42,7 +42,7 @@ export class OrderAuthorityModule {}
       authority: { required: true },
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             {
               key: ORDER,

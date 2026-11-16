@@ -1,7 +1,7 @@
 import { Module, DynamicModule, Provider } from '@nestjs/common';
 
 import { RepositoryBootException } from './exceptions/repository-boot.exception.js';
-import { RepositoryDriverInterface } from './interfaces/repository-module.interface.js';
+import { RepositoryAdapterInterface } from './interfaces/repository-module.interface.js';
 import {
   RepositoryRootAsyncOptions,
   RepositoryRootOptions,
@@ -25,7 +25,7 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  *     RepositoryModule.forRoot({
  *       adapters: [
  *         {
- *           driver: YourDriverModule,
+ *           adapter: YourAdapterModule,
  *           entities: [
  *             { key: 'orders', entity: Order },
  *             { key: 'customers', entity: Customer },
@@ -54,14 +54,14 @@ export class RepositoryModule {
    * Binds each repository to its declarations and runs the startup checks
    * while the application is created; a failure stops it there.
    */
-  static forRoot<const Drivers extends readonly RepositoryDriverInterface[]>(
-    options: RepositoryRootOptions<Drivers>,
+  static forRoot<const Adapters extends readonly RepositoryAdapterInterface[]>(
+    options: RepositoryRootOptions<Adapters>,
   ): DynamicModule {
     const { adapters = [], imports = [], ...moduleOptions } = options;
 
     return createRepositoryRootModule({
       module: RepositoryModule,
-      drivers: adapters,
+      adapters,
       imports,
       optionsProvider: {
         provide: REPOSITORY_MODULE_OPTIONS,
@@ -75,13 +75,13 @@ export class RepositoryModule {
    * factory. Entities stay static.
    */
   static forRootAsync<
-    const Drivers extends readonly RepositoryDriverInterface[],
-  >(options: RepositoryRootAsyncOptions<Drivers>): DynamicModule {
+    const Adapters extends readonly RepositoryAdapterInterface[],
+  >(options: RepositoryRootAsyncOptions<Adapters>): DynamicModule {
     const { adapters = [], imports = [], inject = [], useFactory } = options;
 
     return createRepositoryRootModule({
       module: RepositoryModule,
-      drivers: adapters,
+      adapters,
       imports,
       optionsProvider: {
         provide: REPOSITORY_MODULE_OPTIONS,

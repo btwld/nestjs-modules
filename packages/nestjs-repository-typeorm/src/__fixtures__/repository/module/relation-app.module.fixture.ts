@@ -32,7 +32,7 @@ import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmSqliteRepositoryModule,
+          adapter: TypeOrmSqliteRepositoryModule,
           entities: [
             { key: AUTHOR_ENTITY_TOKEN, entity: AuthorEntityFixture },
             { key: POST_ENTITY_TOKEN, entity: PostEntityFixture },

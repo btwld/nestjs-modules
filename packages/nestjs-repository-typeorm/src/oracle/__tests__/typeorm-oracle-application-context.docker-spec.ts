@@ -91,7 +91,7 @@ describe('applicationContext on Oracle', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmOracleRepositoryModule,
+              adapter: TypeOrmOracleRepositoryModule,
               entities: [{ key: ORDERS_KEY, entity: VpdOrderEntityFixture }],
               options: {
                 applicationContext: {

@@ -54,7 +54,7 @@ describe('UserModule repositories', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 { key: 'user', entity: UserEntityFixture },
                 {

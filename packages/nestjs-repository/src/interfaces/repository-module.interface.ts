@@ -52,9 +52,9 @@ export interface DynamicRepositoryModule extends Pick<
  * the driver, then binds and checks every repository it returns. Applications
  * do not call `register` themselves.
  */
-export interface RepositoryDriverInterface<
+export interface RepositoryAdapterInterface<
   Options extends RepositoryProviderOptions = RepositoryProviderOptions,
-  DriverOptions extends PlainLiteralObject = PlainLiteralObject,
+  AdapterOptions extends PlainLiteralObject = PlainLiteralObject,
 > {
   /**
    * The class name of the driver's module (inherited from
@@ -70,6 +70,6 @@ export interface RepositoryDriverInterface<
    */
   register(
     entities: Options[],
-    options?: DriverOptions,
+    options?: AdapterOptions,
   ): DynamicRepositoryModule;
 }

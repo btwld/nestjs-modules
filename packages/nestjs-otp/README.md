@@ -632,7 +632,7 @@ export class UserOtpEntity extends OtpPostgresEntity {}
 RepositoryModule.forRoot({
   adapters: [
     {
-      driver: TypeOrmPostgresRepositoryModule,
+      adapter: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'userOtp', entity: UserOtpEntity }],
     },
   ],

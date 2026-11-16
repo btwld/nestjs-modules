@@ -101,7 +101,7 @@ describe(OtpModule.name, () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: TypeOrmSqliteRepositoryModule,
+                adapter: TypeOrmSqliteRepositoryModule,
                 entities: [{ key: 'userOtp', entity: UserOtpEntityFixture }],
               },
             ],

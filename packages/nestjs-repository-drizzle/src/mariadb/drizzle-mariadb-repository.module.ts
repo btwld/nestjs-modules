@@ -28,7 +28,7 @@ import {
  *     RepositoryModule.forRoot({
  *       adapters: [
  *         {
- *           driver: DrizzleMariadbRepositoryModule,
+ *           adapter: DrizzleMariadbRepositoryModule,
  *           entities: [
  *             { key: 'books', entity: Book, table: books, removeDate: 'removedAt' },
  *           ],

@@ -114,7 +114,7 @@ describe('transactionSettings on Postgres (Drizzle)', () => {
           RepositoryModule.forRoot({
             adapters: [
               {
-                driver: DrizzlePostgresRepositoryModule,
+                adapter: DrizzlePostgresRepositoryModule,
                 entities: [
                   { key: 'rls-orders', entity: OrderEntity, table: orderTable },
                 ],

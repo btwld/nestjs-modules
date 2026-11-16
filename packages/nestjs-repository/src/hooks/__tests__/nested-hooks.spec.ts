@@ -90,7 +90,7 @@ describe('a hook writing to another entity with its own ctx', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: MemoryRepositoryModuleFixture,
+              adapter: MemoryRepositoryModuleFixture,
               entities: [
                 {
                   key: PET_TOKEN,

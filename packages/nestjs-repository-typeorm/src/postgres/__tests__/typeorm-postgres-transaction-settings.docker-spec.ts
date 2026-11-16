@@ -73,7 +73,7 @@ describe('transactionSettings on Postgres', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmPostgresRepositoryModule,
+              adapter: TypeOrmPostgresRepositoryModule,
               entities: [{ key: ORDERS_KEY, entity: RlsOrderEntityFixture }],
               options: {
                 transactionSettings: (ctx) => {

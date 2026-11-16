@@ -59,7 +59,7 @@ describe('TypeOrmPostgresRepository delete lock', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmPostgresRepositoryModule,
+              adapter: TypeOrmPostgresRepositoryModule,
               entities: [{ key: 'orders', entity: RlsOrderEntityFixture }],
             },
           ],

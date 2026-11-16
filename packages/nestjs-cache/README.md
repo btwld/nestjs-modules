@@ -492,7 +492,7 @@ export class UserCacheEntity extends CachePostgresEntity {}
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'userCache', entity: UserCacheEntity }],
         },
       ],

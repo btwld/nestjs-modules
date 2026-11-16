@@ -55,7 +55,7 @@ export function drizzleSqliteConformanceHarness(): ConformanceHarnessInterface<
 > {
   return {
     name: 'drizzle-sqlite/better-sqlite3',
-    driver: DrizzleSqliteRepositoryModule,
+    adapter: DrizzleSqliteRepositoryModule,
     imports: [
       DrizzleModule.forRootAsync({
         useFactory: () => {

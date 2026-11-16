@@ -4,7 +4,7 @@ import { type DrizzlePostgresTransactionSettingsResolver } from './drizzle-postg
  * Options for the Postgres adapter, given as `options` on its
  * `RepositoryModule.forRoot()` registration.
  */
-export interface DrizzlePostgresDriverOptionsInterface {
+export interface DrizzlePostgresAdapterOptionsInterface {
   /** Settings applied at the start of every transaction a run opens. */
   transactionSettings?: DrizzlePostgresTransactionSettingsResolver;
 }

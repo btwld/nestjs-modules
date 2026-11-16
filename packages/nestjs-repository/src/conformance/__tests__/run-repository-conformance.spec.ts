@@ -20,12 +20,12 @@ import { type ConformanceTestApiInterface } from '../interfaces/conformance-test
 import { type ConformanceUniqueItemInterface } from '../interfaces/conformance-unique-item.interface.js';
 import { runRepositoryConformance } from '../run-repository-conformance.js';
 
-class StubDriver {
+class StubAdapter {
   static register(
     _entities: RepositoryProviderOptions[],
     _options?: PlainLiteralObject,
   ): DynamicRepositoryModule {
-    return { module: StubDriver };
+    return { module: StubAdapter };
   }
 }
 
@@ -85,7 +85,7 @@ class TenantOrderLine implements ConformanceTenantOrderLineInterface {
   declare qty: number;
 }
 
-const FIXTURES: ConformanceFixtureBindings<typeof StubDriver> = {
+const FIXTURES: ConformanceFixtureBindings<typeof StubAdapter> = {
   item: { key: 'item', entity: Item },
   plainItem: { key: 'plain-item', entity: PlainItem },
   uniqueItem: { key: 'unique-item', entity: UniqueItem },
@@ -104,10 +104,10 @@ const FIXTURES: ConformanceFixtureBindings<typeof StubDriver> = {
 
 function harness(
   capabilities: ConformanceCapabilitiesInterface,
-): ConformanceHarnessInterface<typeof StubDriver> {
+): ConformanceHarnessInterface<typeof StubAdapter> {
   return {
     name: 'stub',
-    driver: StubDriver,
+    adapter: StubAdapter,
     fixtures: FIXTURES,
     capabilities,
     reset: async () => undefined,
@@ -360,9 +360,9 @@ describe(runRepositoryConformance.name, () => {
     const { tag: _tag, ...missingTag } = FIXTURES;
 
     // @ts-expect-error every fixture key must be mapped
-    const missing: ConformanceFixtureBindings<typeof StubDriver> = missingTag;
+    const missing: ConformanceFixtureBindings<typeof StubAdapter> = missingTag;
 
-    const notOptedIn: ConformanceFixtureBindings<typeof StubDriver> = {
+    const notOptedIn: ConformanceFixtureBindings<typeof StubAdapter> = {
       ...FIXTURES,
       // @ts-expect-error the eager fixture must opt in to eager results
       bookWithEagerAuthor: {
@@ -371,7 +371,7 @@ describe(runRepositoryConformance.name, () => {
       },
     };
 
-    const wrongShape: ConformanceFixtureBindings<typeof StubDriver> = {
+    const wrongShape: ConformanceFixtureBindings<typeof StubAdapter> = {
       ...FIXTURES,
       // @ts-expect-error an entity must have its fixture's shape
       item: { key: 'item', entity: PlainItem },

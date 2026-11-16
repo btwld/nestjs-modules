@@ -6,7 +6,7 @@
  */
 
 export { TypeOrmSqlServerRepositoryModule } from './sqlserver/typeorm-sqlserver-repository.module.js';
-export { TypeOrmSqlServerDriverOptionsInterface } from './sqlserver/typeorm-sqlserver-driver-options.interface.js';
+export { TypeOrmSqlServerAdapterOptionsInterface } from './sqlserver/typeorm-sqlserver-adapter-options.interface.js';
 export { TypeOrmSqlServerSessionContextResolver } from './sqlserver/typeorm-sqlserver-session-context-resolver.type.js';
 export { TYPEORM_SQLSERVER_TRANSACTION_ID_KEY } from './sqlserver/typeorm-sqlserver.constants.js';
 export { TypeOrmSqlServerRepository } from './sqlserver/typeorm-sqlserver-repository.js';

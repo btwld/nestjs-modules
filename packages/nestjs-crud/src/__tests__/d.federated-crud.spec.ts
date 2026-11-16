@@ -93,7 +93,7 @@ describe('#federated-crud', () => {
         RepositoryModule.forRoot({
           adapters: [
             {
-              driver: TypeOrmSqliteRepositoryModule,
+              adapter: TypeOrmSqliteRepositoryModule,
               entities: [
                 {
                   key: CRUD_TEST_COMPANY_ENTITY_NAME,

@@ -129,7 +129,7 @@ export function describeDrizzlePostgresVersion(
             RepositoryModule.forRoot({
               adapters: [
                 {
-                  driver: DrizzlePostgresRepositoryModule,
+                  adapter: DrizzlePostgresRepositoryModule,
                   entities: [
                     {
                       key: 'shape',

@@ -95,7 +95,7 @@ export class UserCredentialEntity extends UserCredentialPostgresEntity {}
     RepositoryModule.forRoot({
       adapters: [
         {
-          driver: TypeOrmPostgresRepositoryModule,
+          adapter: TypeOrmPostgresRepositoryModule,
           entities: [
             { key: 'user', entity: UserEntity },
             { key: 'user-credentials', entity: UserCredentialEntity },

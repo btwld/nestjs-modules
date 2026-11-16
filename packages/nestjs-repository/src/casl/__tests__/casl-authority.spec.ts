@@ -522,7 +522,7 @@ describe(CaslAuthority.name, () => {
           imports: [AuthorityModule],
           adapters: [
             {
-              driver: MemoryRepositoryModuleFixture,
+              adapter: MemoryRepositoryModuleFixture,
               entities: [
                 {
                   key: ORDER_TOKEN,
