@@ -255,7 +255,7 @@ describe('RepositoryAdapter expected version', () => {
       }
     }
 
-    it('should refuse update and replace without calling the driver', async () => {
+    it('should refuse update and replace without calling the adapter', async () => {
       await usageError(adapter.update(rowWithoutVersion(), { name: 'x' }));
       await usageError(adapter.replace(rowWithoutVersion(), { name: 'x' }));
 
@@ -263,7 +263,7 @@ describe('RepositoryAdapter expected version', () => {
       expect(adapter.doReplaceCalls).toEqual(0);
     });
 
-    it('should refuse a stated expectedVersion without calling the driver', async () => {
+    it('should refuse a stated expectedVersion without calling the adapter', async () => {
       await usageError(
         adapter.update(
           rowWithoutVersion(),

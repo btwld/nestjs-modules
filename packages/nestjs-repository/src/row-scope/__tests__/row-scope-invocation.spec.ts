@@ -77,8 +77,8 @@ class TestAdapter extends RepositoryAdapter<Row> {
     columns: [
       { name: 'id', isPrimary: true, isRemoveDate: false, isVersion: false },
       { name: 'name', isPrimary: false, isRemoveDate: false, isVersion: false },
-      // The column the stamping resolver below writes — only columns reach a
-      // driver.
+      // The column the stamping resolver below writes — only columns reach an
+      // adapter.
       {
         name: 'stamped',
         isPrimary: false,
@@ -94,7 +94,7 @@ class TestAdapter extends RepositoryAdapter<Row> {
     ],
   };
 
-  /** Options/values the driver was ultimately handed, per operation. */
+  /** Options/values the adapter was ultimately handed, per operation. */
   readonly received: { operation: string; payload: unknown }[] = [];
 
   private record<T>(operation: string, payload: T): T {
@@ -316,7 +316,7 @@ describe('row scope invocation guarantee', () => {
     },
   );
 
-  it('invokes the resolver before the driver sees the call', async () => {
+  it('invokes the resolver before the adapter sees the call', async () => {
     await repo.find({});
 
     expect(rowScope.operations()).toEqual([RowScopeOperation.FIND]);
@@ -365,8 +365,11 @@ describe('row scope invocation guarantee', () => {
     });
   });
 
-  describe("the resolver's returned value is what the driver runs", () => {
-    /** Stamps a marker so the driver payload is distinguishable from the input. */
+  describe("the resolver's returned value is what the adapter runs", () => {
+    /**
+     * Stamps a marker so the adapter payload is distinguishable from the
+     * input.
+     */
     class Stamping implements RowScopeInterface {
       scopeQuery<Options extends { where?: WhereClause }>(
         params: RowScopeQueryParams<Options>,
@@ -395,7 +398,7 @@ describe('row scope invocation guarantee', () => {
       RowScopeOperation.SOFT_DELETE,
       RowScopeOperation.RESTORE,
       RowScopeOperation.UPSERT,
-    ])('hands the driver the stamped value for %s', async (operation) => {
+    ])('hands the adapter the stamped value for %s', async (operation) => {
       const stampingRepo = new TestAdapter('rows');
       stampingRepo.bind({ rowScope: scopedTo(Stamping) });
       stampingRepo.setRowScopeResolver(new Stamping());
@@ -408,7 +411,7 @@ describe('row scope invocation guarantee', () => {
       expect(stampOf(received?.payload)).toEqual(true);
     });
 
-    it('hands the driver every stamped element of a batch', async () => {
+    it('hands the adapter every stamped element of a batch', async () => {
       const stampingRepo = new TestAdapter('rows');
       stampingRepo.bind({ rowScope: scopedTo(Stamping) });
       stampingRepo.setRowScopeResolver(new Stamping());

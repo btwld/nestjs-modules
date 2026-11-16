@@ -16,7 +16,7 @@ import {
 } from './drizzle-mariadb.constants.js';
 
 /**
- * The Drizzle repository driver for MariaDB, registered through
+ * The Drizzle repository adapter for MariaDB, registered through
  * `RepositoryModule.forRoot()`. Reads each connection's database from
  * `@nestjs/drizzle`, and refuses a connection that is not a mysql2 one.
  *

@@ -85,7 +85,7 @@ export class VersionedOrderEntityFixture implements VersionedOrderFixture {
 
 /**
  * An order with a version column. The memory fixture neither guards nor bumps
- * it, so it serves only what the abstraction checks before the driver.
+ * it, so it serves only what the abstraction checks before the adapter.
  */
 export const VERSIONED_ORDER_METADATA: RepositoryMetadataInterface<VersionedOrderFixture> =
   {

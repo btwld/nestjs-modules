@@ -20,7 +20,7 @@ import { Where } from '../where.helpers.js';
 
 /**
  * Answers every read with `rows`, and every write with `writeResult`, so a
- * test decides exactly what the driver hands back.
+ * test decides exactly what the adapter hands back.
  */
 class ResultFixture extends RecordingRepositoryFixture {
   override readonly metadata: RepositoryMetadataInterface<EmployeeFixture> = {
@@ -395,7 +395,7 @@ describe('what a read may name about a joined relation', () => {
     expect(repo.reads).toEqual([]);
   });
 
-  it('refuses a filter too complex to translate, whatever the driver', async () => {
+  it('refuses a filter too complex to translate, whatever the adapter', async () => {
     const repo = new ResultFixture('employees');
     repo.bind({});
     const either = (field: string) =>

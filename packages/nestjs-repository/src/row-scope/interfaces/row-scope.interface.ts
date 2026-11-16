@@ -44,7 +44,7 @@ export interface RowScopeQueryParams<
   readonly options: Options;
 
   /**
-   * The context the driver will run this operation under.
+   * The context the adapter will run this operation under.
    *
    * Plumbing, not authority — pass it through on reads the resolver makes
    * itself. Decide *who the caller is* from `scope`. See
@@ -86,7 +86,7 @@ export interface RowScopeWriteParams<
   readonly repository: RowScopeRepository;
 
   /**
-   * The context the driver will run this operation under. See
+   * The context the adapter will run this operation under. See
    * {@link RowScopeQueryParams.ctx}.
    */
   readonly ctx: PlainLiteralObject | undefined;
@@ -105,7 +105,7 @@ export interface RowScopeWriteParams<
  * An implementation owns *all* enforcement: the read predicate, stamping,
  * refusing, and any visibility read it needs to decide. The framework owns
  * exactly one guarantee — that these methods are invoked at every repository
- * entry point, with that operation's real input, before the driver sees it.
+ * entry point, with that operation's real input, before the adapter sees it.
  * It never inspects, verifies, or second-guesses what they return.
  *
  * A refusal must be a `RuntimeException` (or subclass). Repositories are not
@@ -164,16 +164,16 @@ export interface RowScopeInterface<
   readonly joinable?: boolean;
 
   /**
-   * Return the options the driver should run, scoped to the caller.
+   * Return the options the adapter should run, scoped to the caller.
    *
-   * Whatever is returned is handed to the driver untouched.
+   * Whatever is returned is handed to the adapter untouched.
    */
   scopeQuery<Options extends { where?: WhereClause }>(
     params: RowScopeQueryParams<Options, Scope>,
   ): Options | Promise<Options>;
 
   /**
-   * Return the value the driver should write, or throw to refuse the call.
+   * Return the value the adapter should write, or throw to refuse the call.
    *
    * A value carrying a foreign scope must be refused, not silently rewritten
    * to the caller's own scope.

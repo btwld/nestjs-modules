@@ -11,7 +11,7 @@ import { TypeOrmMysqlTransactionFactory } from './typeorm-mysql-transaction.fact
 import { TYPEORM_MYSQL_TRANSACTION_KEY_PREFIX } from './typeorm-mysql.constants.js';
 
 /**
- * The TypeORM repository driver for MySQL, registered through
+ * The TypeORM repository adapter for MySQL, registered through
  * `RepositoryModule.forRoot()`. Refuses a data source of any other
  * database, MariaDB included.
  *

@@ -33,7 +33,7 @@ class UserEntity {}
 class OrderEntity {}
 class DuplicateUserEntity {}
 
-// Mock driver: an in-memory repository per entry, each reading its own rows
+// Mock adapter: an in-memory repository per entry, each reading its own rows
 @Module({})
 class MockRepositoryModule {
   static register(entities: RepositoryProviderOptions[]): DynamicModule {
@@ -236,7 +236,7 @@ describe('RepositoryRegistryService', () => {
     await moduleRef.close();
   });
 
-  it('should throw when a driver registers something other than an adapter', async () => {
+  it('should throw when an adapter registers something other than a RepositoryAdapter', async () => {
     @Module({})
     class RawAdapter {
       static register(entities: RepositoryProviderOptions[]): DynamicModule {
@@ -265,13 +265,13 @@ describe('RepositoryRegistryService', () => {
       }).compile(),
     ).rejects.toThrow(
       new RepositoryBootException([
-        'Driver "RawAdapter" registered "users" with a repository that does ' +
+        'Adapter "RawAdapter" registered "users" with a repository that does ' +
           'not extend RepositoryAdapter.',
       ]),
     );
   });
 
-  it('should throw when one driver is listed twice', () => {
+  it('should throw when one adapter is listed twice', () => {
     expect(() =>
       RepositoryModule.forRoot({
         adapters: [
@@ -286,7 +286,7 @@ describe('RepositoryRegistryService', () => {
         ],
       }),
     ).toThrow(
-      'Driver "MemoryRepositoryModuleFixture" is listed more than once',
+      'Adapter "MemoryRepositoryModuleFixture" is listed more than once',
     );
   });
 
@@ -333,7 +333,7 @@ describe('RepositoryRegistryService', () => {
     );
   });
 
-  it('should throw when two drivers register one transaction key', () => {
+  it('should throw when two adapters register one transaction key', () => {
     const sharedKeyAdapter = (name: string) => ({
       name,
       register: (): DynamicRepositoryModule => ({
@@ -366,7 +366,7 @@ describe('RepositoryRegistryService', () => {
         ],
       }),
     ).toThrow(
-      'Transaction key "shared:default" is registered by more than one driver',
+      'Transaction key "shared:default" is registered by more than one adapter',
     );
   });
 
@@ -409,7 +409,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     }
   }
 
-  it('hands the driver its own options', () => {
+  it('hands the adapter its own options', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
@@ -423,7 +423,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     expect(CollectionAdapter.received).toEqual({ shard: 'a' });
   });
 
-  it('refuses a misspelled driver option at compile time', () => {
+  it('refuses a misspelled adapter option at compile time', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
@@ -436,7 +436,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     });
   });
 
-  it('refuses options for a driver that takes none at compile time', () => {
+  it('refuses options for an adapter that takes none at compile time', () => {
     RepositoryModule.forRoot({
       adapters: [
         {
@@ -449,7 +449,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     });
   });
 
-  it("accepts each driver's own options", () => {
+  it("accepts each adapter's own options", () => {
     expect(() =>
       RepositoryModule.forRoot({
         adapters: [
@@ -486,7 +486,7 @@ describe('RepositoryModule.forRoot entity options', () => {
     });
   });
 
-  it("refuses another driver's option at compile time", () => {
+  it("refuses another adapter's option at compile time", () => {
     RepositoryModule.forRoot({
       adapters: [
         {
@@ -566,7 +566,7 @@ describe('RepositoryModule.forFeature', () => {
     );
   });
 
-  it("binds every driver's repositories", async () => {
+  it("binds every adapter's repositories", async () => {
     @Injectable()
     class BothService {
       constructor(

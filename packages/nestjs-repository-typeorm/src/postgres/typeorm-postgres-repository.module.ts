@@ -12,7 +12,7 @@ import { TypeOrmPostgresTransactionFactory } from './typeorm-postgres-transactio
 import { TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX } from './typeorm-postgres.constants.js';
 
 /**
- * The TypeORM repository driver for Postgres, registered through
+ * The TypeORM repository adapter for Postgres, registered through
  * `RepositoryModule.forRoot()`. Refuses a data source of any other
  * database.
  *

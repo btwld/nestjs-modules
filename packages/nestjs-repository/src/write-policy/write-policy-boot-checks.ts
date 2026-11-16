@@ -16,8 +16,8 @@ type AnyAdapter = RepositoryAdapter<PlainLiteralObject>;
  * whether a row is mutable — a check that has no meaning once no row is.
  *
  * Reported rather than silently tolerated because the usual cause is
- * extending the driver's audited base entity, whose delete-date, update-date
- * and version columns are all dead weight on an append-only row.
+ * extending the adapter's audited base entity, whose delete-date,
+ * update-date and version columns are all dead weight on an append-only row.
  */
 export function checkNoSoftDeleteOnAppendOnly(
   adapters: AnyAdapter[],
@@ -32,7 +32,7 @@ export function checkNoSoftDeleteOnAppendOnly(
       `"${adapter.entityKey}" is declared append-only but has a soft-delete ` +
         `column ("${deleteDateColumn}"). A soft delete is an update, which ` +
         'append-only refuses, so the column can never be set. Extend a base ' +
-        "entity without one, such as your driver's append-only base.",
+        "entity without one, such as your adapter's append-only base.",
     ];
   });
 }

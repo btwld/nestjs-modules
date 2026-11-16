@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-drizzle/mysql`
  *
- * The Drizzle repository driver for MySQL, through the mysql2 client: its
+ * The Drizzle repository adapter for MySQL, through the mysql2 client: its
  * module, repository and transactions.
  */
 

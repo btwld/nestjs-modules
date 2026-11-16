@@ -459,7 +459,7 @@ describe('a join into another scoped entity added after the caller', () => {
 
 describe('a join between entities scoped on the same terms', () => {
   const join = [{ relation: 'order' }];
-  // The memory driver refuses every join, so reaching it is the pass.
+  // The memory adapter refuses every join, so reaching it is the pass.
   const REACHED = 'Error while trying to query the order-lines repository';
   const REFUSED = {
     ...JOIN_REFUSAL,
@@ -517,13 +517,13 @@ describe('a join between entities scoped on the same terms', () => {
     }
   }
 
-  it('reaches the driver when both share a joinable resolver and the join matches its column', async () => {
+  it('reaches the adapter when both share a joinable resolver and the join matches its column', async () => {
     await expect(
       findLines(JoinableTenantRowScopeFixture, JoinableTenantRowScopeFixture),
     ).rejects.toThrow(REACHED);
   });
 
-  it('reaches the driver between two joinable classes on the same column and key', async () => {
+  it('reaches the adapter between two joinable classes on the same column and key', async () => {
     await expect(
       findLines(
         OtherJoinableTenantRowScopeFixture,
@@ -799,7 +799,7 @@ describe('a caller relaxed on reads', () => {
     });
   });
 
-  // The memory driver refuses every join, so reaching it is the pass.
+  // The memory adapter refuses every join, so reaching it is the pass.
   describe('joins, judged per caller on the columns each enforces', () => {
     const REACHED = 'Error while trying to query the %s repository';
     const reached = (key: string) => REACHED.replace('%s', key);
@@ -864,12 +864,12 @@ describe('a caller relaxed on reads', () => {
   });
 });
 
-describe('row scope declared through a driver that rewrites its entries', () => {
+describe('row scope declared through an adapter that rewrites its entries', () => {
   @Module({})
   class RewritingAdapter {
     static register(entities: RepositoryProviderOptions[]): DynamicModule {
       for (const entity of entities) {
-        entity.rowScope = { access: 'open', reason: 'rewritten by driver' };
+        entity.rowScope = { access: 'open', reason: 'rewritten by adapter' };
       }
       return MemoryRepositoryModuleFixture.register(entities);
     }
@@ -910,7 +910,7 @@ describe('row scope declared through a driver that rewrites its entries', () => 
 });
 
 describe('row scope startup checks', () => {
-  it('refuses every call when the driver is registered directly', async () => {
+  it('refuses every call when the adapter is registered directly', async () => {
     // Bypassing RepositoryModule.forRoot leaves the repository unbound, and
     // nothing checks a registration it never saw, so the adapter refuses.
     const moduleRef = await Test.createTestingModule({

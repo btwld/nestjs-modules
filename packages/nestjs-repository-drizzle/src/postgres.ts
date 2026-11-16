@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-drizzle/postgres`
  *
- * The Drizzle repository driver for Postgres: its module, repository and
+ * The Drizzle repository adapter for Postgres: its module, repository and
  * transactions.
  */
 

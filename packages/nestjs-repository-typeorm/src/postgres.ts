@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-typeorm/postgres`
  *
- * The TypeORM repository driver for Postgres: its module, repository,
+ * The TypeORM repository adapter for Postgres: its module, repository,
  * transactions and base entities.
  */
 

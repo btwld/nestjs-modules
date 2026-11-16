@@ -4,40 +4,40 @@ import { type RepositoryModuleOptionsInterface } from './repository-module-optio
 import { type RepositoryAdapterInterface } from './repository-module.interface.js';
 
 /**
- * One driver, the entities it serves, and its own options.
+ * One adapter, the entities it serves, and its own options.
  *
- * `entities` and `options` are checked against the driver's own types, so a
- * misspelled option, or one only another driver understands, does not
+ * `entities` and `options` are checked against the adapter's own types, so a
+ * misspelled option, or one only another adapter understands, does not
  * compile.
  */
 export interface RepositoryAdapterRegistration<
   Adapter extends RepositoryAdapterInterface = RepositoryAdapterInterface,
 > {
   /**
-   * The driver's module class.
+   * The adapter's module class.
    */
   adapter: Adapter;
 
   /**
-   * Entity registrations served by this driver.
+   * Entity registrations served by this adapter.
    */
   entities: NoInfer<RepositoryAdapterEntityOptions<Adapter>>[];
 
   /**
-   * The driver's own options, for everything it serves.
+   * The adapter's own options, for everything it serves.
    */
   options?: NoInfer<RepositoryAdapterOptions<Adapter>>;
 }
 
 /**
- * The entity options a driver accepts.
+ * The entity options an adapter accepts.
  */
 export type RepositoryAdapterEntityOptions<
   Adapter extends RepositoryAdapterInterface,
 > = Parameters<Adapter['register']>[0][number];
 
 /**
- * The driver-level options a driver accepts; `undefined` when it takes none.
+ * The adapter-level options an adapter accepts; `undefined` when it takes none.
  */
 export type RepositoryAdapterOptions<
   Adapter extends RepositoryAdapterInterface,
@@ -45,7 +45,7 @@ export type RepositoryAdapterOptions<
 
 /**
  * One {@link RepositoryAdapterRegistration} per element of `Adapters`, each typed
- * by its own driver.
+ * by its own adapter.
  */
 export type RepositoryAdapterRegistrations<
   Adapters extends readonly RepositoryAdapterInterface[],

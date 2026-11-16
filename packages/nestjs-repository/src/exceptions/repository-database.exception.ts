@@ -6,7 +6,7 @@ import { RepositoryQueryException } from './repository-query.exception.js';
 
 /**
  * Exception thrown when the database raised an error during a repository
- * call, carrying what the driver reported about it: the database, its own
+ * call, carrying what the adapter reported about it: the database, its own
  * error code and its message, for logs and diagnosis.
  */
 export class RepositoryDatabaseException extends RepositoryQueryException {

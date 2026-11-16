@@ -11,7 +11,7 @@ import { type ConformanceUniqueItemInterface } from './conformance-unique-item.i
 
 /**
  * Every entity the conformance suite reads and writes, by fixture key. A
- * harness maps each key to the driver's own entity for that shape.
+ * harness maps each key to the adapter's own entity for that shape.
  */
 export interface ConformanceFixturesInterface {
   item: ConformanceItemInterface;

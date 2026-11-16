@@ -22,7 +22,7 @@ import { type ConformanceItemInterface } from '../interfaces/conformance-item.in
 import { type ConformanceLibraryInterface } from '../interfaces/conformance-library.interface.js';
 
 /**
- * How a driver translates reads: every operator, compound and `never`,
+ * How an adapter translates reads: every operator, compound and `never`,
  * order, paging, `select`, soft-deleted rows, and every kind of join.
  */
 export function readTranslationSection(ctx: ConformanceContext): void {

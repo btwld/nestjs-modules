@@ -11,7 +11,7 @@ import { TypeOrmSqliteTransactionFactory } from './typeorm-sqlite-transaction.fa
 import { TYPEORM_SQLITE_TRANSACTION_KEY_PREFIX } from './typeorm-sqlite.constants.js';
 
 /**
- * The TypeORM repository driver for SQLite (`better-sqlite3`), registered
+ * The TypeORM repository adapter for SQLite (`better-sqlite3`), registered
  * through `RepositoryModule.forRoot()`. Refuses a data source of any other
  * database.
  *

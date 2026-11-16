@@ -49,7 +49,7 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
 @Module({})
 export class RepositoryModule {
   /**
-   * Register every entity in the application, grouped by driver.
+   * Register every entity in the application, grouped by adapter.
    *
    * Binds each repository to its declarations and runs the startup checks
    * while the application is created; a failure stops it there.

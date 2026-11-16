@@ -232,8 +232,8 @@ describe('row scope ordering guarantees', () => {
       expect(rowScope.writes.map((w) => w.operation)).toEqual([
         RowScopeOperation.SOFT_DELETE,
       ]);
-      // The idempotent early return means the driver is never reached — which
-      // is exactly why the resolver has to be consulted before it.
+      // The idempotent early return means the adapter is never reached —
+      // which is exactly why the resolver has to be consulted before it.
       expect(repo.adapterCalls).toEqual([]);
     });
 
@@ -328,7 +328,7 @@ describe('row scope ordering guarantees', () => {
   });
 
   describe('ctx is passed through, not rewritten', () => {
-    it('hands the driver whatever the resolver returned, including its ctx', async () => {
+    it('hands the adapter whatever the resolver returned, including its ctx', async () => {
       const replacement = new AppContextHost();
       class Substituting extends PassthroughRowScope {
         scopeQuery<Options extends { where?: WhereClause }>(
@@ -344,13 +344,13 @@ describe('row scope ordering guarantees', () => {
       await substitutingRepo.find({ ctx: callerCtx() });
 
       // The framework does not touch the return — this is the resolver's
-      // choice reaching the driver, not a framework override.
+      // choice reaching the adapter, not a framework override.
       expect(substitutingRepo.adapterCalls[0]?.payload).toEqual({
         ctx: replacement,
       });
     });
 
-    it('hands the resolver the ctx the driver will run under', async () => {
+    it('hands the resolver the ctx the adapter will run under', async () => {
       const ctx = callerCtx();
 
       await repo.find({ ctx });

@@ -22,7 +22,7 @@ import {
 
 /**
  * Lowercases its columns on assignment, into fields that are not columns:
- * the driver writes another value, and a row it builds holds the fields.
+ * the adapter writes another value, and a row it builds holds the fields.
  */
 class AccountEntity {
   [key: string]: unknown;
@@ -234,7 +234,7 @@ describe(checkColumnsAreNotRelations, () => {
       ]),
     ).toEqual([
       '"accounts" relation "owner" is also reported as a column. The ' +
-        'repository driver must report a relation only as a relation.',
+        'repository adapter must report a relation only as a relation.',
     ]);
   });
 

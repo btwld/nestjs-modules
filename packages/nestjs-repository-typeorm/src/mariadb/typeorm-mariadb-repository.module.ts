@@ -11,7 +11,7 @@ import { TypeOrmMariadbRepository } from './typeorm-mariadb-repository.js';
 import { TYPEORM_MARIADB_TRANSACTION_KEY_PREFIX } from './typeorm-mariadb.constants.js';
 
 /**
- * The TypeORM repository driver for MariaDB, registered through
+ * The TypeORM repository adapter for MariaDB, registered through
  * `RepositoryModule.forRoot()`. Refuses a data source of any other
  * database, MySQL included.
  *

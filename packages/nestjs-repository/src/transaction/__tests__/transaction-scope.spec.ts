@@ -104,7 +104,7 @@ describe(TransactionScope.name, () => {
       });
     });
 
-    it('should create the driver transaction once, with the context the scope runs under', async () => {
+    it('should create the adapter transaction once, with the context the scope runs under', async () => {
       const TenantCtx = new OverlayRef<'withTenant', { tenantId: string }>(
         'withTenant',
       );

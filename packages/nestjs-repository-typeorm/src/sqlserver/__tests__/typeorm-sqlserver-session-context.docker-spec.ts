@@ -88,7 +88,7 @@ describe('sessionContext on SQL Server', () => {
                 { key: ORDERS_KEY, entity: SessionContextOrderEntityFixture },
               ],
               options: {
-                // Nothing without a tenant: the driver still clears the
+                // Nothing without a tenant: the adapter still clears the
                 // tenant an earlier transaction left on the connection.
                 sessionContext: (ctx) =>
                   ctx.supports(RowScopeCtx)

@@ -41,9 +41,9 @@ class AppendableAdapter extends TestRepositoryAdapter {
 }
 
 /**
- * A driver that knows nothing about write policy: it builds each adapter from
- * the key alone and never reads `writePolicy`. Whatever policy the adapter
- * ends up with can only have come from `RepositoryModule.forRoot()`.
+ * An adapter that knows nothing about write policy: it builds each repository
+ * from the key alone and never reads `writePolicy`. Whatever policy the
+ * repository ends up with can only have come from `RepositoryModule.forRoot()`.
  */
 @Module({})
 class PolicyUnawareAdapterModule {
@@ -76,7 +76,7 @@ async function compile(
 }
 
 describe('write policy binding', () => {
-  it('applies a declared policy even though the driver ignores it', async () => {
+  it('applies a declared policy even though the adapter ignores it', async () => {
     const moduleRef = await compile([
       { key: 'items', entity: TestEntityClass, writePolicy: APPEND_ONLY },
     ]);

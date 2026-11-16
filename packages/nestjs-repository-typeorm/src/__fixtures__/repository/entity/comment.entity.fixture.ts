@@ -14,7 +14,7 @@ import { PostEntityFixture } from './post.entity.fixture.js';
  *   come back when a versioned update re-reads the row;
  * - `reviewer` — no foreign key column of its own, so TypeORM keeps the key
  *   in the relation property. The repository refuses such an entity at
- *   startup; it is here to pin how the driver reports it. Specs using this
+ *   startup; it is here to pin how the adapter reports it. Specs using this
  *   fixture do not start the application.
  */
 @Entity()

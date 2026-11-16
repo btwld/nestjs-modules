@@ -176,7 +176,7 @@ describe('authority over columns', () => {
       expect(orders.queries.map(({ select }) => select)).toEqual([undefined]);
     });
 
-    it('should read an empty select as no select, which every driver reads as all', async () => {
+    it('should read an empty select as no select, which every adapter reads as all', async () => {
       const orders = await ordersWith(READS);
 
       await expect(

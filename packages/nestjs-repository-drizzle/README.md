@@ -1,6 +1,6 @@
 # @concepta/nestjs-repository-drizzle
 
-Drizzle driver for `@concepta/nestjs-repository`. Import the adapter for your
+Drizzle adapters for `@concepta/nestjs-repository`. Import the adapter for your
 database (`/postgres`, `/mysql`, `/mariadb` or `/sqlite`), register your
 Drizzle tables with it, and you get repositories that run on the
 `@nestjs/drizzle` connection's transactions.
@@ -94,7 +94,7 @@ primary key. In your transaction that read is locked, so it returns the row
 as written; outside one it can see another writer's row, and a `createMany`
 whose rows insert one by one is not all-or-nothing.
 
-- `create` without a key needs one the driver can read back: an
+- `create` without a key needs one the adapter can read back: an
   auto-increment key, or one the key column's `$defaultFn` generates.
   Any other key the database fills in is refused with a
   `RuntimeException` before anything is written. A `createMany` whose rows
@@ -112,7 +112,7 @@ whose rows insert one by one is not all-or-nothing.
   `DrizzleSingleConnectionException`.
 - A failed statement doesn't end the transaction it ran in, except a
   deadlock, or a lock table out of memory (`'ER_LOCK_TABLE_FULL'`), which
-  the driver treats the same. A deadlock fails the statement with
+  the adapter treats the same. A deadlock fails the statement with
   `RepositoryDatabaseException`
   (`context.code` `'ER_LOCK_DEADLOCK'`), and MySQL rolls back the whole
   transaction. The run then fails, even if it catches the error, and every
@@ -122,7 +122,7 @@ whose rows insert one by one is not all-or-nothing.
   until the transaction ends. Concurrent upserts of new keys, the same or
   neighbouring ones, may deadlock, and other inserts into that gap wait.
 - Leave `innodb_rollback_on_timeout` off (the default): with it on, a
-  lock-wait timeout also rolls the whole transaction back, which the driver
+  lock-wait timeout also rolls the whole transaction back, which the adapter
   doesn't detect, so later calls in the run would run outside it.
 
 ### MariaDB
@@ -136,7 +136,7 @@ MySQL one, so register each connection with the adapter for its server.
 Use the `better-sqlite3` client; any other SQLite client stops startup with
 `DrizzleUnsupportedDatabaseException`. Open the database yourself and turn
 foreign keys on: SQLite enforces them only on a connection that asks, and
-the driver changes nothing about yours. Give each `@nestjs/drizzle`
+the adapter changes nothing about yours. Give each `@nestjs/drizzle`
 connection a database of its own: two connections on one better-sqlite3
 client share its single connection, which can't hold two transactions.
 
@@ -181,7 +181,7 @@ DrizzleModule.forRootAsync({
 ## Module Registration
 
 Register each connection with `@nestjs/drizzle`, then list your adapter's
-module as a driver in `RepositoryModule.forRoot()`, with the tables it
+module under `adapters` in `RepositoryModule.forRoot()`, with the tables it
 serves:
 
 ```ts
@@ -268,12 +268,12 @@ interface DrizzleProviderOptionsInterface<Entity extends PlainLiteralObject>
 - **`removeDate`** -- the nullable date column `softDelete` sets and
   `restore` clears; reads skip rows that have one unless asked for deleted
   rows
-- **`version`** -- an integer column the driver owns: `create` starts it at
+- **`version`** -- an integer column the adapter owns: `create` starts it at
   1, and each write that changes the row moves it on by one; never set it
   yourself
 - **`rowScope`**, **`authority`**, **`writePolicy`**, **`activity`**,
   **`hooks`** -- the entity's declarations, read by
-  `RepositoryModule.forRoot()`; the driver ignores them
+  `RepositoryModule.forRoot()`; the adapter ignores them
 
 A table is matched by its connection and its schema-qualified name, so the
 same table reached through two connections counts as two: give each
@@ -310,7 +310,7 @@ finds codes containing `50%`.
 
 ### Relations
 
-Not supported yet: the driver reports no relations, so a read can't join
+Not supported yet: the adapter reports no relations, so a read can't join
 one. Read and write related rows through their own repositories.
 
 ### Upsert
@@ -354,7 +354,7 @@ does.
   column whenever Drizzle builds an update of the row, which a write may do
   even when it changes nothing (the version then stays where it was), and on
   an insert that leaves the column out, unless it has a default. Which writes
-  build an update is the driver's to choose, so don't rely on `$onUpdate` to
+  build an update is the adapter's to choose, so don't rely on `$onUpdate` to
   mark that a row changed.
 - **Database defaults, triggers and generated columns** are your database's:
   what they write reaches the row unchecked, and comes back in the result.
@@ -509,7 +509,7 @@ create role app_admin login password '...' bypassrls;
   without the policies, so otherwise a row can point into another tenant.
 - **Create views with `security_invoker = true`.** Otherwise they run as
   their owner and skip the policies. `security definer` functions always do.
-- **Code on the raw Drizzle database** runs outside the driver's
+- **Code on the raw Drizzle database** runs outside the adapter's
   transactions and has no tenant.
 
 ## Exceptions

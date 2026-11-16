@@ -54,7 +54,7 @@ This package is ESM-only and requires Node.js >= 22.12 and NestJS 12.
 | `@nestjs/config` | Yes | Module option registration |
 | `@nestjs/core` | Yes | Module reference and reflection — install explicitly |
 | `@nestjs/cqrs` | No | Optional peer — required in practice for the CQRS buses |
-| `typeorm` | No | Only when using TypeORM repository driver |
+| `typeorm` | No | Only when using a TypeORM repository adapter |
 | `@concepta/nestjs-crud` | No | Only for the `optional/crud` entry (CRUD gateway, `userPaginatedSchema`, `userCreateBatchSchema`) |
 | `@concepta/typeorm-seeding` | No | Only when using database seeding |
 | `@faker-js/faker` | No | Only when using the seed factory |

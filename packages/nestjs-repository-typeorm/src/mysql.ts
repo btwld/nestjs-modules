@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-typeorm/mysql`
  *
- * The TypeORM repository driver for MySQL: its module, repository,
+ * The TypeORM repository adapter for MySQL: its module, repository,
  * transactions and base entities.
  */
 

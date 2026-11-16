@@ -4,7 +4,7 @@ import { type ConformanceContext } from '../conformance-context.js';
 import { seedLibrary } from '../conformance-seed.js';
 
 /**
- * How a driver reports an error its store raised: as a
+ * How an adapter reports an error its store raised: as a
  * `RepositoryDatabaseException` naming the store.
  */
 export function errorsSection(ctx: ConformanceContext): void {

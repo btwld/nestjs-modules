@@ -5,8 +5,9 @@ import { type ConformanceContext } from '../conformance-context.js';
 import { ownAuthor, seedLibrary } from '../conformance-seed.js';
 
 /**
- * Whether a driver loads a relation an entity declares eager, for an entity
- * registered with `allowEagerRelations` — and never for one that is not.
+ * Whether an adapter loads a relation an entity declares eager, for an
+ * entity registered with `allowEagerRelations` — and never for one that is
+ * not.
  */
 export function eagerResultsSection(ctx: ConformanceContext): void {
   const { it, beforeEach } = ctx.test;

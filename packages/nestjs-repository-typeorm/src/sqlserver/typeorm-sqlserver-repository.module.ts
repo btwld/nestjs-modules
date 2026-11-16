@@ -12,7 +12,7 @@ import { TypeOrmSqlServerTransactionFactory } from './typeorm-sqlserver-transact
 import { TYPEORM_SQLSERVER_TRANSACTION_KEY_PREFIX } from './typeorm-sqlserver.constants.js';
 
 /**
- * The TypeORM repository driver for SQL Server, registered through
+ * The TypeORM repository adapter for SQL Server, registered through
  * `RepositoryModule.forRoot()`. Refuses a data source of any other database.
  *
  * @example

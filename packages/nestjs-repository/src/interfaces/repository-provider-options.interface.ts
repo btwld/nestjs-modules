@@ -33,8 +33,8 @@ export interface RelationConfig {
 
 /**
  * Options for registering a repository provider.
- * Drivers extend this with their own options; `RepositoryModule.forRoot()`
- * checks each entity against its driver's.
+ * Adapters extend this with their own options; `RepositoryModule.forRoot()`
+ * checks each entity against its adapter's.
  */
 export interface RepositoryProviderOptions<
   Entity extends PlainLiteralObject = PlainLiteralObject,

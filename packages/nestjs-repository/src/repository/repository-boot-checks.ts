@@ -50,13 +50,13 @@ export function checkSinglePrimaryKey(adapters: AnyAdapter[]): string[] {
  * Check that no column, foreign key columns included, is backed by a getter
  * or setter on the entity class.
  *
- * A driver building the entity runs the class's setters. The field a setter
+ * An adapter building the entity runs the class's setters. The field a setter
  * stores the value in is not a column, so every row built that way holds a
  * property nothing asked for, and its read fails. A setter that rewrites a
  * key, such as one lowercasing an email, also makes the repository's checks
- * and the driver name different rows: the create guard looks up one key
- * while the driver overwrites another, or a row-scope resolver checks one
- * parent while the driver links another.
+ * and the adapter name different rows: the create guard looks up one key
+ * while the adapter overwrites another, or a row-scope resolver checks one
+ * parent while the adapter links another.
  */
 export function checkNoAccessorColumns(adapters: AnyAdapter[]): string[] {
   return adapters.flatMap((adapter) => {
@@ -96,7 +96,7 @@ export function checkColumnsAreNotRelations(adapters: AnyAdapter[]): string[] {
       .map(
         ({ name }) =>
           `"${adapter.entityKey}" relation "${name}" is also reported as a ` +
-          `column. The repository driver must report a relation only as a ` +
+          `column. The repository adapter must report a relation only as a ` +
           `relation.`,
       );
   });

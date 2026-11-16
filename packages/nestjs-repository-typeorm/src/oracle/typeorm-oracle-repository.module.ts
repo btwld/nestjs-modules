@@ -12,7 +12,7 @@ import { TypeOrmOracleTransactionFactory } from './typeorm-oracle-transaction.fa
 import { TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX } from './typeorm-oracle.constants.js';
 
 /**
- * The TypeORM repository driver for Oracle, registered through
+ * The TypeORM repository adapter for Oracle, registered through
  * `RepositoryModule.forRoot()`. Refuses a data source of any other database.
  *
  * @example

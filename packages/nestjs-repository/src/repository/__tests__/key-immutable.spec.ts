@@ -35,7 +35,7 @@ const metadataOf = (columns: ReturnType<typeof column>[]) => ({
 });
 
 /**
- * Records what reached the driver, so a refusal can be distinguished from a
+ * Records what reached the adapter, so a refusal can be distinguished from a
  * write that happened to target the right row anyway.
  */
 class TestAdapter extends RepositoryAdapter<Row> {
@@ -226,7 +226,7 @@ describe('primary key immutability on update and replace', () => {
   });
 
   // This fixture's `merge` copies properties as given, so nothing but the
-  // repository stands between the relation object and the driver.
+  // repository stands between the relation object and the adapter.
   it.each([
     ['update', (a: TestAdapter, data: Row) => a.update(EXISTING, data)],
     ['replace', (a: TestAdapter, data: Row) => a.replace(EXISTING, data)],
@@ -241,10 +241,10 @@ describe('primary key immutability on update and replace', () => {
   });
 
   describe('a relation on the entity argument', () => {
-    // A driver resolves a column from its relation object in preference to the
-    // column's own scalar, so a relation on the stored row would decide which
-    // row the write lands on, whatever the scalar says. It never reaches the
-    // driver, leaving the scalar to decide.
+    // An adapter resolves a column from its relation object in preference to
+    // the column's own scalar, so a relation on the stored row would decide
+    // which row the write lands on, whatever the scalar says. It never reaches
+    // the adapter, leaving the scalar to decide.
     it.each([
       ['update', (a: TestAdapter, e: Row) => a.update(e, { name: 'Renamed' })],
       [
@@ -340,9 +340,9 @@ describe('primary key immutability on update and replace', () => {
 
 describe('the delete family pins the row the entity argument names', () => {
   // These operations act on the entity itself rather than on separate data.
-  // The hazard is the one update and replace face: a driver resolves a column
-  // from its relation object in preference to the column's own scalar, so the
-  // resolver's pre-check and the statement the driver runs could name
+  // The hazard is the one update and replace face: an adapter resolves a
+  // column from its relation object in preference to the column's own scalar,
+  // so the resolver's pre-check and the statement the adapter runs could name
   // different rows. A relation on the entity is left out before either sees
   // it.
   const PLANTED: Row = { ...EXISTING, account: { id: 'acct-9' } };
@@ -352,7 +352,7 @@ describe('the delete family pins the row the entity argument names', () => {
     ['softDelete', (a: TestAdapter, e: Row) => a.softDelete(e)],
     ['restore', (a: TestAdapter, e: Row) => a.restore(e)],
     ['deleteMany', (a: TestAdapter, e: Row) => a.deleteMany([e])],
-  ])('%s hands the driver no relation property', async (_name, run) => {
+  ])('%s hands the adapter no relation property', async (_name, run) => {
     const adapter = new TestAdapter();
 
     await run(adapter, { ...PLANTED });

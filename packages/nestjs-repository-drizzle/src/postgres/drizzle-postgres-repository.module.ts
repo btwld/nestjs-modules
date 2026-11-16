@@ -21,7 +21,7 @@ import {
 import { type DrizzlePostgresClient } from './drizzle-postgres.types.js';
 
 /**
- * The Drizzle repository driver for Postgres, registered through
+ * The Drizzle repository adapter for Postgres, registered through
  * `RepositoryModule.forRoot()`. Reads each connection's database from
  * `@nestjs/drizzle`, and refuses a connection to any other database.
  *

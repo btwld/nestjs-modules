@@ -6,7 +6,7 @@ import { type TypeOrmSqlServerSessionContextResolver } from './typeorm-sqlserver
  */
 export interface TypeOrmSqlServerAdapterOptionsInterface {
   /**
-   * Values set in the session context for every transaction the driver
+   * Values set in the session context for every transaction the adapter
    * opens, with the transaction's id under
    * `TYPEORM_SQLSERVER_TRANSACTION_ID_KEY`.
    */

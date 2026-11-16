@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-typeorm/sqlserver`
  *
- * The TypeORM repository driver for SQL Server: its module, repository,
+ * The TypeORM repository adapter for SQL Server: its module, repository,
  * transactions and base entities.
  */
 

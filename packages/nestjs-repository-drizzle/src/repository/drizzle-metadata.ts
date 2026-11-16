@@ -99,8 +99,8 @@ function primaryKeysOf(table: Table): string[] {
 }
 
 /**
- * The metadata a repository reports for one registration. The driver reports
- * no relations, so the repository refuses every read that joins one.
+ * The metadata a repository reports for one registration. The adapter
+ * reports no relations, so the repository refuses every read that joins one.
  */
 export function buildMetadata<Entity extends PlainLiteralObject>(
   options: DrizzleProviderOptionsInterface<Entity>,

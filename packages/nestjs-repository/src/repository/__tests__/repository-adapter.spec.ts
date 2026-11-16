@@ -157,7 +157,7 @@ describe(RepositoryAdapter.name, () => {
     });
   });
 
-  describe('a driver error', () => {
+  describe('an adapter error', () => {
     const reads: [string, (repo: TestRepositoryAdapter) => Promise<unknown>][] =
       [
         ['find', (repo) => repo.find()],
@@ -168,7 +168,7 @@ describe(RepositoryAdapter.name, () => {
       ['fails', true],
       ['leaves', false],
     ])(
-      '%s the caller’s transaction scope when the driver reports it ended the transaction: %s',
+      '%s the caller’s transaction scope when the adapter reports it ended the transaction: %s',
       async (_, ends) => {
         class EndingAdapter extends TestRepositoryAdapter {
           protected override endsTransaction(): boolean {
@@ -203,7 +203,7 @@ describe(RepositoryAdapter.name, () => {
     );
 
     it.each(reads)(
-      'is wrapped by %s in a RepositoryDatabaseException when the driver reports it',
+      'is wrapped by %s in a RepositoryDatabaseException when the adapter reports it',
       async (_, run) => {
         class ReportingAdapter extends TestRepositoryAdapter {
           protected override describeDatabaseError(error: unknown) {

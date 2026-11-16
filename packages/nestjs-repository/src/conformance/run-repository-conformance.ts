@@ -18,8 +18,8 @@ import { transactionsSection } from './sections/transactions.section.js';
 import { writesSection } from './sections/writes.section.js';
 
 /**
- * Every section of the driver contract. All of them run for every harness;
- * a driver cannot pick.
+ * Every section of the adapter contract. All of them run for every harness;
+ * an adapter cannot pick.
  */
 const SECTIONS: Record<string, (ctx: ConformanceContext) => void> = {
   metadata: metadataSection,
@@ -32,7 +32,7 @@ const SECTIONS: Record<string, (ctx: ConformanceContext) => void> = {
 };
 
 /**
- * Register the repository driver contract with a test runner, run against
+ * Register the repository adapter contract with a test runner, run against
  * one harness: one database, with every fixture the suite defines.
  *
  * @example

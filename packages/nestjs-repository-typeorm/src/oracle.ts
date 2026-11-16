@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-typeorm/oracle`
  *
- * The TypeORM repository driver for Oracle: its module, repository,
+ * The TypeORM repository adapter for Oracle: its module, repository,
  * transactions and base entities.
  */
 

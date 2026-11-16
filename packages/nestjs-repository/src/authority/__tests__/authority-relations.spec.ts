@@ -108,7 +108,7 @@ describe('authority over related rows', () => {
 
     /**
      * Answers every read with `rows`, holding the relations it joins, as a
-     * driver that joins would.
+     * adapter that joins would.
      */
     class EmployeesFixture extends RecordingRepositoryFixture {
       override readonly metadata = ROOT_METADATA;

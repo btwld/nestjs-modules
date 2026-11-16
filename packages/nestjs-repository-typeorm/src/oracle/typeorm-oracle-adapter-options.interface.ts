@@ -6,7 +6,7 @@ import { type TypeOrmOracleApplicationContextInterface } from './typeorm-oracle-
  */
 export interface TypeOrmOracleAdapterOptionsInterface {
   /**
-   * Values set in an application context for every transaction the driver
+   * Values set in an application context for every transaction the adapter
    * opens, and cleared before its connection goes back to the pool.
    */
   applicationContext?: TypeOrmOracleApplicationContextInterface;

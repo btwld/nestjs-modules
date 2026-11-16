@@ -17,7 +17,7 @@ import {
 
 /**
  * Refuse to start when the repositories were not bound at startup, a
- * driver's transaction factory was never registered, a scoped entity's
+ * adapter's transaction factory was never registered, a scoped entity's
  * resolver was never attached, or a governed entity's authority was never
  * attached.
  *
@@ -99,7 +99,7 @@ export class RepositoryBindingCheck implements OnModuleInit {
         [
           'The repositories were never bound at startup because something ' +
             'they depend on is request-scoped: a forRootAsync() inject, or a ' +
-            "driver's provider. Keep them singleton-scoped.",
+            "adapter's provider. Keep them singleton-scoped.",
         ],
         { originalError: error },
       );

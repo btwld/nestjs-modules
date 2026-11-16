@@ -12,7 +12,7 @@ import { type ConformanceContext } from '../conformance-context.js';
 import { ownAuthor, ownBook, seedLibrary } from '../conformance-seed.js';
 
 /**
- * How a driver writes: what each write persists and returns.
+ * How an adapter writes: what each write persists and returns.
  */
 export function writesSection(ctx: ConformanceContext): void {
   const { it } = ctx.test;
@@ -228,7 +228,7 @@ export function writesSection(ctx: ConformanceContext): void {
     assertRows(await unique.find(), [other]);
   });
 
-  it('doUpdate, doReplace and doUpsert: a version in the data leaves the version to the driver', async () => {
+  it('doUpdate, doReplace and doUpsert: a version in the data leaves the version to the adapter', async () => {
     const item = ctx.repo('item');
     const created = await item.create({ name: 'v', rank: 1, note: null });
 

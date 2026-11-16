@@ -644,7 +644,7 @@ describe('activity', () => {
   });
 });
 
-/** A driver that loses the last row of every batch write. */
+/** An adapter that loses the last row of every batch write. */
 class LossyWidgetRepository extends MemoryRepositoryFixture<WidgetFixture> {
   protected async doCreateMany(
     entities: DeepPartial<WidgetFixture>[],
@@ -699,7 +699,7 @@ describe('batch writes', () => {
     ['a recorded entity', { store: ACTIVITY_TOKEN }],
     ['an entity that is not recorded', undefined],
   ])(
-    'refuses a driver result without one row per input, for %s',
+    'refuses an adapter result without one row per input, for %s',
     async (_label, activity) => {
       await start(activity);
       const rows: PlainLiteralObject[] = [{ name: 'a' }, { name: 'b' }];

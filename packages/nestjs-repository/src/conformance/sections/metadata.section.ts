@@ -31,7 +31,7 @@ const column = (
 
 /**
  * Every fixture's own columns and their flags, sorted by name. `removedAt`
- * is the remove date only where the driver supports soft delete.
+ * is the remove date only where the adapter supports soft delete.
  */
 function columnsFor(
   softDelete: boolean,
@@ -144,7 +144,7 @@ function joinPairs(
 }
 
 /**
- * What a driver reports about each entity: names, URNs, own columns and
+ * What an adapter reports about each entity: names, URNs, own columns and
  * their flags, and relations.
  */
 export function metadataSection(ctx: ConformanceContext): void {

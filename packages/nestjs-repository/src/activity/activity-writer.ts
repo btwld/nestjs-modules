@@ -33,7 +33,7 @@ export class ActivityWriter {
    * Record `rows`, the checked rows a write returned, or for the delete
    * family the checked rows it named.
    *
-   * `payload` is what an update or upsert handed the driver: the columns it
+   * `payload` is what an update or upsert handed the adapter: the columns it
    * names are the ones that changed.
    */
   async record(

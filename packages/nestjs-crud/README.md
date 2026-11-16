@@ -64,7 +64,7 @@ schemas (Standard Schema) — `zod` is a direct dependency.
 | `@nestjs/config` | Yes | Module option registration via `registerAs` |
 | `@nestjs/swagger` | Yes | OpenAPI decorator support — install explicitly |
 | `rxjs` | Yes | Interceptor pipeline |
-| `@concepta/nestjs-repository-typeorm` | No | TypeORM repository driver |
+| `@concepta/nestjs-repository-typeorm` | No | TypeORM repository adapters |
 | `@nestjs/cqrs` | No | Only for `CrudCqrsResolver`, from `@concepta/nestjs-crud/optional/cqrs` |
 
 ## Quick Start
@@ -315,7 +315,7 @@ CrudAdapter
   |
 RepositoryAdapter (@concepta/nestjs-repository)
   |
-Database Driver (TypeORM, etc.)
+Repository Adapter (TypeORM, etc.)
 ```
 
 - **Controller** — Decorated class with operation methods. Can be fully

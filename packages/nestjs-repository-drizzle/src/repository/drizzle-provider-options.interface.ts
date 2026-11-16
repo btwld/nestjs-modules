@@ -5,7 +5,7 @@ import { type PlainLiteralObject } from '@nestjs/common';
 import { type RepositoryProviderOptions } from '@concepta/nestjs-repository';
 
 /**
- * How one entity is registered with the Drizzle driver: its class, the table
+ * How one entity is registered with the Drizzle adapter: its class, the table
  * its rows live in, and the columns Drizzle has no notion of.
  */
 export interface DrizzleProviderOptionsInterface<

@@ -28,7 +28,7 @@ import { type DrizzleMysqlClient } from '../drizzle-mysql.types.js';
 
 import { type DrizzleMysqlAdapterModule } from './drizzle-mysql-adapter-module.type.js';
 
-/** A key the driver generates before the insert. */
+/** A key the adapter generates before the insert. */
 const tokenTable = mysqlTable('mysql_token', {
   id: varchar({ length: 36 })
     .primaryKey()

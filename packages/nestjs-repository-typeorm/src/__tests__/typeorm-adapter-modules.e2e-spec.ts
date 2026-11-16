@@ -18,7 +18,7 @@ import { TypeOrmSqliteTransaction } from '../sqlite/typeorm-sqlite-transaction.j
 import { ormConfig } from '../__fixtures__/repository/config/ormconfig.fixture.js';
 import { TestEntityFixture } from '../__fixtures__/repository/entity/test.entity.fixture.js';
 
-/** An application with one entity, registered with `driver`, on SQLite. */
+/** An application with one entity, registered with `adapter`, on SQLite. */
 function compile(adapter: RepositoryAdapterInterface & Type) {
   return Test.createTestingModule({
     imports: [

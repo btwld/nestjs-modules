@@ -1,7 +1,7 @@
 import { type RepositoryColumnMetadataInterface } from '../repository/interfaces/repository-column-metadata.interface.js';
 
 /**
- * Column metadata as a driver would report it, for hand-built test metadata.
+ * Column metadata as an adapter would report it, for hand-built test metadata.
  */
 export const columnFixture = (
   name: string,

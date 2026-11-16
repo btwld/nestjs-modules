@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-drizzle/mariadb`
  *
- * The Drizzle repository driver for MariaDB, through the mysql2 client: its
+ * The Drizzle repository adapter for MariaDB, through the mysql2 client: its
  * module and repository. Its transactions and client are the MySQL
  * adapter's.
  */

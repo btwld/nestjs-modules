@@ -18,7 +18,7 @@ import { TypeOrmSqliteRepository } from '../../sqlite/typeorm-sqlite-repository.
 import { TypeOrmRepository } from '../typeorm-repository.js';
 
 /**
- * What the TypeORM driver does beyond the driver contract, which
+ * What the TypeORM adapter does beyond the adapter contract, which
  * `typeorm-conformance.e2e-spec.ts` covers.
  */
 describe(TypeOrmRepository, () => {
@@ -133,7 +133,7 @@ describe(TypeOrmRepository, () => {
       ],
     ] as const)('%s opens no transaction of its own', async (_name, call) => {
       const entity = await testFactory.create({ firstName: 'Alice' });
-      // How a driver would open one: `DataSource.transaction()` runs here
+      // How an adapter would open one: `DataSource.transaction()` runs here
       // too. TypeORM's own `save()` and `remove()` don't.
       const transaction = vi.spyOn(EntityManager.prototype, 'transaction');
 

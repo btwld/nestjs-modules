@@ -196,7 +196,7 @@ describe('RepositoryAdapter soft-deleted immutability', () => {
     it.each([
       ['softDelete', (a: NoDeleteDateAdapter) => a.softDelete(liveEntity())],
       ['restore', (a: NoDeleteDateAdapter) => a.restore(liveEntity())],
-    ])('should refuse %s before the driver', async (operation, run) => {
+    ])('should refuse %s before the adapter', async (operation, run) => {
       const noDeleteDate = new NoDeleteDateAdapter('test-entity');
       noDeleteDate.bind({});
 

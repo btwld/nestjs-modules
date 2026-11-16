@@ -1,7 +1,7 @@
 /**
  * `@concepta/nestjs-repository-typeorm/sqlite`
  *
- * The TypeORM repository driver for SQLite (`better-sqlite3`): its module,
+ * The TypeORM repository adapter for SQLite (`better-sqlite3`): its module,
  * repository, transactions and base entities.
  */
 

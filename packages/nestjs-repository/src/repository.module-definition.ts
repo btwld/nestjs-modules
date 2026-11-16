@@ -48,8 +48,8 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  * Build the global module `RepositoryModule.forRoot()` and `forRootAsync()`
  * return.
  *
- * Every driver registers its entities here, and one provider binds and checks
- * them all. Only that provider's result is exported, for
+ * Every adapter registers its entities here, and one provider binds and
+ * checks them all. Only that provider's result is exported, for
  * `RepositoryModule.forFeature()` to hand repositories out from.
  */
 export function createRepositoryRootModule(params: {
@@ -60,7 +60,7 @@ export function createRepositoryRootModule(params: {
 }): DynamicModule {
   const { module, adapters, imports, optionsProvider } = params;
 
-  // Copied before any driver sees the entries, so nothing a driver does to
+  // Copied before any adapter sees the entries, so nothing an adapter does to
   // them can change what is checked and bound.
   const entries: RepositoryBindingEntry[] = adapters.flatMap(
     ({ adapter, entities }) =>
@@ -220,8 +220,8 @@ function assertDistinctAdapters(
     throw new RepositoryBootException(
       [...new Set(repeated)].map(
         (name) =>
-          `Driver "${name}" is listed more than once in ` +
-          'RepositoryModule.forRoot(). List each driver once, with all of ' +
+          `Adapter "${name}" is listed more than once in ` +
+          'RepositoryModule.forRoot(). List each adapter once, with all of ' +
           'its entities.',
       ),
     );
@@ -311,8 +311,8 @@ function assertDistinctTransactionKeys(keys: string[]): void {
     throw new RepositoryBootException(
       [...new Set(repeated)].map(
         (key) =>
-          `Transaction key "${key}" is registered by more than one driver. ` +
-          'Each driver must name its transaction keys uniquely.',
+          `Transaction key "${key}" is registered by more than one adapter. ` +
+          'Each adapter must name its transaction keys uniquely.',
       ),
     );
   }

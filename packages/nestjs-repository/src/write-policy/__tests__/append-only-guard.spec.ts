@@ -18,7 +18,7 @@ interface Row extends PlainLiteralObject {
 
 /**
  * Records which `do*` the adapter reached, so a test can tell "refused before
- * the driver" from "driver happened to do nothing".
+ * the adapter" from "adapter happened to do nothing".
  */
 class RecordingAdapter extends RepositoryAdapter<Row> {
   readonly metadata: RepositoryMetadataInterface<Row>;
@@ -157,13 +157,13 @@ describe('append-only guard', () => {
     });
 
     it.each(STORED_ROW_OPERATIONS)(
-      'refuses $operation before the driver is reached',
+      'refuses $operation before the adapter is reached',
       async ({ call }) => {
         const adapter = new RecordingAdapter(appendOnly);
 
         await expect(call(adapter)).rejects.toThrow();
 
-        // The point of the guard: the write never gets as far as the driver,
+        // The point of the guard: the write never gets as far as the adapter,
         // so there is nothing to roll back.
         expect(adapter.reached).toEqual([]);
       },
