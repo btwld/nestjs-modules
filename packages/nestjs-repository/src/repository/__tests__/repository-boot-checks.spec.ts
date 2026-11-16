@@ -294,7 +294,7 @@ describe('repository startup checks', () => {
       Test.createTestingModule({
         imports: [
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: AccountsDriver,
                 entities: [{ key: 'accounts', entity: PlainAccountEntity }],

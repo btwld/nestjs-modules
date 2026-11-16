@@ -12,7 +12,7 @@ import { PhotoBodyFallbackModuleFixture } from './photo-body-fallback/photo-body
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

@@ -45,7 +45,7 @@ const startWith = async (except: string[]) => {
       }),
       RepositoryModule.forRoot({
         imports: [ExceptAuthorityModule],
-        drivers: [
+        adapters: [
           {
             driver: TypeOrmSqliteRepositoryModule,
             entities: [

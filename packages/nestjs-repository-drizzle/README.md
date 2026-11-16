@@ -213,7 +213,7 @@ export class Book {
       connection: { connectionString: process.env.DATABASE_URL },
     }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: DrizzlePostgresRepositoryModule,
           entities: [
@@ -431,7 +431,7 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { DrizzlePostgresRepositoryModule } from '@concepta/nestjs-repository-drizzle/postgres';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: DrizzlePostgresRepositoryModule,
       entities: [{ key: 'order', entity: Order, table: orders }],

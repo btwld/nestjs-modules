@@ -69,7 +69,7 @@ async function compile(
     imports: [
       RepositoryModule.forRoot({
         ...moduleOptions,
-        drivers: [{ driver: PolicyUnawareDriverModule, entities }],
+        adapters: [{ driver: PolicyUnawareDriverModule, entities }],
       }),
     ],
   }).compile();
@@ -143,7 +143,7 @@ describe('write policy binding', () => {
             useFactory: async (settings: { strict: boolean }) => ({
               requireWritePolicyDeclaration: settings.strict,
             }),
-            drivers: [
+            adapters: [
               {
                 driver: PolicyUnawareDriverModule,
                 entities: [{ key: 'items', entity: TestEntityClass }],

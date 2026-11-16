@@ -56,7 +56,7 @@ const USER_ROLE_ENTITY_KEY = 'userRole';
     }),
     CqrsModule.forRoot(),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

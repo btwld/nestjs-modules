@@ -23,7 +23,7 @@ const USER_CREDENTIALS_ENTITY_KEY = 'user-credentials';
   imports: [
     TypeOrmModule.forRoot(ormConfig),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

@@ -41,7 +41,7 @@ import { type DrizzleSqliteClient } from './drizzle-sqlite.types.js';
  *       },
  *     }),
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
  *           driver: DrizzleSqliteRepositoryModule,
  *           entities: [

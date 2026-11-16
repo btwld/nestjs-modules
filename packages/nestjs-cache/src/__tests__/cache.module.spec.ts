@@ -99,7 +99,7 @@ describe(CacheModule.name, () => {
             entities: [UserEntityFixture, UserCacheEntityFixture],
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [

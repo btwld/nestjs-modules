@@ -272,7 +272,7 @@ describe('repository hooks', () => {
       imports: [
         CoreModule.forRoot(),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: MemoryRepositoryModuleFixture,
               entities: [{ key: ORDER_TOKEN, entity: OrderEntityFixture }],

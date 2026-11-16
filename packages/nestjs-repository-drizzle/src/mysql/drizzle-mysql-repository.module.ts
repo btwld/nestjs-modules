@@ -30,7 +30,7 @@ import { type DrizzleMysqlClient } from './drizzle-mysql.types.js';
  *   imports: [
  *     DrizzleModule.forRoot({ drizzle, connection }),
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
  *           driver: DrizzleMysqlRepositoryModule,
  *           entities: [

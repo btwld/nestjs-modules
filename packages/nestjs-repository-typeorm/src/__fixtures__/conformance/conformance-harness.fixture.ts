@@ -6,7 +6,7 @@ import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import {
   type ConformanceCapability,
   type ConformanceHarnessInterface,
-} from '@concepta/nestjs-repository/conformance';
+} from '@concepta/nestjs-repository/conformance/adapter';
 
 import { type TypeOrmMariadbRepositoryModule } from '../../mariadb/typeorm-mariadb-repository.module.js';
 import { type TypeOrmMysqlRepositoryModule } from '../../mysql/typeorm-mysql-repository.module.js';

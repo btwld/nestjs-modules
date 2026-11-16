@@ -19,7 +19,7 @@ import { TYPEORM_POSTGRES_TRANSACTION_KEY_PREFIX } from './typeorm-postgres.cons
  * @example
  * ```typescript
  * RepositoryModule.forRoot({
- *   drivers: [
+ *   adapters: [
  *     {
  *       driver: TypeOrmPostgresRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],

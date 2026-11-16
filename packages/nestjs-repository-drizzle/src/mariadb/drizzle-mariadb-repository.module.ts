@@ -26,7 +26,7 @@ import {
  *   imports: [
  *     DrizzleModule.forRoot({ drizzle, connection }),
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
  *           driver: DrizzleMariadbRepositoryModule,
  *           entities: [

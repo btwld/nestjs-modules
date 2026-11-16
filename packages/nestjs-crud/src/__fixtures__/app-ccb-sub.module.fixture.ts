@@ -12,7 +12,7 @@ import { PhotoCcbSubModuleFixture } from './photo-ccb-sub/photo-ccb-sub.module.f
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

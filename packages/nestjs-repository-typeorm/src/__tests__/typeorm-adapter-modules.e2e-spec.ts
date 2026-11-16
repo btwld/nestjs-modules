@@ -24,7 +24,7 @@ function compile(driver: RepositoryDriverInterface & Type) {
     imports: [
       TypeOrmModule.forRoot(ormConfig),
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           { driver, entities: [{ key: 'test', entity: TestEntityFixture }] },
         ],
       }),

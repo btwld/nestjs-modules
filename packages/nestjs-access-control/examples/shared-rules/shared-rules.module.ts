@@ -33,7 +33,7 @@ import {
     RepositoryModule.forRoot({
       imports: [InvoiceAuthorityModule],
       authority: { required: true },
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

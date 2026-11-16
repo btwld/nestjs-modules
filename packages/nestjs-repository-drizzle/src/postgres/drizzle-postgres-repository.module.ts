@@ -31,7 +31,7 @@ import { type DrizzlePostgresClient } from './drizzle-postgres.types.js';
  *   imports: [
  *     DrizzleModule.forRoot({ drizzle, connection }),
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
  *           driver: DrizzlePostgresRepositoryModule,
  *           entities: [

@@ -490,7 +490,7 @@ export class UserCacheEntity extends CachePostgresEntity {}
     CqrsModule.forRoot(),
     CacheModule.forRoot({ settings: { expiresIn: '1h' } }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'userCache', entity: UserCacheEntity }],

@@ -52,7 +52,7 @@ async function createApp(
   const app = await Test.createTestingModule({
     imports: [
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
             driver: DurableMemoryRepositoryModuleFixture,
             entities: [{ key: WIDGET_TOKEN, entity: WidgetEntityFixture }],

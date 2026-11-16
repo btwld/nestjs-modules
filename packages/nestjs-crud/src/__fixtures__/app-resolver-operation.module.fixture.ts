@@ -23,7 +23,7 @@ class PhotoCcbOperationModuleFixture {}
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

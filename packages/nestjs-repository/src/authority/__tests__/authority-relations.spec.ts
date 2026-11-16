@@ -551,7 +551,7 @@ describe('authority over related rows', () => {
             CoreModule.forRoot({}),
             RepositoryModule.forRoot({
               imports: [deciders(new AuthorityFixture())],
-              drivers: [
+              adapters: [
                 {
                   driver: MemoryRepositoryModuleFixture,
                   entities: [
@@ -593,7 +593,7 @@ describe('authority over related rows', () => {
             imports: [
               deciders(new AuthorityFixture(table), [ReadsAsAdminHook]),
             ],
-            drivers: [
+            adapters: [
               {
                 driver: MemoryRepositoryModuleFixture,
                 entities: [
@@ -680,7 +680,7 @@ describe('authority over related rows', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [deciders(new AuthorityFixture())],
-            drivers: [
+            adapters: [
               {
                 driver: MemoryRepositoryModuleFixture,
                 entities: [
@@ -791,7 +791,7 @@ describe('authority over related rows', () => {
           CoreModule.forRoot({}),
           RepositoryModule.forRoot({
             imports: [deciders(authority, lineHooks)],
-            drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+            adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
           }),
         ],
       }).compile();
@@ -1193,7 +1193,7 @@ describe('authority over related rows', () => {
             CoreModule.forRoot({}),
             RepositoryModule.forRoot({
               imports: [deciders(authority)],
-              drivers: [
+              adapters: [
                 {
                   driver: MemoryRepositoryModuleFixture,
                   entities: [
@@ -1572,7 +1572,7 @@ describe('authority over related rows', () => {
                 }),
               ),
             ],
-            drivers: [
+            adapters: [
               {
                 driver: MemoryRepositoryModuleFixture,
                 entities: [

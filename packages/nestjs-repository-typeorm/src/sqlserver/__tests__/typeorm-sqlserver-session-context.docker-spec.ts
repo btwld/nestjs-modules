@@ -81,7 +81,7 @@ describe('sessionContext on SQL Server', () => {
           pool: { min: 1, max: 1 },
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: TypeOrmSqlServerRepositoryModule,
               entities: [

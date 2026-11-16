@@ -86,7 +86,7 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
   imports: [
     RepositoryModule.forRoot({
       defaultTimeout: 30000, // transaction timeout in ms (default)
-      drivers: [
+      adapters: [
         {
           driver: YourDriverModule,
           entities: [
@@ -126,7 +126,7 @@ Further options for scoped, governed, append-only or recorded entities:
 ```ts
 RepositoryModule.forRoot({
   imports: [OrdersRowScopeModule], // exports OrdersRowScope — see The resolver
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [
@@ -149,7 +149,7 @@ Entities stay static; only the settings come from the factory.
 @Module({
   imports: [
     RepositoryModule.forRootAsync({
-      drivers: [
+      adapters: [
         {
           driver: YourDriverModule,
           entities: [{ key: 'order', entity: Order }],
@@ -211,7 +211,7 @@ interface RepositoryModuleOptionsInterface {
 }
 ```
 
-`forRoot()` takes these beside `drivers`; `forRootAsync()`'s `useFactory`
+`forRoot()` takes these beside `adapters`; `forRootAsync()`'s `useFactory`
 returns them.
 
 `requireRowScopeDeclaration` turns "nobody declared this entity" into a
@@ -394,7 +394,7 @@ The repository only compares them; row scope uses them to find relations into
 scoped rows.
 
 Your driver's module class is what applications list in `forRoot()`'s
-`drivers`. It implements `RepositoryDriverInterface`: a static
+`adapters`. It implements `RepositoryDriverInterface`: a static
 `register(entities)` that returns one provider per entity, under
 `getDynamicRepositoryToken(key)`, the `imports` those providers need, and any
 `transactionFactories`. Keep those providers and everything your transaction
@@ -413,14 +413,14 @@ same way.
 
 ### Testing Your Driver
 
-`@concepta/nestjs-repository/conformance` is the driver contract as a test
+`@concepta/nestjs-repository/conformance/adapter` is the driver contract as a test
 suite: what your driver reports, how it translates every read, what each
 write persists, and which database errors it reports. Run it once per
 database your driver supports. You give it a harness, and it registers its
 own cases with your test runner:
 
 ```ts
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 runRepositoryConformance(
   {
@@ -699,7 +699,7 @@ can also configure per-relation behavior on its `forRoot()` entry:
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [{
@@ -942,7 +942,7 @@ An entity whose relations load on their own, eagerly, opts in with
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [
@@ -1755,7 +1755,7 @@ import { RepositoryModule } from '@concepta/nestjs-repository';
   imports: [
     CoreModule.forRoot(), // 1. required for any hook to run
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: YourDriverModule,
           entities: [
@@ -2501,7 +2501,7 @@ Every entity is governed, open, or undeclared:
 ```ts
 RepositoryModule.forRoot({
   imports: [AuthorityModule],
-  drivers: [
+  adapters: [
     {
       driver: MyDriverModule,
       entities: [
@@ -2530,7 +2530,7 @@ other, or startup fails:
 ```ts
 RepositoryModule.forRoot({
   authority: { required: true },
-  drivers: [...],
+  adapters: [...],
 });
 ```
 
@@ -2926,7 +2926,7 @@ Row scope restricts *which* rows a caller may touch. Write policy restricts
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [
@@ -3031,7 +3031,7 @@ which columns:
 export class Activity extends YourDriverActivityEntity {}
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [
@@ -3324,7 +3324,7 @@ the registrations that conflict.
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [
@@ -3348,7 +3348,7 @@ and `Where.rel()`, on `find`, `findOne`, `count` and `findAndCount`:
 
 ```ts
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: YourDriverModule,
       entities: [
@@ -3412,7 +3412,7 @@ Every federated query carries at most `federation.maxKeys` keys (default
 `1000`):
 
 ```ts
-RepositoryModule.forRoot({ federation: { maxKeys: 5000 }, drivers: [/* … */] });
+RepositoryModule.forRoot({ federation: { maxKeys: 5000 }, adapters: [/* … */] });
 ```
 
 - **A join** attaches its relation to rows holding up to `maxKeys` distinct
@@ -3533,7 +3533,7 @@ also exported for manual provider wiring.
 | Import Path | Contents |
 | --- | --- |
 | `@concepta/nestjs-repository` | Module, adapter, repository interfaces, Where/OrderBy builders, transaction management, hooks, federation, decorators, exceptions |
-| `@concepta/nestjs-repository/conformance` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
+| `@concepta/nestjs-repository/conformance/adapter` | `runRepositoryConformance`, the harness, capability and fixture interfaces. See [Testing Your Driver](#testing-your-driver) |
 | `@concepta/nestjs-repository/optional/casl` | `CaslAuthority`, `CaslAuthorityOptionsInterface`, `CaslAuthorityRulesInterface`, `CaslAuthorityRulesInvalidException`. Requires `@casl/ability` — see [Rules with CASL](#rules-with-casl) |
 | `@concepta/nestjs-repository/optional/outbox` | `DurableMessaging`, `DurableMessagingModule`, `DurableMessagingOptionsInterface`, `DurableDriverInterface`, `DurableBindingInterface`, `UnsupportedDurableDriverException`. Requires `@nestjs/outbox` |
 | `@concepta/nestjs-repository/testing` | `createMockTransaction`, `createMockRepository`, `MockTransactionHandle`. Requires `vitest` and `vitest-mock-extended` |

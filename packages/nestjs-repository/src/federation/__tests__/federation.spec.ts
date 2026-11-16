@@ -158,7 +158,7 @@ async function compile({
       RepositoryModule.forRoot({
         imports: scoped ? [ResolverModule] : [],
         federation: maxKeys === undefined ? undefined : { maxKeys },
-        drivers: [
+        adapters: [
           {
             driver: MemoryRepositoryModuleFixture,
             entities: entities.filter(({ key }) => !omit.includes(key)),

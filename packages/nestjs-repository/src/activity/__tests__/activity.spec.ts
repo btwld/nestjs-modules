@@ -127,7 +127,7 @@ function compile(
       CoreModule.forRoot(),
       RepositoryModule.forRoot({
         imports: [ResolverModule],
-        drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
     providers,
@@ -680,7 +680,7 @@ describe('batch writes', () => {
     moduleRef = await Test.createTestingModule({
       imports: [
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             { driver: LossyDriverModule, entities: [widgets(activity)] },
             { driver: MemoryRepositoryModuleFixture, entities: [STORE] },
           ],

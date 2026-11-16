@@ -1,4 +1,4 @@
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 import { drizzlePostgresConformanceHarness } from '../__fixtures__/conformance-postgres-harness.fixture.js';
 import { nodePostgresDatabase } from '../__fixtures__/postgres-databases.fixture.js';

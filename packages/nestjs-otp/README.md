@@ -630,7 +630,7 @@ import { Entity } from 'typeorm';
 export class UserOtpEntity extends OtpPostgresEntity {}
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'userOtp', entity: UserOtpEntity }],

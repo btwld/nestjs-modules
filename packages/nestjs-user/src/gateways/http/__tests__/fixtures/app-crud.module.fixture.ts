@@ -51,7 +51,7 @@ const USER_CREDENTIALS_ENTITY_KEY_FIXTURE = 'user-credentials';
     TypeOrmModule.forRoot(ormConfig),
     CqrsModule.forRoot(),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

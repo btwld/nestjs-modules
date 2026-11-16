@@ -34,7 +34,7 @@ describe('TypeOrmRepository on a data source that loads relations by query', () 
           relationLoadStrategy: 'query',
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: TypeOrmSqliteRepositoryModule,
               entities: [

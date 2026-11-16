@@ -85,7 +85,7 @@ describe('DrizzleSqliteRepository version', () => {
             },
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: DrizzleSqliteRepositoryModule,
                 entities: [

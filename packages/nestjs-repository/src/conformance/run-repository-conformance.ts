@@ -74,7 +74,7 @@ export function runRepositoryConformance<
               CoreModule.forRoot(),
               ...(harness.imports ?? []),
               RepositoryModule.forRoot({
-                drivers: [
+                adapters: [
                   {
                     driver: harness.driver,
                     entities: [

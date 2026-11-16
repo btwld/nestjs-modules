@@ -31,7 +31,7 @@ function withFileEntity(fileModule: DynamicModule) {
     CoreModule.forRoot(),
     TypeOrmModule.forRoot(ormConfig),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [{ key: 'file', entity: FileEntityFixture }],

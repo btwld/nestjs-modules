@@ -4,7 +4,7 @@ import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 import {
   type ConformanceCapability,
   type ConformanceHarnessInterface,
-} from '@concepta/nestjs-repository/conformance';
+} from '@concepta/nestjs-repository/conformance/adapter';
 
 import {
   ConformanceAuthorEntity,

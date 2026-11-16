@@ -40,7 +40,7 @@ export class OrderAuthorityModule {}
     RepositoryModule.forRoot({
       imports: [OrderAuthorityModule],
       authority: { required: true },
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

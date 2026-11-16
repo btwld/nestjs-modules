@@ -1,9 +1,9 @@
 /**
- * `@concepta/nestjs-repository/conformance`
+ * `@concepta/nestjs-repository/conformance/adapter`
  *
- * The repository driver contract as a test suite: what a driver reports,
+ * The repository adapter contract as a test suite: what an adapter reports,
  * how it translates reads, what it persists, and what it refuses. Every
- * driver runs it, once per database, against its own entities for the
+ * adapter runs it, once per database, against its own entities for the
  * suite's fixtures. Nothing here imports a test runner; the runner's
  * functions are passed in.
  */

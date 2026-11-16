@@ -74,7 +74,7 @@ const USER_OTP_ENTITY_KEY = 'user-otp';
     }),
     CqrsModule.forRoot(),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

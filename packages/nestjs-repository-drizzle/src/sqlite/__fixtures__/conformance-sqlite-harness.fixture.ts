@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { type INestApplicationContext } from '@nestjs/common';
 import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
 
-import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance';
+import { type ConformanceHarnessInterface } from '@concepta/nestjs-repository/conformance/adapter';
 
 import {
   ConformanceAuthorEntity,

@@ -23,7 +23,7 @@ import { getDynamicRepositoryToken } from './utils/get-dynamic-repository-token.
  * @Module({
  *   imports: [
  *     RepositoryModule.forRoot({
- *       drivers: [
+ *       adapters: [
  *         {
  *           driver: YourDriverModule,
  *           entities: [
@@ -57,11 +57,11 @@ export class RepositoryModule {
   static forRoot<const Drivers extends readonly RepositoryDriverInterface[]>(
     options: RepositoryRootOptions<Drivers>,
   ): DynamicModule {
-    const { drivers = [], imports = [], ...moduleOptions } = options;
+    const { adapters = [], imports = [], ...moduleOptions } = options;
 
     return createRepositoryRootModule({
       module: RepositoryModule,
-      drivers,
+      drivers: adapters,
       imports,
       optionsProvider: {
         provide: REPOSITORY_MODULE_OPTIONS,
@@ -77,11 +77,11 @@ export class RepositoryModule {
   static forRootAsync<
     const Drivers extends readonly RepositoryDriverInterface[],
   >(options: RepositoryRootAsyncOptions<Drivers>): DynamicModule {
-    const { drivers = [], imports = [], inject = [], useFactory } = options;
+    const { adapters = [], imports = [], inject = [], useFactory } = options;
 
     return createRepositoryRootModule({
       module: RepositoryModule,
-      drivers,
+      drivers: adapters,
       imports,
       optionsProvider: {
         provide: REPOSITORY_MODULE_OPTIONS,

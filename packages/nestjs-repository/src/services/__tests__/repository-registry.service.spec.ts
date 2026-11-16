@@ -64,14 +64,14 @@ const mockRoot = (
   entities: RepositoryProviderOptions[],
 ): ReturnType<typeof RepositoryModule.forRoot> =>
   RepositoryModule.forRoot({
-    drivers: [{ driver: MockRepositoryModule, entities }],
+    adapters: [{ driver: MockRepositoryModule, entities }],
   });
 
 const memoryRoot = (
   entities: RepositoryProviderOptions[],
 ): ReturnType<typeof RepositoryModule.forRoot> =>
   RepositoryModule.forRoot({
-    drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+    adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
   });
 
 describe('RepositoryRegistryService', () => {
@@ -147,7 +147,7 @@ describe('RepositoryRegistryService', () => {
       Test.createTestingModule({
         imports: [
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: MemoryRepositoryModuleFixture,
                 entities: [{ key: 'pets', entity: PetEntityFixture }],
@@ -254,7 +254,7 @@ describe('RepositoryRegistryService', () => {
       Test.createTestingModule({
         imports: [
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: RawDriver,
                 entities: [{ key: 'users', entity: UserEntity }],
@@ -274,7 +274,7 @@ describe('RepositoryRegistryService', () => {
   it('should throw when one driver is listed twice', () => {
     expect(() =>
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
             driver: MemoryRepositoryModuleFixture,
             entities: [{ key: 'pets', entity: PetEntityFixture }],
@@ -321,7 +321,7 @@ describe('RepositoryRegistryService', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             { driver, entities: [{ key: 'users', entity: UserEntity }] },
           ],
         }),
@@ -354,7 +354,7 @@ describe('RepositoryRegistryService', () => {
 
     expect(() =>
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
             driver: sharedKeyDriver('FirstDriver'),
             entities: [{ key: 'users', entity: UserEntity }],
@@ -411,7 +411,7 @@ describe('RepositoryModule.forRoot entity options', () => {
 
   it('hands the driver its own options', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: CollectionDriver,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
@@ -425,7 +425,7 @@ describe('RepositoryModule.forRoot entity options', () => {
 
   it('refuses a misspelled driver option at compile time', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: CollectionDriver,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
@@ -438,7 +438,7 @@ describe('RepositoryModule.forRoot entity options', () => {
 
   it('refuses options for a driver that takes none at compile time', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: MemoryRepositoryModuleFixture,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
@@ -452,7 +452,7 @@ describe('RepositoryModule.forRoot entity options', () => {
   it("accepts each driver's own options", () => {
     expect(() =>
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
             driver: CollectionDriver,
             entities: [
@@ -470,7 +470,7 @@ describe('RepositoryModule.forRoot entity options', () => {
 
   it('refuses a misspelled option at compile time', () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: MemoryRepositoryModuleFixture,
           entities: [
@@ -488,7 +488,7 @@ describe('RepositoryModule.forRoot entity options', () => {
 
   it("refuses another driver's option at compile time", () => {
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: CollectionDriver,
           entities: [{ key: 'pets', entity: PetEntityFixture }],
@@ -580,7 +580,7 @@ describe('RepositoryModule.forFeature', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: MemoryRepositoryModuleFixture,
               entities: [{ key: 'pets', entity: PetEntityFixture }],

@@ -18,7 +18,7 @@ import { TYPEORM_MYSQL_TRANSACTION_KEY_PREFIX } from './typeorm-mysql.constants.
  * @example
  * ```typescript
  * RepositoryModule.forRoot({
- *   drivers: [
+ *   adapters: [
  *     {
  *       driver: TypeOrmMysqlRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],

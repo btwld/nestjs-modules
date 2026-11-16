@@ -62,7 +62,7 @@ describe('DrizzleSqliteRepository on a database with snake_case casing', () => {
             useFactory: casedDatabase,
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: DrizzleSqliteRepositoryModule,
                 entities: [

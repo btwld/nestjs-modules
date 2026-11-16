@@ -225,7 +225,7 @@ export function describeDrizzleMysqlRepository(
               },
             }),
             RepositoryModule.forRoot({
-              drivers: [
+              adapters: [
                 {
                   driver,
                   entities: [

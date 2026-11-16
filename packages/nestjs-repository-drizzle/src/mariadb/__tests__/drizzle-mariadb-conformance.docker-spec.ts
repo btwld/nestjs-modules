@@ -1,4 +1,4 @@
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 import { drizzleMysqlConformanceHarness } from '../../mysql/__fixtures__/conformance-mysql-harness.fixture.js';
 import { DrizzleMariadbRepositoryModule } from '../drizzle-mariadb-repository.module.js';

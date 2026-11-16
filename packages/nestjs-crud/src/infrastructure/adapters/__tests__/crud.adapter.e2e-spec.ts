@@ -81,7 +81,7 @@ describe('CrudAdapter (e2e)', () => {
           entities: [TestEntityFixture],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: TypeOrmSqliteRepositoryModule,
               entities: [{ key: ENTITY_TOKEN, entity: TestEntityFixture }],
@@ -1163,7 +1163,7 @@ describe('CrudAdapter relations (e2e)', () => {
           entities: [CompanyEntity, UserEntity, ProjectEntity],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: TypeOrmSqliteRepositoryModule,
               entities: [

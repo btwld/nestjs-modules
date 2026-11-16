@@ -36,7 +36,7 @@ describe(RoleModule.name, () => {
           ],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: TypeOrmSqliteRepositoryModule,
               entities: [

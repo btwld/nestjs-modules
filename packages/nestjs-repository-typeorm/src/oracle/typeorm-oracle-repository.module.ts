@@ -18,7 +18,7 @@ import { TYPEORM_ORACLE_TRANSACTION_KEY_PREFIX } from './typeorm-oracle.constant
  * @example
  * ```typescript
  * RepositoryModule.forRoot({
- *   drivers: [
+ *   adapters: [
  *     {
  *       driver: TypeOrmOracleRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],

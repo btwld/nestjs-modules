@@ -119,7 +119,7 @@ async function compile(
       RepositoryModule.forRoot({
         ...moduleOptions,
         imports,
-        drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
   }).compile();
@@ -416,7 +416,7 @@ describe('a join into another scoped entity added after the caller', () => {
         CoreModule.forRoot(),
         RepositoryModule.forRoot({
           imports,
-          drivers: [
+          adapters: [
             {
               driver: MemoryRepositoryModuleFixture,
               entities: [SCOPED[0], lines],
@@ -887,7 +887,7 @@ describe('row scope declared through a driver that rewrites its entries', () => 
       imports: [
         RepositoryModule.forRoot({
           imports: [OrderResolverModule],
-          drivers: [{ driver: RewritingDriver, entities: [{ ...SCOPED[0] }] }],
+          adapters: [{ driver: RewritingDriver, entities: [{ ...SCOPED[0] }] }],
         }),
       ],
     }).compile();
@@ -1009,7 +1009,7 @@ describe('row scope startup checks', () => {
           imports: [SettingsModule, ResolverModule],
           inject: [PerRequestSettings],
           useFactory: () => ({}),
-          drivers: [
+          adapters: [
             { driver: MemoryRepositoryModuleFixture, entities: [SCOPED[0]] },
           ],
         }),

@@ -57,7 +57,7 @@ describe('DrizzleSqliteRepository outside a run', () => {
             },
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: DrizzleSqliteRepositoryModule,
                 entities: [

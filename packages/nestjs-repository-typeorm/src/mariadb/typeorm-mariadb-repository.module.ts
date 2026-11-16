@@ -18,7 +18,7 @@ import { TYPEORM_MARIADB_TRANSACTION_KEY_PREFIX } from './typeorm-mariadb.consta
  * @example
  * ```typescript
  * RepositoryModule.forRoot({
- *   drivers: [
+ *   adapters: [
  *     {
  *       driver: TypeOrmMariadbRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],

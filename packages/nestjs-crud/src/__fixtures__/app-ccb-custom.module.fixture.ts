@@ -12,7 +12,7 @@ import { PhotoCcbCustomModuleFixture } from './photo-ccb-custom/photo-ccb-custom
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

@@ -382,7 +382,7 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [

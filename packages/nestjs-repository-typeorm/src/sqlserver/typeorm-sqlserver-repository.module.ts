@@ -18,7 +18,7 @@ import { TYPEORM_SQLSERVER_TRANSACTION_KEY_PREFIX } from './typeorm-sqlserver.co
  * @example
  * ```typescript
  * RepositoryModule.forRoot({
- *   drivers: [
+ *   adapters: [
  *     {
  *       driver: TypeOrmSqlServerRepositoryModule,
  *       entities: [{ key: 'orders', entity: Order }],

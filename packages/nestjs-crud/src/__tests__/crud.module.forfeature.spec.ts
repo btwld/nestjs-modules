@@ -57,7 +57,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -248,7 +248,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -414,7 +414,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -638,7 +638,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -789,7 +789,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -850,7 +850,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -926,7 +926,7 @@ describe('CrudModule.forFeature', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [

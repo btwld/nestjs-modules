@@ -24,7 +24,7 @@ class PhotoCcbCqrsModuleFixture {}
 @Module({
   imports: [
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

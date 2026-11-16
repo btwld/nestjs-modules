@@ -1,4 +1,4 @@
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 import { drizzleSqliteConformanceHarness } from '../__fixtures__/conformance-sqlite-harness.fixture.js';
 

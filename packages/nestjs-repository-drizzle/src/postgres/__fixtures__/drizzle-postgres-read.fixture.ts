@@ -72,7 +72,7 @@ export function describeDrizzlePostgresReads(
               },
             }),
             RepositoryModule.forRoot({
-              drivers: [
+              adapters: [
                 {
                   driver: DrizzlePostgresRepositoryModule,
                   entities: [

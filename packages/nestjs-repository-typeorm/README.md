@@ -218,7 +218,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
       entities: [OrderEntity, CustomerEntity],
     }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmPostgresRepositoryModule,
           entities: [
@@ -635,7 +635,7 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typeorm/postgres';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: TypeOrmPostgresRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
@@ -751,7 +751,7 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { TypeOrmOracleRepositoryModule } from '@concepta/nestjs-repository-typeorm/oracle';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: TypeOrmOracleRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
@@ -876,7 +876,7 @@ import { RepositoryModule, RowScopeCtx } from '@concepta/nestjs-repository';
 import { TypeOrmSqlServerRepositoryModule } from '@concepta/nestjs-repository-typeorm/sqlserver';
 
 RepositoryModule.forRoot({
-  drivers: [
+  adapters: [
     {
       driver: TypeOrmSqlServerRepositoryModule,
       entities: [{ key: 'order', entity: Order }],
@@ -1133,7 +1133,7 @@ import { TypeOrmPostgresRepositoryModule } from '@concepta/nestjs-repository-typ
   imports: [
     TypeOrmModule.forRoot({ type: 'postgres' /* ... */ }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmPostgresRepositoryModule,
           entities: [{ key: 'order', entity: OrderEntity }],

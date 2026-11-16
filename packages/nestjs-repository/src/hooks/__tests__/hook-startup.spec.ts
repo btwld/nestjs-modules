@@ -29,7 +29,7 @@ const boot = async (providers: Type[], withCore = true): Promise<void> => {
     imports: [
       ...(withCore ? [CoreModule.forRoot()] : []),
       RepositoryModule.forRoot({
-        drivers: [
+        adapters: [
           {
             driver: MemoryRepositoryModuleFixture,
             entities: [

@@ -93,7 +93,7 @@ export class UserCredentialEntity extends UserCredentialPostgresEntity {}
   imports: [
     TypeOrmModule.forRoot({ /* ... */ }),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmPostgresRepositoryModule,
           entities: [

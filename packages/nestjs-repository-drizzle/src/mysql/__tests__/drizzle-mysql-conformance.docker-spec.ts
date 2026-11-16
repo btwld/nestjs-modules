@@ -1,4 +1,4 @@
-import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance';
+import { runRepositoryConformance } from '@concepta/nestjs-repository/conformance/adapter';
 
 import { DrizzleMysqlRepositoryModule } from '../drizzle-mysql-repository.module.js';
 

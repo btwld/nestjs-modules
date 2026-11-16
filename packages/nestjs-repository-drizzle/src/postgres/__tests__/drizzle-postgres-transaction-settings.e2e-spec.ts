@@ -102,7 +102,7 @@ describe('transactionSettings on the Drizzle Postgres adapter', () => {
             },
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: DrizzlePostgresRepositoryModule,
                 entities: [

@@ -104,7 +104,7 @@ function compile(
     imports: [
       RepositoryModule.forRoot({
         imports: withResolvers ? [ResolverModule] : [],
-        drivers: [{ driver: MemoryRepositoryModuleFixture, entities }],
+        adapters: [{ driver: MemoryRepositoryModuleFixture, entities }],
       }),
     ],
   }).compile();

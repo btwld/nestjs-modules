@@ -47,7 +47,7 @@ describe('DrizzlePostgresRepository reporting a failed query', () => {
             }),
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: DrizzlePostgresRepositoryModule,
                 entities: [

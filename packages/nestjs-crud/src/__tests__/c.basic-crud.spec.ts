@@ -158,7 +158,7 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -239,7 +239,7 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot(ormSqliteConfig),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -508,7 +508,7 @@ describe('#crud-typeorm', () => {
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
           TypeOrmModule.forFeature([ProjectEntity, UserEntity]),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [
@@ -1043,7 +1043,7 @@ describe('#crud-typeorm', () => {
         imports: [
           TypeOrmModule.forRoot({ ...ormSqliteConfig, logging: false }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: TypeOrmSqliteRepositoryModule,
                 entities: [

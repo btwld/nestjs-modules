@@ -69,7 +69,7 @@ describe('DrizzleSqliteRepository on one connection', () => {
             },
           }),
           RepositoryModule.forRoot({
-            drivers: [
+            adapters: [
               {
                 driver: DrizzleSqliteRepositoryModule,
                 entities: [

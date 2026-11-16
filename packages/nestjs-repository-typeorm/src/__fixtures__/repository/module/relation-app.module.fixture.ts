@@ -30,7 +30,7 @@ import { TagEntityFixture } from '../entity/tag.entity.fixture.js';
   imports: [
     TypeOrmModule.forRoot(relationOrmConfig),
     RepositoryModule.forRoot({
-      drivers: [
+      adapters: [
         {
           driver: TypeOrmSqliteRepositoryModule,
           entities: [

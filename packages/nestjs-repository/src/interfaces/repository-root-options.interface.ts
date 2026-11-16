@@ -61,9 +61,9 @@ export interface RepositoryRootRegistrationOptions<
   Drivers extends readonly RepositoryDriverInterface[],
 > {
   /**
-   * Every entity in the application, grouped by the driver that serves it.
+   * Every entity in the application, grouped by the adapter that serves it.
    */
-  drivers?: [...RepositoryDriverRegistrations<Drivers>];
+  adapters?: [...RepositoryDriverRegistrations<Drivers>];
 
   /**
    * Modules exporting the row scope resolvers that entities declare, and,

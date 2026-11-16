@@ -36,7 +36,7 @@ describe('TypeOrmRepository activity (e2e)', () => {
           entities: [AuditedStatementItemEntityFixture, ActivityEntityFixture],
         }),
         RepositoryModule.forRoot({
-          drivers: [
+          adapters: [
             {
               driver: TypeOrmSqliteRepositoryModule,
               entities: [
